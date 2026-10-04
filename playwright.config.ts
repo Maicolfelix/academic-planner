@@ -26,8 +26,10 @@ export default defineConfig({
   // Always starts its own stack, wired to the TEST database, so browser tests can never write to
   // development data. Stop any `npm run dev` on :5173 first.
   webServer: {
-    // No watch modes: `npm run dev` restarts the API when tsc (core) re-emits dist right after the stack is
-    // "ready", and on stray file-system events, which showed up as 502s in the middle of tests.
+    // Production-like and quiet: core and web are built once, the API runs without --watch and the built bundle
+    // is served by `vite preview`. The dev stack (`npm run dev`) restarted the API when tsc re-emitted dist right
+    // after startup and, under four browsers loading modules at once, sometimes refused connections or stalled
+    // for seconds (seen as 502, ERR_CONNECTION_REFUSED and 5 s timeouts in the first steps of a test).
     command: 'npm run dev:e2e',
     // Ready only when Vite AND the API behind its proxy both answer.
     url: 'http://localhost:5173/api/health',
