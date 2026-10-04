@@ -1,6 +1,7 @@
-import type { AcademicPeriod, Subject } from '@planner/core';
+import type { AcademicPeriod, Activity, DashboardActivity, Subject } from '@planner/core';
 import type {
   AcademicPeriod as PeriodRow,
+  Activity as ActivityRow,
   Subject as SubjectRow,
 } from './generated/prisma/client.js';
 
@@ -20,6 +21,26 @@ export const toPeriodDto = (p: PeriodRow): AcademicPeriod => ({
   createdAt: p.createdAt.toISOString(),
   updatedAt: p.updatedAt.toISOString(),
 });
+
+export const toActivityDto = (a: ActivityRow): Activity => ({
+  id: a.id,
+  subjectId: a.subjectId,
+  title: a.title,
+  description: a.description,
+  type: a.type,
+  priority: a.priority,
+  status: a.status,
+  dueAt: a.dueAt.toISOString(),
+  hasTime: a.hasTime,
+  completedAt: a.completedAt?.toISOString() ?? null,
+  createdAt: a.createdAt.toISOString(),
+  updatedAt: a.updatedAt.toISOString(),
+});
+
+/** An activity row joined with the few subject fields the Dashboard shows (same query, no N+1). */
+export const toDashboardActivityDto = (
+  a: ActivityRow & { subject: { id: string; name: string; color: string } },
+): DashboardActivity => ({ ...toActivityDto(a), subject: a.subject });
 
 /** Deliberately omits userId and nameKey: internal details the client has no use for. */
 export const toSubjectDto = (s: SubjectRow): Subject => ({

@@ -10,6 +10,13 @@ const subjectNotFound = () => notFound('Asignatura no encontrada.');
 const isPrismaError = (err: unknown, code: string) =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
 
+const notEmpty = () =>
+  new AppError(
+    409,
+    'SUBJECT_NOT_EMPTY',
+    'Esta asignatura tiene actividades asociadas. Elimínalas o muévelas antes de borrar la asignatura.',
+  );
+
 const duplicate = () =>
   new AppError(
     409,
@@ -69,9 +76,17 @@ export function createSubjectService(subjects: SubjectRepository, periods: Perio
       }
     },
 
+    /** Never cascades: a subject with activities must be emptied (or its activities moved) first. */
     async remove(userId: string, id: string) {
-      // Phase 4 will add activities: this is where "has activities" rules will live.
-      if (!(await subjects.delete(userId, id))) throw subjectNotFound();
+      if (!(await subjects.findOwned(userId, id))) throw subjectNotFound();
+      if ((await subjects.countActivities(id)) > 0) throw notEmpty();
+      try {
+        if (!(await subjects.delete(userId, id))) throw subjectNotFound();
+      } catch (err) {
+        // An activity was added between the check and the delete: the foreign key still says no.
+        if (isPrismaError(err, 'P2003')) throw notEmpty();
+        throw err;
+      }
     },
   };
 }

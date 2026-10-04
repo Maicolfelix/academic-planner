@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   completeOnboarding,
   expectNoHorizontalOverflow,
+  greetingFor,
   login,
   NAME,
   register,
@@ -256,8 +257,8 @@ test('navigation: shell links work and the user name is shown', async ({ page })
   );
   await nav.getByRole('link', { name: 'Inicio' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: `Hola, ${NAME}` })).toBeVisible();
-  await expect(page.getByText('Periodo actual:')).toContainText('Segundo semestre 2026');
+  await expect(page.getByRole('heading', { level: 1, name: greetingFor(NAME) })).toBeVisible();
+  await expect(page.getByText('Segundo semestre 2026')).toBeVisible();
   await expect(nav.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 

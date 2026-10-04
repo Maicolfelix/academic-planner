@@ -29,6 +29,7 @@ export function createSessionService(prisma: PrismaClient) {
       const session = await prisma.session.findUnique({
         where: { tokenHash: hashToken(token) },
         include: { user: true },
+        relationLoadStrategy: 'join',
       });
       if (!session) return null;
 

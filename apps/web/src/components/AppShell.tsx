@@ -22,6 +22,9 @@ export function AppShell() {
           <NavLink to="/subjects" className={linkClass}>
             Asignaturas
           </NavLink>
+          <NavLink to="/activities" className={linkClass}>
+            Actividades
+          </NavLink>
           <LogoutButton />
         </nav>
       </header>

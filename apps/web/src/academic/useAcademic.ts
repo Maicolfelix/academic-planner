@@ -8,6 +8,7 @@ import {
   fetchSubjects,
   updateSubjectRequest,
 } from '../api/academic';
+import { DASHBOARD_KEY } from '../dashboard/useDashboard';
 
 export const periodsKey = ['periods'] as const;
 export const subjectsKey = (periodId: string) => ['subjects', periodId] as const;
@@ -27,7 +28,11 @@ export function useCreatePeriod() {
   return useMutation({
     mutationFn: createPeriodRequest,
     // Returning the promise makes the mutation wait for fresh data before callers navigate.
-    onSuccess: () => qc.invalidateQueries({ queryKey: periodsKey }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: periodsKey }),
+        qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      ]),
   });
 }
 
@@ -40,10 +45,15 @@ export function useSubjects(periodId: string | undefined) {
   });
 }
 
-// Every subject mutation refreshes all cached subject lists, so the UI never needs a page reload.
+// Every subject mutation refreshes all cached subject lists and the Dashboard (its subject count and
+// the subject names/colors on its rows), so the UI never needs a page reload.
 function useInvalidateSubjects() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['subjects'] });
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['subjects'] }),
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+    ]);
 }
 
 export function useCreateSubject() {

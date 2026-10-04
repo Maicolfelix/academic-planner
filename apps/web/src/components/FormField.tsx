@@ -1,7 +1,7 @@
 interface FormFieldProps {
   id: string;
   label: string;
-  type?: 'text' | 'email' | 'password' | 'date';
+  type?: 'text' | 'email' | 'password' | 'date' | 'time';
   /** Renders a textarea instead of an input. */
   multiline?: boolean;
   autoComplete?: string;

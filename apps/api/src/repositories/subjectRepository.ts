@@ -31,6 +31,8 @@ export function createSubjectRepository(prisma: PrismaClient) {
 
     create: (data: SubjectCreateData) => prisma.subject.create({ data }),
 
+    countActivities: (subjectId: string) => prisma.activity.count({ where: { subjectId } }),
+
     /** `where: { id, userId }` makes ownership part of the write itself (P2025 when it is not yours). */
     update: (userId: string, id: string, data: SubjectUpdateData) =>
       prisma.subject.update({ where: { id, userId }, data }),

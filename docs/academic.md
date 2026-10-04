@@ -37,8 +37,8 @@ El mismo nombre en otro periodo, o en otro usuario, es válido. Error: `409 SUBJ
 **Eliminar un periodo.** Si tiene asignaturas → `409 PERIOD_NOT_EMPTY` y no se borra nada (sin cascadas silenciosas). Lo refuerza la BD (FK `NO ACTION`).
 Primero hay que eliminar las asignaturas. Borrar un _usuario_ sí elimina todo lo suyo.
 
-**Eliminar una asignatura.** Hoy se borra sin más. En la Fase 4 existirán actividades: la regla ("¿qué pasa con sus actividades?")
-vivirá en `subjectService.remove`, y el diálogo de confirmación (`DeleteSubjectDialog`) ya está aislado para poder ajustar su mensaje.
+**Eliminar una asignatura.** Si tiene actividades → `409 SUBJECT_NOT_EMPTY` y no se borra nada (regla en `subjectService.remove`, reforzada por la FK).
+Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activities.md). Sin actividades se borra tras la confirmación.
 
 ## Propiedad (ownership)
 

@@ -3,6 +3,10 @@ import { expect, type Page } from '@playwright/test';
 export const uniqueEmail = () =>
   `ana+${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 export const PASSWORD = 'correct horse battery';
+
+/** The Dashboard heading: a time-of-day greeting (decided by the backend) plus the user's name. */
+export const greetingFor = (name: string) =>
+  new RegExp(`^(Buenos días|Buenas tardes|Buenas noches), ${name}$`);
 export const NAME = 'Ana Pérez';
 
 /**
@@ -25,7 +29,11 @@ export function watch(page: Page, alsoExpected: string[] = []) {
     if (!url.pathname.startsWith('/api/') || r.status() < 400) return;
     const expected = r.status() === 401 && /^\/api\/auth\/(me|login)$/.test(url.pathname);
     const label = `${r.status()} ${url.pathname}`;
-    if (!expected && !alsoExpected.includes(label)) failedApi.push(label);
+    // An entry ending in "*" matches by prefix (e.g. "409 /api/subjects/*" for any subject id).
+    const listed = alsoExpected.some((e) =>
+      e.endsWith('*') ? label.startsWith(e.slice(0, -1)) : e === label,
+    );
+    if (!expected && !listed) failedApi.push(label);
   });
 
   return () => {
@@ -65,4 +73,42 @@ export async function expectNoHorizontalOverflow(page: Page) {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0);
+}
+
+/** Creates a subject through the UI (from /subjects). */
+export async function addSubjectViaUi(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Agregar asignatura' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Agregar asignatura' });
+  await dialog.getByLabel('Nombre').fill(name);
+  await dialog.getByRole('button', { name: 'Agregar', exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/** YYYY-MM-DD, `days` from today (machine date: only used to pick a "near future" deadline). */
+export function daysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Seeds data through the API with the page's session (faster than clicking through the UI). */
+export async function apiSubjects(page: Page) {
+  const res = await page.request.get('/api/subjects');
+  return (await res.json()).subjects as { id: string; name: string; periodId: string }[];
+}
+
+export async function apiCreateSubject(page: Page, name: string) {
+  const [first] = await apiSubjects(page);
+  const res = await page.request.post('/api/subjects', {
+    data: { periodId: first!.periodId, name },
+  });
+  expect(res.status()).toBe(201);
+  return (await res.json()).subject as { id: string; name: string };
+}
+
+export async function apiCreateActivity(page: Page, data: Record<string, unknown>) {
+  const res = await page.request.post('/api/activities', { data });
+  expect(res.status(), await res.text()).toBe(201);
+  return (await res.json()).activity as { id: string; title: string };
 }

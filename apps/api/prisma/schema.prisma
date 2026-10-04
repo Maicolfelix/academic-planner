@@ -1,6 +1,8 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // Lets a query ask for real SQL JOINs (`relationLoadStrategy: 'join'`) instead of one extra query per `include`.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -19,6 +21,7 @@ model User {
   sessions     Session[]
   periods      AcademicPeriod[]
   subjects     Subject[]
+  activities   Activity[]
 }
 
 // Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so
@@ -59,9 +62,61 @@ model Subject {
   // NoAction (checked at end of statement): a period with subjects cannot be deleted silently,
   // yet deleting a whole user still cascades cleanly.
   period      AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  activities  Activity[]
 
   @@unique([periodId, nameKey])
   @@index([userId, periodId])
+}
+
+enum ActivityType {
+  TASK
+  EXAM
+  QUIZ
+  PROJECT
+  PRESENTATION
+  WORKSHOP
+  READING
+  OTHER
+}
+
+enum ActivityPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ActivityStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// The period is NOT stored here: it is derived through `subject.periodId`, so the two can never
+// disagree. "Overdue" is NOT stored either: it is derived (dueAt < now AND status != COMPLETED).
+model Activity {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @db.Uuid
+  subjectId   String           @db.Uuid
+  title       String
+  description String?
+  type        ActivityType     @default(TASK)
+  priority    ActivityPriority @default(MEDIUM)
+  status      ActivityStatus   @default(PENDING)
+  // An instant (UTC). With hasTime = false it is the END of the user's local day (23:59:59.999).
+  dueAt       DateTime         @db.Timestamptz(3)
+  hasTime     Boolean          @default(false)
+  // Set exactly while status = COMPLETED (also enforced by a CHECK in the migration).
+  completedAt DateTime?        @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // NoAction: a subject with activities cannot be deleted silently, yet deleting a whole user cascades.
+  // Phase 7 will hang Reminders off Activity with their own cascade.
+  subject     Subject          @relation(fields: [subjectId], references: [id], onDelete: NoAction)
+
+  @@index([userId, dueAt])
+  @@index([userId, status])
+  @@index([subjectId])
 }
 
 model Session {

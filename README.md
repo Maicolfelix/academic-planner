@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 3 — Periodo académico y asignaturas** (sobre autenticación completa de la Fase 2).
+Estado actual: **Fase 5 — Dashboard académico** (sobre autenticación, periodos, asignaturas y actividades).
 
 ## Requisitos
 
@@ -41,6 +41,7 @@ Migraciones actuales:
 1. `init` (Fase 1).
 2. `auth_user_session_drop_app_metadata` (Fase 2): crea `User` y `Session`, elimina la tabla provisional `AppMetadata`.
 3. `academic_periods_and_subjects` (Fase 3): crea `AcademicPeriod` y `Subject`. Incluye SQL escrito a mano (índice único parcial de "un solo periodo actual por usuario" y `CHECK endDate > startDate`) porque Prisma no sabe expresarlos.
+4. `activities` (Fase 4): crea `Activity` y sus enums, con un `CHECK` escrito a mano que liga `status = COMPLETED` con `completedAt`.
 
 ## Scripts
 
@@ -80,6 +81,19 @@ Pantallas: `/register` y `/login`. El Dashboard real es de la Fase 5.
 `/api/periods` y `/api/subjects` (CRUD, todos con sesión). Cada recurso pertenece al usuario de la sesión; el de otro usuario responde `404`, igual que uno inexistente.
 Las fechas académicas son `DATE` (`YYYY-MM-DD`, sin zona horaria). Decisiones, reglas de duplicados y de borrado en [docs/academic.md](docs/academic.md).
 Pantallas: `/onboarding`, `/dashboard` (aún temporal), `/subjects`.
+
+## Actividades
+
+`/api/activities` (CRUD y filtros: asignatura, estado, prioridad, tipo, vencidas, rango de fechas; todos con sesión). Cada actividad pertenece a una asignatura del usuario;
+el periodo se deriva de la asignatura. La fecha límite se guarda como instante UTC más `hasTime`, convertida con la zona horaria del usuario
+(`America/Bogota` por defecto) por funciones de `@planner/core`; "vencida" es un valor derivado, nunca guardado. Una asignatura con actividades no se puede eliminar (`409 SUBJECT_NOT_EMPTY`).
+Detalle en [docs/activities.md](docs/activities.md). Pantalla: `/activities` (filtros en la URL).
+
+## Dashboard
+
+`GET /api/dashboard` devuelve, en una sola petición, todo lo que muestra la pantalla de inicio para el periodo actual del usuario (resumen por estado, progreso,
+próxima entrega, vencidas, para hoy y próximas). Todo se deriva de los datos reales; no se guarda nada. "Hoy" y el saludo usan la zona horaria del perfil (`User.timezone`).
+Usa 8 consultas constantes (sin N+1). Reglas, estructura de la respuesta y decisiones en [docs/dashboard.md](docs/dashboard.md). Pantalla: `/dashboard` ("Inicio").
 
 ## Estructura
 

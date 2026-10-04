@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { completeOnboarding, login, NAME, register, uniqueEmail, watch } from './helpers';
+import {
+  completeOnboarding,
+  greetingFor,
+  login,
+  NAME,
+  register,
+  uniqueEmail,
+  watch,
+} from './helpers';
 
 test('full auth flow: register, persist, logout, guard, login, wrong credentials', async ({
   page,
@@ -14,8 +22,8 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   await completeOnboarding(page);
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: `Hola, ${NAME}` })).toBeVisible();
-  await expect(page.getByText('Tu sesión está activa.')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: greetingFor(NAME) })).toBeVisible();
+  await expect(page.getByText('Segundo semestre 2026')).toBeVisible();
 
   // The session cookie is HttpOnly (invisible to JS) and nothing is kept in web storage.
   const cookie = (await context.cookies()).find((c) => c.name === 'academic_planner_session');
@@ -25,7 +33,7 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
 
   // 5-6. Refresh: still authenticated.
   await page.reload();
-  await expect(page.getByRole('heading', { name: `Hola, ${NAME}` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: greetingFor(NAME) })).toBeVisible();
 
   // Authenticated users are bounced away from /login and /register.
   await page.goto('/login');
@@ -43,7 +51,7 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   // 10-11. Log in again.
   await login(page, email.toUpperCase());
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: `Hola, ${NAME}` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: greetingFor(NAME) })).toBeVisible();
 
   // Back button after logout must not reveal the protected screen.
   await page.getByRole('button', { name: 'Cerrar sesión' }).click();

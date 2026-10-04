@@ -1,5 +1,6 @@
 import { formatDateOnly, type Subject } from '@planner/core';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { DeleteSubjectDialog } from './subjects/DeleteSubjectDialog';
 import { SubjectFormDialog } from './subjects/SubjectFormDialog';
@@ -13,10 +14,21 @@ const secondaryButton =
 export function SubjectsPage() {
   const { period } = useCurrentPeriod();
   const subjects = useSubjects(period?.id);
-  const [editing, setEditing] = useState<Subject | 'new' | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [editing, setEditing] = useState<Subject | 'new' | null>(() =>
+    params.get('action') === 'create' ? 'new' : null,
+  );
   const [deleting, setDeleting] = useState<Subject | null>(null);
   const [notice, setNotice] = useState<string>();
 
+  // Arrived through a quick action (?action=create): the dialog is already opening (initial state),
+  // so drop that one-shot parameter from the URL.
+  useEffect(() => {
+    if (!params.has('action')) return;
+    const rest = new URLSearchParams(params);
+    rest.delete('action');
+    setParams(rest, { replace: true });
+  }, [params, setParams]);
   if (!period) return null; // RequirePeriod guarantees one; keeps the type honest
 
   const list = subjects.data ?? [];

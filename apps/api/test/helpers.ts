@@ -33,6 +33,22 @@ export async function signUp(app: Express, email: string, name = 'Test User') {
   return { agent, user: res.body.user as { id: string; email: string } };
 }
 
+/** A user with a current period and one subject, ready to hold activities. */
+export async function setupUser(app: Express, email: string, subjectName = 'Redes') {
+  const session = await signUp(app, email);
+  const period = (await session.agent.post('/api/periods').send(periodInput)).body.period;
+  const subject = (
+    await session.agent.post('/api/subjects').send({ periodId: period.id, name: subjectName })
+  ).body.subject;
+  return { ...session, period, subject };
+}
+
+/** POST /api/activities with sensible defaults (far-future date so it is never overdue). */
+export const postActivity = (agent: request.Agent, subjectId: string, body: object = {}) =>
+  agent
+    .post('/api/activities')
+    .send({ subjectId, title: 'Parcial 1', dueDate: '2099-03-15', ...body });
+
 export const periodInput = {
   name: 'Segundo semestre 2026',
   startDate: '2026-08-03',
