@@ -51,16 +51,17 @@ Documentos por área: [auth](auth.md), [academic](academic.md), [activities](act
 
 Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
 
-## Totales de tests (tras la Fase 8)
+## Totales de tests (tras la Fase 9)
 
-Vitest: core 298, API 394, web 28 (720). Playwright: 84 (móvil 360 px y escritorio 1366 px).
+Vitest: core 345, API 418, web 28 (791). Playwright: 94 (móvil 360 px y escritorio 1366 px).
 
 ## Riesgos conocidos
 
 - Un recordatorio AUTO eliminado por el estudiante no vuelve hasta que cambie la fecha, el tipo o el estado de la actividad (documentado).
 - Los offsets de recordatorio son minutos absolutos: en un cambio de horario "1 día antes" son 24 h reales.
 - `/api/reminders/due` solo cubre el periodo actual.
-- Un e2e (`activities.spec` "activity flow", escritorio) falló una vez bajo carga completa (Fase 7) sin causa encontrada; no reapareció en 5 pasadas completas posteriores (en monitoreo). Si vuelve, investigar la causa con la evidencia, no solo reejecutar.
+- **Resuelto en la Fase 9:** el flake de `activities.spec` ("activity flow") era del propio test: comprobaba `toContainText('En proceso')`, siempre cierto por ser también el texto de una `<option>`, y recargaba con el `PATCH` aún en vuelo (en la traza, estado `-1`). Ahora espera el valor del `<select>` controlado. Lección: en e2e, no esperar con una aserción que ya es cierta; esperar el efecto real antes de recargar.
+- El stack e2e (`npm run dev:e2e`) sirve el bundle compilado con `vite preview` y la API sin `--watch`: el servidor de desarrollo reiniciaba la API al re-emitir `dist` y rechazaba conexiones bajo carga (167 de 800 en una prueba).
 - `npm audit` reporta vulnerabilidades altas en dependencias de desarrollo del CLI de `prisma` (`mysql2`, `deepmerge-ts`); no se usa MySQL. Revisar en la fase de endurecimiento.
 - Sin notificaciones fuera de la app: solo recordatorios internos.
 - Windows: Git avisa de conversión LF→CRLF; es inocuo. Los scripts de PowerShell 5.1 pueden corromper UTF-8 al leer/escribir; usar las herramientas de edición.
@@ -79,7 +80,7 @@ npm run format:check
 npm run typecheck        # compila core, tipos de todos los workspaces y e2e
 npm test                 # Vitest (core, api, web); crea y migra academic_planner_test
 npm run build
-PW_CHANNEL=msedge npm run test:browser   # Playwright (levanta su propio stack contra la BD de test; parar `npm run dev` antes)
+PW_CHANNEL=msedge npm run test:browser   # Playwright (levanta su propio stack `dev:e2e` contra la BD de test; parar `npm run dev` antes: ambos usan el puerto 5173)
 ```
 
 Verificación de instalación limpia: `docker compose down -v`, borrar `node_modules`, `dist`, `apps/api/src/generated`, `test-results` y `.env`, y repetir la secuencia anterior. Comprobar también que no hay drift de esquema (`prisma migrate diff ... --exit-code`) y que la BD de desarrollo queda sin filas tras los tests.
