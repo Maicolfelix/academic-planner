@@ -9,6 +9,7 @@ import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
+import { RemindersPanel } from './reminders/RemindersPanel';
 
 const quickLink =
   'inline-flex min-h-11 items-center rounded-md border border-slate-400 px-4 py-2 text-sm font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
@@ -57,6 +58,8 @@ export function DashboardPage() {
           </p>
         )}
       </header>
+
+      <RemindersPanel timeZone={timeZone} now={now} />
 
       {d.classesToday.length > 0 && !hasData && (
         <ClassesToday classes={d.classesToday} timeZone={timeZone} />

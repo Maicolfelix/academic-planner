@@ -113,6 +113,16 @@ export function toLocalParts(instant: Date | string, timeZone: string): LocalPar
   };
 }
 
+/** "10:00 a. m." on the user's wall clock (12-hour, Colombian Spanish). */
+export function formatClock(instant: Date | string, timeZone: string, locale = 'es-CO'): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(instant));
+}
+
 /**
  * Human text for a due date, in the user's timezone: "vie, 10 oct 2026" or, when the user chose a
  * time, "vie, 10 oct 2026, 2:00 p. m.". Without a time no hour is shown (the stored 23:59 is an

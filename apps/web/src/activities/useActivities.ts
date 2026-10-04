@@ -1,6 +1,7 @@
 import type { UpdateActivityRequest } from '@planner/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
+import { REMINDERS_KEY } from '../reminders/useReminders';
 import {
   createActivityRequest,
   deleteActivityRequest,
@@ -18,14 +19,16 @@ export function useActivities(query: ActivityQuery, enabled: boolean) {
   });
 }
 
-// Every activity mutation refreshes all cached activity lists (any filter combination) AND the
-// Dashboard, which is derived from the same data, so the UI is consistent and never needs a reload.
+// Every activity mutation refreshes all cached activity lists (any filter combination), the Dashboard
+// (derived from the same data) AND the reminders (a new deadline, type or completion rewrites them
+// on the server), so the UI is consistent and never needs a reload.
 function useInvalidateActivities() {
   const qc = useQueryClient();
   return () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: ['activities'] }),
       qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      qc.invalidateQueries({ queryKey: REMINDERS_KEY }),
     ]);
 }
 

@@ -4,7 +4,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { createAuthService } from './auth/authService.js';
 import { createSessionService } from './auth/sessions.js';
-import type { PrismaClient } from './db/prisma.js';
+import { transactionRunner, type PrismaClient } from './db/prisma.js';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { originCheck } from './middleware/originCheck.js';
 import type { AuthRateLimits } from './middleware/rateLimit.js';
@@ -12,11 +12,13 @@ import { createRequireAuth } from './middleware/requireAuth.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createReminderController } from './controllers/reminderController.js';
 import { createScheduleController } from './controllers/scheduleController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
+import { createReminderRepository } from './repositories/reminderRepository.js';
 import { createScheduleRepository } from './repositories/scheduleRepository.js';
 import { createSubjectRepository } from './repositories/subjectRepository.js';
 import { activitiesRouter } from './routes/activities.js';
@@ -24,11 +26,13 @@ import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { periodsRouter } from './routes/periods.js';
+import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createActivityService } from './services/activityService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
+import { createReminderService } from './services/reminderService.js';
 import { createScheduleService } from './services/scheduleService.js';
 import { createSubjectService } from './services/subjectService.js';
 
@@ -50,11 +54,22 @@ export function createApp(deps: AppDeps): Express {
   const auth = createAuthService(prisma, sessions);
   const requireAuth = createRequireAuth(sessions, secureCookies);
 
+  const runInTransaction = transactionRunner(prisma);
   const subjectRepository = createSubjectRepository(prisma);
-  const activityController = createActivityController(
-    createActivityService(createActivityRepository(prisma), subjectRepository, clock),
-  );
   const periodRepository = createPeriodRepository(prisma);
+  const activityRepository = createActivityRepository(prisma);
+  const activityController = createActivityController(
+    createActivityService(activityRepository, subjectRepository, clock, runInTransaction),
+  );
+  const reminderController = createReminderController(
+    createReminderService(
+      createReminderRepository(prisma),
+      activityRepository,
+      periodRepository,
+      runInTransaction,
+      clock,
+    ),
+  );
   const scheduleRepository = createScheduleRepository(prisma);
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
@@ -83,6 +98,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
   app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
+  app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler());

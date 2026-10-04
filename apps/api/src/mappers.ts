@@ -5,6 +5,8 @@ import {
   type Activity,
   type BlockOccurrence,
   type DashboardActivity,
+  type DueReminder,
+  type Reminder,
   type ScheduleBlock,
   type ScheduleBlockLike,
   type ScheduleOccurrence,
@@ -13,6 +15,7 @@ import {
 import type {
   AcademicPeriod as PeriodRow,
   Activity as ActivityRow,
+  Reminder as ReminderRow,
   ScheduleBlock as ScheduleRow,
   Subject as SubjectRow,
 } from './generated/prisma/client.js';
@@ -47,6 +50,41 @@ export const toActivityDto = (a: ActivityRow): Activity => ({
   completedAt: a.completedAt?.toISOString() ?? null,
   createdAt: a.createdAt.toISOString(),
   updatedAt: a.updatedAt.toISOString(),
+});
+
+export const toReminderDto = (r: ReminderRow): Reminder => ({
+  id: r.id,
+  activityId: r.activityId,
+  remindAt: r.remindAt.toISOString(),
+  kind: r.kind,
+  status: r.status,
+  offsetMinutes: r.offsetMinutes,
+  createdAt: r.createdAt.toISOString(),
+  updatedAt: r.updatedAt.toISOString(),
+});
+
+/** A reminder joined with its activity and subject: what the UI needs to write the message. */
+export const toDueReminderDto = (
+  r: ReminderRow & {
+    activity: {
+      id: string;
+      title: string;
+      type: ActivityRow['type'];
+      dueAt: Date;
+      hasTime: boolean;
+      subject: { id: string; name: string; color: string };
+    };
+  },
+): DueReminder => ({
+  ...toReminderDto(r),
+  activity: {
+    id: r.activity.id,
+    title: r.activity.title,
+    type: r.activity.type,
+    dueAt: r.activity.dueAt.toISOString(),
+    hasTime: r.activity.hasTime,
+  },
+  subject: r.activity.subject,
 });
 
 /** A schedule block row joined with its subject and the period's days (one query, no N+1). */

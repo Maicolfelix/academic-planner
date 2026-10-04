@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router';
+import { useDueReminders } from '../reminders/useReminders';
 import { LogoutButton } from './LogoutButton';
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -11,6 +12,7 @@ export function AppShell() {
   // The weekly grid needs seven readable columns; every other screen is a comfortable reading column.
   const wide = useLocation().pathname.startsWith('/calendar');
   const width = wide ? 'max-w-6xl' : 'max-w-3xl';
+  const dueCount = useDueReminders().data?.total ?? 0;
 
   return (
     <div className="min-h-screen">
@@ -22,6 +24,15 @@ export function AppShell() {
           <span className="mr-auto py-2 font-semibold">Academic Planner</span>
           <NavLink to="/dashboard" className={linkClass}>
             Inicio
+            {dueCount > 0 && (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 text-xs">
+                <span aria-hidden="true">🔔 {dueCount}</span>
+                <span className="sr-only">
+                  {' '}
+                  {dueCount} {dueCount === 1 ? 'recordatorio' : 'recordatorios'}
+                </span>
+              </span>
+            )}
           </NavLink>
           <NavLink to="/subjects" className={linkClass}>
             Asignaturas

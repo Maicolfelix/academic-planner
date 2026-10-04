@@ -1,5 +1,5 @@
 import type { ActivityPriority, ActivityStatus, ActivityType } from '@planner/core';
-import type { PrismaClient } from '../db/prisma.js';
+import type { Db } from '../db/prisma.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 export interface ActivityFilters {
@@ -40,7 +40,7 @@ export interface ActivityUpdateData {
 }
 
 /** Every query is scoped by userId: an activity id alone never reaches data. */
-export function createActivityRepository(prisma: PrismaClient) {
+export function createActivityRepository(prisma: Db) {
   return {
     list(userId: string, f: ActivityFilters = {}) {
       const and: Prisma.ActivityWhereInput[] = [];
@@ -70,6 +70,18 @@ export function createActivityRepository(prisma: PrismaClient) {
     },
 
     findOwned: (userId: string, id: string) => prisma.activity.findFirst({ where: { id, userId } }),
+
+    /**
+     * Locks the activity row until the surrounding transaction ends (FOR UPDATE). Every write that also
+     * touches the activity's reminders takes it first, so two simultaneous changes run one after the other
+     * instead of interleaving and duplicating reminders. false when the activity is not the user's.
+     */
+    async lock(userId: string, id: string): Promise<boolean> {
+      const rows = await prisma.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "Activity" WHERE id = ${id}::uuid AND "userId" = ${userId}::uuid FOR UPDATE`;
+      return rows.length > 0;
+    },
 
     create: (data: ActivityCreateData) => prisma.activity.create({ data }),
 

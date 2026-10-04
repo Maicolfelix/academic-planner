@@ -23,6 +23,7 @@ model User {
   subjects       Subject[]
   activities     Activity[]
   scheduleBlocks ScheduleBlock[]
+  reminders      Reminder[]
 }
 
 // Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so
@@ -117,9 +118,46 @@ model Activity {
   // Phase 7 will hang Reminders off Activity with their own cascade.
   subject     Subject          @relation(fields: [subjectId], references: [id], onDelete: NoAction)
 
+  reminders Reminder[]
+
   @@index([userId, dueAt])
   @@index([userId, status])
   @@index([subjectId])
+}
+
+enum ReminderKind {
+  AUTO
+  MANUAL
+}
+
+enum ReminderStatus {
+  PENDING
+  SHOWN
+  CANCELLED
+}
+
+// An internal in-app reminder. It stores only WHEN (and a reference to the activity): the message is
+// derived from the activity at display time, so renaming an activity renames its reminders.
+// AUTO reminders come from the per-type rules and carry the offset they were computed with
+// (remindAt = dueAt + offsetMinutes, always negative); MANUAL ones were chosen by the student and are
+// never recomputed. Hand-written constraints (in the migration): AUTO <=> negative offset, and a
+// partial unique index so an activity can never hold two AUTO reminders with the same offset.
+model Reminder {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @db.Uuid
+  activityId    String         @db.Uuid
+  remindAt      DateTime       @db.Timestamptz(3)
+  kind          ReminderKind
+  status        ReminderStatus @default(PENDING)
+  offsetMinutes Int?
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Cascade: deleting an activity deletes its reminders (the service also handles completion explicitly).
+  activity      Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, remindAt])
+  @@index([activityId])
 }
 
 model Session {

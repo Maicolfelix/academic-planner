@@ -20,6 +20,7 @@ import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
 import { Modal } from '../../components/Modal';
 import { SelectField } from '../../components/SelectField';
+import { ReminderSection } from '../reminders/ReminderSection';
 
 interface Props {
   subjects: Subject[];
@@ -179,6 +180,11 @@ export function ActivityFormDialog({
               error={fieldErrors.dueTime?.[0]}
               hint="Sin hora, vence al terminar el día."
             />
+            {!activity && (
+              <p className="text-sm text-slate-700">
+                Los recordatorios se crean solos según el tipo; podrás ajustarlos al editar.
+              </p>
+            )}
             <SelectField
               id="activity-type"
               label="Tipo"
@@ -227,6 +233,7 @@ export function ActivityFormDialog({
           </button>
         </div>
       </form>
+      {activity && <ReminderSection activity={activity} timeZone={timeZone} />}
     </Modal>
   );
 }

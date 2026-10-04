@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 6 — Agenda y horarios** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
+Estado actual: **Fase 7 — Recordatorios automáticos** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
 
 ## Requisitos
 
@@ -43,6 +43,7 @@ Migraciones actuales:
 3. `academic_periods_and_subjects` (Fase 3): crea `AcademicPeriod` y `Subject`. Incluye SQL escrito a mano (índice único parcial de "un solo periodo actual por usuario" y `CHECK endDate > startDate`) porque Prisma no sabe expresarlos.
 4. `activities` (Fase 4): crea `Activity` y sus enums, con un `CHECK` escrito a mano que liga `status = COMPLETED` con `completedAt`.
 5. `schedule_blocks` (Fase 6): crea `ScheduleBlock`, con `CHECK` escritos a mano (`endAt > startAt` y duración ≤ 24 h; serie semanal ⇔ fecha final).
+6. `reminders` (Fase 7): crea `Reminder` (FK a `Activity` con `ON DELETE CASCADE`), con un `CHECK` (AUTO ⇔ tiene offset negativo) y un índice único parcial `(activityId, offsetMinutes) WHERE kind = 'AUTO'`, escritos a mano.
 
 ## Scripts
 
@@ -101,6 +102,10 @@ Usa 8 consultas constantes (sin N+1). Reglas, estructura de la respuesta y decis
 `/api/schedule` (CRUD y consulta semanal; todos con sesión). Una clase semanal es **una sola fila**: las ocurrencias se expanden al leer, solo para el rango pedido, con hora local (también a través de cambios de horario).
 Los conflictos de horario son **advertencias**, no restricciones (`warnings` en la respuesta y `?dryRun=true` para avisar antes de guardar). Una asignatura o un periodo con bloques no se puede eliminar.
 El Dashboard muestra las clases de hoy. Detalle y decisiones en [docs/schedule.md](docs/schedule.md). Pantalla: `/calendar` (escritorio: semana completa; móvil: lista por día).
+
+## Recordatorios
+
+Recordatorios **internos** de la app solo para actividades (sin push, correo ni notificaciones del sistema). Al crear una actividad se generan solos según su tipo (p. ej. parcial: 3 días, 1 día y 3 horas antes); nunca se crea uno que ya haya pasado. Se recalculan solo si cambian la fecha/hora límite, el tipo o el estado (finalizar cancela los pendientes; reabrir regenera los futuros). Editar uno automático lo vuelve manual. `GET /api/reminders/due` alimenta el panel "Recordatorios" del Dashboard (máx. 20) y la insignia 🔔 de "Inicio"; nada se marca como visto al leer. Reglas, limitaciones y decisiones en [docs/reminders.md](docs/reminders.md).
 
 ## Estructura
 

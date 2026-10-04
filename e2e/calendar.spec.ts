@@ -470,6 +470,7 @@ test('responsive: no horizontal overflow with many blocks, long titles, open dia
 
   await blockButton(page, 'Seminario').first().click();
   const edit = page.getByRole('dialog', { name: 'Editar bloque' });
+  await expect(edit).toBeVisible();
   await expectNoHorizontalOverflow(page);
   const editBox = (await edit.boundingBox())!;
   expect(editBox.x + editBox.width).toBeLessThanOrEqual(viewport.width);
