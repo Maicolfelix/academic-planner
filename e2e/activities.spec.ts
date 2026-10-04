@@ -80,7 +80,10 @@ test('activity flow: create, edit, status, persistence, subject guard, delete, e
 
   // 8. Change status to En proceso from the card.
   await parcial.getByLabel('Cambiar estado de Parcial 1').selectOption({ label: 'En proceso' });
-  await expect(parcial).toContainText('En proceso');
+  // Wait for the real effect: the select is controlled, so it only shows the new value once the server answered.
+  // (toContainText('En proceso') is always true: it is also the text of an <option>. Reloading right away aborted
+  // the in-flight PATCH and the status was lost: the long-standing flake of this test.)
+  await expect(parcial.getByLabel('Cambiar estado de Parcial 1')).toHaveValue('IN_PROGRESS');
 
   // 9-10. Refresh: persisted.
   await page.reload();
