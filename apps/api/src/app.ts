@@ -9,8 +9,16 @@ import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.j
 import { originCheck } from './middleware/originCheck.js';
 import type { AuthRateLimits } from './middleware/rateLimit.js';
 import { createRequireAuth } from './middleware/requireAuth.js';
+import { createPeriodController } from './controllers/periodController.js';
+import { createSubjectController } from './controllers/subjectController.js';
+import { createPeriodRepository } from './repositories/periodRepository.js';
+import { createSubjectRepository } from './repositories/subjectRepository.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
+import { periodsRouter } from './routes/periods.js';
+import { subjectsRouter } from './routes/subjects.js';
+import { createPeriodService } from './services/periodService.js';
+import { createSubjectService } from './services/subjectService.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -27,6 +35,12 @@ export function createApp(deps: AppDeps): Express {
   const auth = createAuthService(prisma, sessions);
   const requireAuth = createRequireAuth(sessions, secureCookies);
 
+  const periodRepository = createPeriodRepository(prisma);
+  const periodController = createPeriodController(createPeriodService(periodRepository));
+  const subjectController = createSubjectController(
+    createSubjectService(createSubjectRepository(prisma), periodRepository),
+  );
+
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());
@@ -37,6 +51,9 @@ export function createApp(deps: AppDeps): Express {
 
   app.use('/api/health', healthRouter(checkDatabase));
   app.use('/api/auth', authRouter({ auth, sessions, requireAuth, secureCookies, rateLimits }));
+
+  app.use('/api/periods', periodsRouter(periodController, requireAuth));
+  app.use('/api/subjects', subjectsRouter(subjectController, requireAuth));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler());

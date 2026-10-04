@@ -17,6 +17,51 @@ model User {
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
   sessions     Session[]
+  periods      AcademicPeriod[]
+  subjects     Subject[]
+}
+
+// Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so
+// "2026-08-03" can never drift to the 2nd through a conversion. The API exchanges "YYYY-MM-DD".
+model AcademicPeriod {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  name      String
+  startDate DateTime  @db.Date
+  endDate   DateTime  @db.Date
+  isCurrent Boolean   @default(false)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects  Subject[]
+
+  @@index([userId])
+  // Also in the migration SQL (Prisma cannot express them):
+  //  - partial unique index: at most one isCurrent = true per user
+  //  - CHECK ("endDate" > "startDate")
+}
+
+model Subject {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  periodId    String         @db.Uuid
+  // As typed by the user (trimmed).
+  name        String
+  // Normalised name (lowercase, no accents, collapsed spaces): duplicates are compared on this.
+  nameKey     String
+  professor   String?
+  // One of the fixed palette hex values (validated in @planner/core).
+  color       String
+  description String?
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // NoAction (checked at end of statement): a period with subjects cannot be deleted silently,
+  // yet deleting a whole user still cascades cleanly.
+  period      AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction)
+
+  @@unique([periodId, nameKey])
+  @@index([userId, periodId])
 }
 
 model Session {

@@ -1,52 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-
-const uniqueEmail = () => `ana+${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-const PASSWORD = 'correct horse battery';
-const NAME = 'Ana Pérez';
-
-/**
- * Collects unexpected console errors, uncaught exceptions and failed API calls.
- * The only failures allowed are 401s from the auth endpoints (anonymous /me, wrong password).
- */
-function watch(page: Page, alsoExpected: string[] = []) {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  const failedApi: string[] = [];
-
-  page.on('console', (m) => {
-    // Chrome logs every 4xx response as a console error; those are checked via `failedApi` instead.
-    if (m.type() === 'error' && !/status of 40[19]/.test(m.text()) /* 401/409: see failedApi */)
-      consoleErrors.push(m.text());
-  });
-  page.on('pageerror', (e) => pageErrors.push(e.message));
-  page.on('response', (r) => {
-    const url = new URL(r.url());
-    if (!url.pathname.startsWith('/api/') || r.status() < 400) return;
-    const expected = r.status() === 401 && /^\/api\/auth\/(me|login)$/.test(url.pathname);
-    const label = `${r.status()} ${url.pathname}`;
-    if (!expected && !alsoExpected.includes(label)) failedApi.push(label);
-  });
-
-  return () => {
-    expect(pageErrors, 'uncaught exceptions').toEqual([]);
-    expect(consoleErrors, 'console errors').toEqual([]);
-    expect(failedApi, 'unexpected failed API calls').toEqual([]);
-  };
-}
-
-async function register(page: Page, email: string) {
-  await page.goto('/register');
-  await page.getByLabel('Nombre').fill(NAME);
-  await page.getByLabel('Correo').fill(email);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Crear cuenta' }).click();
-}
-
-async function login(page: Page, email: string, password = PASSWORD) {
-  await page.getByLabel('Correo').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-}
+import { expect, test } from '@playwright/test';
+import { completeOnboarding, login, NAME, register, uniqueEmail, watch } from './helpers';
 
 test('full auth flow: register, persist, logout, guard, login, wrong credentials', async ({
   page,
@@ -55,8 +8,11 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   const assertClean = watch(page);
   const email = uniqueEmail();
 
-  // 1-4. Register -> redirected to the protected screen showing the user's name.
+  // 1-4. Register -> a user without an academic period is sent to onboarding first (Phase 3),
+  // then reaches the protected screen showing their name.
   await register(page, email);
+  await completeOnboarding(page);
+  await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: `Hola, ${NAME}` })).toBeVisible();
   await expect(page.getByText('Tu sesión está activa.')).toBeVisible();
@@ -127,7 +83,7 @@ test('registering an existing email shows a clear error', async ({ page, context
   const email = uniqueEmail();
 
   await register(page, email);
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/onboarding$/);
   await context.clearCookies(); // simulate another browser
 
   await register(page, email);

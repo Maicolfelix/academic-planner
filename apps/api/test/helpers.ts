@@ -1,3 +1,5 @@
+import type { Express } from 'express';
+import request from 'supertest';
 import { createApp, type AppDeps } from '../src/app.js';
 import { createPrisma, pingDatabase } from '../src/db/prisma.js';
 import { truncateAll } from './testDb.js';
@@ -20,6 +22,22 @@ export function buildApp(overrides: Partial<AppDeps> = {}) {
     ...overrides,
   });
 }
+
+/** Registers a user and returns a supertest agent that carries that user's session cookie. */
+export async function signUp(app: Express, email: string, name = 'Test User') {
+  const agent = request.agent(app);
+  const res = await agent
+    .post('/api/auth/register')
+    .send({ name, email, password: 'correct horse battery' })
+    .expect(201);
+  return { agent, user: res.body.user as { id: string; email: string } };
+}
+
+export const periodInput = {
+  name: 'Segundo semestre 2026',
+  startDate: '2026-08-03',
+  endDate: '2026-11-28',
+};
 
 export const credentials = {
   name: 'Ana Pérez',

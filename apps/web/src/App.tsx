@@ -1,9 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router';
-import { PublicOnly, RequireAuth } from './auth/guards';
+import { PublicOnly, RequireAuth, RequirePeriod } from './auth/guards';
+import { AppShell } from './components/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { StatusPage } from './pages/StatusPage';
+import { SubjectsPage } from './pages/SubjectsPage';
 
 export function App() {
   return (
@@ -14,7 +17,13 @@ export function App() {
         <Route path="/register" element={<RegisterPage />} />
       </Route>
       <Route element={<RequireAuth />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route element={<RequirePeriod />}>
+          <Route element={<AppShell />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/subjects" element={<SubjectsPage />} />
+          </Route>
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

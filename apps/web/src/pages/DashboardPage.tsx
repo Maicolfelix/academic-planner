@@ -1,37 +1,28 @@
-import { useNavigate } from 'react-router';
-import { useLogout, useMe } from '../auth/useAuth';
+import { formatDateOnly } from '@planner/core';
+import { Link } from 'react-router';
+import { useCurrentPeriod } from '../academic/useAcademic';
+import { useMe } from '../auth/useAuth';
 
-/** Temporary protected screen that only proves authentication works. The real Dashboard is Phase 5. */
+/** Temporary home. The real Dashboard (activities, radar, progress) arrives in Phase 5. */
 export function DashboardPage() {
-  const navigate = useNavigate();
   const { data: user } = useMe();
-  const logout = useLogout();
+  const { period } = useCurrentPeriod();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Hola, {user?.name}</h1>
+    <div className="flex flex-col gap-3">
+      <h1 className="text-2xl font-semibold break-words">Hola, {user?.name}</h1>
       <p>Tu sesión está activa.</p>
-      {logout.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          No se pudo cerrar la sesión: {logout.error.message}
+      {period && (
+        <p className="text-slate-700">
+          Periodo actual: <strong>{period.name}</strong> ({formatDateOnly(period.startDate)} –{' '}
+          {formatDateOnly(period.endDate)})
         </p>
       )}
-      <button
-        type="button"
-        disabled={logout.isPending}
-        onClick={() =>
-          logout.mutate(undefined, {
-            onSuccess: () =>
-              navigate('/login', {
-                replace: true,
-                state: { notice: 'Sesión cerrada correctamente.' },
-              }),
-          })
-        }
-        className="self-start rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
-      >
-        {logout.isPending ? 'Cerrando…' : 'Cerrar sesión'}
-      </button>
-    </main>
+      <p>
+        <Link to="/subjects" className="font-medium underline">
+          Ver mis asignaturas
+        </Link>
+      </p>
+    </div>
   );
 }

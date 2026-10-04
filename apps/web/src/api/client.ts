@@ -19,7 +19,7 @@ export class ApiRequestError extends Error {
 }
 
 interface RequestOptions<T> {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Validates the success payload; omit for 204 responses. */
   schema?: ZodType<T>;

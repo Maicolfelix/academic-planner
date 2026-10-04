@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 2 — Autenticación** (registro, login, logout, sesión, rutas protegidas).
+Estado actual: **Fase 3 — Periodo académico y asignaturas** (sobre autenticación completa de la Fase 2).
 
 ## Requisitos
 
@@ -18,7 +18,8 @@ npm run db:deploy           # aplica las migraciones a la BD de desarrollo
 npm run dev                 # API :3000 + Web :5173 (con proxy /api)
 ```
 
-Abre http://localhost:5173 → te lleva a `/login`. Crea una cuenta en `/register`.
+Abre http://localhost:5173 → te lleva a `/login`. Crea una cuenta en `/register`; un usuario nuevo pasa por `/onboarding`
+(configurar el semestre) y llega a `/subjects` para agregar sus asignaturas.
 Estado del sistema: http://localhost:5173/status o `curl http://localhost:3000/api/health`.
 
 PostgreSQL usa el puerto **5433** del host para no chocar con una instalación local en 5432.
@@ -35,7 +36,11 @@ PostgreSQL usa el puerto **5433** del host para no chocar con una instalación l
 - Nunca se edita una migración ya aplicada: se crea otra.
 - Reiniciar la BD de desarrollo desde cero: `docker compose down -v && npm run db:up && npm run db:deploy`.
 
-Migraciones actuales: `init` (Fase 1) y `auth_user_session_drop_app_metadata` (crea `User` y `Session`, elimina la tabla provisional `AppMetadata`).
+Migraciones actuales:
+
+1. `init` (Fase 1).
+2. `auth_user_session_drop_app_metadata` (Fase 2): crea `User` y `Session`, elimina la tabla provisional `AppMetadata`.
+3. `academic_periods_and_subjects` (Fase 3): crea `AcademicPeriod` y `Subject`. Incluye SQL escrito a mano (índice único parcial de "un solo periodo actual por usuario" y `CHECK endDate > startDate`) porque Prisma no sabe expresarlos.
 
 ## Scripts
 
@@ -68,7 +73,13 @@ Sesiones server-side en PostgreSQL con cookie `academic_planner_session` (HttpOn
 verificación de origen contra CSRF y rate limiting en login/registro. Detalle, decisiones y limitaciones en [docs/auth.md](docs/auth.md).
 
 Endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`.
-Pantallas: `/register`, `/login` y `/dashboard` (temporal, solo comprueba la sesión; el Dashboard real es de la Fase 5).
+Pantallas: `/register` y `/login`. El Dashboard real es de la Fase 5.
+
+## Periodos y asignaturas
+
+`/api/periods` y `/api/subjects` (CRUD, todos con sesión). Cada recurso pertenece al usuario de la sesión; el de otro usuario responde `404`, igual que uno inexistente.
+Las fechas académicas son `DATE` (`YYYY-MM-DD`, sin zona horaria). Decisiones, reglas de duplicados y de borrado en [docs/academic.md](docs/academic.md).
+Pantallas: `/onboarding`, `/dashboard` (aún temporal), `/subjects`.
 
 ## Estructura
 
