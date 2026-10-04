@@ -1,14 +1,12 @@
 import { apiErrorSchema, healthResponseSchema } from '@planner/core';
 import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createApp } from './app.js';
-import { loadEnv } from './config/env.js';
-import { createPrisma, pingDatabase } from './db/prisma.js';
+import { buildApp, prisma } from '../test/helpers.js';
 
-const corsOrigins = ['http://localhost:5173'];
+afterAll(() => prisma.$disconnect());
 
 describe('error handling', () => {
-  const app = createApp({ checkDatabase: async () => true, corsOrigins });
+  const app = buildApp();
 
   it('returns the uniform envelope for unknown routes', async () => {
     const res = await request(app).get('/api/nope');
@@ -34,7 +32,7 @@ describe('error handling', () => {
 
 describe('GET /api/health (database down)', () => {
   it('answers 503 degraded instead of crashing', async () => {
-    const app = createApp({ checkDatabase: async () => false, corsOrigins });
+    const app = buildApp({ checkDatabase: async () => false });
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(503);
     expect(healthResponseSchema.parse(res.body)).toMatchObject({
@@ -44,11 +42,10 @@ describe('GET /api/health (database down)', () => {
   });
 
   it('does not leak internals when the check throws', async () => {
-    const app = createApp({
+    const app = buildApp({
       checkDatabase: async () => {
         throw new Error('secret connection string');
       },
-      corsOrigins,
     });
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(500);
@@ -56,18 +53,14 @@ describe('GET /api/health (database down)', () => {
   });
 });
 
-describe('GET /api/health (real PostgreSQL)', () => {
-  const prisma = createPrisma(loadEnv().DATABASE_URL);
-  afterAll(() => prisma.$disconnect());
-
+describe('GET /api/health (real PostgreSQL test database)', () => {
   it('reports the database as up', async () => {
-    const app = createApp({ checkDatabase: () => pingDatabase(prisma), corsOrigins });
-    const res = await request(app).get('/api/health');
+    const res = await request(buildApp()).get('/api/health');
     expect(res.status).toBe(200);
     expect(healthResponseSchema.parse(res.body)).toMatchObject({ status: 'ok', database: 'up' });
   });
 
-  it('can read the migrated foundation table', async () => {
-    expect(await prisma.appMetadata.count()).toBeGreaterThanOrEqual(0);
+  it('can read the migrated tables', async () => {
+    expect(await prisma.user.count()).toBeGreaterThanOrEqual(0);
   });
 });

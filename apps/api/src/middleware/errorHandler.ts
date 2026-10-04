@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import type { ApiError } from '@planner/core';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { AppError, notFound } from '../errors/AppError.js';
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
@@ -21,7 +21,12 @@ export function createErrorHandler(
     } else if (err instanceof ZodError) {
       status = 400;
       body = {
-        error: { code: 'VALIDATION_ERROR', message: 'Invalid request', details: err.issues },
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Datos inválidos. Revisa los campos marcados.',
+          // { fieldName: [messages] } — never echoes the submitted values (e.g. passwords).
+          details: { fields: z.flattenError(err).fieldErrors },
+        },
       };
     } else if (
       typeof err === 'object' &&

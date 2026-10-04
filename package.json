@@ -18,7 +18,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "npm run build -w @planner/core && npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build -w @planner/core && npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json",
     "test": "npm run build -w @planner/core && npm test --workspaces --if-present",
     "test:browser": "playwright test",
     "db:up": "docker compose up -d --wait",

@@ -4,40 +4,45 @@ Estado: Fase 0 (análisis). No se escribió código de producto.
 
 ## 1. Estado actual del repositorio
 
-| Aspecto | Hallazgo |
-|---|---|
-| Código existente | Ninguno (proyecto desde cero, confirmado por el usuario) |
-| Dependencias / configs | Ninguna |
-| Deuda técnica / errores | N/A |
-| Git | Sin repositorio del proyecto; se crea en Fase 1 |
+| Aspecto                 | Hallazgo                                                 |
+| ----------------------- | -------------------------------------------------------- |
+| Código existente        | Ninguno (proyecto desde cero, confirmado por el usuario) |
+| Dependencias / configs  | Ninguna                                                  |
+| Deuda técnica / errores | N/A                                                      |
+| Git                     | Sin repositorio del proyecto; se crea en Fase 1          |
 
 Entorno de desarrollo verificado:
 
-| Herramienta | Estado | Implicación |
-|---|---|---|
-| Node | v20.12.2 | Vite 7 exige Node ≥ 20.19 → usar **Vite 6** o actualizar Node (riesgo R1) |
-| npm | 10.8.1 | OK; se usarán npm workspaces |
-| Git | 2.44 | OK |
-| PostgreSQL | Servicio `postgresql-x64-18` activo; `psql` no está en PATH | Usable; alternativa reproducible: Docker |
-| Docker | 29.5.3 | `docker-compose.yml` con Postgres para instalación reproducible |
+| Herramienta | Estado                                                      | Implicación                                                               |
+| ----------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Node        | v20.12.2                                                    | Vite 7 exige Node ≥ 20.19 → usar **Vite 6** o actualizar Node (riesgo R1) |
+| npm         | 10.8.1                                                      | OK; se usarán npm workspaces                                              |
+| Git         | 2.44                                                        | OK                                                                        |
+| PostgreSQL  | Servicio `postgresql-x64-18` activo; `psql` no está en PATH | Usable; alternativa reproducible: Docker                                  |
+| Docker      | 29.5.3                                                      | `docker-compose.yml` con Postgres para instalación reproducible           |
 
 Comparación contra el contexto maestro: 0 % implementado; todas las funciones están por construir.
 
 ## 2. Arquitectura final
 
 ### Frontend
+
 React + Vite + TypeScript + Tailwind + React Router. Sin lógica de negocio: solo presentación, formularios y llamadas a la API. Estado de servidor con **TanStack Query** (justificación: el Dashboard debe actualizarse al mutar actividades "sin recargar toda la app"; la invalidación de queries lo resuelve de forma estándar). Formularios con **react-hook-form + zod resolver**, reutilizando los esquemas Zod compartidos.
 
 ### Backend
+
 Node + TypeScript + Express en capas: `routes → controllers (delgados) → services (reglas de negocio) → repositories (Prisma)`. Reglas puras (vencimiento, urgencia, scoring, carga, parser) en `packages/core`, sin dependencias de Express ni Prisma, para testearlas con fechas controladas.
 
 ### Base de datos
+
 PostgreSQL + Prisma. Migraciones versionadas. Toda tabla de dominio lleva `userId` con índice.
 
 ### Comunicación
+
 REST JSON bajo `/api`, errores con formato uniforme `{ error: { code, message, details? } }`. En desarrollo, proxy de Vite hacia `/api` (mismo origen, cookies sin fricción, CORS innecesario). En producción, un único origen: Express sirve el build del frontend y la API.
 
 ### Autenticación
+
 Sesión por **cookie HTTP-only** (ver §5).
 
 ## 3. Estructura de carpetas (monorepo npm workspaces)
@@ -91,23 +96,25 @@ Reglas de integridad: `Subject.userId` y `Activity.userId` se validan en el serv
 ## 7. Dependencias
 
 **Obligatorias**
+
 - Web: react, react-dom, react-router, vite, typescript, tailwindcss, @tanstack/react-query, zod, react-hook-form, date-fns(-tz).
 - API: express, @prisma/client, prisma, zod, argon2, helmet, cors (solo si hace falta), express-rate-limit, cookie-parser, pino (logs).
 - Dev: eslint, prettier, vitest, supertest, tsx, @types/*, concurrently.
 
 **Opcionales / posteriores**
+
 - `@playwright/test` (Fase 17), `vite-plugin-pwa` (Fase 13), `tesseract.js` u OCR equivalente (Fase 14), `multer` + validación MIME (Fase 14), `rrule` (solo si se justifica, ver §14), `sharp` (iconos PWA).
 
 No se agregará ninguna librería UI pesada: Tailwind + componentes propios pequeños (accesibilidad con elementos nativos, `<dialog>` para modales).
 
 ## 8. Estrategia de pruebas
 
-| Nivel | Herramienta | Alcance |
-|---|---|---|
-| Unitarias | Vitest | `packages/core`: vencimiento, urgencia, scoring, carga, parser, recurrencia (fechas fijas) |
-| Integración API | Vitest + Supertest + BD de prueba real | Auth, CRUD, ownership (dos usuarios), validaciones |
-| Componentes | Vitest + Testing Library | Solo formularios críticos |
-| E2E | Playwright | 5 flujos de Fase 17, viewports 360 y 1366 |
+| Nivel           | Herramienta                            | Alcance                                                                                    |
+| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Unitarias       | Vitest                                 | `packages/core`: vencimiento, urgencia, scoring, carga, parser, recurrencia (fechas fijas) |
+| Integración API | Vitest + Supertest + BD de prueba real | Auth, CRUD, ownership (dos usuarios), validaciones                                         |
+| Componentes     | Vitest + Testing Library               | Solo formularios críticos                                                                  |
+| E2E             | Playwright                             | 5 flujos de Fase 17, viewports 360 y 1366                                                  |
 
 BD de prueba: base separada (`*_test`), migraciones aplicadas antes de la suite, limpieza por test. Sin mocks de Prisma para integración (los mocks ocultan fallos de persistencia/ownership).
 
@@ -124,22 +131,23 @@ Un solo servicio Node (Express sirve `apps/web/dist` + `/api`) + PostgreSQL gest
 0 Análisis → 1 Foundation → 2 Auth → 3 Asignaturas → 4 Actividades → 5 Dashboard → 6 Agenda → 7 Recordatorios → 8 Radar → 9 ¿Qué hago ahora? → 10 Progreso/carga → 11 Captura rápida → 12 Bandeja → 13 PWA → 14 Importación → 15 UX/a11y → 16 Seguridad → 17 E2E → 18 Seed/demo → 19 Docs → 20 RC.
 
 Recomendaciones sobre el orden (no se aplican sin tu aprobación):
+
 1. Crear `AcademicPeriod` ya en Fase 3 (el progreso "del periodo" y la recurrencia "hasta fin de semestre" dependen de él).
 2. Que el cálculo de vencimiento (Fase 4) viva en `packages/core` desde el inicio para que Dashboard, Radar y scoring lo reutilicen.
 3. La tabla `Session` entra en Fase 2.
 
 ## 12. Riesgos
 
-| ID | Riesgo | Mitigación |
-|---|---|---|
-| R1 | Node 20.12 < requisito de Vite 7 | Fijar Vite 6 o actualizar Node ≥ 20.19; declarar `engines` |
-| R2 | PostgreSQL local con credenciales desconocidas; `psql` fuera de PATH | Docker Compose como camino documentado y reproducible; README cubre ambos |
-| R3 | `argon2` nativo en Windows (compilación) | Verificar en Fase 1; fallback documentado: `@node-rs/argon2` (binarios precompilados) |
-| R4 | Zona horaria/DST y recurrencias | Todo en UTC + `now` inyectado; tests con fechas fijas |
-| R5 | Parser de lenguaje natural en español con ambigüedad | Nunca guardar sin confirmar; `needsConfirmation` + `confidence`; sin inventar fechas |
-| R6 | OCR de horarios poco fiable | Fase 14 tardía, preview editable obligatorio |
-| R7 | Sobrealcance (21 fases) | Una fase a la vez con criterios de salida estrictos |
-| R8 | IDOR por referencias cruzadas (ej. `subjectId` ajeno) | Validar pertenencia en servicios; tests de dos usuarios desde Fase 3 |
+| ID  | Riesgo                                                               | Mitigación                                                                            |
+| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| R1  | Node 20.12 < requisito de Vite 7                                     | Fijar Vite 6 o actualizar Node ≥ 20.19; declarar `engines`                            |
+| R2  | PostgreSQL local con credenciales desconocidas; `psql` fuera de PATH | Docker Compose como camino documentado y reproducible; README cubre ambos             |
+| R3  | `argon2` nativo en Windows (compilación)                             | Verificar en Fase 1; fallback documentado: `@node-rs/argon2` (binarios precompilados) |
+| R4  | Zona horaria/DST y recurrencias                                      | Todo en UTC + `now` inyectado; tests con fechas fijas                                 |
+| R5  | Parser de lenguaje natural en español con ambigüedad                 | Nunca guardar sin confirmar; `needsConfirmation` + `confidence`; sin inventar fechas  |
+| R6  | OCR de horarios poco fiable                                          | Fase 14 tardía, preview editable obligatorio                                          |
+| R7  | Sobrealcance (21 fases)                                              | Una fase a la vez con criterios de salida estrictos                                   |
+| R8  | IDOR por referencias cruzadas (ej. `subjectId` ajeno)                | Validar pertenencia en servicios; tests de dos usuarios desde Fase 3                  |
 
 ## 13. Funciones a posponer
 
@@ -163,4 +171,5 @@ Fuera del MVP mínimo (si el tiempo aprieta, en este orden de recorte): Importac
 4. ¿Carpeta definitiva del proyecto? Hoy este documento está en un espacio temporal.
 
 ---
+
 Fin de ARCHITECTURE PLAN v1. **Me detengo aquí.** No avanzo a la Fase 1 hasta tu aprobación explícita.

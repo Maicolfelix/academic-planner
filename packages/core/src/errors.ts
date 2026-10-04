@@ -10,3 +10,7 @@ export const apiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+/** `{ field: [messages] }` from a failed parse, for showing errors next to form fields. */
+export const fieldErrorsOf = (error: z.ZodError): Record<string, string[]> =>
+  z.flattenError(error).fieldErrors as Record<string, string[]>;

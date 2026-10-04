@@ -5,8 +5,11 @@ import { createPrisma, pingDatabase } from './db/prisma.js';
 const env = loadEnv();
 const prisma = createPrisma(env.DATABASE_URL);
 const app = createApp({
+  prisma,
   checkDatabase: () => pingDatabase(prisma),
   corsOrigins: env.CORS_ORIGIN,
+  secureCookies: env.NODE_ENV === 'production',
+  rateLimits: { loginMax: env.LOGIN_RATE_LIMIT_MAX, registerMax: env.REGISTER_RATE_LIMIT_MAX },
 });
 
 const server = app.listen(env.API_PORT, () => {

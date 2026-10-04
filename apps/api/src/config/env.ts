@@ -13,6 +13,10 @@ const envSchema = z.object({
         .map((o) => o.trim())
         .filter(Boolean),
     ),
+  // Failed logins allowed per IP per 15 min (successful logins are not counted).
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  // Registrations allowed per IP per hour.
+  REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
 });
 
 export type Env = z.infer<typeof envSchema>;

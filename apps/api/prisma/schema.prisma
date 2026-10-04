@@ -7,10 +7,28 @@ datasource db {
   provider = "postgresql"
 }
 
-// Foundation-only table: lets the initial migration run end to end.
-// Domain entities (User, Subject, Activity, ...) arrive in their own phases.
-model AppMetadata {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  // Always stored trimmed + lowercase (normalised in @planner/core), so the plain unique index is enough.
+  email        String    @unique
+  passwordHash String
+  timezone     String    @default("America/Bogota")
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+  sessions     Session[]
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  // SHA-256 (hex) of the random cookie token. The plain token is never stored.
+  tokenHash  String    @unique
+  expiresAt  DateTime  @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
