@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Foundation-only table: lets the initial migration run end to end.
+// Domain entities (User, Subject, Activity, ...) arrive in their own phases.
+model AppMetadata {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
