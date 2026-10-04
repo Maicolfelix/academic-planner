@@ -80,7 +80,7 @@ Límites: título 1–150, descripción ≤ 2000.
 
 ## Borrar una asignatura
 
-`DELETE /api/subjects/:id` con actividades → `409 SUBJECT_NOT_EMPTY` ("Esta asignatura tiene actividades asociadas. Elimínalas o muévelas antes de borrar la asignatura.").
+`DELETE /api/subjects/:id` con actividades → `409 SUBJECT_NOT_EMPTY` ("La asignatura tiene actividades o bloques de agenda asociados.", desde la Fase 6: también cuentan los bloques de la agenda).
 Se decide en `subjectService.remove`; la FK (`NO ACTION`) lo refuerza ante una carrera. No hay cascadas silenciosas. Para "mover" una actividad: `PATCH { subjectId }`.
 
 ## UX (`/activities`)

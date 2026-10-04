@@ -505,7 +505,7 @@ describe('efficiency: a constant number of queries, no N+1', () => {
 
     expect(d.summary.total).toBe(153);
     expect(large.count).toBe(small.count); // does not grow with the data
-    // 1 session lookup (+ optional lastUsedAt touch) + 1 current period + 6 parallel queries.
+    // 1 session lookup (+ optional lastUsedAt touch) + 1 current period + 7 parallel queries.
     expect(large.count).toBeLessThanOrEqual(9);
     expect(large.count).toBeGreaterThanOrEqual(7);
     console.info(

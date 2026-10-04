@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { periodSchema } from './academic.js';
 import { activitySchema } from './activity.js';
+import { scheduleOccurrenceSchema } from './schedule.js';
 import { toLocalParts } from './time.js';
 
 export const DASHBOARD_UPCOMING_LIMIT = 5;
 export const DASHBOARD_OVERDUE_LIMIT = 10;
+export const DASHBOARD_CLASSES_LIMIT = 5;
 
 // ───────────────────────── Pure rules ─────────────────────────
 
@@ -104,6 +106,8 @@ export const dashboardSchema = z.object({
   upcoming: z.array(dashboardActivitySchema),
   /** Open and past due, most overdue first, at most DASHBOARD_OVERDUE_LIMIT. */
   overdue: z.array(dashboardActivitySchema),
+  /** Today's classes (type CLASS only) of the current period, by start time, at most DASHBOARD_CLASSES_LIMIT. */
+  classesToday: z.array(scheduleOccurrenceSchema),
 });
 
 export const dashboardResponseSchema = z.object({ dashboard: dashboardSchema });

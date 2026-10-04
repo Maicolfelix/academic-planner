@@ -1,5 +1,6 @@
 import {
   calculateProgress,
+  DASHBOARD_CLASSES_LIMIT,
   DASHBOARD_OVERDUE_LIMIT,
   DASHBOARD_UPCOMING_LIMIT,
   greetingForTime,
@@ -9,16 +10,22 @@ import {
 } from '@planner/core';
 import { toDashboardActivityDto, toPeriodDto } from '../mappers.js';
 import type { DashboardRepository } from '../repositories/dashboardRepository.js';
+import type { ScheduleRepository } from '../repositories/scheduleRepository.js';
 import type { Actor } from './activityService.js';
+import { occurrencesInRange, windowOf } from './scheduleOccurrences.js';
 
 /**
  * Builds the Dashboard of the authenticated user for their current period.
  *
- * Main queries: 1 (current period) + 6 run in parallel (subject count, count by status, overdue count,
- * and the overdue / today / upcoming lists) = 7, whatever the amount of data. Nothing is stored:
+ * Main queries: 1 (current period) + 7 run in parallel (subject count, count by status, overdue count,
+ * the overdue / today / upcoming lists and today's class candidates) = 8, whatever the amount of data. Nothing is stored:
  * everything is derived on each request. `clock` is injected so "now", "today" and the greeting are testable.
  */
-export function createDashboardService(dashboard: DashboardRepository, clock: () => Date) {
+export function createDashboardService(
+  dashboard: DashboardRepository,
+  schedule: ScheduleRepository,
+  clock: () => Date,
+) {
   return {
     async get(actor: Actor): Promise<Dashboard> {
       const now = clock();
@@ -43,6 +50,7 @@ export function createDashboardService(dashboard: DashboardRepository, clock: ()
           today: [],
           upcoming: [],
           overdue: [],
+          classesToday: [],
         };
       }
 
@@ -50,7 +58,7 @@ export function createDashboardService(dashboard: DashboardRepository, clock: ()
       // Already-expired deadlines of today belong to `overdue`, so the three lists never overlap.
       const endOfToday = localDayBounds(localDate, tz).end;
 
-      const [subjectCount, counts, overdueCount, overdueRows, todayRows, upcomingRows] =
+      const [subjectCount, counts, overdueCount, overdueRows, todayRows, upcomingRows, classRows] =
         await Promise.all([
           dashboard.countSubjects(actor.id, period.id),
           dashboard.countByStatus(actor.id, period.id),
@@ -58,6 +66,12 @@ export function createDashboardService(dashboard: DashboardRepository, clock: ()
           dashboard.listOverdue(actor.id, period.id, now, DASHBOARD_OVERDUE_LIMIT),
           dashboard.listDueBetween(actor.id, period.id, now, endOfToday),
           dashboard.listDueAfter(actor.id, period.id, endOfToday, DASHBOARD_UPCOMING_LIMIT),
+          // Candidates only: the weekly rules are expanded in memory for today alone.
+          schedule.candidates(actor.id, {
+            ...windowOf({ from: localDate, to: localDate }, tz),
+            types: ['CLASS'],
+            periodId: period.id,
+          }),
         ]);
 
       const total = counts.PENDING + counts.IN_PROGRESS + counts.COMPLETED;
@@ -85,6 +99,10 @@ export function createDashboardService(dashboard: DashboardRepository, clock: ()
         today,
         upcoming,
         overdue: overdueRows.map(toDashboardActivityDto),
+        classesToday: occurrencesInRange(classRows, { from: localDate, to: localDate }, tz).slice(
+          0,
+          DASHBOARD_CLASSES_LIMIT,
+        ),
       };
     },
   };

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { LogoutButton } from './LogoutButton';
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -8,12 +8,16 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 /** Navigation for authenticated screens. Wraps on narrow phones instead of overflowing. */
 export function AppShell() {
+  // The weekly grid needs seven readable columns; every other screen is a comfortable reading column.
+  const wide = useLocation().pathname.startsWith('/calendar');
+  const width = wide ? 'max-w-6xl' : 'max-w-3xl';
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200">
         <nav
           aria-label="Principal"
-          className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2"
+          className={`mx-auto flex ${width} flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2`}
         >
           <span className="mr-auto py-2 font-semibold">Academic Planner</span>
           <NavLink to="/dashboard" className={linkClass}>
@@ -25,10 +29,13 @@ export function AppShell() {
           <NavLink to="/activities" className={linkClass}>
             Actividades
           </NavLink>
+          <NavLink to="/calendar" className={linkClass}>
+            Agenda
+          </NavLink>
           <LogoutButton />
         </nav>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className={`mx-auto ${width} px-4 py-6`}>
         <Outlet />
       </main>
     </div>

@@ -112,7 +112,7 @@ test('activity flow: create, edit, status, persistence, subject guard, delete, e
   const confirmSubject = page.getByRole('dialog', { name: '¿Eliminar Redes?' });
   await confirmSubject.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await expect(confirmSubject.getByRole('alert')).toHaveText(
-    'Esta asignatura tiene actividades asociadas. Elimínalas o muévelas antes de borrar la asignatura.',
+    'La asignatura tiene actividades o bloques de agenda asociados.',
   );
   await confirmSubject.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Redes' })).toBeVisible();

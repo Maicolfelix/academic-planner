@@ -10,11 +10,13 @@ const subjectNotFound = () => notFound('Asignatura no encontrada.');
 const isPrismaError = (err: unknown, code: string) =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
 
-const notEmpty = () =>
+/** Counts are included when known (the foreign-key race path does not have them). */
+const notEmpty = (dependents?: { activities: number; scheduleBlocks: number }) =>
   new AppError(
     409,
     'SUBJECT_NOT_EMPTY',
-    'Esta asignatura tiene actividades asociadas. Elimínalas o muévelas antes de borrar la asignatura.',
+    'La asignatura tiene actividades o bloques de agenda asociados.',
+    dependents,
   );
 
 const duplicate = () =>
@@ -76,10 +78,11 @@ export function createSubjectService(subjects: SubjectRepository, periods: Perio
       }
     },
 
-    /** Never cascades: a subject with activities must be emptied (or its activities moved) first. */
+    /** Never cascades: a subject with activities or schedule blocks must be emptied (or they moved) first. */
     async remove(userId: string, id: string) {
       if (!(await subjects.findOwned(userId, id))) throw subjectNotFound();
-      if ((await subjects.countActivities(id)) > 0) throw notEmpty();
+      const dependents = await subjects.countDependents(id);
+      if (dependents.activities > 0 || dependents.scheduleBlocks > 0) throw notEmpty(dependents);
       try {
         if (!(await subjects.delete(userId, id))) throw subjectNotFound();
       } catch (err) {

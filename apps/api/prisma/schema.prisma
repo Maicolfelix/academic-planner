@@ -10,59 +10,62 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  name         String
+  id             String           @id @default(uuid()) @db.Uuid
+  name           String
   // Always stored trimmed + lowercase (normalised in @planner/core), so the plain unique index is enough.
-  email        String    @unique
-  passwordHash String
-  timezone     String    @default("America/Bogota")
-  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
-  sessions     Session[]
-  periods      AcademicPeriod[]
-  subjects     Subject[]
-  activities   Activity[]
+  email          String           @unique
+  passwordHash   String
+  timezone       String           @default("America/Bogota")
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+  sessions       Session[]
+  periods        AcademicPeriod[]
+  subjects       Subject[]
+  activities     Activity[]
+  scheduleBlocks ScheduleBlock[]
 }
 
 // Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so
 // "2026-08-03" can never drift to the 2nd through a conversion. The API exchanges "YYYY-MM-DD".
 model AcademicPeriod {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  name      String
-  startDate DateTime  @db.Date
-  endDate   DateTime  @db.Date
-  isCurrent Boolean   @default(false)
-  createdAt DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjects  Subject[]
-
-  @@index([userId])
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  name           String
+  startDate      DateTime        @db.Date
+  endDate        DateTime        @db.Date
+  isCurrent      Boolean         @default(false)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects       Subject[]
+  scheduleBlocks ScheduleBlock[]
   // Also in the migration SQL (Prisma cannot express them):
   //  - partial unique index: at most one isCurrent = true per user
   //  - CHECK ("endDate" > "startDate")
+
+  @@index([userId])
 }
 
 model Subject {
-  id          String         @id @default(uuid()) @db.Uuid
-  userId      String         @db.Uuid
-  periodId    String         @db.Uuid
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  periodId       String          @db.Uuid
   // As typed by the user (trimmed).
-  name        String
+  name           String
   // Normalised name (lowercase, no accents, collapsed spaces): duplicates are compared on this.
-  nameKey     String
-  professor   String?
+  nameKey        String
+  professor      String?
   // One of the fixed palette hex values (validated in @planner/core).
-  color       String
-  description String?
-  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  color          String
+  description    String?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // NoAction (checked at end of statement): a period with subjects cannot be deleted silently,
   // yet deleting a whole user still cascades cleanly.
-  period      AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction)
-  activities  Activity[]
+  period         AcademicPeriod  @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  activities     Activity[]
+  scheduleBlocks ScheduleBlock[]
 
   @@unique([periodId, nameKey])
   @@index([userId, periodId])
@@ -131,4 +134,45 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+enum ScheduleBlockType {
+  CLASS
+  STUDY
+  ACADEMIC_PERSONAL
+}
+
+enum RecurrenceType {
+  NONE
+  WEEKLY
+}
+
+// One row per block OR per weekly series: occurrences are expanded at read time for the requested
+// range (never one row per week). startAt/endAt are the instants of the FIRST (or only) occurrence;
+// a weekly series repeats that local wall-clock time every 7 calendar days up to `recurrenceUntil`
+// (a local DATE, inclusive). The weekday is not stored: it is the weekday of the first occurrence in
+// the user's timezone, so it can never contradict it. Hand-written CHECKs live in the migration.
+model ScheduleBlock {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @db.Uuid
+  // Unlike Activity, a block belongs to a period directly: a study session may have no subject.
+  periodId        String            @db.Uuid
+  subjectId       String?           @db.Uuid
+  title           String
+  type            ScheduleBlockType
+  startAt         DateTime          @db.Timestamptz(3)
+  endAt           DateTime          @db.Timestamptz(3)
+  recurrenceType  RecurrenceType    @default(NONE)
+  recurrenceUntil DateTime?         @db.Date
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // NoAction: a period or subject that still has blocks cannot be deleted silently,
+  // yet deleting a whole user cascades cleanly.
+  period          AcademicPeriod    @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  subject         Subject?          @relation(fields: [subjectId], references: [id], onDelete: NoAction)
+
+  @@index([userId, startAt])
+  @@index([periodId])
+  @@index([subjectId])
 }

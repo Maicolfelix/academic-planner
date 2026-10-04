@@ -12,20 +12,24 @@ import { createRequireAuth } from './middleware/requireAuth.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createScheduleController } from './controllers/scheduleController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
+import { createScheduleRepository } from './repositories/scheduleRepository.js';
 import { createSubjectRepository } from './repositories/subjectRepository.js';
 import { activitiesRouter } from './routes/activities.js';
 import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { periodsRouter } from './routes/periods.js';
+import { scheduleRouter } from './routes/schedule.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createActivityService } from './services/activityService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
+import { createScheduleService } from './services/scheduleService.js';
 import { createSubjectService } from './services/subjectService.js';
 
 export interface AppDeps {
@@ -50,10 +54,14 @@ export function createApp(deps: AppDeps): Express {
   const activityController = createActivityController(
     createActivityService(createActivityRepository(prisma), subjectRepository, clock),
   );
-  const dashboardController = createDashboardController(
-    createDashboardService(createDashboardRepository(prisma), clock),
-  );
   const periodRepository = createPeriodRepository(prisma);
+  const scheduleRepository = createScheduleRepository(prisma);
+  const dashboardController = createDashboardController(
+    createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
+  );
+  const scheduleController = createScheduleController(
+    createScheduleService(scheduleRepository, periodRepository, subjectRepository, clock),
+  );
   const periodController = createPeriodController(createPeriodService(periodRepository));
   const subjectController = createSubjectController(
     createSubjectService(subjectRepository, periodRepository),
@@ -74,6 +82,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/subjects', subjectsRouter(subjectController, requireAuth));
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
+  app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler());

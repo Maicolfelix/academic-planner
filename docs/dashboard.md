@@ -8,18 +8,19 @@ qué mirar primero y cómo voy en el periodo actual. **No guarda nada propio**: 
 Sin parámetros. El usuario, su zona horaria y el periodo salen de la sesión (periodo = el actual del usuario); un `userId` o `periodId` en la query se **ignora**
 (hay tests de integración y de navegador que lo comprueban). Respuesta `{ dashboard }` validada con un esquema Zod compartido (`dashboardSchema` en `@planner/core`):
 
-| Campo                      | Contenido                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
-| `generatedAt`, `localDate` | instante de la respuesta y la fecha de hoy **en la zona del usuario** (`YYYY-MM-DD`)                |
-| `greeting`                 | "Buenos días" / "Buenas tardes" / "Buenas noches"                                                   |
-| `period`                   | periodo actual (`null` si aún no hay: la app lo manda a onboarding, y el endpoint no falla)         |
-| `subjectCount`             | asignaturas del periodo actual                                                                      |
-| `summary`                  | `total`, `pending`, `inProgress`, `completed`, `overdue` (solo periodo actual)                      |
-| `progress`                 | `completed`, `total`, `percent`                                                                     |
-| `nextDue`                  | primera actividad abierta y aún no vencida, por fecha (de `today` o `upcoming`)                     |
-| `today`                    | abiertas, aún no vencidas, que vencen en el día local de hoy                                        |
-| `upcoming`                 | abiertas que vencen después de hoy, la más próxima primero, **máximo 5**                            |
-| `overdue`                  | abiertas y vencidas, la más atrasada primero, **máximo 10** (el total real va en `summary.overdue`) |
+| Campo                      | Contenido                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generatedAt`, `localDate` | instante de la respuesta y la fecha de hoy **en la zona del usuario** (`YYYY-MM-DD`)                                                              |
+| `greeting`                 | "Buenos días" / "Buenas tardes" / "Buenas noches"                                                                                                 |
+| `period`                   | periodo actual (`null` si aún no hay: la app lo manda a onboarding, y el endpoint no falla)                                                       |
+| `subjectCount`             | asignaturas del periodo actual                                                                                                                    |
+| `summary`                  | `total`, `pending`, `inProgress`, `completed`, `overdue` (solo periodo actual)                                                                    |
+| `progress`                 | `completed`, `total`, `percent`                                                                                                                   |
+| `nextDue`                  | primera actividad abierta y aún no vencida, por fecha (de `today` o `upcoming`)                                                                   |
+| `today`                    | abiertas, aún no vencidas, que vencen en el día local de hoy                                                                                      |
+| `upcoming`                 | abiertas que vencen después de hoy, la más próxima primero, **máximo 5**                                                                          |
+| `overdue`                  | abiertas y vencidas, la más atrasada primero, **máximo 10** (el total real va en `summary.overdue`)                                               |
+| `classesToday`             | _(Fase 6)_ clases (`type = CLASS`) de hoy en el día local del usuario, del periodo actual, por hora, **máximo 5**; ver [schedule.md](schedule.md) |
 
 Cada actividad de las listas lleva `subject: { id, name, color }` (unida en la misma consulta). La respuesta es `Cache-Control: no-store`.
 
@@ -48,11 +49,11 @@ Las etiquetas "Vence hoy / mañana / en 3 días" salen de otra función pura (`d
 
 ## Consultas (rendimiento)
 
-Una petición ejecuta **8 consultas**, constantes sin importar cuántas actividades haya:
+Una petición ejecuta **9 consultas** (8 hasta la Fase 5; la Fase 6 añadió las clases de hoy), constantes sin importar cuántas actividades haya:
 
 1. sesión (con su usuario en un solo `JOIN`) — autenticación;
 2. periodo actual;
-   3–8. en paralelo: conteo de asignaturas, **un** `GROUP BY` para los conteos por estado, conteo de vencidas y las tres listas (cada una con su asignatura unida por `JOIN`).
+   3–9. en paralelo: conteo de asignaturas, **un** `GROUP BY` para los conteos por estado, conteo de vencidas, las tres listas (cada una con su asignatura unida por `JOIN`) y los **bloques `CLASS` candidatos de hoy** (las reglas semanales se expanden en memoria solo para hoy).
 
 No hay N+1 (ninguna consulta por tarjeta ni por fila). Para obtener los `JOIN` se activó `relationLoadStrategy: 'join'` (`previewFeatures = ["relationJoins"]` en el generador de Prisma):
 sin él, Prisma hacía una consulta extra por cada `include` (12 consultas en total). Un test cuenta las consultas con 3 y con 153 actividades y exige que sean las mismas;

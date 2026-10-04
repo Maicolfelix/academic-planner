@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useMe } from '../auth/useAuth';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
+import { ClassesToday } from './dashboard/ClassesToday';
 import { NoActivities, NoSubjects } from './dashboard/EmptyStates';
 import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
@@ -57,6 +58,10 @@ export function DashboardPage() {
         )}
       </header>
 
+      {d.classesToday.length > 0 && !hasData && (
+        <ClassesToday classes={d.classesToday} timeZone={timeZone} />
+      )}
+
       {d.subjectCount === 0 && <NoSubjects />}
       {d.subjectCount > 0 && d.summary.total === 0 && <NoActivities />}
 
@@ -64,6 +69,9 @@ export function DashboardPage() {
         <>
           <SummaryTiles summary={d.summary} />
           <NextDueCard activity={d.nextDue} timeZone={timeZone} now={now} />
+          {d.classesToday.length > 0 && (
+            <ClassesToday classes={d.classesToday} timeZone={timeZone} />
+          )}
 
           {d.overdue.length > 0 && (
             <DueSection

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router';
 import { PublicOnly, RequireAuth, RequirePeriod } from './auth/guards';
 import { AppShell } from './components/AppShell';
 import { ActivitiesPage } from './pages/ActivitiesPage';
+import { CalendarPage } from './pages/CalendarPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -24,6 +25,7 @@ export function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/subjects" element={<SubjectsPage />} />
             <Route path="/activities" element={<ActivitiesPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
           </Route>
         </Route>
       </Route>

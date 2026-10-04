@@ -21,7 +21,7 @@ export function watch(page: Page, alsoExpected: string[] = []) {
 
   page.on('console', (m) => {
     // Chrome logs every 4xx response as a console error; those are checked via `failedApi` instead.
-    if (m.type() === 'error' && !/status of 40[19]/.test(m.text())) consoleErrors.push(m.text());
+    if (m.type() === 'error' && !/status of 40[019]/.test(m.text())) consoleErrors.push(m.text());
   });
   page.on('pageerror', (e) => pageErrors.push(e.message));
   page.on('response', (r) => {
@@ -58,14 +58,24 @@ export async function login(page: Page, email: string, password = PASSWORD) {
 }
 
 /** First-run screen: a new user must create an academic period before using the app. */
-export async function completeOnboarding(page: Page, periodName = 'Segundo semestre 2026') {
+export async function completeOnboarding(
+  page: Page,
+  periodName = 'Segundo semestre 2026',
+  dates: { start: string; end: string } = { start: '2026-08-03', end: '2026-11-28' },
+) {
   await expect(page).toHaveURL(/\/onboarding$/);
   await page.getByLabel('Nombre del periodo').fill(periodName);
-  await page.getByLabel('Inicio', { exact: true }).fill('2026-08-03');
-  await page.getByLabel('Fin', { exact: true }).fill('2026-11-28');
+  await page.getByLabel('Inicio', { exact: true }).fill(dates.start);
+  await page.getByLabel('Fin', { exact: true }).fill(dates.end);
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page).toHaveURL(/\/subjects$/);
 }
+
+/** Today's date for a user in Bogotá (the app's default timezone), whatever the machine's zone is. */
+export const bogotaToday = (plusDays = 0): string =>
+  new Date(Date.now() + plusDays * 86_400_000).toLocaleDateString('en-CA', {
+    timeZone: 'America/Bogota',
+  });
 
 /** A page must never scroll sideways, in any state (including with a dialog open). */
 export async function expectNoHorizontalOverflow(page: Page) {

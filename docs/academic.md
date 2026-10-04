@@ -34,7 +34,7 @@ minúsculas, sin tildes y con espacios colapsados (`normalizeNameKey` en `@plann
 `name` se guarda como lo escribió el usuario (solo `trim`); `nameKey` es únicamente para comparar. La unicidad la impone la BD (también ante peticiones simultáneas).
 El mismo nombre en otro periodo, o en otro usuario, es válido. Error: `409 SUBJECT_ALREADY_EXISTS` con `details.fields.name`.
 
-**Eliminar un periodo.** Si tiene asignaturas → `409 PERIOD_NOT_EMPTY` y no se borra nada (sin cascadas silenciosas). Lo refuerza la BD (FK `NO ACTION`).
+**Eliminar un periodo.** Si tiene asignaturas **o bloques de agenda** (Fase 6, también los que no tienen asignatura) → `409 PERIOD_NOT_EMPTY` y no se borra nada (sin cascadas silenciosas). Lo refuerza la BD (FK `NO ACTION`).
 Primero hay que eliminar las asignaturas. Borrar un _usuario_ sí elimina todo lo suyo.
 
 **Eliminar una asignatura.** Si tiene actividades → `409 SUBJECT_NOT_EMPTY` y no se borra nada (regla en `subjectService.remove`, reforzada por la FK).

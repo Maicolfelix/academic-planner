@@ -25,6 +25,9 @@ export function createPeriodRepository(prisma: PrismaClient) {
     findOwned: (userId: string, id: string) =>
       prisma.academicPeriod.findFirst({ where: { id, userId } }),
 
+    findCurrent: (userId: string) =>
+      prisma.academicPeriod.findFirst({ where: { userId, isCurrent: true } }),
+
     hasCurrent: async (userId: string) =>
       (await prisma.academicPeriod.count({ where: { userId, isCurrent: true } })) > 0,
 
@@ -64,6 +67,8 @@ export function createPeriodRepository(prisma: PrismaClient) {
       }),
 
     countSubjects: (periodId: string) => prisma.subject.count({ where: { periodId } }),
+
+    countScheduleBlocks: (periodId: string) => prisma.scheduleBlock.count({ where: { periodId } }),
 
     delete: async (userId: string, id: string) =>
       (await prisma.academicPeriod.deleteMany({ where: { id, userId } })).count > 0,

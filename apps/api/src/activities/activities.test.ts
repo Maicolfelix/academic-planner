@@ -443,7 +443,7 @@ describe('subject deletion now that activities exist', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('SUBJECT_NOT_EMPTY');
     expect(res.body.error.message).toBe(
-      'Esta asignatura tiene actividades asociadas. Elimínalas o muévelas antes de borrar la asignatura.',
+      'La asignatura tiene actividades o bloques de agenda asociados.',
     );
     expect(await prisma.subject.count()).toBe(1);
     expect(await prisma.activity.findUniqueOrThrow({ where: { id: created.id } })).toEqual(before);

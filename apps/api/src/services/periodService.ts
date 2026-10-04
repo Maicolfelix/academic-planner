@@ -18,7 +18,7 @@ const notEmpty = () =>
   new AppError(
     409,
     'PERIOD_NOT_EMPTY',
-    'Este periodo todavía tiene asignaturas. Elimínalas primero para poder borrarlo.',
+    'Este periodo todavía tiene asignaturas o bloques de agenda. Elimínalos primero para poder borrarlo.',
   );
 
 export function createPeriodService(periods: PeriodRepository) {
@@ -76,7 +76,12 @@ export function createPeriodService(periods: PeriodRepository) {
     /** Never cascades: a period with subjects must be emptied by the user first. */
     async remove(userId: string, id: string) {
       if (!(await periods.findOwned(userId, id))) throw periodNotFound();
-      if ((await periods.countSubjects(id)) > 0) throw notEmpty();
+      // Subjects AND standalone schedule blocks (a study session has no subject but has a period).
+      const [subjectCount, blockCount] = await Promise.all([
+        periods.countSubjects(id),
+        periods.countScheduleBlocks(id),
+      ]);
+      if (subjectCount > 0 || blockCount > 0) throw notEmpty();
       try {
         if (!(await periods.delete(userId, id))) throw periodNotFound();
       } catch (err) {

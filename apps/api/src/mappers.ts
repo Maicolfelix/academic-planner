@@ -1,7 +1,19 @@
-import type { AcademicPeriod, Activity, DashboardActivity, Subject } from '@planner/core';
+import {
+  toLocalParts,
+  weekdayOf,
+  type AcademicPeriod,
+  type Activity,
+  type BlockOccurrence,
+  type DashboardActivity,
+  type ScheduleBlock,
+  type ScheduleBlockLike,
+  type ScheduleOccurrence,
+  type Subject,
+} from '@planner/core';
 import type {
   AcademicPeriod as PeriodRow,
   Activity as ActivityRow,
+  ScheduleBlock as ScheduleRow,
   Subject as SubjectRow,
 } from './generated/prisma/client.js';
 
@@ -35,6 +47,67 @@ export const toActivityDto = (a: ActivityRow): Activity => ({
   completedAt: a.completedAt?.toISOString() ?? null,
   createdAt: a.createdAt.toISOString(),
   updatedAt: a.updatedAt.toISOString(),
+});
+
+/** A schedule block row joined with its subject and the period's days (one query, no N+1). */
+export type ScheduleBlockRow = ScheduleRow & {
+  subject: { id: string; name: string; color: string } | null;
+  period: { startDate: Date; endDate: Date };
+};
+
+/** The stored block, with its first occurrence expressed on the user's wall clock. */
+export const toScheduleBlockDto = (row: ScheduleBlockRow, timeZone: string): ScheduleBlock => {
+  const start = toLocalParts(row.startAt, timeZone);
+  const end = toLocalParts(row.endAt, timeZone);
+  return {
+    id: row.id,
+    periodId: row.periodId,
+    subjectId: row.subjectId,
+    subject: row.subject,
+    title: row.title,
+    type: row.type,
+    date: start.date,
+    startTime: start.time,
+    endTime: end.time,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    recurrence:
+      row.recurrenceType === 'WEEKLY' && row.recurrenceUntil
+        ? {
+            frequency: 'WEEKLY',
+            weekday: weekdayOf(start.date),
+            until: toDateOnly(row.recurrenceUntil),
+          }
+        : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+};
+
+/** What the expansion function needs from a stored block (including its period's days as bounds). */
+export const toBlockLike = (row: ScheduleBlockRow): ScheduleBlockLike => ({
+  startAt: row.startAt,
+  endAt: row.endAt,
+  recurrenceUntil:
+    row.recurrenceType === 'WEEKLY' && row.recurrenceUntil ? toDateOnly(row.recurrenceUntil) : null,
+  bounds: { from: toDateOnly(row.period.startDate), to: toDateOnly(row.period.endDate) },
+});
+
+export const toOccurrenceDto = (
+  row: ScheduleBlockRow,
+  occurrence: BlockOccurrence,
+  hasConflict: boolean,
+): ScheduleOccurrence => ({
+  blockId: row.id,
+  periodId: row.periodId,
+  occurrenceDate: occurrence.date,
+  startAt: occurrence.startAt.toISOString(),
+  endAt: occurrence.endAt.toISOString(),
+  title: row.title,
+  type: row.type,
+  subject: row.subject,
+  isRecurring: row.recurrenceType === 'WEEKLY',
+  hasConflict,
 });
 
 /** An activity row joined with the few subject fields the Dashboard shows (same query, no N+1). */

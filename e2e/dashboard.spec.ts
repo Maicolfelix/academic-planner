@@ -4,6 +4,7 @@ import {
   apiCreateActivity,
   apiCreateSubject,
   apiSubjects,
+  bogotaToday,
   completeOnboarding,
   daysFromNow,
   expectNoHorizontalOverflow,
@@ -18,12 +19,6 @@ import {
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Principal' });
 const section = (page: Page, name: string) => page.getByRole('region', { name });
 const goHome = (page: Page) => nav(page).getByRole('link', { name: 'Inicio' }).click();
-
-/** Today's date for a user in Bogotá (the app's default timezone), independent of the machine's zone. */
-const bogotaToday = (plusDays = 0) => {
-  const d = new Date(Date.now() + plusDays * 86_400_000);
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
-};
 
 test('dashboard flow: empty states, next due, overdue, progress, live updates, persistence', async ({
   page,

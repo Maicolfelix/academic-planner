@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 5 — Dashboard académico** (sobre autenticación, periodos, asignaturas y actividades).
+Estado actual: **Fase 6 — Agenda y horarios** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
 
 ## Requisitos
 
@@ -42,6 +42,7 @@ Migraciones actuales:
 2. `auth_user_session_drop_app_metadata` (Fase 2): crea `User` y `Session`, elimina la tabla provisional `AppMetadata`.
 3. `academic_periods_and_subjects` (Fase 3): crea `AcademicPeriod` y `Subject`. Incluye SQL escrito a mano (índice único parcial de "un solo periodo actual por usuario" y `CHECK endDate > startDate`) porque Prisma no sabe expresarlos.
 4. `activities` (Fase 4): crea `Activity` y sus enums, con un `CHECK` escrito a mano que liga `status = COMPLETED` con `completedAt`.
+5. `schedule_blocks` (Fase 6): crea `ScheduleBlock`, con `CHECK` escritos a mano (`endAt > startAt` y duración ≤ 24 h; serie semanal ⇔ fecha final).
 
 ## Scripts
 
@@ -94,6 +95,12 @@ Detalle en [docs/activities.md](docs/activities.md). Pantalla: `/activities` (fi
 `GET /api/dashboard` devuelve, en una sola petición, todo lo que muestra la pantalla de inicio para el periodo actual del usuario (resumen por estado, progreso,
 próxima entrega, vencidas, para hoy y próximas). Todo se deriva de los datos reales; no se guarda nada. "Hoy" y el saludo usan la zona horaria del perfil (`User.timezone`).
 Usa 8 consultas constantes (sin N+1). Reglas, estructura de la respuesta y decisiones en [docs/dashboard.md](docs/dashboard.md). Pantalla: `/dashboard` ("Inicio").
+
+## Agenda
+
+`/api/schedule` (CRUD y consulta semanal; todos con sesión). Una clase semanal es **una sola fila**: las ocurrencias se expanden al leer, solo para el rango pedido, con hora local (también a través de cambios de horario).
+Los conflictos de horario son **advertencias**, no restricciones (`warnings` en la respuesta y `?dryRun=true` para avisar antes de guardar). Una asignatura o un periodo con bloques no se puede eliminar.
+El Dashboard muestra las clases de hoy. Detalle y decisiones en [docs/schedule.md](docs/schedule.md). Pantalla: `/calendar` (escritorio: semana completa; móvil: lista por día).
 
 ## Estructura
 

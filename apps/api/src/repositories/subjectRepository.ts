@@ -31,7 +31,14 @@ export function createSubjectRepository(prisma: PrismaClient) {
 
     create: (data: SubjectCreateData) => prisma.subject.create({ data }),
 
-    countActivities: (subjectId: string) => prisma.activity.count({ where: { subjectId } }),
+    /** What still hangs from a subject: its presence blocks deletion (no silent cascades). */
+    async countDependents(subjectId: string) {
+      const [activities, scheduleBlocks] = await Promise.all([
+        prisma.activity.count({ where: { subjectId } }),
+        prisma.scheduleBlock.count({ where: { subjectId } }),
+      ]);
+      return { activities, scheduleBlocks };
+    },
 
     /** `where: { id, userId }` makes ownership part of the write itself (P2025 when it is not yours). */
     update: (userId: string, id: string, data: SubjectUpdateData) =>
