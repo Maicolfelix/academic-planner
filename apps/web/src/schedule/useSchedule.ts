@@ -7,6 +7,7 @@ import {
   saveScheduleBlock,
 } from '../api/schedule';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
+import { WORKLOAD_KEY } from '../insights/useInsights';
 
 /** One query per visible range: ['schedule', from, to]. */
 export function useSchedule(from: string, to: string) {
@@ -26,13 +27,15 @@ export function useScheduleBlock(id: string | undefined) {
   });
 }
 
-// Every write refreshes every cached week AND the Dashboard (its "Clases de hoy" derives from the same data).
+// Every write refreshes every cached week, the Dashboard (its "Clases de hoy" derives from the same data) and the
+// weekly workload (the agenda is one of its two sources).
 function useInvalidateSchedule() {
   const qc = useQueryClient();
   return () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: ['schedule'] }),
       qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      qc.invalidateQueries({ queryKey: WORKLOAD_KEY }),
     ]);
 }
 

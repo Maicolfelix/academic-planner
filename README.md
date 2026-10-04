@@ -111,6 +111,10 @@ Clasifica cada actividad **abierta** por el tiempo real que falta para su fecha 
 
 Sugiere **una** actividad abierta que requiere mayor atención y explica por qué ("Vence en menos de 24 horas.", "Tiene prioridad alta.", "Ya comenzaste esta actividad."). Es determinístico, sin IA ni datos de comportamiento: suma el peso del nivel del Radar, el de la prioridad y un pequeño bono por "en proceso", y desempata por fecha. El score es interno: no se muestra. `GET /api/attention` y tarjeta en el Dashboard con enlace a la actividad. Fórmula, pesos, desempates y escenarios numéricos en [docs/attention-engine.md](docs/attention-engine.md).
 
+## Progreso y carga semanal
+
+Dos vistas **descriptivas** de lo registrado (no miden rendimiento, productividad ni estrés y no recomiendan nada). **Progreso:** actividades completadas / registradas, en general y por asignatura (alfabético; "Sin actividades registradas" en vez de 0 %), solo del periodo actual. **Carga semanal:** compromisos de una semana lunes-domingo (actividades por su fecha límite + ocurrencias de la agenda), horas programadas, desglose por día y día con más compromisos, sin niveles "alta/baja". `GET /api/progress` y `GET /api/workload?week=<cualquier fecha>`; tarjeta "Esta semana" en el Dashboard y página `/progress`. Definiciones, qué cuenta y limitaciones en [docs/progress-and-workload.md](docs/progress-and-workload.md).
+
 ## Recordatorios
 
 Recordatorios **internos** de la app solo para actividades (sin push, correo ni notificaciones del sistema). Al crear una actividad se generan solos según su tipo (p. ej. parcial: 3 días, 1 día y 3 horas antes); nunca se crea uno que ya haya pasado. Se recalculan solo si cambian la fecha/hora límite, el tipo o el estado (finalizar cancela los pendientes; reabrir regenera los futuros). Editar uno automático lo vuelve manual. `GET /api/reminders/due` alimenta el panel "Recordatorios" del Dashboard (máx. 20) y la insignia 🔔 de "Inicio"; nada se marca como visto al leer. Reglas, limitaciones y decisiones en [docs/reminders.md](docs/reminders.md).
