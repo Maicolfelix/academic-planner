@@ -8,7 +8,7 @@ Academic Planner: PWA universitaria de planeación académica. Monorepo npm work
 - Una fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe final termina exactamente con `FASE N APROBADA` o `FASE N BLOQUEADA`.
 - **Commit solo cuando el usuario lo pida.** Mensajes con prefijo `feat:`; usar `git commit -F <archivo>` para mensajes con comillas.
 - Responder y documentar en español.
-- Fase actual: **8 aprobada. Fase 9 sin empezar** (esperar el prompt del usuario).
+- Fase actual: **9 aprobada. Fase 10 sin empezar** (esperar el prompt del usuario).
 
 ## Comandos
 
@@ -33,6 +33,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 - Invariantes críticas en la BD con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). Nunca editar una migración ya aplicada: crear otra.
 - Escrituras que tocan varias tablas van en una transacción; ediciones concurrentes de una actividad se serializan con `FOR UPDATE` (`activities.lock`).
 - Sin N+1: Prisma con `relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas constantes.
+- Atención (Fase 9): motor determinístico en `packages/core/src/attention.ts` (reutiliza `calculateRadarStatus`); el score es interno y nunca se muestra ni se persiste; las razones son plantillas fijas; el servicio siempre aplica el comparador, nunca el orden de la BD; tono neutral ("requiere mayor atención"), sin órdenes ni culpa.
 - Radar (Fase 8): categoría derivada por duración real en `packages/core/src/radar.ts` (`calculateRadarStatus`); nunca se persiste ni se duplica la regla; no es prioridad.
 - Recordatorios (Fase 7): solo `Activity`; AUTO se recalcula solo si cambian `dueAt`, `type` o el cruce a `COMPLETED`; MANUAL nunca se sobrescribe; el mensaje se deriva, no se guarda.
 
@@ -51,4 +52,4 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, "¿Qué hago ahora?", scoring de recomendación y carga semanal.
+Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos.

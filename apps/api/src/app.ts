@@ -10,6 +10,7 @@ import { originCheck } from './middleware/originCheck.js';
 import type { AuthRateLimits } from './middleware/rateLimit.js';
 import { createRequireAuth } from './middleware/requireAuth.js';
 import { createActivityController } from './controllers/activityController.js';
+import { createAttentionController } from './controllers/attentionController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
 import { createPeriodController } from './controllers/periodController.js';
 import { createRadarController } from './controllers/radarController.js';
@@ -24,6 +25,7 @@ import { createReminderRepository } from './repositories/reminderRepository.js';
 import { createScheduleRepository } from './repositories/scheduleRepository.js';
 import { createSubjectRepository } from './repositories/subjectRepository.js';
 import { activitiesRouter } from './routes/activities.js';
+import { attentionRouter } from './routes/attention.js';
 import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
@@ -33,6 +35,7 @@ import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createActivityService } from './services/activityService.js';
+import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createRadarService } from './services/radarService.js';
@@ -78,8 +81,12 @@ export function createApp(deps: AppDeps): Express {
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
   );
+  const radarRepository = createRadarRepository(prisma);
   const radarController = createRadarController(
-    createRadarService(createRadarRepository(prisma), periodRepository, clock),
+    createRadarService(radarRepository, periodRepository, clock),
+  );
+  const attentionController = createAttentionController(
+    createAttentionService(radarRepository, periodRepository, clock),
   );
   const scheduleController = createScheduleController(
     createScheduleService(scheduleRepository, periodRepository, subjectRepository, clock),
@@ -105,6 +112,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
   app.use('/api/radar', radarRouter(radarController, requireAuth));
+  app.use('/api/attention', attentionRouter(attentionController, requireAuth));
   app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
 

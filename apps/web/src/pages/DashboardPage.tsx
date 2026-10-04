@@ -9,6 +9,7 @@ import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
+import { AttentionCard } from './attention/AttentionCard';
 import { RadarCard } from './radar/RadarCard';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
@@ -72,6 +73,7 @@ export function DashboardPage() {
       {hasData && (
         <>
           <SummaryTiles summary={d.summary} />
+          <AttentionCard timeZone={timeZone} now={now} />
           <RadarCard />
           <NextDueCard activity={d.nextDue} timeZone={timeZone} now={now} />
           {d.classesToday.length > 0 && (

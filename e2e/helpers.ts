@@ -122,3 +122,21 @@ export async function apiCreateActivity(page: Page, data: Record<string, unknown
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()).activity as { id: string; title: string };
 }
+
+/**
+ * Local Bogotá date and time `offsetMs` from now, the way a student would type them. Offsets used here sit in
+ * the MIDDLE of each Radar band (12 h, 2 d, 5 d, 10 d), so the minute rounding of the form can never move an
+ * activity across a limit and the test does not depend on the exact second it runs.
+ */
+export function inBogota(offsetMs: number) {
+  const d = new Date(Date.now() + offsetMs);
+  return {
+    dueDate: d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
+    dueTime: d.toLocaleTimeString('en-GB', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }),
+  };
+}

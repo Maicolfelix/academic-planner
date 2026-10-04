@@ -50,6 +50,26 @@ export function ActivitiesPage() {
     rest.delete('action');
     setParams(rest, { replace: true });
   }, [params, setParams]);
+
+  // Arrived through a "Ver actividad" link (?edit=<id>): the dialog is derived from the URL once the FRESH list
+  // is loaded (no extra state). An id that is not in the list is simply dropped from the URL.
+  const editId = params.get('edit');
+  const listReady = activities.isSuccess && !activities.isFetching;
+  const linked = editId && listReady ? activities.data.find((a) => a.id === editId) : undefined;
+  useEffect(() => {
+    if (!editId || !listReady || linked) return;
+    const rest = new URLSearchParams(params);
+    rest.delete('edit');
+    setParams(rest, { replace: true });
+  }, [editId, listReady, linked, params, setParams]);
+  const current = editing ?? linked ?? null;
+  const closeEditor = () => {
+    setEditing(null);
+    if (!params.has('edit')) return;
+    const rest = new URLSearchParams(params);
+    rest.delete('edit');
+    setParams(rest, { replace: true });
+  };
   if (!period) return null; // RequirePeriod guarantees one; keeps the type honest
 
   const subjectList = subjects.data ?? [];
@@ -170,15 +190,15 @@ export function ActivitiesPage() {
         </>
       )}
 
-      {editing && canCreate && (
+      {current && canCreate && (
         <ActivityFormDialog
           subjects={subjectList}
-          activity={editing === 'new' ? undefined : editing}
+          activity={current === 'new' ? undefined : current}
           defaultSubjectId={filters.subject}
           timeZone={timeZone}
-          onClose={() => setEditing(null)}
+          onClose={closeEditor}
           onSaved={(message) => {
-            setEditing(null);
+            closeEditor();
             setNotice(message);
           }}
         />

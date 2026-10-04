@@ -6,8 +6,8 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 8 (Radar académico).**
-- **Siguiente: Fase 9, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 9 (¿Qué hago ahora?).**
+- **Siguiente: Fase 10, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
@@ -21,7 +21,8 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 | 4-5  | Actividades académicas y Dashboard                                           | `6501bd9`     |
 | 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb`     |
 | 7    | Recordatorios internos automáticos para actividades                          | `404a032`     |
-| 8    | Radar académico: categorías derivadas por tiempo restante                    | ver `git log` |
+| 8    | Radar académico: categorías derivadas por tiempo restante                    | `c0698c0`     |
+| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | ver `git log` |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -42,11 +43,13 @@ Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migracione
 
 - **Radar (Fase 8):** categoría derivada (`OVERDUE`/`IMMEDIATE`/`UPCOMING`/`PLANNABLE`/`UNDER_CONTROL`) calculada por `calculateRadarStatus` en `packages/core/src/radar.ts` con duración real; nunca se guarda. `GET /api/radar` (2 consultas) y filtro `?radar=`. Detalle en [radar.md](radar.md).
 
-Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md).
+- **Atención (Fase 9):** `packages/core/src/attention.ts`. `score = peso del nivel (Radar, con la vencida > 7 días rebajada) + peso de prioridad + bono de en proceso`; la brecha entre niveles (10) supera cualquier ayuda de prioridad + estado (9), así que la urgencia domina. Desempates totales, razones por plantillas, score nunca expuesto. `GET /api/attention` (2 consultas). Detalle en [attention-engine.md](attention-engine.md).
+
+Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md).
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, "¿Qué hago ahora?", scoring de recomendación y carga semanal. Cada uno pertenece a una fase futura definida por el usuario.
+Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
 
 ## Totales de tests (tras la Fase 8)
 

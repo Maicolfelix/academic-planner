@@ -5,6 +5,7 @@ import {
   apiSubjects,
   completeOnboarding,
   expectNoHorizontalOverflow,
+  inBogota,
   register,
   uniqueEmail,
   watch,
@@ -12,24 +13,6 @@ import {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-
-/**
- * Local Bogotá date and time `offsetMs` from now, the way a student would type them. Offsets used here sit in
- * the MIDDLE of each Radar band (12 h, 2 d, 5 d, 10 d), so the minute rounding of the form can never move an
- * activity across a limit and the test does not depend on the exact second it runs.
- */
-function inBogota(offsetMs: number) {
-  const d = new Date(Date.now() + offsetMs);
-  return {
-    dueDate: d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
-    dueTime: d.toLocaleTimeString('en-GB', {
-      timeZone: 'America/Bogota',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }),
-  };
-}
 
 async function newUserWithSubject(page: Page, subjectName = 'Redes') {
   await register(page, uniqueEmail());
