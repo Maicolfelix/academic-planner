@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 7 — Recordatorios automáticos** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
+Estado actual: **Fase 8 — Radar académico** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
 
 ## Requisitos
 
@@ -102,6 +102,10 @@ Usa 8 consultas constantes (sin N+1). Reglas, estructura de la respuesta y decis
 `/api/schedule` (CRUD y consulta semanal; todos con sesión). Una clase semanal es **una sola fila**: las ocurrencias se expanden al leer, solo para el rango pedido, con hora local (también a través de cambios de horario).
 Los conflictos de horario son **advertencias**, no restricciones (`warnings` en la respuesta y `?dryRun=true` para avisar antes de guardar). Una asignatura o un periodo con bloques no se puede eliminar.
 El Dashboard muestra las clases de hoy. Detalle y decisiones en [docs/schedule.md](docs/schedule.md). Pantalla: `/calendar` (escritorio: semana completa; móvil: lista por día).
+
+## Radar académico
+
+Clasifica cada actividad **abierta** por el tiempo real que falta para su fecha límite: Vencida, Atención inmediata (< 24 h), Próxima (≤ 72 h), Planificable (≤ 7 días) y Bajo control (> 7 días). Es derivado (nunca se guarda), determinístico y no es prioridad ni recomendación. Una sola regla en `packages/core`; `GET /api/radar`, filtro `GET /api/activities?radar=…`, tarjeta en el Dashboard y página `/radar`. Límites, reglas de borde y decisiones en [docs/radar.md](docs/radar.md).
 
 ## Recordatorios
 

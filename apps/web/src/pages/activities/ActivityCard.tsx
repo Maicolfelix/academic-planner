@@ -1,13 +1,15 @@
 import {
   ACTIVITY_STATUSES,
   ACTIVITY_STATUS_LABELS,
+  calculateRadarStatus,
   formatDue,
-  isOverdue,
+  radarExplanation,
   type Activity,
   type ActivityStatus,
   type Subject,
 } from '@planner/core';
-import { OverdueBadge, PriorityBadge, StatusBadge, TypeBadge } from './badges';
+import { RadarBadge } from '../radar/RadarBadge';
+import { PriorityBadge, StatusBadge, TypeBadge } from './badges';
 
 interface Props {
   activity: Activity;
@@ -33,7 +35,8 @@ export function ActivityCard({
   onEdit,
   onDelete,
 }: Props) {
-  const overdue = isOverdue(activity, now);
+  // Derived from the clock on every render (see core/radar.ts): null for a finished activity.
+  const radar = calculateRadarStatus(activity, now);
   const done = activity.status === 'COMPLETED';
 
   return (
@@ -49,7 +52,15 @@ export function ActivityCard({
             {activity.title}
           </h2>
           {subject && <p className="text-sm text-slate-700 break-words">{subject.name}</p>}
-          <p className="text-sm text-slate-700">{formatDue(activity, timeZone)}</p>
+          <p className="text-sm text-slate-700">
+            {formatDue(activity, timeZone)}
+            {radar && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <span className="font-medium">{radarExplanation(activity, now, timeZone)}</span>
+              </>
+            )}
+          </p>
           {activity.description && (
             <p className="mt-1 line-clamp-2 text-sm text-slate-600 break-words">
               {activity.description}
@@ -58,7 +69,7 @@ export function ActivityCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {overdue && <OverdueBadge />}
+          {radar && <RadarBadge status={radar} />}
           <StatusBadge status={activity.status} />
           <PriorityBadge priority={activity.priority} />
           <TypeBadge type={activity.type} />

@@ -19,6 +19,7 @@ describe('activity filters in the URL', () => {
       subject: undefined,
       priority: undefined,
       type: undefined,
+      radar: undefined,
     });
   });
 
@@ -54,7 +55,21 @@ describe('activity filters in the URL', () => {
       priority: undefined,
       type: undefined,
       overdue: undefined,
+      radar: undefined,
     });
     expect(toApiQuery({ overdue: true }, 'p1').overdue).toBe(true);
+  });
+
+  it('keeps the Radar category in the URL and sends it to the API; unknown values are dropped', () => {
+    expect(parse('radar=IMMEDIATE').radar).toBe('IMMEDIATE');
+    expect(parse('radar=COMPLETED').radar).toBeUndefined(); // finished activities have no category
+    expect(parse('radar=immediate').radar).toBeUndefined();
+    expect(serializeFilters({ radar: 'UPCOMING' }).toString()).toBe('radar=UPCOMING');
+    expect(parseFilters(serializeFilters({ radar: 'PLANNABLE', subject: 's' }))).toMatchObject({
+      radar: 'PLANNABLE',
+      subject: 's',
+    });
+    expect(hasActiveFilters({ radar: 'OVERDUE' })).toBe(true);
+    expect(toApiQuery({ radar: 'UNDER_CONTROL' }, 'p1').radar).toBe('UNDER_CONTROL');
   });
 });

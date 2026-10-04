@@ -51,6 +51,7 @@ export function createActivityService(
         dueFrom: query.from ? localDayBounds(query.from, actor.timezone).start : undefined,
         dueTo: query.to ? localDayBounds(query.to, actor.timezone).end : undefined,
         overdue: query.overdue === undefined ? undefined : { now: clock(), value: query.overdue },
+        radar: query.radar ? { now: clock(), status: query.radar } : undefined,
       });
       return rows.map(toActivityDto);
     },

@@ -1,4 +1,10 @@
-import type { ActivityPriority, ActivityStatus, ActivityType } from '@planner/core';
+import {
+  radarDueRange,
+  type ActivityPriority,
+  type ActivityStatus,
+  type ActivityType,
+  type RadarStatus,
+} from '@planner/core';
 import type { Db } from '../db/prisma.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -14,6 +20,8 @@ export interface ActivityFilters {
   dueTo?: Date;
   /** true: dueAt < now AND not completed. false: the complement. */
   overdue?: { now: Date; value: boolean };
+  /** Open activities whose deadline falls in the Radar category's range (the range comes from core). */
+  radar?: { now: Date; status: RadarStatus };
 }
 
 export interface ActivityCreateData {
@@ -53,6 +61,12 @@ export function createActivityRepository(prisma: Db) {
             ? { dueAt: { lt: now }, status: { not: 'COMPLETED' } }
             : { OR: [{ dueAt: { gte: now } }, { status: 'COMPLETED' }] },
         );
+      }
+      if (f.radar) {
+        and.push({
+          status: { not: 'COMPLETED' },
+          dueAt: radarDueRange(f.radar.status, f.radar.now),
+        });
       }
       return prisma.activity.findMany({
         where: {

@@ -6,6 +6,7 @@ import {
   type ActivityStatus,
   type ActivityType,
   type CreateActivityInput,
+  type RadarStatus,
   type UpdateActivityRequest,
 } from '@planner/core';
 import { apiFetch } from './client';
@@ -17,6 +18,7 @@ export interface ActivityQuery {
   priority?: ActivityPriority;
   type?: ActivityType;
   overdue?: boolean;
+  radar?: RadarStatus;
 }
 
 export async function fetchActivities(query: ActivityQuery): Promise<Activity[]> {

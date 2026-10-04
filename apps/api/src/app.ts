@@ -12,12 +12,14 @@ import { createRequireAuth } from './middleware/requireAuth.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
 import { createScheduleController } from './controllers/scheduleController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
+import { createRadarRepository } from './repositories/radarRepository.js';
 import { createReminderRepository } from './repositories/reminderRepository.js';
 import { createScheduleRepository } from './repositories/scheduleRepository.js';
 import { createSubjectRepository } from './repositories/subjectRepository.js';
@@ -26,12 +28,14 @@ import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { periodsRouter } from './routes/periods.js';
+import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createActivityService } from './services/activityService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
+import { createRadarService } from './services/radarService.js';
 import { createReminderService } from './services/reminderService.js';
 import { createScheduleService } from './services/scheduleService.js';
 import { createSubjectService } from './services/subjectService.js';
@@ -74,6 +78,9 @@ export function createApp(deps: AppDeps): Express {
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
   );
+  const radarController = createRadarController(
+    createRadarService(createRadarRepository(prisma), periodRepository, clock),
+  );
   const scheduleController = createScheduleController(
     createScheduleService(scheduleRepository, periodRepository, subjectRepository, clock),
   );
@@ -97,6 +104,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/subjects', subjectsRouter(subjectController, requireAuth));
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
+  app.use('/api/radar', radarRouter(radarController, requireAuth));
   app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
 

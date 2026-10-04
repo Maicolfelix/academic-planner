@@ -11,10 +11,20 @@ interface Props {
   overdue?: boolean;
   /** Shown under the list, e.g. a link to the rest. */
   footer?: ReactNode;
+  /** Wording of the time left; defaults to the calendar label ("Vence mañana"). */
+  describe?: (a: DashboardActivity) => string;
 }
 
 /** A compact list of activities: title, subject, deadline and how far away it is. */
-export function DueSection({ title, items, timeZone, now, overdue = false, footer }: Props) {
+export function DueSection({
+  title,
+  items,
+  timeZone,
+  now,
+  overdue = false,
+  footer,
+  describe = (a) => dueRelativeLabel(a, now, timeZone),
+}: Props) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
@@ -38,7 +48,7 @@ export function DueSection({ title, items, timeZone, now, overdue = false, foote
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-700">
                 <span>{formatDue(a, timeZone)}</span>
                 <span aria-hidden="true">·</span>
-                <span className="font-medium">{dueRelativeLabel(a, now, timeZone)}</span>
+                <span className="font-medium">{describe(a)}</span>
                 {overdue && <OverdueBadge />}
               </p>
             </div>

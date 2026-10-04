@@ -3,6 +3,8 @@ import {
   ACTIVITY_PRIORITY_LABELS,
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_LABELS,
+  RADAR_GROUP_LABELS,
+  RADAR_STATUSES,
   type ActivityStatus,
   type Subject,
 } from '@planner/core';
@@ -58,7 +60,7 @@ export function ActivityFilters({ filters, subjects, onChange }: Props) {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SelectField
           className="col-span-2 sm:col-span-1"
           id="filter-subject"
@@ -88,6 +90,15 @@ export function ActivityFilters({ filters, subjects, onChange }: Props) {
           value={filters.type ?? ''}
           onChange={(v) => onChange({ ...filters, type: (v || undefined) as Filters['type'] })}
           options={ACTIVITY_TYPES.map((t) => ({ value: t, label: ACTIVITY_TYPE_LABELS[t] }))}
+        />
+        <SelectField
+          className="col-span-2 sm:col-span-1"
+          id="filter-radar"
+          label="Radar"
+          placeholder="Todas"
+          value={filters.radar ?? ''}
+          onChange={(v) => onChange({ ...filters, radar: (v || undefined) as Filters['radar'] })}
+          options={RADAR_STATUSES.map((s) => ({ value: s, label: RADAR_GROUP_LABELS[s] }))}
         />
       </div>
 

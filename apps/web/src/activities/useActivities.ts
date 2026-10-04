@@ -1,6 +1,7 @@
 import type { UpdateActivityRequest } from '@planner/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
+import { RADAR_KEY } from '../radar/useRadar';
 import { REMINDERS_KEY } from '../reminders/useReminders';
 import {
   createActivityRequest,
@@ -29,6 +30,7 @@ function useInvalidateActivities() {
       qc.invalidateQueries({ queryKey: ['activities'] }),
       qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
       qc.invalidateQueries({ queryKey: REMINDERS_KEY }),
+      qc.invalidateQueries({ queryKey: RADAR_KEY }),
     ]);
 }
 

@@ -6,21 +6,22 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 7 (Recordatorios automáticos)**, commit `404a032`.
-- **Siguiente: Fase 8, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 8 (Radar académico).**
+- **Siguiente: Fase 9, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
 
-| Fase | Contenido                                                                    | Commit    |
-| ---- | ---------------------------------------------------------------------------- | --------- |
-| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a       |
-| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e` |
-| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c` |
-| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9` |
-| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9` |
-| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb` |
-| 7    | Recordatorios internos automáticos para actividades                          | `404a032` |
+| Fase | Contenido                                                                    | Commit        |
+| ---- | ---------------------------------------------------------------------------- | ------------- |
+| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a           |
+| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e`     |
+| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c`     |
+| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9`     |
+| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9`     |
+| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb`     |
+| 7    | Recordatorios internos automáticos para actividades                          | `404a032`     |
+| 8    | Radar académico: categorías derivadas por tiempo restante                    | ver `git log` |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -39,22 +40,24 @@ Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migracione
 - **Recordatorios (Fase 7):** solo para `Activity`. AUTO se recalcula solo si cambian `dueAt`, `type` o el estado cruza `COMPLETED`; MANUAL nunca se sobrescribe. Escrituras de actividad + recordatorios en una transacción con `FOR UPDATE` sobre la actividad; índice único parcial `(activityId, offsetMinutes) WHERE kind='AUTO'`. Marcar como visto es todo o nada; `/due` solo del periodo actual, máximo 20. Detalle en [reminders.md](reminders.md).
 - **Relaciones Prisma:** `relationJoins` con `relationLoadStrategy: 'join'` para evitar consultas extra.
 
-Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md).
+- **Radar (Fase 8):** categoría derivada (`OVERDUE`/`IMMEDIATE`/`UPCOMING`/`PLANNABLE`/`UNDER_CONTROL`) calculada por `calculateRadarStatus` en `packages/core/src/radar.ts` con duración real; nunca se guarda. `GET /api/radar` (2 consultas) y filtro `?radar=`. Detalle en [radar.md](radar.md).
+
+Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md).
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, Radar y "¿Qué hago ahora?". Cada uno pertenece a una fase futura definida por el usuario.
+Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, "¿Qué hago ahora?", scoring de recomendación y carga semanal. Cada uno pertenece a una fase futura definida por el usuario.
 
-## Totales de tests (tras la Fase 7)
+## Totales de tests (tras la Fase 8)
 
-Vitest: core 252, API 375, web 27 (654). Playwright: 72 (móvil 360 px y escritorio 1366 px).
+Vitest: core 298, API 394, web 28 (720). Playwright: 84 (móvil 360 px y escritorio 1366 px).
 
 ## Riesgos conocidos
 
 - Un recordatorio AUTO eliminado por el estudiante no vuelve hasta que cambie la fecha, el tipo o el estado de la actividad (documentado).
 - Los offsets de recordatorio son minutos absolutos: en un cambio de horario "1 día antes" son 24 h reales.
 - `/api/reminders/due` solo cubre el periodo actual.
-- Un e2e (`activities.spec` "activity flow", escritorio) falló una vez bajo carga completa sin causa encontrada; pasa en aislamiento y en pasadas completas posteriores. Vigilar.
+- Un e2e (`activities.spec` "activity flow", escritorio) falló una vez bajo carga completa (Fase 7) sin causa encontrada; no reapareció en 5 pasadas completas posteriores (en monitoreo). Si vuelve, investigar la causa con la evidencia, no solo reejecutar.
 - `npm audit` reporta vulnerabilidades altas en dependencias de desarrollo del CLI de `prisma` (`mysql2`, `deepmerge-ts`); no se usa MySQL. Revisar en la fase de endurecimiento.
 - Sin notificaciones fuera de la app: solo recordatorios internos.
 - Windows: Git avisa de conversión LF→CRLF; es inocuo. Los scripts de PowerShell 5.1 pueden corromper UTF-8 al leer/escribir; usar las herramientas de edición.

@@ -9,6 +9,7 @@ import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
+import { RadarCard } from './radar/RadarCard';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
 const quickLink =
@@ -71,6 +72,7 @@ export function DashboardPage() {
       {hasData && (
         <>
           <SummaryTiles summary={d.summary} />
+          <RadarCard />
           <NextDueCard activity={d.nextDue} timeZone={timeZone} now={now} />
           {d.classesToday.length > 0 && (
             <ClassesToday classes={d.classesToday} timeZone={timeZone} />

@@ -41,6 +41,19 @@ export const ACTIVITY_STATUS_LABELS: Record<ActivityStatus, string> = {
   COMPLETED: 'Finalizada',
 };
 
+/**
+ * Radar categories (derived from the deadline, never stored). The rule lives in radar.ts; the list is here so
+ * the activities filter can validate it without a circular import.
+ */
+export const RADAR_STATUSES = [
+  'OVERDUE',
+  'IMMEDIATE',
+  'UPCOMING',
+  'PLANNABLE',
+  'UNDER_CONTROL',
+] as const;
+export type RadarStatus = (typeof RADAR_STATUSES)[number];
+
 /** Quick creation never asks for these: most activities are plain tasks of normal importance. */
 export const DEFAULT_ACTIVITY_TYPE: ActivityType = 'TASK';
 export const DEFAULT_ACTIVITY_PRIORITY: ActivityPriority = 'MEDIUM';
@@ -160,6 +173,8 @@ export const listActivitiesQuerySchema = z
     priority: enumField(ACTIVITY_PRIORITIES, 'Prioridad inválida.').optional(),
     type: enumField(ACTIVITY_TYPES, 'Tipo inválido.').optional(),
     overdue: optionalBool.optional(),
+    /** Radar category, converted by the backend into a deadline range (open activities only). */
+    radar: enumField(RADAR_STATUSES, 'Categoría de Radar inválida.').optional(),
     /** Inclusive local days of the user: from 00:00 of `from` to 23:59:59.999 of `to`. */
     from: optionalDay.optional(),
     to: optionalDay.optional(),
