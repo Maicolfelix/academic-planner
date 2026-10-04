@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "postinstall": "npm run build -w @planner/core && npm run db:generate",
+    "dev:e2e": "npm run build -w @planner/core && concurrently -n api,web -c blue,green \"npm run serve -w @planner/api\" \"npm run dev -w @planner/web\"",
     "dev": "concurrently -n core,api,web -c gray,blue,green \"npm run dev -w @planner/core\" \"npm run dev -w @planner/api\" \"npm run dev -w @planner/web\"",
     "build": "npm run build -w @planner/core && npm run build -w @planner/api && npm run build -w @planner/web",
     "lint": "eslint .",
