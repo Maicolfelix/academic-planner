@@ -6,8 +6,8 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 9 (¿Qué hago ahora?).**
-- **Siguiente: Fase 10, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 10 (Progreso y carga semanal)** (PR #2, pendiente de fusionar en `main` por el usuario).
+- **Siguiente: Fase 11, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
