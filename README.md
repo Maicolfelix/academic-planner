@@ -1,7 +1,7 @@
 # Academic Planner (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 16 completada (endurecimiento de seguridad)**; siguiente: Fase 17 (validación integral del sistema). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 17 completada (validación integral del sistema)**; siguiente: Fase 18 (datos de demostración / seed). Evidencia de validación: [docs/system-validation.md](docs/system-validation.md). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -54,7 +54,10 @@ Migraciones actuales:
 | `npm run typecheck`                     | `tsc` en todos los paquetes y en `e2e/`                                            |
 | `npm test`                              | Vitest en todos los paquetes. La API usa PostgreSQL real (`academic_planner_test`) |
 | `npm run build`                         | Build de producción de core, API y Web                                             |
-| `npm run test:browser`                  | Playwright (360 px y 1366 px) contra su propio stack apuntando a la BD de test     |
+| `npm run test:browser`                  | Playwright (360 px y 1366 px) contra su propio stack (`dev:e2e`) y la BD de test   |
+| `npm run security:scan`                 | Escaneo offline de secretos y construcciones peligrosas en los archivos con git    |
+| `npm run test:security`                 | `security:scan` + pruebas de seguridad de la API                                   |
+| `npm run test:security:browser`         | Playwright en topología de producción (la API sirve la app, puerto 4300)           |
 | `npm run db:up` / `db:down`             | Inicia / detiene PostgreSQL                                                        |
 | `npm run db:migrate` / `db:deploy`      | Migraciones (ver arriba)                                                           |
 
@@ -68,15 +71,15 @@ y cada test vacía las tablas; se niega a ejecutar si `TEST_DATABASE_URL` no ter
 Requiere un navegador: `npx playwright install chromium`. Si la descarga no es posible en tu red,
 usa uno instalado: `PW_CHANNEL=msedge npm run test:browser`
 (PowerShell: `$env:PW_CHANNEL='msedge'; npm run test:browser`).
-`test:browser` arranca su propio `npm run dev` (apuntando a la BD de test), así que **detén cualquier `npm run dev` en :5173 antes**.
+`test:browser` arranca su propio stack con `npm run dev:e2e` (bundle compilado + API sin watch, apuntando a la BD de test) en :5173, así que **detén cualquier `npm run dev` antes**. `test:security:browser` usa el puerto 4300 y también comparte la BD de test.
 
 ## Autenticación
 
-Sesiones server-side en PostgreSQL con cookie `academic_planner_session` (HttpOnly, SameSite=Lax, 7 días, `Secure` en producción), contraseñas con Argon2id,
+Sesiones server-side en PostgreSQL con cookie `academic_planner_session` (HttpOnly, SameSite=Lax, 7 días, `Secure` en producción; bajo HTTPS se llama `__Host-academic_planner_session`), contraseñas con Argon2id,
 verificación de origen contra CSRF y rate limiting en login/registro. Detalle, decisiones y limitaciones en [docs/auth.md](docs/auth.md).
 
 Endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`.
-Pantallas: `/register` y `/login`. El Dashboard real es de la Fase 5.
+Pantallas: `/register` y `/login`.
 
 ## Periodos y asignaturas
 
