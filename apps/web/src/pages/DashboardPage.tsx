@@ -12,6 +12,7 @@ import { SummaryTiles } from './dashboard/SummaryTiles';
 import { AttentionCard } from './attention/AttentionCard';
 import { WeekCard } from './dashboard/WeekCard';
 import { RadarCard } from './radar/RadarCard';
+import { InstallPrompt } from '../pwa/InstallPrompt';
 import { QuickCapture } from './quickCapture/QuickCapture';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
@@ -132,6 +133,8 @@ export function DashboardPage() {
           </nav>
         </>
       )}
+
+      <InstallPrompt />
     </div>
   );
 }
