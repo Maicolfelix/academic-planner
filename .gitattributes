@@ -1,0 +1,2 @@
+# Keep the working tree in LF (Prettier and the repo use LF) even on Windows with core.autocrlf.
+* text=auto eol=lf

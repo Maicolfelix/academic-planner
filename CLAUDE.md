@@ -8,7 +8,7 @@ Academic Planner: PWA universitaria de planeación académica. Monorepo npm work
 - Una fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe final termina exactamente con `FASE N APROBADA` o `FASE N BLOQUEADA`.
 - **Commit solo cuando el usuario lo pida.** Mensajes con prefijo `feat:`; usar `git commit -F <archivo>` para mensajes con comillas.
 - Responder y documentar en español.
-- Fase actual: **10 aprobada. Fase 11 sin empezar** (esperar el prompt del usuario).
+- Fase actual: **11 aprobada. Fase 12 sin empezar** (esperar el prompt del usuario).
 
 ## Comandos
 
@@ -33,6 +33,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 - Invariantes críticas en la BD con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). Nunca editar una migración ya aplicada: crear otra.
 - Escrituras que tocan varias tablas van en una transacción; ediciones concurrentes de una actividad se serializan con `FOR UPDATE` (`activities.lock`).
 - Sin N+1: Prisma con `relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas constantes.
+- Captura rápida (Fase 11): `packages/core/src/quickCapture.ts`. Parser determinístico sin IA; solo **propone** (Capturar → Interpretar → Confirmar). Confirmar usa el `POST /api/activities` y la mutación del formulario manual: la captura rápida **no tiene camino de creación propio**. Nunca inventa una asignatura (ambigua o faltante se pregunta), no corrige en silencio una fecha fuera del periodo y no guarda el texto.
 - Progreso y carga (Fase 10): descriptivos, derivados y nunca guardados (`packages/core/src/insights.ts`). Progreso por asignatura = la regla del Dashboard, alfabético y sin ponderar; carga semanal lunes-domingo en la zona del perfil, reutilizando `expandBlock` de la agenda; una actividad es 1 compromiso y 0 horas; sin niveles de carga ni lenguaje de juicio ("sobrecargado", "deberías").
 - Atención (Fase 9): motor determinístico en `packages/core/src/attention.ts` (reutiliza `calculateRadarStatus`); el score es interno y nunca se muestra ni se persiste; las razones son plantillas fijas; el servicio siempre aplica el comparador, nunca el orden de la BD; tono neutral ("requiere mayor atención"), sin órdenes ni culpa.
 - Radar (Fase 8): categoría derivada por duración real en `packages/core/src/radar.ts` (`calculateRadarStatus`); nunca se persiste ni se duplica la regla; no es prioridad.
@@ -50,7 +51,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 
 - Docker Desktop puede no estar arrancado: abrirlo y esperar a `docker info` antes de `npm run db:up`.
 - PowerShell 5.1 corrompe UTF-8 al leer/escribir con `Get-Content`/`Set-Content`; usar Read/Write/Edit. Heredocs largos en Bash pueden fallar al parsear: preferir Write.
-- Los avisos LF→CRLF de git son inocuos.
+- `.gitattributes` fija `eol=lf`; si `format:check` falla tras un `pull` por CRLF, `npx prettier --write .` lo normaliza sin cambiar contenido. Un aviso LF→CRLF de `git add` es inocuo.
 
 ## Fuera de alcance hasta nueva orden
 

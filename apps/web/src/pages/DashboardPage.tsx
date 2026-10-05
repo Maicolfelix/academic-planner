@@ -12,6 +12,7 @@ import { SummaryTiles } from './dashboard/SummaryTiles';
 import { AttentionCard } from './attention/AttentionCard';
 import { WeekCard } from './dashboard/WeekCard';
 import { RadarCard } from './radar/RadarCard';
+import { QuickCapture } from './quickCapture/QuickCapture';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
 const quickLink =
@@ -63,6 +64,8 @@ export function DashboardPage() {
       </header>
 
       <RemindersPanel timeZone={timeZone} now={now} />
+
+      {d.subjectCount > 0 && <QuickCapture />}
 
       {d.classesToday.length > 0 && !hasData && (
         <ClassesToday classes={d.classesToday} timeZone={timeZone} />
