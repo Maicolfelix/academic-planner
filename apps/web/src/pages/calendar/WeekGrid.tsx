@@ -2,6 +2,7 @@ import {
   SCHEDULE_BLOCK_TYPE_LABELS,
   WEEKDAY_LABELS,
   WEEKDAY_SHORT_LABELS,
+  formatHourLabel,
   toLocalParts,
   weekdayOf,
   type ScheduleOccurrence,
@@ -57,7 +58,7 @@ export function WeekGrid({ days, occurrences, timeZone, today, onOpen }: Props) 
             style={{ top: (h - firstHour) * HOUR_PX }}
             className="absolute right-1 -translate-y-2 text-xs text-slate-600"
           >
-            {h > firstHour && `${String(h).padStart(2, '0')}:00`}
+            {h > firstHour && formatHourLabel(h)}
           </span>
         ))}
       </div>
@@ -78,6 +79,7 @@ export function WeekGrid({ days, occurrences, timeZone, today, onOpen }: Props) 
                 key={`${o.blockId}-${o.startAt}`}
                 type="button"
                 onClick={() => onOpen(o)}
+                title={`${o.title}, ${timeRange(o, timeZone)}`}
                 aria-label={`${o.title}, ${WEEKDAY_LABELS[weekdayOf(o.occurrenceDate)]}, ${timeRange(o, timeZone).replace('–', ' a ')}${
                   o.hasConflict ? ', con choque de horario' : ''
                 }`}

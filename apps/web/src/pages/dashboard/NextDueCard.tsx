@@ -11,7 +11,7 @@ export function NextDueCard({ activity, timeZone, now }: Props) {
   return (
     <section
       aria-labelledby="next-due-title"
-      className="rounded-lg border-2 border-slate-900 bg-white p-4"
+      className="rounded-lg border border-slate-300 bg-white p-4"
     >
       <h2
         id="next-due-title"

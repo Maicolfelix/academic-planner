@@ -8,7 +8,9 @@ import { FormField } from '../components/FormField';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const notice = (useLocation().state as { notice?: string } | null)?.notice;
+  const state = useLocation().state as { notice?: string; warning?: string } | null;
+  const notice = state?.notice;
+  const warning = state?.warning;
   const login = useLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +38,11 @@ export function LoginPage() {
 
   return (
     <AuthLayout title="Iniciar sesión">
+      {warning && (
+        <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+          {warning}
+        </p>
+      )}
       {notice && (
         <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
           {notice}
@@ -68,7 +75,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={login.isPending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+          className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
         >
           {login.isPending ? 'Entrando…' : 'Entrar'}
         </button>

@@ -1,7 +1,7 @@
-# Planificador Académico (PWA)
+# Academic Planner (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 14 completada (importación de horario con OCR)**; siguiente: Fase 15. Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 15 completada (UX, accesibilidad y responsive)**; siguiente: Fase 16 (endurecimiento de seguridad). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -130,6 +130,10 @@ Recordatorios **internos** de la app solo para actividades (sin push, correo ni 
 ## Importación asistida de horarios
 
 Desde la Agenda, «Importar horario» (`/calendar/import`) permite subir una imagen (PNG/JPG) o un PDF de tu horario: se lee con OCR local (Tesseract) o con el texto del PDF, se te muestra una **propuesta editable** y solo se crean las clases que confirmes (como clases semanales). No importa «cualquier horario automáticamente»: el OCR puede equivocarse, así que revisa siempre las horas. Sin IA, el archivo no se envía a terceros ni se guarda. Máx. 10 MB y 5 páginas. Detalle en [docs/schedule-import.md](docs/schedule-import.md).
+
+## Accesibilidad y uso en móvil
+
+Pensada para 360 px en adelante: navegación compacta, enlace «Saltar al contenido», uso completo con teclado, diálogos que no pierden lo escrito (preguntan antes de descartar), horas en un solo estilo (12 h, a. m./p. m.) y auditoría automática con axe (orientada a WCAG 2.1 AA, no es una certificación). Decisiones, verificación y lista de pruebas en dispositivos reales: [docs/ux-accessibility.md](docs/ux-accessibility.md).
 
 ## PWA instalable
 

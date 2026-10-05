@@ -1,6 +1,7 @@
 import {
   WEEKDAY_LABELS,
   WEEKDAYS,
+  formatClockRange,
   toLocalParts,
   weekdayOf,
   type ScheduleImportProposal,
@@ -87,8 +88,7 @@ interface Props {
 
 const conflictText = (c: Conflict, timeZone: string) => {
   const start = toLocalParts(c.startAt, timeZone);
-  const end = toLocalParts(c.endAt, timeZone);
-  return `Conflicto con ${c.title}, ${WEEKDAY_LABELS[weekdayOf(start.date)].toLowerCase()} ${start.time}–${end.time}`;
+  return `Conflicto con ${c.title}, ${WEEKDAY_LABELS[weekdayOf(start.date)].toLowerCase()} ${formatClockRange(c.startAt, c.endAt, timeZone)}`;
 };
 
 /** One proposed class, editable. Nothing is saved until "Importar seleccionadas". */

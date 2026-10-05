@@ -41,6 +41,8 @@ export default defineConfig({
       LOGIN_RATE_LIMIT_MAX: '1000',
       REGISTER_RATE_LIMIT_MAX: '1000',
       SCHEDULE_IMPORT_RATE_LIMIT_MAX: '1000',
+      // Dual-stack (IPv4 + IPv6): with the default `localhost` the preview only listened on [::1].
+      WEB_HOST: '::',
     },
   },
 });

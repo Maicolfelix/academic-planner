@@ -10,7 +10,7 @@ export function StatusPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Planificador Académico</h1>
+      <h1 className="text-2xl font-semibold">Academic Planner</h1>
       <section aria-live="polite" className="rounded-lg border border-slate-300 p-4">
         <h2 className="text-sm font-medium text-slate-600">Estado del sistema</h2>
         {isPending && <p>Conectando con el servidor…</p>}

@@ -7,6 +7,7 @@ import {
 } from '@planner/core';
 import { Link } from 'react-router';
 import { useMe } from '../auth/useAuth';
+import { QueryError } from '../components/QueryError';
 import { useNow } from '../lib/useNow';
 import { useRadar } from '../radar/useRadar';
 import { DueSection } from './dashboard/DueSection';
@@ -23,20 +24,7 @@ export function RadarPage() {
   const now = useNow();
 
   if (radar.isPending) return <p role="status">Cargando Radar…</p>;
-  if (radar.isError) {
-    return (
-      <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
-        <p className="mb-2">No se pudo cargar el Radar: {radar.error.message}</p>
-        <button
-          type="button"
-          onClick={() => radar.refetch()}
-          className="min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100"
-        >
-          Reintentar
-        </button>
-      </div>
-    );
-  }
+  if (!radar.data) return <QueryError query={radar} title="No se pudo cargar el Radar" />;
 
   const { summary, groups, period } = radar.data;
   const open = Object.values(summary).reduce((a, b) => a + b, 0);
@@ -51,6 +39,8 @@ export function RadarPage() {
           prioridad ni una recomendación de qué hacer primero.
         </p>
       </header>
+
+      <QueryError query={radar} title="No se pudo cargar el Radar" />
 
       <section aria-labelledby="radar-summary-title" className="flex flex-col gap-2">
         <h2 id="radar-summary-title" className="text-lg font-semibold">

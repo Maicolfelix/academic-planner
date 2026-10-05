@@ -75,7 +75,7 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={register.isPending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+          className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
         >
           {register.isPending ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>

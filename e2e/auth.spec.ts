@@ -13,7 +13,9 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   page,
   context,
 }) => {
-  const assertClean = watch(page);
+  // A background refresh (reminders, radar, attention poll every minute and on focus) can be in flight at the very
+  // moment of signing out; the server correctly answers it 401. That is not an error of the app.
+  const assertClean = watch(page, ['401 /api/reminders/*', '401 /api/radar', '401 /api/attention']);
   const email = uniqueEmail();
 
   // 1-4. Register -> a user without an academic period is sent to onboarding first (Phase 3),

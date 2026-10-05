@@ -1,3 +1,4 @@
+import { QueryError } from '../../components/QueryError';
 import { formatDuration } from '@planner/core';
 import { Link } from 'react-router';
 import { useWorkload } from '../../insights/useInsights';
@@ -24,18 +25,7 @@ export function WeekCard() {
       </h2>
 
       {workload.isPending && <p role="status">Cargando tu semana…</p>}
-      {workload.isError && (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-          <p className="mb-2">No se pudo cargar la semana: {workload.error.message}</p>
-          <button
-            type="button"
-            onClick={() => workload.refetch()}
-            className="min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100"
-          >
-            Reintentar
-          </button>
-        </div>
-      )}
+      <QueryError query={workload} title="No se pudo cargar la semana" />
 
       {workload.data &&
         (workload.data.totals.totalCommitments === 0 ? (

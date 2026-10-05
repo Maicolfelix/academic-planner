@@ -217,8 +217,10 @@ test('subject form: validation, duplicates, cancel, keyboard and responsive layo
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
   expect(box!.y).toBeGreaterThanOrEqual(0);
 
-  // Escape closes and returns focus to the button that opened it.
+  // Typed text is not lost by an accidental Escape: it asks first, then discarding returns focus to the opener.
   await page.keyboard.press('Escape');
+  await expect(dialog.getByRole('alert')).toContainText('Tienes cambios sin guardar');
+  await dialog.getByRole('button', { name: 'Descartar cambios' }).click();
   await expect(dialog).toBeHidden();
   await expect(addButton).toBeFocused();
 

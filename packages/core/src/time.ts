@@ -123,6 +123,32 @@ export function formatClock(instant: Date | string, timeZone: string, locale = '
   }).format(new Date(instant));
 }
 
+const MERIDIEM = /\s*([ap])\.\s?m\./i;
+
+/**
+ * "8:00–10:00 a. m." or "11:00 a. m.–1:00 p. m.": a time range in the same 12-hour style as every other time of
+ * the product (Colombian Spanish). The a. m./p. m. is written once when both ends share it.
+ */
+export function formatClockRange(
+  start: Date | string,
+  end: Date | string,
+  timeZone: string,
+  locale = 'es-CO',
+): string {
+  const a = formatClock(start, timeZone, locale);
+  const b = formatClock(end, timeZone, locale);
+  const ma = MERIDIEM.exec(a)?.[1]?.toLowerCase();
+  const mb = MERIDIEM.exec(b)?.[1]?.toLowerCase();
+  return ma !== undefined && ma === mb ? `${a.replace(MERIDIEM, '')}–${b}` : `${a}–${b}`;
+}
+
+/** "8 a. m.", "12 p. m.": the label of a whole hour (0-23), for the hour axis of the agenda. */
+export function formatHourLabel(hour: number, locale = 'es-CO'): string {
+  return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', hour: 'numeric', hour12: true }).format(
+    new Date(Date.UTC(2000, 0, 1, hour)),
+  );
+}
+
 /**
  * Human text for a due date, in the user's timezone: "vie, 10 oct 2026" or, when the user chose a
  * time, "vie, 10 oct 2026, 2:00 p. m.". Without a time no hour is shown (the stored 23:59 is an
