@@ -9,6 +9,8 @@ const app = createApp({
   checkDatabase: () => pingDatabase(prisma),
   corsOrigins: env.CORS_ORIGIN,
   secureCookies: env.NODE_ENV === 'production',
+  trustProxy: env.TRUST_PROXY,
+  webDistDir: env.WEB_DIST_DIR,
   rateLimits: { loginMax: env.LOGIN_RATE_LIMIT_MAX, registerMax: env.REGISTER_RATE_LIMIT_MAX },
   scheduleImport: { limit: env.SCHEDULE_IMPORT_RATE_LIMIT_MAX },
 });

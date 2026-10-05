@@ -1,7 +1,7 @@
 import { loginSchema, registerSchema, type AuthResponse } from '@planner/core';
-import { Router, type RequestHandler } from 'express';
+import { Router, type Request, type RequestHandler } from 'express';
 import type { AuthService } from '../auth/authService.js';
-import { clearSessionCookie, SESSION_COOKIE, setSessionCookie } from '../auth/cookies.js';
+import { clearSessionCookie, sessionTokenOf, setSessionCookie } from '../auth/cookies.js';
 import type { SessionService } from '../auth/sessions.js';
 import {
   createLimiter,
@@ -28,6 +28,13 @@ export function authRouter({
 }: Deps): Router {
   const router = Router();
 
+  // Signing in (or up) always issues a NEW token; the one the browser was holding, if any, is revoked on the spot
+  // so it cannot linger as a second valid session (and nothing a client sends is ever reused as a session).
+  const retire = async (req: Request) => {
+    const previous = sessionTokenOf(req, secureCookies);
+    if (previous) await sessions.revoke(previous);
+  };
+
   // Credentials and sessions must never be cached by browsers or proxies.
   router.use((_req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -40,6 +47,7 @@ export function authRouter({
     async (req, res) => {
       const input = registerSchema.parse(req.body ?? {});
       const { user, session } = await auth.register(input);
+      await retire(req);
       setSessionCookie(res, session.token, secureCookies);
       res.status(201).json({ user } satisfies AuthResponse);
     },
@@ -51,6 +59,7 @@ export function authRouter({
     async (req, res) => {
       const input = loginSchema.parse(req.body ?? {});
       const { user, session } = await auth.login(input);
+      await retire(req);
       setSessionCookie(res, session.token, secureCookies);
       res.json({ user } satisfies AuthResponse);
     },
@@ -58,10 +67,8 @@ export function authRouter({
 
   // Idempotent: logging out without a valid session is still a success.
   router.post('/logout', async (req, res) => {
-    const token: unknown = req.cookies?.[SESSION_COOKIE];
-    if (typeof token === 'string' && token.length > 0 && token.length <= 128) {
-      await sessions.revoke(token);
-    }
+    const token = sessionTokenOf(req, secureCookies);
+    if (token) await sessions.revoke(token);
     clearSessionCookie(res, secureCookies);
     res.status(204).end();
   });

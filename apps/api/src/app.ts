@@ -1,14 +1,16 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
-import helmet from 'helmet';
 import { createAuthService } from './auth/authService.js';
 import { createSessionService } from './auth/sessions.js';
 import { transactionRunner, type PrismaClient } from './db/prisma.js';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { originCheck } from './middleware/originCheck.js';
 import { createLimiter, type AuthRateLimits } from './middleware/rateLimit.js';
+import { requireKnownBodyType } from './middleware/requestGuards.js';
 import { createRequireAuth } from './middleware/requireAuth.js';
+import { noStoreApi, securityHeaders } from './middleware/securityHeaders.js';
+import { staticWeb } from './middleware/staticWeb.js';
 import { createAcademicInboxController } from './controllers/academicInboxController.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createAttentionController } from './controllers/attentionController.js';
@@ -71,6 +73,10 @@ export interface AppDeps {
   corsOrigins: string[];
   /** `Secure` cookie attribute; true in production (HTTPS). */
   secureCookies: boolean;
+  /** Express `trust proxy` setting (hop count or addresses). Unset = the API is reached directly. */
+  trustProxy?: number | string;
+  /** Built web app to serve (production). Unset in development, where Vite serves it. */
+  webDistDir?: string;
   rateLimits: AuthRateLimits;
   /** Source of "now" for rules that depend on it (overdue filter, completedAt). Defaults to the real clock. */
   clock?: () => Date;
@@ -165,11 +171,15 @@ export function createApp(deps: AppDeps): Express {
 
   const app = express();
   app.disable('x-powered-by');
-  app.use(helmet());
+  if (deps.trustProxy !== undefined) app.set('trust proxy', deps.trustProxy);
+  app.use(securityHeaders({ https: secureCookies }));
+  app.use('/api', noStoreApi);
   app.use(cors({ origin: corsOrigins, credentials: true }));
+  // Cheapest checks first: a forged origin or an odd content type is refused before any body is read.
+  app.use('/api', originCheck(corsOrigins));
+  app.use('/api', requireKnownBodyType({ multipartPaths: ['/schedule-import'] }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
-  app.use('/api', originCheck(corsOrigins));
 
   app.use('/api/health', healthRouter(checkDatabase));
   app.use('/api/auth', authRouter({ auth, sessions, requireAuth, secureCookies, rateLimits }));
@@ -190,6 +200,8 @@ export function createApp(deps: AppDeps): Express {
     scheduleImportRouter(scheduleImportController, requireAuth, importLimiter),
   );
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
+
+  if (deps.webDistDir) app.use(staticWeb(deps.webDistDir));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler());

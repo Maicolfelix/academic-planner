@@ -61,10 +61,10 @@ export const credentials = {
   password: 'correct horse battery',
 };
 
-/** First `academic_planner_session` Set-Cookie header of a response, if any. */
+/** First session Set-Cookie (`academic_planner_session`, or its `__Host-` form over HTTPS) header of a response, if any. */
 export function sessionCookie(res: { headers: Record<string, unknown> }): string | undefined {
   const raw = res.headers['set-cookie'] as string[] | undefined;
-  return raw?.find((c) => c.startsWith('academic_planner_session='));
+  return raw?.find((c) => /^(__Host-)?academic_planner_session=/.test(c));
 }
 
 export const tokenFrom = (setCookie: string): string => setCookie.split(';')[0]!.split('=')[1]!;
