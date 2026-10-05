@@ -8,7 +8,7 @@ Academic Planner: PWA universitaria de planeación académica. Monorepo npm work
 - Una fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe final termina exactamente con `FASE N APROBADA` o `FASE N BLOQUEADA`.
 - **Commit solo cuando el usuario lo pida.** Mensajes con prefijo `feat:`; usar `git commit -F <archivo>` para mensajes con comillas.
 - Responder y documentar en español.
-- Fase actual: **9 aprobada. Fase 10 sin empezar** (esperar el prompt del usuario).
+- Fase actual: **10 aprobada. Fase 11 sin empezar** (esperar el prompt del usuario).
 
 ## Comandos
 
@@ -18,7 +18,7 @@ npm run db:deploy                   # aplicar migraciones (dev)
 npm run lint && npm run format:check && npm run typecheck
 npm test                            # Vitest: core, api (BD real *_test), web
 npm run build
-PW_CHANNEL=msedge npm run test:browser   # Playwright 360 px y 1366 px; no tener `npm run dev` corriendo
+PW_CHANNEL=msedge npm run test:browser   # Playwright 360 px y 1366 px; usa `dev:e2e` (bundle compilado + API sin watch) y comparte el puerto 5173: no tener `npm run dev` corriendo
 npm run dev                         # core + api + web (web en :5173)
 ```
 
@@ -33,6 +33,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 - Invariantes críticas en la BD con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). Nunca editar una migración ya aplicada: crear otra.
 - Escrituras que tocan varias tablas van en una transacción; ediciones concurrentes de una actividad se serializan con `FOR UPDATE` (`activities.lock`).
 - Sin N+1: Prisma con `relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas constantes.
+- Progreso y carga (Fase 10): descriptivos, derivados y nunca guardados (`packages/core/src/insights.ts`). Progreso por asignatura = la regla del Dashboard, alfabético y sin ponderar; carga semanal lunes-domingo en la zona del perfil, reutilizando `expandBlock` de la agenda; una actividad es 1 compromiso y 0 horas; sin niveles de carga ni lenguaje de juicio ("sobrecargado", "deberías").
 - Atención (Fase 9): motor determinístico en `packages/core/src/attention.ts` (reutiliza `calculateRadarStatus`); el score es interno y nunca se muestra ni se persiste; las razones son plantillas fijas; el servicio siempre aplica el comparador, nunca el orden de la BD; tono neutral ("requiere mayor atención"), sin órdenes ni culpa.
 - Radar (Fase 8): categoría derivada por duración real en `packages/core/src/radar.ts` (`calculateRadarStatus`); nunca se persiste ni se duplica la regla; no es prioridad.
 - Recordatorios (Fase 7): solo `Activity`; AUTO se recalcula solo si cambian `dueAt`, `type` o el cruce a `COMPLETED`; MANUAL nunca se sobrescribe; el mensaje se deriva, no se guarda.
@@ -41,6 +42,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 
 - TanStack Query: invalidar `['activities']`, `DASHBOARD_KEY` y `['reminders']` desde las mutaciones de actividades.
 - UI: legible a 360 px, sin desbordamiento horizontal, controles táctiles ≥ 44 px, estados siempre con texto (no solo color), `aria-label` en botones sin texto claro.
+- E2E: nunca esperar con una aserción ya cierta (p. ej. el texto de una `<option>` dentro de la propia tarjeta) antes de recargar o navegar: espera el efecto real (valor de un control controlado, aparición/desaparición de elementos) o el `PATCH` queda abortado.
 - Tests: Vitest (core/api/web), Supertest contra BD real, Playwright con el helper `watch(page, alsoExpected)`. Hacer _mutation checks_ en reglas críticas y revertirlos (`grep MUTATION` debe dar 0). Las capturas de revisión van en un spec temporal que se borra.
 - Zona horaria en tests e2e: probar navegador en `Asia/Tokyo` con perfil Bogotá.
 

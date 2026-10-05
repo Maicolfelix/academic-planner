@@ -12,6 +12,10 @@ import { createRequireAuth } from './middleware/requireAuth.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createAttentionController } from './controllers/attentionController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
+import {
+  createProgressController,
+  createWorkloadController,
+} from './controllers/insightsController.js';
 import { createPeriodController } from './controllers/periodController.js';
 import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
@@ -19,6 +23,7 @@ import { createScheduleController } from './controllers/scheduleController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
+import { createInsightsRepository } from './repositories/insightsRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
 import { createRadarRepository } from './repositories/radarRepository.js';
 import { createReminderRepository } from './repositories/reminderRepository.js';
@@ -29,6 +34,7 @@ import { attentionRouter } from './routes/attention.js';
 import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
+import { progressRouter, workloadRouter } from './routes/insights.js';
 import { periodsRouter } from './routes/periods.js';
 import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
@@ -38,9 +44,11 @@ import { createActivityService } from './services/activityService.js';
 import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
+import { createProgressService } from './services/progressService.js';
 import { createRadarService } from './services/radarService.js';
 import { createReminderService } from './services/reminderService.js';
 import { createScheduleService } from './services/scheduleService.js';
+import { createWorkloadService } from './services/workloadService.js';
 import { createSubjectService } from './services/subjectService.js';
 
 export interface AppDeps {
@@ -81,6 +89,13 @@ export function createApp(deps: AppDeps): Express {
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
   );
+  const insightsRepository = createInsightsRepository(prisma);
+  const progressController = createProgressController(
+    createProgressService(insightsRepository, periodRepository, clock),
+  );
+  const workloadController = createWorkloadController(
+    createWorkloadService(insightsRepository, scheduleRepository, periodRepository, clock),
+  );
   const radarRepository = createRadarRepository(prisma);
   const radarController = createRadarController(
     createRadarService(radarRepository, periodRepository, clock),
@@ -112,6 +127,8 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
   app.use('/api/radar', radarRouter(radarController, requireAuth));
+  app.use('/api/progress', progressRouter(progressController, requireAuth));
+  app.use('/api/workload', workloadRouter(workloadController, requireAuth));
   app.use('/api/attention', attentionRouter(attentionController, requireAuth));
   app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));

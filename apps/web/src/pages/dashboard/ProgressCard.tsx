@@ -1,4 +1,5 @@
 import type { Dashboard } from '@planner/core';
+import { Link } from 'react-router';
 
 /**
  * Progress of the activities registered in this period (finished / total). It is not performance,
@@ -32,6 +33,12 @@ export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) 
       <p className="text-sm text-slate-600">
         Mide solo las actividades que has registrado en este periodo.
       </p>
+      <Link
+        to="/progress"
+        className="inline-flex min-h-11 items-center self-start text-sm font-medium underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      >
+        Ver progreso por asignatura
+      </Link>
     </section>
   );
 }

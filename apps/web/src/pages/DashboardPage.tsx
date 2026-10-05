@@ -10,6 +10,7 @@ import { NextDueCard } from './dashboard/NextDueCard';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
 import { AttentionCard } from './attention/AttentionCard';
+import { WeekCard } from './dashboard/WeekCard';
 import { RadarCard } from './radar/RadarCard';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
@@ -106,6 +107,7 @@ export function DashboardPage() {
             <DueSection title="Próximas entregas" items={upcoming} timeZone={timeZone} now={now} />
           )}
 
+          <WeekCard />
           <ProgressCard progress={d.progress} />
 
           <nav aria-label="Accesos rápidos" className="flex flex-wrap gap-2">

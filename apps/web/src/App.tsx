@@ -6,6 +6,7 @@ import { CalendarPage } from './pages/CalendarPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
+import { ProgressPage } from './pages/ProgressPage';
 import { RadarPage } from './pages/RadarPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { StatusPage } from './pages/StatusPage';
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/activities" element={<ActivitiesPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/radar" element={<RadarPage />} />
+            <Route path="/progress" element={<ProgressPage />} />
           </Route>
         </Route>
       </Route>

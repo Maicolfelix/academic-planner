@@ -9,6 +9,7 @@ import {
   updateSubjectRequest,
 } from '../api/academic';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
+import { PROGRESS_KEY } from '../insights/useInsights';
 
 export const periodsKey = ['periods'] as const;
 export const subjectsKey = (periodId: string) => ['subjects', periodId] as const;
@@ -53,6 +54,8 @@ function useInvalidateSubjects() {
     Promise.all([
       qc.invalidateQueries({ queryKey: ['subjects'] }),
       qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      // The progress lists every subject of the period (with its name, color and counts).
+      qc.invalidateQueries({ queryKey: PROGRESS_KEY }),
     ]);
 }
 
