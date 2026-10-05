@@ -142,7 +142,9 @@ test('activity flow: create, edit, status, persistence, subject guard, delete, e
   await expect(page.getByText('Primero agrega una asignatura.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Agregar actividad' })).toHaveCount(0);
 
-  // The session and data survive a full logout/login cycle.
+  // The session and data survive a full logout/login cycle. Let the screen finish loading first: logging out with
+  // the activities request still in flight is answered 401 by the server (seen under 4 parallel browsers).
+  await page.waitForLoadState('networkidle');
   await nav(page).getByRole('button', { name: 'Cerrar sesión' }).click();
   await login(page, email);
   await expect(page).toHaveURL(/\/dashboard$/);

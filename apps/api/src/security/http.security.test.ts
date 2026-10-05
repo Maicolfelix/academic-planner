@@ -292,7 +292,7 @@ describe('errors reveal nothing', () => {
     const broken = buildApp({
       checkDatabase: () => {
         throw new Error(
-          'connect ECONNREFUSED postgresql://planner:SECRETPW@10.1.2.3:5432/db at C:\\Users\\dev\\academic-planner\\src\\db.ts:42',
+          'connect ECONNREFUSED postgresql://planner:SECRETPW@example.test:5432/db at C:\\Users\\dev\\academic-planner\\src\\db.ts:42',
         );
       },
     });
