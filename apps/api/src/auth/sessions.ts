@@ -5,6 +5,8 @@ import type { PrismaClient } from '../db/prisma.js';
 /** Fixed 7-day lifetime: long enough for a student not to re-login daily, short enough to bound a stolen cookie. */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 60 * 1000;
+/** Several devices are fine; an unbounded pile of live sessions per account is not (the oldest are dropped). */
+export const MAX_SESSIONS_PER_USER = 20;
 
 export interface AuthContext {
   sessionId: string;
@@ -21,6 +23,15 @@ export function createSessionService(prisma: PrismaClient) {
       const token = randomBytes(32).toString('base64url');
       const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
       await prisma.session.create({ data: { userId, tokenHash: hashToken(token), expiresAt } });
+      const surplus = await prisma.session.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip: MAX_SESSIONS_PER_USER,
+        select: { id: true },
+      });
+      if (surplus.length > 0) {
+        await prisma.session.deleteMany({ where: { id: { in: surplus.map((s) => s.id) } } });
+      }
       return { token, expiresAt };
     },
 

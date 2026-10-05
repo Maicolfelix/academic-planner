@@ -1,7 +1,7 @@
 # Academic Planner (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 15 completada (UX, accesibilidad y responsive)**; siguiente: Fase 16 (endurecimiento de seguridad). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 16 completada (endurecimiento de seguridad)**; siguiente: Fase 17 (validación integral del sistema). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -130,6 +130,10 @@ Recordatorios **internos** de la app solo para actividades (sin push, correo ni 
 ## Importación asistida de horarios
 
 Desde la Agenda, «Importar horario» (`/calendar/import`) permite subir una imagen (PNG/JPG) o un PDF de tu horario: se lee con OCR local (Tesseract) o con el texto del PDF, se te muestra una **propuesta editable** y solo se crean las clases que confirmes (como clases semanales). No importa «cualquier horario automáticamente»: el OCR puede equivocarse, así que revisa siempre las horas. Sin IA, el archivo no se envía a terceros ni se guarda. Máx. 10 MB y 5 páginas. Detalle en [docs/schedule-import.md](docs/schedule-import.md).
+
+## Seguridad
+
+Revisión orientada a seguridad (no es una prueba de penetración ni una certificación): sesiones y cookies endurecidas, protección CSRF, propiedad de datos probada con una matriz IDOR, CSP estricta, límites de subida/OCR y de frecuencia, y `npm run security:scan` para detectar secretos y construcciones peligrosas. Modelo de amenazas, decisiones, hallazgos de dependencias, limitaciones y recomendaciones de despliegue: [docs/security.md](docs/security.md).
 
 ## Accesibilidad y uso en móvil
 

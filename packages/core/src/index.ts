@@ -1,3 +1,4 @@
+import './zodRuntime.js'; // first: see the file
 export * from './academic.js';
 export * from './academicInbox.js';
 export * from './activity.js';

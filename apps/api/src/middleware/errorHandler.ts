@@ -3,9 +3,17 @@ import type { ApiError } from '@planner/core';
 import { z, ZodError } from 'zod';
 import { AppError, notFound } from '../errors/AppError.js';
 
-export const notFoundHandler: RequestHandler = (req, _res, next) => {
-  next(notFound(`Route not found: ${req.method} ${req.path}`));
+// The same answer for every unknown address: no route list, no echo of what was asked.
+export const notFoundHandler: RequestHandler = (_req, _res, next) => {
+  next(notFound('Recurso no encontrado.'));
 };
+
+const isClientHttpError = (err: unknown): err is { status: number; type?: string } =>
+  typeof err === 'object' &&
+  err !== null &&
+  typeof (err as { status?: unknown }).status === 'number' &&
+  (err as { status: number }).status >= 400 &&
+  (err as { status: number }).status < 500;
 
 export function createErrorHandler(
   opts: { log?: (err: unknown) => void } = {},
@@ -34,7 +42,16 @@ export function createErrorHandler(
       (err as { type?: string }).type === 'entity.parse.failed'
     ) {
       status = 400;
-      body = { error: { code: 'INVALID_JSON', message: 'Malformed JSON body' } };
+      body = {
+        error: { code: 'INVALID_JSON', message: 'El cuerpo de la solicitud no es JSON válido.' },
+      };
+    } else if (isClientHttpError(err)) {
+      // A request the HTTP layer itself refused (body too large, bad charset…): its status, our wording.
+      status = err.status;
+      body =
+        err.type === 'entity.too.large'
+          ? { error: { code: 'PAYLOAD_TOO_LARGE', message: 'La solicitud es demasiado grande.' } }
+          : { error: { code: 'BAD_REQUEST', message: 'Solicitud inválida.' } };
     } else {
       log(err); // never leak internals to the client
     }

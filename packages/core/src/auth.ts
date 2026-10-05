@@ -15,7 +15,7 @@ export const emailSchema = z
   .max(254, 'El correo es demasiado largo.')
   .pipe(z.email('Ingresa un correo válido.'));
 
-export const registerSchema = z.object({
+export const registerSchema = z.strictObject({
   name: z
     .string({ error: 'Ingresa tu nombre.' })
     .trim()
@@ -32,6 +32,7 @@ export const registerSchema = z.object({
 });
 
 /** Login does not enforce the registration policy: it must not hint at it. */
+// Not strict on purpose: signing in assigns nothing from the body, it only reads email and password.
 export const loginSchema = z.object({
   email: emailSchema,
   password: z

@@ -6,6 +6,8 @@ loadRootEnv();
 // Browser verification tool for phases with UI. The permanent E2E suite is built in Phase 17.
 export default defineConfig({
   testDir: 'e2e',
+  // The production-topology checks (API serving the built app, CSP) have their own config and stack.
+  testIgnore: /security\.spec\.ts/,
   globalSetup: './e2e/globalSetup.ts',
   fullyParallel: true,
   reporter: [['list']],
