@@ -9,6 +9,7 @@ import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.j
 import { originCheck } from './middleware/originCheck.js';
 import type { AuthRateLimits } from './middleware/rateLimit.js';
 import { createRequireAuth } from './middleware/requireAuth.js';
+import { createAcademicInboxController } from './controllers/academicInboxController.js';
 import { createActivityController } from './controllers/activityController.js';
 import { createAttentionController } from './controllers/attentionController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
@@ -30,6 +31,7 @@ import { createRadarRepository } from './repositories/radarRepository.js';
 import { createReminderRepository } from './repositories/reminderRepository.js';
 import { createScheduleRepository } from './repositories/scheduleRepository.js';
 import { createSubjectRepository } from './repositories/subjectRepository.js';
+import { academicInboxRouter } from './routes/academicInbox.js';
 import { activitiesRouter } from './routes/activities.js';
 import { attentionRouter } from './routes/attention.js';
 import { authRouter } from './routes/auth.js';
@@ -42,6 +44,7 @@ import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
 import { subjectsRouter } from './routes/subjects.js';
+import { createAcademicInboxService } from './services/academicInboxService.js';
 import { createActivityService } from './services/activityService.js';
 import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
@@ -92,6 +95,9 @@ export function createApp(deps: AppDeps): Express {
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
   );
+  const academicInboxController = createAcademicInboxController(
+    createAcademicInboxService(periodRepository, subjectRepository, activityRepository, clock),
+  );
   const quickCaptureController = createQuickCaptureController(
     createQuickCaptureService(periodRepository, subjectRepository, clock),
   );
@@ -133,6 +139,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
   app.use('/api/radar', radarRouter(radarController, requireAuth));
+  app.use('/api/academic-inbox', academicInboxRouter(academicInboxController, requireAuth));
   app.use('/api/quick-capture', quickCaptureRouter(quickCaptureController, requireAuth));
   app.use('/api/progress', progressRouter(progressController, requireAuth));
   app.use('/api/workload', workloadRouter(workloadController, requireAuth));

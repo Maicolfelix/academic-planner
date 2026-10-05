@@ -1,4 +1,5 @@
 export * from './academic.js';
+export * from './academicInbox.js';
 export * from './activity.js';
 export * from './attention.js';
 export * from './auth.js';

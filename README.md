@@ -115,6 +115,10 @@ Sugiere **una** actividad abierta que requiere mayor atención y explica por qu�
 
 Escribe una frase corta ("parcial redes martes 10am") en el Dashboard y la aplicación **propone** una actividad: tipo, asignatura, fecha, hora y título. Flujo **Capturar → Interpretar → Confirmar**: nada se guarda hasta que pulsas "Crear actividad", que usa el mismo `POST /api/activities` que el formulario manual (así heredan recordatorios, Radar, Atención, progreso y carga). Es un parser determinístico de reglas, sin IA ni servicios externos, y el texto no se guarda. `POST /api/quick-capture/parse`. Reglas, ejemplos y limitaciones en [docs/quick-capture.md](docs/quick-capture.md).
 
+## Bandeja académica
+
+En `/inbox` ("Bandeja académica") pegas un mensaje largo de un profesor (hasta 5000 caracteres) y la aplicación **propone** de 0 a 10 actividades: **Pegar → Interpretar → Revisar → Confirmar**. Reutiliza el parser de Captura rápida, es determinístico (sin IA ni servicios externos) y no guarda el texto. Cada propuesta se edita y se crea con el mismo `POST /api/activities` (una por una, sin transacción global). `POST /api/academic-inbox/parse`. Detalle en [docs/academic-inbox.md](docs/academic-inbox.md).
+
 ## Progreso y carga semanal
 
 Dos vistas **descriptivas** de lo registrado (no miden rendimiento, productividad ni estrés y no recomiendan nada). **Progreso:** actividades completadas / registradas, en general y por asignatura (alfabético; "Sin actividades registradas" en vez de 0 %), solo del periodo actual. **Carga semanal:** compromisos de una semana lunes-domingo (actividades por su fecha límite + ocurrencias de la agenda), horas programadas, desglose por día y día con más compromisos, sin niveles "alta/baja". `GET /api/progress` y `GET /api/workload?week=<cualquier fecha>`; tarjeta "Esta semana" en el Dashboard y página `/progress`. Definiciones, qué cuenta y limitaciones en [docs/progress-and-workload.md](docs/progress-and-workload.md).
