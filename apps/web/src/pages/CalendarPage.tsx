@@ -9,7 +9,7 @@ import {
   type ScheduleOccurrence,
 } from '@planner/core';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { usePeriods, useCurrentPeriod } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
@@ -68,9 +68,14 @@ export function CalendarPage() {
             Semana del {formatDateOnly(week.from)} al {formatDateOnly(week.to)}
           </p>
         </div>
-        <button type="button" onClick={() => setEditing('new')} className={primary}>
-          Agregar bloque
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/calendar/import" className={`${secondary} inline-flex items-center`}>
+            Importar horario
+          </Link>
+          <button type="button" onClick={() => setEditing('new')} className={primary}>
+            Agregar bloque
+          </button>
+        </div>
       </header>
 
       <nav aria-label="Semana" className="flex flex-wrap gap-2">

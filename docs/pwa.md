@@ -68,4 +68,5 @@ DevTools → Application → Service Workers (Unregister) y Storage → Clear si
 
 - Sin datos offline, ni siquiera de solo lectura.
 - Navegación offline limitada al shell; las pantallas muestran el mensaje de conexión.
+- El favicon va en línea (`data:` URI) a propósito: una petición de archivo iniciada por el navegador fue la que `vite preview` rechazó bajo carga en los tests (ver `docs/project-state.md`).
 - El icono es sencillo; no hay capturas ni `screenshots` en el manifest.

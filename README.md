@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 13 completada (PWA instalable)**; siguiente: Fase 14. Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 14 completada (importación de horario con OCR)**; siguiente: Fase 15. Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -126,6 +126,10 @@ Dos vistas **descriptivas** de lo registrado (no miden rendimiento, productivida
 ## Recordatorios
 
 Recordatorios **internos** de la app solo para actividades (sin push, correo ni notificaciones del sistema). Al crear una actividad se generan solos según su tipo (p. ej. parcial: 3 días, 1 día y 3 horas antes); nunca se crea uno que ya haya pasado. Se recalculan solo si cambian la fecha/hora límite, el tipo o el estado (finalizar cancela los pendientes; reabrir regenera los futuros). Editar uno automático lo vuelve manual. `GET /api/reminders/due` alimenta el panel "Recordatorios" del Dashboard (máx. 20) y la insignia 🔔 de "Inicio"; nada se marca como visto al leer. Reglas, limitaciones y decisiones en [docs/reminders.md](docs/reminders.md).
+
+## Importación asistida de horarios
+
+Desde la Agenda, «Importar horario» (`/calendar/import`) permite subir una imagen (PNG/JPG) o un PDF de tu horario: se lee con OCR local (Tesseract) o con el texto del PDF, se te muestra una **propuesta editable** y solo se crean las clases que confirmes (como clases semanales). No importa «cualquier horario automáticamente»: el OCR puede equivocarse, así que revisa siempre las horas. Sin IA, el archivo no se envía a terceros ni se guarda. Máx. 10 MB y 5 páginas. Detalle en [docs/schedule-import.md](docs/schedule-import.md).
 
 ## PWA instalable
 

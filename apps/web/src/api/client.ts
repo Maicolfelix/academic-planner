@@ -20,7 +20,10 @@ export class ApiRequestError extends Error {
 
 interface RequestOptions<T> {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  /** JSON-encoded, except a `FormData` (a file upload), which is sent as it is. */
   body?: unknown;
+  /** Lets the caller cancel a long request (e.g. reading a schedule image). */
+  signal?: AbortSignal;
   /** Validates the success payload; omit for 204 responses. */
   schema?: ZodType<T>;
 }
@@ -35,10 +38,20 @@ export async function apiFetch<T = void>(path: string, opts: RequestOptions<T> =
     res = await fetch(path, {
       method: opts.method ?? 'GET',
       credentials: 'include',
-      headers: opts.body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      headers:
+        opts.body === undefined || opts.body instanceof FormData
+          ? undefined
+          : { 'Content-Type': 'application/json' },
+      body:
+        opts.body === undefined || opts.body instanceof FormData
+          ? (opts.body as FormData | undefined)
+          : JSON.stringify(opts.body),
+      signal: opts.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiRequestError(0, 'ABORTED', 'Se canceló la operación.');
+    }
     throw new ApiRequestError(0, 'NETWORK_ERROR', 'No se pudo conectar con el servidor.');
   }
 

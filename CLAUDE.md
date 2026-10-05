@@ -8,7 +8,7 @@ Academic Planner: PWA universitaria de planeación académica. Monorepo npm work
 - Una fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe final termina exactamente con `FASE N APROBADA` o `FASE N BLOQUEADA`.
 - **Commit solo cuando el usuario lo pida.** Mensajes con prefijo `feat:`; usar `git commit -F <archivo>` para mensajes con comillas.
 - Responder y documentar en español.
-- Fase actual: **13 aprobada. Fase 14 (importación de horario / OCR) sin empezar** (esperar el prompt del usuario).
+- Fase actual: **14 aprobada. Fase 15 (pulido de UX, accesibilidad y responsive) sin empezar** (esperar el prompt del usuario).
 
 ## Comandos
 
@@ -33,6 +33,7 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 - Invariantes críticas en la BD con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). Nunca editar una migración ya aplicada: crear otra.
 - Escrituras que tocan varias tablas van en una transacción; ediciones concurrentes de una actividad se serializan con `FOR UPDATE` (`activities.lock`).
 - Sin N+1: Prisma con `relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas constantes.
+- Importación de horario (Fase 14): interpretación pura en `packages/core/src/scheduleImport.ts` sobre una representación intermedia (palabras con posición); extracción en `apps/api/src/scheduleImport/` (Tesseract local para imágenes y PDF escaneados, texto nativo `unpdf` primero). Solo **propone** (nunca crea); el archivo vive en memoria y no se guarda ni se registra su contenido; cada clase confirmada se crea con el `POST /api/schedule` normal. La asignatura LIKELY nunca se aplica sin confirmar; no se crean asignaturas. Ver [docs/schedule-import.md](docs/schedule-import.md).
 - PWA (Fase 13): `vite-plugin-pwa` (Workbox `generateSW`, `registerType: 'prompt'`) en `apps/web/vite.config.ts`; UI en `apps/web/src/pwa/`. Solo precachea el shell estático; **`/api/*` siempre `NetworkOnly`, nunca se guardan respuestas privadas**; sin offline de datos ni escrituras offline. El SW no corre en `npm run dev`. La actualización nunca recarga sola. Ver [docs/pwa.md](docs/pwa.md).
 - Bandeja académica (Fase 12): `packages/core/src/academicInbox.ts` (segmentación, contexto por oración, duplicados) sobre los bloques compartidos de `captureShared.ts` (también usados por Captura rápida). Pega → Interpretar → Revisar → Confirmar; máx. 5000 caracteres y 10 propuestas; no guarda el texto ni crea nada: cada propuesta se confirma con el `POST /api/activities` normal, una por una. `/inbox`. Ver [docs/academic-inbox.md](docs/academic-inbox.md).
 - Captura rápida (Fase 11): `packages/core/src/quickCapture.ts`. Parser determinístico sin IA; solo **propone** (Capturar → Interpretar → Confirmar). Confirmar usa el `POST /api/activities` y la mutación del formulario manual: la captura rápida **no tiene camino de creación propio**. Nunca inventa una asignatura (ambigua o faltante se pregunta), no corrige en silencio una fecha fuera del periodo y no guarda el texto.
@@ -57,4 +58,4 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, OCR, importación de horarios, IA, sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos.
+Push/Web Push/correo/SMS, IA (incluida visión), sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos.

@@ -10,6 +10,7 @@ const app = createApp({
   corsOrigins: env.CORS_ORIGIN,
   secureCookies: env.NODE_ENV === 'production',
   rateLimits: { loginMax: env.LOGIN_RATE_LIMIT_MAX, registerMax: env.REGISTER_RATE_LIMIT_MAX },
+  scheduleImport: { limit: env.SCHEDULE_IMPORT_RATE_LIMIT_MAX },
 });
 
 const server = app.listen(env.API_PORT, () => {
