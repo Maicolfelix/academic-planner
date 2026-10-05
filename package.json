@@ -29,6 +29,7 @@
     "db:deploy": "npm run db:deploy -w @planner/api"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "concurrently": "^10.0.5",

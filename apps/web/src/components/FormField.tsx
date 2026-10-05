@@ -29,7 +29,7 @@ export function FormField({
     value,
     'aria-invalid': error ? true : undefined,
     'aria-describedby': describedBy || undefined,
-    className: `w-full rounded-md border px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-slate-900 ${
+    className: `min-h-11 w-full rounded-md border px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-slate-900 ${
       error ? 'border-red-600' : 'border-slate-400'
     }`,
   };

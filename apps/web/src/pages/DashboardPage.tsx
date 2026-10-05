@@ -1,6 +1,7 @@
 import { DEFAULT_TIMEZONE, formatDateOnly } from '@planner/core';
 import { Link } from 'react-router';
 import { useMe } from '../auth/useAuth';
+import { QueryError } from '../components/QueryError';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
 import { ClassesToday } from './dashboard/ClassesToday';
@@ -26,19 +27,8 @@ export function DashboardPage() {
   const now = useNow();
 
   if (dashboard.isPending) return <p role="status">Cargando tu panel…</p>;
-  if (dashboard.isError) {
-    return (
-      <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
-        <p className="mb-2">No se pudo cargar tu panel: {dashboard.error.message}</p>
-        <button
-          type="button"
-          onClick={() => dashboard.refetch()}
-          className="min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100"
-        >
-          Reintentar
-        </button>
-      </div>
-    );
+  if (!dashboard.data) {
+    return <QueryError query={dashboard} title="No se pudo cargar tu panel" />;
   }
 
   const d = dashboard.data;
@@ -64,17 +54,23 @@ export function DashboardPage() {
         )}
       </header>
 
+      <QueryError query={dashboard} title="No se pudo cargar tu panel" />
+
       <RemindersPanel timeZone={timeZone} now={now} />
 
-      {d.subjectCount > 0 && <QuickCapture />}
+      {/* Hierarchy: what to do now comes first; capturing is one step below; the rest is context. */}
+      {hasData && <AttentionCard timeZone={timeZone} now={now} />}
 
       {d.subjectCount > 0 && (
-        <p className="text-sm text-slate-700">
-          ¿Tienes un mensaje del profesor? Pégalo aquí.{' '}
-          <Link to="/inbox" className="font-medium underline">
-            Interpretar mensaje
-          </Link>
-        </p>
+        <div className="flex flex-col gap-3">
+          <QuickCapture />
+          <p className="text-sm text-slate-700">
+            ¿Tienes un mensaje del profesor? Pégalo aquí.{' '}
+            <Link to="/inbox" className="font-medium underline">
+              Interpretar mensaje
+            </Link>
+          </p>
+        </div>
       )}
 
       {d.classesToday.length > 0 && !hasData && (
@@ -87,7 +83,6 @@ export function DashboardPage() {
       {hasData && (
         <>
           <SummaryTiles summary={d.summary} />
-          <AttentionCard timeZone={timeZone} now={now} />
           <RadarCard />
           <NextDueCard activity={d.nextDue} timeZone={timeZone} now={now} />
           {d.classesToday.length > 0 && (

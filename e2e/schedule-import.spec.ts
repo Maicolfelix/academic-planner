@@ -117,7 +117,9 @@ test('image -> read -> review -> correct -> import, then the same file warns abo
   await expect(card(page, 0)).toContainText('Esta clase parece estar ya en tu agenda.');
   await expect(card(page, 0).getByLabel(/Incluir/)).not.toBeChecked(); // a duplicate is the student's call
   await expect(card(page, 1)).not.toContainText('Esta clase parece estar ya en tu agenda.');
-  await expect(card(page, 1)).toContainText(/Conflicto con Bases de Datos, miércoles 10:00–13:00/);
+  await expect(card(page, 1)).toContainText(
+    /Conflicto con Bases de Datos, miércoles 10:00\sa\.\sm\.–1:00\sp\.\sm\./,
+  );
   await expect(card(page, 1).getByLabel(/Incluir/)).toBeChecked(); // a conflict warns, it does not unselect
   assertClean();
 });
@@ -252,7 +254,7 @@ test('a class that overlaps another is a warning, not a block', async ({ page })
   await card(page, 1).getByLabel('Día').selectOption('1');
   await card(page, 1).getByLabel('Inicio', { exact: true }).fill('09:00');
   await card(page, 1).getByLabel('Fin', { exact: true }).fill('11:00');
-  await expect(card(page, 1)).toContainText(/Conflicto con Redes, lunes 08:00–10:00/);
+  await expect(card(page, 1)).toContainText(/Conflicto con Redes, lunes 8:00–10:00\sa\.\sm\./);
   await card(page, 1)
     .getByLabel(/Incluir/)
     .check();

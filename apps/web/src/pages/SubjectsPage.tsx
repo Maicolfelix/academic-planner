@@ -1,3 +1,4 @@
+import { QueryError } from '../components/QueryError';
 import { formatDateOnly, type Subject } from '@planner/core';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -58,14 +59,7 @@ export function SubjectsPage() {
 
       {subjects.isPending && <p role="status">Cargando asignaturas…</p>}
 
-      {subjects.isError && (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
-          <p className="mb-2">No se pudieron cargar tus asignaturas: {subjects.error.message}</p>
-          <button type="button" onClick={() => subjects.refetch()} className={secondaryButton}>
-            Reintentar
-          </button>
-        </div>
-      )}
+      <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && list.length === 0 && (
         <section className="rounded-lg border border-dashed border-slate-300 p-6 text-center">

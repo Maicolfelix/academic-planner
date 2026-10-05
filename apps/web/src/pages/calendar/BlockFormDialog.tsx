@@ -8,6 +8,7 @@ import {
   createScheduleBlockSchema,
   fieldErrorsOf,
   firstWeekdayOnOrAfter,
+  formatClockRange,
   toLocalParts,
   updateScheduleBlockSchema,
   weekdayOf,
@@ -182,10 +183,9 @@ export function BlockFormDialog({
   }, [showWarning]);
   const describe = (w: ScheduleWarning) => {
     const start = toLocalParts(w.with.startAt, timeZone);
-    const end = toLocalParts(w.with.endAt, timeZone);
     const day = WEEKDAY_SHORT_LABELS[weekdayOf(start.date)].toLowerCase();
     const more = w.with.occurrences > 1 ? ` (se cruza en ${w.with.occurrences} semanas)` : '';
-    return `«${w.with.title}» (${day} ${start.time}–${end.time})${more}`;
+    return `«${w.with.title}» (${day} ${formatClockRange(w.with.startAt, w.with.endAt, timeZone)})${more}`;
   };
 
   return (

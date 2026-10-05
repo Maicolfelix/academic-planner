@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
   // Single source of truth: the root .env (also used by the API).
   const env = loadEnv(mode, '../../', '');
   const port = Number(env.WEB_PORT ?? 5173);
+  // `localhost` makes Node listen on the IPv6 loopback ONLY ([::1]): a client that tries 127.0.0.1 gets
+  // ERR_CONNECTION_REFUSED. WEB_HOST=:: (used by the e2e stack) listens on both, like the API already does.
+  const host = env.WEB_HOST || 'localhost';
   const proxy = { '/api': { target: env.API_PROXY_TARGET ?? 'http://localhost:3000' } };
   return {
     plugins: [
@@ -60,9 +63,9 @@ export default defineConfig(({ mode }) => {
         devOptions: { enabled: false },
       }),
     ],
-    server: { port, strictPort: true, proxy },
+    server: { host, port, strictPort: true, proxy },
     // `vite preview` serves the built bundle (used by the e2e stack) with the same /api proxy.
-    preview: { port, strictPort: true, proxy },
+    preview: { host, port, strictPort: true, proxy },
     test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'] },
   };
 });

@@ -82,8 +82,8 @@ test('agenda flow: weekly class, next week, conflict warning, study session, edi
   await expect(page.getByText(`Semana del ${formatDateOnly(nextWeek().from)}`)).toBeVisible();
   await showDay(page, addDays(nextWeek().from, 1));
   await expect(blockButton(page, 'Redes')).toBeVisible();
-  await expect(blockButton(page, 'Redes')).toContainText(/08:00/);
-  await expect(blockButton(page, 'Redes')).toHaveAccessibleName(/08:00( a |–)10:00/);
+  await expect(blockButton(page, 'Redes')).toContainText(/8:00/);
+  await expect(blockButton(page, 'Redes')).toHaveAccessibleName(/(?<!\d)8:00( a |–)10:00/);
   await expect(page.getByRole('button', { name: /choque de horario/i })).toHaveCount(0);
 
   // 8-10. A second class at 09:00–11:00 the same weekday: the form WARNS first, then lets us save anyway.
@@ -141,7 +141,7 @@ test('agenda flow: weekly class, next week, conflict warning, study session, edi
   await showDay(page, wednesday);
   await expect(blockButton(page, 'Repasar redes \\(examen\\)')).toBeVisible();
   await expect(blockButton(page, 'Repasar redes \\(examen\\)')).toHaveAccessibleName(
-    /14:00( a |–)17:00/,
+    /(?<!d)2:00( a |–)5:00/,
   );
 
   // 15-16. The Dashboard reflects the classes of TODAY (when today is a Tuesday that is Redes and Bases).
@@ -334,7 +334,7 @@ test('timezone: a class at 08:00 Bogotá reads 08:00 even in a browser set to To
 
   await page.reload();
   await showDay(page, addDays(thisWeek().from, 1));
-  await expect(blockButton(page, 'Redes')).toHaveAccessibleName(/08:00( a |–)10:00/); // not 22:00
+  await expect(blockButton(page, 'Redes')).toHaveAccessibleName(/(?<!\d)8:00( a |–)10:00/); // not 10 p. m.
   await expect(page.getByText('22:00')).toHaveCount(0);
 
   await blockButton(page, 'Redes').click();
@@ -382,7 +382,7 @@ test('Dashboard shows today’s classes only, in the user’s day', async ({ pag
   await nav(page).getByRole('link', { name: 'Inicio' }).click();
   const section = page.getByRole('region', { name: 'Clases de hoy' });
   await expect(section).toContainText('Clase de hoy');
-  await expect(section).toContainText('08:00–10:00');
+  await expect(section).toContainText(/8:00–10:00\sa\.\sm\./);
   await expect(section).not.toContainText('Estudio de hoy'); // only CLASS
   await expect(section).not.toContainText('Clase de mañana');
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
@@ -471,6 +471,9 @@ test('responsive: no horizontal overflow with many blocks, long titles, open dia
   await blockButton(page, 'Seminario').first().click();
   const edit = page.getByRole('dialog', { name: 'Editar bloque' });
   await expect(edit).toBeVisible();
+  // While the block loads a placeholder dialog with the same name is shown and then replaced by the form:
+  // measure only once the form itself is there.
+  await expect(edit.getByLabel('Inicio', { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   const editBox = (await edit.boundingBox())!;
   expect(editBox.x + editBox.width).toBeLessThanOrEqual(viewport.width);

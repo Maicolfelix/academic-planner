@@ -1,3 +1,4 @@
+import { QueryError } from '../../components/QueryError';
 import { formatDue, radarExplanation, type RadarStatus } from '@planner/core';
 import { Link } from 'react-router';
 import { useAttention } from '../../attention/useAttention';
@@ -12,9 +13,6 @@ const INTRO: Record<RadarStatus, string> = {
   PLANNABLE: 'Actividad que requiere mayor atención.',
   UNDER_CONTROL: 'Todo está bajo control. Si quieres avanzar, podrías continuar con:',
 };
-
-const secondary =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
 
 /**
  * "¿Qué hago ahora?": ONE suggested activity and the plain reasons behind it. The internal score is never
@@ -31,14 +29,7 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
 
       {attention.isPending && <p role="status">Buscando qué actividad requiere atención…</p>}
 
-      {attention.isError && (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-          <p className="mb-2">No se pudo cargar la sugerencia: {attention.error.message}</p>
-          <button type="button" onClick={() => attention.refetch()} className={secondary}>
-            Reintentar
-          </button>
-        </div>
-      )}
+      <QueryError query={attention} title="No se pudo cargar la sugerencia" />
 
       {attention.data && !attention.data.recommendation && (
         <p className="rounded-lg border border-dashed border-slate-300 p-4">

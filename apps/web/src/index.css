@@ -5,3 +5,19 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
 }
+
+/* A modal dialog is open: the page behind must not scroll under the student's finger. */
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+
+/* Respect the system setting: no smooth scrolling or transitions for people who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

@@ -219,7 +219,9 @@ test('filters live in the URL, combine, survive reload and can be cleared', asyn
   await expect(page).toHaveURL(/status=PENDING/);
   await expect(page.getByRole('listitem')).toHaveCount(2);
 
-  // Selectors combine with the chip (Asignatura, Prioridad, Tipo).
+  // Selectors combine with the chip (Asignatura, Prioridad, Tipo). On a phone they sit under "Más filtros".
+  const more = page.getByText(/^Más filtros/);
+  if (await more.isVisible()) await more.click();
   await page.getByLabel('Asignatura').selectOption({ label: 'Redes' });
   await page.getByLabel('Prioridad').selectOption({ label: 'Alta' });
   await expect(page).toHaveURL(/priority=HIGH/);
@@ -352,8 +354,16 @@ test('activity form: validation, keyboard, focus and responsive layout with long
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
   expect(box.y).toBeGreaterThanOrEqual(0);
 
-  // Escape closes it and focus returns to the trigger.
+  // The student has typed: Escape asks before throwing it away ("Seguir editando" is the safe, focused answer)...
   await page.keyboard.press('Escape');
+  await expect(dialog.getByRole('alert')).toContainText('Tienes cambios sin guardar');
+  await expect(dialog.getByRole('button', { name: 'Seguir editando' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Descripción')).toHaveValue(/texto texto/);
+  // ...and discarding closes it, with focus back on the trigger.
+  await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: 'Descartar cambios' }).click();
   await expect(dialog).toBeHidden();
   await expect(addButton).toBeFocused();
 

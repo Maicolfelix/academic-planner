@@ -1,21 +1,7 @@
-import { useSyncExternalStore } from 'react';
-
-const QUERY = '(min-width: 768px)';
-
-function subscribe(onChange: () => void) {
-  const media = window.matchMedia(QUERY);
-  media.addEventListener('change', onChange);
-  return () => media.removeEventListener('change', onChange);
-}
+import { useMediaQuery } from './useMediaQuery';
 
 /**
- * True from 768 px up. Components render ONE layout or the other (never both hidden with CSS), so the
- * accessibility tree and the tests only ever see a single copy of each block.
+ * True from 1024 px up (the weekly grid needs seven readable columns; below that the agenda is a day list).
+ * Breakpoints in use: 640 px (`sm`, filters in one row), 768 px (`md`, navigation in one row) and 1024 px (this one).
  */
-export function useIsDesktop(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(QUERY).matches,
-    () => true,
-  );
-}
+export const useIsDesktop = (): boolean => useMediaQuery('(min-width: 1024px)');

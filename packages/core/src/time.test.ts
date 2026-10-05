@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TIMEZONE,
   dueFromLocal,
+  formatClockRange,
   formatDue,
+  formatHourLabel,
   localDayBounds,
   toLocalParts,
   zonedTimeToUtc,
@@ -182,5 +184,38 @@ describe('formatDue', () => {
   it('formats the same instant differently for another timezone', () => {
     const { dueAt, hasTime } = dueFromLocal({ date: '2026-10-10', time: '14:00' }, BOGOTA);
     expect(formatDue({ dueAt, hasTime }, 'UTC')).toMatch(/7:00/);
+  });
+});
+
+describe('formatClockRange / formatHourLabel (one 12-hour style for the whole product)', () => {
+  // Intl separates "a. m." with no-break spaces: compare on plain spaces.
+  const plain = (s: string) => s.replace(/\s/g, ' ');
+
+  it('writes a. m./p. m. once when both ends share it', () => {
+    expect(
+      plain(formatClockRange('2026-08-03T13:00:00Z', '2026-08-03T15:00:00Z', 'America/Bogota')),
+    ).toBe('8:00–10:00 a. m.');
+    expect(
+      plain(formatClockRange('2026-08-03T19:00:00Z', '2026-08-03T21:30:00Z', 'America/Bogota')),
+    ).toBe('2:00–4:30 p. m.');
+  });
+
+  it('writes both when the range crosses noon', () => {
+    expect(
+      plain(formatClockRange('2026-08-03T16:00:00Z', '2026-08-03T18:00:00Z', 'America/Bogota')),
+    ).toBe('11:00 a. m.–1:00 p. m.');
+  });
+
+  it('uses the given timezone, not the machine one', () => {
+    expect(
+      plain(formatClockRange('2026-08-03T13:00:00Z', '2026-08-03T15:00:00Z', 'Asia/Tokyo')),
+    ).toBe('10:00 p. m.–12:00 a. m.');
+  });
+
+  it('labels whole hours', () => {
+    expect(plain(formatHourLabel(8))).toBe('8 a. m.');
+    expect(plain(formatHourLabel(12))).toBe('12 p. m.');
+    expect(plain(formatHourLabel(0))).toBe('12 a. m.');
+    expect(plain(formatHourLabel(15))).toBe('3 p. m.');
   });
 });

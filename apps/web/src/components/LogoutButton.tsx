@@ -24,7 +24,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
         {logout.isPending ? 'Cerrando…' : 'Cerrar sesión'}
       </button>
       {logout.isError && (
-        <p role="alert" className="w-full text-sm text-red-700">
+        <p role="alert" className="order-4 w-full text-sm text-red-700">
           No se pudo cerrar la sesión: {logout.error.message}
         </p>
       )}

@@ -140,3 +140,61 @@ export function inBogota(offsetMs: number) {
     }),
   };
 }
+
+export const LONG_SUBJECT =
+  'Introducción a la Ingeniería de Software Orientada a Servicios y Arquitecturas Distribuidas';
+export const LONG_TITLE =
+  'Entrega final del proyecto integrador: documento de arquitectura, manual de usuario, pruebas de aceptación y presentación final ante el comité';
+
+/**
+ * A realistic, crowded account: long names, every radar band, a completed activity, an overlapping class.
+ * Used by the layout checks so that "long content" is tested the same way everywhere.
+ */
+export async function seedRichData(page: Page) {
+  const redes = (await apiSubjects(page))[0]!;
+  const bases = await apiCreateSubject(page, 'Bases de Datos');
+  const long = await apiCreateSubject(page, LONG_SUBJECT);
+  const rows: [string, string, string, number, string?][] = [
+    [redes.id, 'Parcial 1', 'EXAM', 12 * 3600e3],
+    [bases.id, 'Taller de normalización', 'WORKSHOP', 2 * 86400e3],
+    [long.id, LONG_TITLE, 'PROJECT', 5 * 86400e3],
+    [redes.id, 'Lectura capítulo 4', 'READING', 10 * 86400e3],
+    [bases.id, 'Quiz SQL', 'QUIZ', 40 * 86400e3],
+  ];
+  for (const [subjectId, title, type, offset] of rows) {
+    await apiCreateActivity(page, { subjectId, title, type, ...inBogota(offset) });
+  }
+  const done = await apiCreateActivity(page, {
+    subjectId: redes.id,
+    title: 'Tarea de subredes',
+    type: 'TASK',
+    ...inBogota(3 * 86400e3),
+  });
+  await page.request.patch(`/api/activities/${done.id}`, { data: { status: 'COMPLETED' } });
+  const [period] = (await (await page.request.get('/api/periods')).json()).periods as {
+    startDate: string;
+    endDate: string;
+  }[];
+  const monday = new Date(`${period!.startDate}T00:00:00Z`);
+  while (monday.getUTCDay() !== 1) monday.setUTCDate(monday.getUTCDate() + 1);
+  const date = monday.toISOString().slice(0, 10);
+  const until = period!.endDate;
+  for (const [subjectId, title, startTime, endTime] of [
+    [redes.id, 'Redes', '08:00', '10:00'],
+    [bases.id, 'Bases de Datos', '09:00', '11:00'], // overlaps Redes on purpose
+    [long.id, LONG_SUBJECT.slice(0, 60), '14:00', '16:00'],
+  ] as const) {
+    const res = await page.request.post('/api/schedule', {
+      data: {
+        type: 'CLASS',
+        subjectId,
+        title,
+        date,
+        startTime,
+        endTime,
+        recurrence: { frequency: 'WEEKLY', until },
+      },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+  }
+}

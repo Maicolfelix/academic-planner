@@ -1,3 +1,4 @@
+import { QueryError } from '../components/QueryError';
 import {
   DEFAULT_TIMEZONE,
   addDays,
@@ -105,14 +106,7 @@ export function CalendarPage() {
       )}
 
       {schedule.isPending && <p role="status">Cargando agenda…</p>}
-      {schedule.isError && (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
-          <p className="mb-2">No se pudo cargar la agenda: {schedule.error.message}</p>
-          <button type="button" onClick={() => schedule.refetch()} className={secondary}>
-            Reintentar
-          </button>
-        </div>
-      )}
+      <QueryError query={schedule} title="No se pudo cargar la agenda" />
 
       {schedule.isSuccess && occurrences.length === 0 && (
         <p className="rounded-md border border-dashed border-slate-300 p-3 text-slate-700">

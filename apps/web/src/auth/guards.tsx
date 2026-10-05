@@ -1,8 +1,13 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet } from 'react-router';
 import { usePeriods } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
 import { OFFLINE_DETAIL, OFFLINE_MESSAGE } from '../pwa/pwaState';
+import {
+  clearSessionExpired,
+  SESSION_EXPIRED_MESSAGE,
+  sessionExpiredPending,
+} from './sessionExpiry';
 import { useMe } from './useAuth';
 
 export function FullPageMessage({ children }: { children: ReactNode }) {
@@ -43,6 +48,19 @@ function RetryMessage({
   );
 }
 
+/** To the login; when the server ended the session, the login says so. */
+function RedirectToLogin() {
+  const [expired] = useState(sessionExpiredPending);
+  useEffect(() => clearSessionExpired(), []);
+  return (
+    <Navigate
+      to="/login"
+      replace
+      state={expired ? { warning: SESSION_EXPIRED_MESSAGE } : undefined}
+    />
+  );
+}
+
 /** Renders child routes only for a signed-in user; otherwise sends them to /login. */
 export function RequireAuth() {
   const me = useMe();
@@ -58,7 +76,7 @@ export function RequireAuth() {
       />
     );
   }
-  return me.data ? <Outlet /> : <Navigate to="/login" replace />;
+  return me.data ? <Outlet /> : <RedirectToLogin />;
 }
 
 /** Login/register are for signed-out users; signed-in users go straight to the app. */

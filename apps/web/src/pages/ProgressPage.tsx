@@ -1,3 +1,4 @@
+import { QueryError } from '../components/QueryError';
 import { addDays, formatDateOnly, formatDuration, isRealDateOnly } from '@planner/core';
 import { Link, useSearchParams } from 'react-router';
 import { useProgress, useWorkload } from '../insights/useInsights';
@@ -36,14 +37,7 @@ export function ProgressPage() {
           Progreso de actividades
         </h2>
         {progress.isPending && <p role="status">Cargando progreso…</p>}
-        {progress.isError && (
-          <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-            <p className="mb-2">No se pudo cargar el progreso: {progress.error.message}</p>
-            <button type="button" onClick={() => progress.refetch()} className={secondary}>
-              Reintentar
-            </button>
-          </div>
-        )}
+        <QueryError query={progress} title="No se pudo cargar el progreso" />
         {progress.data && <ProgressContent data={progress.data} />}
       </section>
 
@@ -73,14 +67,7 @@ export function ProgressPage() {
           </button>
         </div>
         {workload.isPending && <p role="status">Cargando la semana…</p>}
-        {workload.isError && (
-          <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-            <p className="mb-2">No se pudo cargar la semana: {workload.error.message}</p>
-            <button type="button" onClick={() => workload.refetch()} className={secondary}>
-              Reintentar
-            </button>
-          </div>
-        )}
+        <QueryError query={workload} title="No se pudo cargar la semana" />
         {workload.data && (
           <>
             <p className="font-medium">
