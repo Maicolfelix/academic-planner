@@ -111,6 +111,10 @@ Clasifica cada actividad **abierta** por el tiempo real que falta para su fecha 
 
 Sugiere **una** actividad abierta que requiere mayor atención y explica por qué ("Vence en menos de 24 horas.", "Tiene prioridad alta.", "Ya comenzaste esta actividad."). Es determinístico, sin IA ni datos de comportamiento: suma el peso del nivel del Radar, el de la prioridad y un pequeño bono por "en proceso", y desempata por fecha. El score es interno: no se muestra. `GET /api/attention` y tarjeta en el Dashboard con enlace a la actividad. Fórmula, pesos, desempates y escenarios numéricos en [docs/attention-engine.md](docs/attention-engine.md).
 
+## Captura rápida
+
+Escribe una frase corta ("parcial redes martes 10am") en el Dashboard y la aplicación **propone** una actividad: tipo, asignatura, fecha, hora y título. Flujo **Capturar → Interpretar → Confirmar**: nada se guarda hasta que pulsas "Crear actividad", que usa el mismo `POST /api/activities` que el formulario manual (así heredan recordatorios, Radar, Atención, progreso y carga). Es un parser determinístico de reglas, sin IA ni servicios externos, y el texto no se guarda. `POST /api/quick-capture/parse`. Reglas, ejemplos y limitaciones en [docs/quick-capture.md](docs/quick-capture.md).
+
 ## Progreso y carga semanal
 
 Dos vistas **descriptivas** de lo registrado (no miden rendimiento, productividad ni estrés y no recomiendan nada). **Progreso:** actividades completadas / registradas, en general y por asignatura (alfabético; "Sin actividades registradas" en vez de 0 %), solo del periodo actual. **Carga semanal:** compromisos de una semana lunes-domingo (actividades por su fecha límite + ocurrencias de la agenda), horas programadas, desglose por día y día con más compromisos, sin niveles "alta/baja". `GET /api/progress` y `GET /api/workload?week=<cualquier fecha>`; tarjeta "Esta semana" en el Dashboard y página `/progress`. Definiciones, qué cuenta y limitaciones en [docs/progress-and-workload.md](docs/progress-and-workload.md).

@@ -17,6 +17,7 @@ import {
   createWorkloadController,
 } from './controllers/insightsController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createQuickCaptureController } from './controllers/quickCaptureController.js';
 import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
 import { createScheduleController } from './controllers/scheduleController.js';
@@ -35,6 +36,7 @@ import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { progressRouter, workloadRouter } from './routes/insights.js';
+import { quickCaptureRouter } from './routes/quickCapture.js';
 import { periodsRouter } from './routes/periods.js';
 import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
@@ -45,6 +47,7 @@ import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProgressService } from './services/progressService.js';
+import { createQuickCaptureService } from './services/quickCaptureService.js';
 import { createRadarService } from './services/radarService.js';
 import { createReminderService } from './services/reminderService.js';
 import { createScheduleService } from './services/scheduleService.js';
@@ -89,6 +92,9 @@ export function createApp(deps: AppDeps): Express {
   const dashboardController = createDashboardController(
     createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
   );
+  const quickCaptureController = createQuickCaptureController(
+    createQuickCaptureService(periodRepository, subjectRepository, clock),
+  );
   const insightsRepository = createInsightsRepository(prisma);
   const progressController = createProgressController(
     createProgressService(insightsRepository, periodRepository, clock),
@@ -127,6 +133,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
   app.use('/api/dashboard', dashboardRouter(dashboardController, requireAuth));
   app.use('/api/radar', radarRouter(radarController, requireAuth));
+  app.use('/api/quick-capture', quickCaptureRouter(quickCaptureController, requireAuth));
   app.use('/api/progress', progressRouter(progressController, requireAuth));
   app.use('/api/workload', workloadRouter(workloadController, requireAuth));
   app.use('/api/attention', attentionRouter(attentionController, requireAuth));
