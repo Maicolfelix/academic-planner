@@ -67,6 +67,15 @@ export function DashboardPage() {
 
       {d.subjectCount > 0 && <QuickCapture />}
 
+      {d.subjectCount > 0 && (
+        <p className="text-sm text-slate-700">
+          ¿Tienes un mensaje del profesor? Pégalo aquí.{' '}
+          <Link to="/inbox" className="font-medium underline">
+            Interpretar mensaje
+          </Link>
+        </p>
+      )}
+
       {d.classesToday.length > 0 && !hasData && (
         <ClassesToday classes={d.classesToday} timeZone={timeZone} />
       )}

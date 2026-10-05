@@ -65,7 +65,7 @@ Una palabra de tipo suelta ("proyecto") no elige asignatura por sí sola: "proye
 Siempre sobre el calendario **local** del usuario (`User.timezone`), reutilizando los ayudantes de fecha existentes.
 
 - **Relativas:** `hoy`, `mañana`, `pasado mañana`.
-- **Días de la semana:** lunes … domingo (con o sin acento; "este"/"próximo" se aceptan y no cambian el significado).
+- **Días de la semana:** lunes … domingo (con o sin acento). "este martes" es la próxima ocurrencia contando hoy; **"próximo martes" es estrictamente posterior a hoy** (si hoy es martes, el de la semana siguiente).
 - **Numéricas, día primero (formato colombiano, nunca MM/DD):** `15/10`, `15-10`, `15/10/2026`, `15/10/26`.
 - **Con el mes escrito:** `10 de octubre`, `10 octubre`, `octubre 10`, `10 de octubre de 2026`.
 - **Sin año:** la próxima ocurrencia de ese día y mes, contando hoy (`29/02` → el próximo 29 de febrero real).
@@ -81,7 +81,7 @@ Si la fecha interpretada queda **fuera del periodo actual**, no se corrige: se m
 
 ## Horas
 
-`10am`, `10 am`, `10 a.m.`, `10 a. m.`, `10:30`, `10:30pm`, `14:00`, `2pm`, `2 pm`, y "a las 10am". Se normalizan a `HH:mm` en 24 h (`12am` = 00:00, `12pm` = 12:00). Una hora inválida (`25:00`, `14:90`, `0pm`, `13pm`) se avisa con un mensaje claro y se descarta, sin romper el resto. Un número suelto ("a las 10", "unidad 3") **no** se toma como hora: hace falta `am/pm` o `HH:mm`.
+`10am`, `10 am`, `10 a.m.`, `10 a. m.`, `10:30`, `10:30pm`, `14:00`, `2pm`, `2 pm`, y "a las 10am". Se normalizan a `HH:mm` en 24 h (`12am` = 00:00, `12pm` = 12:00). Una hora inválida (`25:00`, `14:90`, `0pm`, `13pm`) se avisa con un mensaje claro y se descarta, sin romper el resto. Un número suelto ("unidad 3") **no** se toma como hora: hace falta `am/pm` o `HH:mm`. Única excepción: "a las 10" se lee como 10:00 con certeza `LIKELY` (no `EXACT`), para que el estudiante lo revise. Si se escribe un día de la semana junto a una fecha ("martes 13 de octubre") y no coinciden, se usa la fecha y se avisa (`WEEKDAY_MISMATCH`).
 
 Sin hora, `hasTime = false`: la actividad conserva el comportamiento de siempre (vence al terminar el día); no se inventa "11:59 p. m." en la interfaz.
 
@@ -145,4 +145,4 @@ Un parser de reglas es explicable, reproducible, testeable y funciona sin conexi
 
 ## Diferencia con la Fase 12
 
-La Fase 11 entiende **frases cortas y semiestructuradas** ("parcial redes martes 10am"). La Fase 12 tratará **mensajes largos** (el recordatorio de un profesor en un párrafo) y múltiples actividades. Nada de eso se implementa aquí: un texto largo se rechaza con un mensaje claro.
+La Fase 11 entiende **frases cortas y semiestructuradas** ("parcial redes martes 10am"). La Fase 12 ([academic-inbox.md](academic-inbox.md)) trata **mensajes largos** y varias actividades, reutilizando este mismo parser (`captureShared.ts`) sin duplicar reglas.

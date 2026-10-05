@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 9 — ¿Qué hago ahora?** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
+Estado actual: **Fase 12 completada (Bandeja académica)**; siguiente: Fase 13 (PWA). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -114,6 +114,10 @@ Sugiere **una** actividad abierta que requiere mayor atención y explica por qu�
 ## Captura rápida
 
 Escribe una frase corta ("parcial redes martes 10am") en el Dashboard y la aplicación **propone** una actividad: tipo, asignatura, fecha, hora y título. Flujo **Capturar → Interpretar → Confirmar**: nada se guarda hasta que pulsas "Crear actividad", que usa el mismo `POST /api/activities` que el formulario manual (así heredan recordatorios, Radar, Atención, progreso y carga). Es un parser determinístico de reglas, sin IA ni servicios externos, y el texto no se guarda. `POST /api/quick-capture/parse`. Reglas, ejemplos y limitaciones en [docs/quick-capture.md](docs/quick-capture.md).
+
+## Bandeja académica
+
+En `/inbox` ("Bandeja académica") pegas un mensaje largo de un profesor (hasta 5000 caracteres) y la aplicación **propone** de 0 a 10 actividades: **Pegar → Interpretar → Revisar → Confirmar**. Reutiliza el parser de Captura rápida, es determinístico (sin IA ni servicios externos) y no guarda el texto. Cada propuesta se edita y se crea con el mismo `POST /api/activities` (una por una, sin transacción global). `POST /api/academic-inbox/parse`. Detalle en [docs/academic-inbox.md](docs/academic-inbox.md).
 
 ## Progreso y carga semanal
 
