@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import { getTestDatabaseUrl, loadRootEnv } from './apps/api/test/testDb';
+import { ensureTestDatabaseSync, getTestDatabaseUrl, loadRootEnv } from './apps/api/test/testDb';
 
 loadRootEnv();
+ensureTestDatabaseSync();
 
 // Browser verification tool for phases with UI. The permanent E2E suite is built in Phase 17.
 export default defineConfig({

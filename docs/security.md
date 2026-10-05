@@ -175,3 +175,7 @@ PW_CHANNEL=msedge npm run test:browser         # suite completa (PWA, accesibili
 ```
 
 Cabeceras reales: arrancar con `WEB_DIST_DIR=apps/web/dist` y `curl -I http://localhost:3000/`. Para repetir las comprobaciones negativas, romper a propósito una regla (el filtro de propietario de un repositorio, `originCheck`, `httpOnly`, la regla `NetworkOnly`…) y confirmar que alguna prueba falla.
+
+## 20. Datos de demostración (Fase 18)
+
+`npm run db:seed:demo -- --allow-demo` es el único camino que crea datos de demostración. **Desactivado en producción:** rechaza con código 2 si `NODE_ENV` es `production` aunque lleve el flag, y rechaza sin el flag. No se ejecuta con `npm install`, `dev`, `db:deploy` ni al arrancar el servidor. Solo lee y escribe filas del usuario demo (correo fijo `demo@academicplanner.local`), nunca borra otros usuarios ni sus sesiones, no hace `DROP`/`TRUNCATE` y no imprime la URL de la base de datos ni el hash. La contraseña demo es sintética y pública (docs/demo.md): **la cuenta demo no debe existir en un despliegue público**; si por error se hubiera sembrado una base compartida, se elimina con una sola sentencia sobre ese correo. No hay modo demo en el producto ni credenciales en el frontend. Se probó (BD de test) que el flag es obligatorio, que producción lo rechaza, que otros usuarios quedan intactos y que la contraseña sirve solo a través del inicio de sesión normal.

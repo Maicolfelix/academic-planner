@@ -8,31 +8,32 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 17 (validación integral del sistema)** (rama `feat/phase-17-end-to-end-validation`, PR pendiente de fusionar por el usuario). Base: `main` `cfe5783` (Fase 16 fusionada). Checkpoint previo: tag `phase-12-complete` (`0ab869e`).
-- **Siguiente: Fase 18 (datos de demostración / seed), sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 18 (datos de demostración reproducibles)** (rama `feat/phase-18-demo-seed`, PR pendiente de fusionar por el usuario). Base: `main` `eb5cbb8` (Fase 17 fusionada). Checkpoint previo: tag `phase-12-complete` (`0ab869e`).
+- **Siguiente: Fase 19 (documentación final), sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
 
-| Fase | Contenido                                                                      | Commit                                      |
-| ---- | ------------------------------------------------------------------------------ | ------------------------------------------- |
-| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria)   | n/a                                         |
-| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                    | `f542f5e`                                   |
-| 2    | Autenticación: registro, login, logout, sesiones en servidor                   | `095c12c`                                   |
-| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)                | `da5eda9`                                   |
-| 4-5  | Actividades académicas y Dashboard                                             | `6501bd9`                                   |
-| 6    | Agenda, horarios y recurrencia semanal                                         | `7a031fb`                                   |
-| 7    | Recordatorios internos automáticos para actividades                            | `404a032`                                   |
-| 8    | Radar académico: categorías derivadas por tiempo restante                      | `c0698c0`                                   |
-| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable                | `b7c7874`                                   |
-| 10   | Progreso por asignatura y carga semanal (descriptivas)                         | PR #2 (`1848dff`)                           |
-| 11   | Captura rápida: parser determinístico de frases cortas con vista previa        | PR #3                                       |
-| 12   | Bandeja académica: mensajes largos a 0-10 propuestas revisables                | PR #4 (`6b21f49`)                           |
-| 13   | PWA instalable: manifest, service worker, instalación, shell sin conexión      | PR #5 (`bfb7ea5`)                           |
-| 14   | Importación de horario (imagen/PDF) con OCR local y vista previa editable      | PR #6 (`d589984`)                           |
-| 15   | UX, accesibilidad y responsive: pulido transversal, axe, diálogos, 404, sesión | PR #7 (`4b9c913`)                           |
-| 16   | Endurecimiento de seguridad: sesiones, CSRF, IDOR, CSP, subidas, límites       | PR #8 (`cfe5783`)                           |
-| 17   | Validación integral: escenario maestro, coherencia entre módulos, fallos, humo | PR de `feat/phase-17-end-to-end-validation` |
+| Fase | Contenido                                                                      | Commit                          |
+| ---- | ------------------------------------------------------------------------------ | ------------------------------- |
+| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria)   | n/a                             |
+| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                    | `f542f5e`                       |
+| 2    | Autenticación: registro, login, logout, sesiones en servidor                   | `095c12c`                       |
+| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)                | `da5eda9`                       |
+| 4-5  | Actividades académicas y Dashboard                                             | `6501bd9`                       |
+| 6    | Agenda, horarios y recurrencia semanal                                         | `7a031fb`                       |
+| 7    | Recordatorios internos automáticos para actividades                            | `404a032`                       |
+| 8    | Radar académico: categorías derivadas por tiempo restante                      | `c0698c0`                       |
+| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable                | `b7c7874`                       |
+| 10   | Progreso por asignatura y carga semanal (descriptivas)                         | PR #2 (`1848dff`)               |
+| 11   | Captura rápida: parser determinístico de frases cortas con vista previa        | PR #3                           |
+| 12   | Bandeja académica: mensajes largos a 0-10 propuestas revisables                | PR #4 (`6b21f49`)               |
+| 13   | PWA instalable: manifest, service worker, instalación, shell sin conexión      | PR #5 (`bfb7ea5`)               |
+| 14   | Importación de horario (imagen/PDF) con OCR local y vista previa editable      | PR #6 (`d589984`)               |
+| 15   | UX, accesibilidad y responsive: pulido transversal, axe, diálogos, 404, sesión | PR #7 (`4b9c913`)               |
+| 16   | Endurecimiento de seguridad: sesiones, CSRF, IDOR, CSP, subidas, límites       | PR #8 (`cfe5783`)               |
+| 17   | Validación integral: escenario maestro, coherencia entre módulos, fallos, humo | PR #9 (`eb5cbb8`)               |
+| 18   | Datos de demostración reproducibles (`db:seed:demo`) y guion de presentación   | PR de `feat/phase-18-demo-seed` |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -57,6 +58,7 @@ Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migracione
 
 - **Progreso y carga (Fase 10):** `packages/core/src/insights.ts`. Progreso = la regla del Dashboard, por asignatura, alfabético, sin ponderar; "Sin actividades registradas" en vez de 0 %. Carga semanal lunes-domingo en la zona del perfil: actividades por el día local de `dueAt` (cualquier estado; una vencida de otra semana no cuenta) + ocurrencias de la agenda (reutiliza `expandBlock`), `scheduledMinutes` reales (una actividad es 1 compromiso y 0 horas), día con más compromisos (compromisos → minutos → día más temprano), sin niveles alta/baja. `GET /api/progress` y `GET /api/workload?week=` (solo periodo actual, consultas constantes). Detalle en [progress-and-workload.md](progress-and-workload.md).
 
+- **Datos de demostración (Fase 18):** `npm run db:seed:demo -- --allow-demo` ([demo.md](demo.md)). Estrategia: usuario fijo `demo@academicplanner.local` (mismo `id` entre ejecuciones), se borran **solo** sus datos y sus sesiones y se recrean a través de los servicios reales con un reloj inyectable (hash Argon2id, recordatorios AUTO, validación de agenda, regla de completado); todas las fechas parten de un único `now` (periodo desde el lunes de hace 5 semanas, 17 semanas). Dataset: 6 asignaturas, 6 clases semanales, 15 actividades (Radar 1/2/2/3/3 + 4 finalizadas; progreso 27 %; «¿Qué hago ahora?» = Parcial 1 de Redes), 1 recordatorio manual. Candados: `NODE_ENV` ≠ `production` (el flag no lo anula) y `--allow-demo` (flag de línea de comandos: portable entre cmd/PowerShell/bash y no puede quedar activado por olvido en `.env`). Sin `ALLOW_DEMO_SEED` en `.env.example` a propósito. Pruebas: 28 de API (BD de test) + 1 spec de navegador aislada; ninguna otra prueba depende del seed. Credenciales sintéticas solo para desarrollo, en docs/demo.md.
 - **Validación integral (Fase 17):** sin funcionalidad nueva. Suite de sistema (API con reloj fijo: coherencia Radar/Atención/Progreso/Carga/Recordatorios, medianoche, bordes del periodo, errores, rendimiento con 500 actividades; navegador: escenario MASTER de un semestre completo, dos usuarios, fallos de red inyectados con recuperación, Tokyo, teclado, 768 px, inventario de rutas), instalación limpia reproducida siguiendo el README y cinco pasadas completas consecutivas. Defectos de producto: ninguno; hallazgos menores (escáner de seguridad con una URL falsa, README desactualizado, trampa de entorno con `npm run dev` huérfano) corregidos o documentados. Todo en [system-validation.md](system-validation.md). revisión orientada a seguridad con modelo de amenazas y `docs/security.md`. Cambios: cookie `__Host-` bajo HTTPS; el inicio de sesión revoca el token anterior y limita a 20 sesiones por usuario; registro `strict`; `Cache-Control: no-store` global en `/api`; cabeceras (CSP estricta sin `unsafe-inline`/`unsafe-eval`, `frame-ancestors 'none'`, Referrer-Policy, Permissions-Policy, HSTS solo con HTTPS); la API puede servir la app (`WEB_DIST_DIR`) sin dotfiles/listados y con 404 JSON para `/api/*`; tipos de contenido conocidos (415), cuerpo > 100 kB = 413 (antes 500); `TRUST_PROXY` explícito (nunca `true`) y `CORS_ORIGIN` exacto validados al arrancar; Zod `jitless` en el navegador (hallazgo: violación de CSP); errores genéricos sin pila. Pruebas: matriz IDOR, autenticación, HTTP/CSRF/CORS/cabeceras/estáticos, robustez (parsers y archivos hostiles), restricciones de BD, y navegador real en la topología de producción. Requisitos de despliegue en [security.md](security.md).
 - **UX, accesibilidad y responsive (Fase 15):** auditoría orientada a WCAG 2.1 AA con `@axe-core/playwright` (0 violaciones A/AA en todas las pantallas y estados probados) más revisión manual con capturas a 360/768/1366 px y reflow a 320. Navegación compacta en móvil, enlace «Saltar al contenido», un `h1` y un título de documento por ruta, `Modal` que pregunta antes de descartar cambios, `QueryError` (un refresco fallido conserva los datos), 404 útil, `ErrorBoundary` global, manejo de sesión caducada, horas en 12 h con a. m./p. m. en todo el producto, cuadrícula semanal solo ≥ 1024 px, filtros secundarios plegables en móvil, rutas con `React.lazy` (paquete principal 799 → 529 kB, 223 → 154 kB gzip, más un fragmento de React de 164 kB). Sin dispositivo real (lista pendiente en [ux-accessibility.md](ux-accessibility.md)). La actualización de la PWA se probó de verdad (compilación A → B).
 - **Importación de horario (Fase 14):** `POST /api/schedule-import/parse` (multipart, campo `file`). OCR local con `tesseract.js` 7 (WASM, modelo `spa` del paquete `@tesseract.js-data/spa`, sin descargas), texto de PDF con `unpdf` y render de páginas escaneadas con `@napi-rs/canvas`, subida con `multer` en memoria. Formatos PNG/JPG/PDF, 10 MB, 5 páginas, 60 s, una importación a la vez por usuario y 10 cada 10 min por IP (`SCHEDULE_IMPORT_RATE_LIMIT_MAX`). Extracción separada de la interpretación (`ExtractedDocument` → clases candidatas → propuestas); asignaturas `EXACT/LIKELY/AMBIGUOUS/MISSING` (nunca se aplica una aproximada sin confirmar); duplicados propios y conflictos vía `dryRun` del servicio de Agenda. Detalle en [schedule-import.md](schedule-import.md).
@@ -78,9 +80,9 @@ Push/Web Push/correo/SMS, IA (incluida visión), sincronización offline complet
 
 Una rama por fase (`feat/phase-N-...`) desde `main`, un commit `feat: ...` por fase, un PR por fase que el usuario autoriza fusionar (merge commit). Tras fusionar, tag anotado de checkpoint (`phase-12-complete`). `main` es la fuente persistente del proyecto.
 
-## Totales de tests (tras la Fase 17)
+## Totales de tests (tras la Fase 18)
 
-Vitest: core 766, API 754, web 37 (1557). Playwright: 256 por pasada (252 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil) más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). Móvil 360 px y escritorio 1366 px.
+Vitest: core 766, API 782, web 37 (1585). Playwright: 258 por pasada (254 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil) más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). Móvil 360 px y escritorio 1366 px.
 
 ## Riesgos conocidos
 
@@ -92,6 +94,8 @@ Vitest: core 766, API 754, web 37 (1557). Playwright: 256 por pasada (252 se eje
 - El stack e2e (`npm run dev:e2e`) sirve el bundle compilado con `vite preview` y la API sin `--watch`: el servidor de desarrollo reiniciaba la API al re-emitir `dist` y rechazaba conexiones bajo carga (167 de 800 en una prueba).
 - `npm audit` reporta vulnerabilidades altas en dependencias de desarrollo del CLI de `prisma` (`mysql2`, `deepmerge-ts`); no se usa MySQL. Revisar en la fase de endurecimiento.
 - Sin notificaciones fuera de la app: solo recordatorios internos.
+- **Resuelto en la Fase 18 (reproducibilidad):** `npm run test:browser` en una máquina nueva (o tras `docker compose down -v`) se quedaba esperando 120 s y fallaba con «Timed out waiting from config.webServer». Causa raíz: Playwright arranca el servidor web **antes** de su `globalSetup`, y esa API necesita la BD `academic_planner_test`, que aún no existía (la comprobación de salud nunca daba 200). En la Fase 17 no se vio porque `npm test` (que crea esa BD) corrió antes. Corrección: `ensureTestDatabaseSync()` (`apps/api/test/testDb.ts`) la crea y migra desde las dos configuraciones de Playwright antes de arrancar nada. Comprobado partiendo sin esa BD.
+- **Fase 18, dos carreras de test corregidas (no del producto):** `activities.spec` («activity flow») y `ux-accessibility.spec` («when the session ends») fallaron una vez cada una porque cerraban sesión o borraban la cookie con peticiones aún en vuelo (la API responde 401 y la app ya había redirigido al login). Se confirmó en la traza y se añadió `waitForLoadState('networkidle')` antes de la acción. Tras el último cambio: **5 pasadas completas consecutivas verdes (254 pasan + 4 omitidas, 6,2–6,8 min)**, sin `ERR_CONNECTION_REFUSED`.
 - **Dependencias (Fase 16):** `npm audit` = 4 altas, todas de la cadena del **CLI** `prisma@7.10.0` (`@prisma/config` → `deepmerge-ts`, y `mysql2`): no alcanzables (configuración propia; nunca se conecta a MySQL). El arreglo que propone npm es retroceder a `prisma@6.19.3`; se rechazó. Pendiente: pasar a la siguiente estable de Prisma que la corrija.
 - **Dispositivos reales (pendiente):** instalación de la PWA y uso en iOS/Android físicos no probados (solo emulación a 360/768/1366 px en Edge).
 - **Seguridad (límites conocidos):** límites de frecuencia en memoria y por proceso (una sola instancia o almacén compartido); el registro revela si un correo existe; sin verificación de correo, recuperación de contraseña ni MFA; sesión fija de 7 días. Detalle en [security.md](security.md).
