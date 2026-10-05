@@ -1,1 +1,7 @@
 @import 'tailwindcss';
+
+/* Notch / home-indicator insets when installed (0 in ordinary browsers). */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}

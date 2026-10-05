@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 12 completada (Bandeja académica)**; siguiente: Fase 13 (PWA). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 13 completada (PWA instalable)**; siguiente: Fase 14. Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -126,6 +126,10 @@ Dos vistas **descriptivas** de lo registrado (no miden rendimiento, productivida
 ## Recordatorios
 
 Recordatorios **internos** de la app solo para actividades (sin push, correo ni notificaciones del sistema). Al crear una actividad se generan solos según su tipo (p. ej. parcial: 3 días, 1 día y 3 horas antes); nunca se crea uno que ya haya pasado. Se recalculan solo si cambian la fecha/hora límite, el tipo o el estado (finalizar cancela los pendientes; reabrir regenera los futuros). Editar uno automático lo vuelve manual. `GET /api/reminders/due` alimenta el panel "Recordatorios" del Dashboard (máx. 20) y la insignia 🔔 de "Inicio"; nada se marca como visto al leer. Reglas, limitaciones y decisiones en [docs/reminders.md](docs/reminders.md).
+
+## PWA instalable
+
+Academic Planner se puede **instalar** (manifest, iconos, service worker, modo standalone; ayuda para iOS) y su shell estático abre sin conexión. **No es una app offline completa:** consultar o modificar datos académicos requiere conexión; sin ella verás un aviso claro. La API nunca se cachea (privacidad). Hay aviso de «Nueva versión» sin recargar solo. El service worker solo existe en `build` + `preview`/producción (no en `npm run dev`) y requiere HTTPS (o localhost). Detalle, depuración y límites en [docs/pwa.md](docs/pwa.md).
 
 ## Estructura
 
