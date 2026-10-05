@@ -17,6 +17,8 @@ const envSchema = z.object({
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   // Registrations allowed per IP per hour.
   REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  // Schedule imports (OCR is the costliest thing the API does) allowed per IP per 10 min.
+  SCHEDULE_IMPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 });
 
 export type Env = z.infer<typeof envSchema>;

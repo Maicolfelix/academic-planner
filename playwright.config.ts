@@ -40,6 +40,7 @@ export default defineConfig({
       NODE_ENV: 'test',
       LOGIN_RATE_LIMIT_MAX: '1000',
       REGISTER_RATE_LIMIT_MAX: '1000',
+      SCHEDULE_IMPORT_RATE_LIMIT_MAX: '1000',
     },
   },
 });

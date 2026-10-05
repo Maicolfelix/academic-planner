@@ -8,6 +8,7 @@ import { InboxPage } from './pages/InboxPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ProgressPage } from './pages/ProgressPage';
+import { ScheduleImportPage } from './pages/ScheduleImportPage';
 import { RadarPage } from './pages/RadarPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { StatusPage } from './pages/StatusPage';
@@ -34,6 +35,7 @@ export function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/radar" element={<RadarPage />} />
               <Route path="/progress" element={<ProgressPage />} />
+              <Route path="/calendar/import" element={<ScheduleImportPage />} />
               <Route path="/inbox" element={<InboxPage />} />
             </Route>
           </Route>

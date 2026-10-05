@@ -1,0 +1,289 @@
+import {
+  WEEKDAY_LABELS,
+  WEEKDAYS,
+  toLocalParts,
+  weekdayOf,
+  type ScheduleImportProposal,
+  type Subject,
+} from '@planner/core';
+import { FormField } from '../../components/FormField';
+import { SelectField } from '../../components/SelectField';
+
+/** What the student can correct before importing. */
+export interface ImportDraft {
+  subjectId: string;
+  /** '1'-'7' or '' when it could not be read. */
+  weekday: string;
+  startTime: string;
+  endTime: string;
+  title: string;
+  /** Last day of the weekly repetition. */
+  until: string;
+}
+
+export interface Conflict {
+  title: string;
+  startAt: string;
+  endAt: string;
+}
+
+export interface ImportRow {
+  proposal: ScheduleImportProposal;
+  draft: ImportDraft;
+  selected: boolean;
+  /** The title still follows the subject name (the student has not typed their own). */
+  autoTitle: boolean;
+  status: 'idle' | 'creating' | 'created' | 'error';
+  error?: string;
+  errors: Record<string, string[]>;
+  /** Conflicts found while editing (the Schedule service in dry-run mode); null = the ones from the reading. */
+  liveConflicts: Conflict[] | null;
+}
+
+/** What is still missing or wrong for this class to be created. */
+export function problemsOf(d: ImportDraft): string[] {
+  const out: string[] = [];
+  if (d.subjectId === '') out.push('la asignatura');
+  if (d.weekday === '') out.push('el día');
+  if (d.startTime === '') out.push('la hora de inicio');
+  if (d.endTime === '') out.push('la hora de fin');
+  if (d.title.trim() === '') out.push('el título');
+  return out;
+}
+
+export const endsBeforeStart = (d: ImportDraft) =>
+  d.startTime !== '' && d.endTime !== '' && d.endTime <= d.startTime;
+
+/** A reading warning stays only while the student has not fixed what it is about. */
+const stillApplies = (code: string, d: ImportDraft, hasSuggestion: boolean): boolean => {
+  switch (code) {
+    case 'SUBJECT_MISSING':
+    case 'SUBJECT_AMBIGUOUS':
+      return d.subjectId === '';
+    case 'SUBJECT_LIKELY':
+      return d.subjectId === '' && !hasSuggestion; // with a suggestion, the "¿Quisiste decir…?" box says it
+    case 'MISSING_WEEKDAY':
+      return d.weekday === '';
+    case 'MISSING_START_TIME':
+      return d.startTime === '';
+    case 'MISSING_END_TIME':
+      return d.endTime === '';
+    case 'INVALID_TIME':
+      return endsBeforeStart(d);
+    default:
+      return true;
+  }
+};
+
+interface Props {
+  index: number;
+  row: ImportRow;
+  subjects: Subject[];
+  timeZone: string;
+  periodEnd: string;
+  onChange: (patch: Partial<ImportDraft>) => void;
+  onSelect: (selected: boolean) => void;
+}
+
+const conflictText = (c: Conflict, timeZone: string) => {
+  const start = toLocalParts(c.startAt, timeZone);
+  const end = toLocalParts(c.endAt, timeZone);
+  return `Conflicto con ${c.title}, ${WEEKDAY_LABELS[weekdayOf(start.date)].toLowerCase()} ${start.time}–${end.time}`;
+};
+
+/** One proposed class, editable. Nothing is saved until "Importar seleccionadas". */
+export function ImportProposalCard({
+  index,
+  row,
+  subjects,
+  timeZone,
+  periodEnd,
+  onChange,
+  onSelect,
+}: Props) {
+  const { proposal: p, draft: d } = row;
+  const id = `import-${index}`;
+  const locked = row.status === 'created' || row.status === 'creating';
+  const problems = problemsOf(d);
+  const badRange = endsBeforeStart(d);
+  const blocked = problems.length > 0 || badRange;
+  const conflicts = row.liveConflicts ?? p.conflicts;
+  const suggested = p.subjectMatch.suggestedId
+    ? subjects.find((s) => s.id === p.subjectMatch.suggestedId)
+    : undefined;
+  const candidates = p.subjectMatch.candidates;
+  const notes = p.warnings.filter((w) => stillApplies(w.code, d, suggested !== undefined));
+  const duplicate = p.duplicateOf !== null;
+
+  const badge =
+    row.status === 'created'
+      ? 'Importada ✓'
+      : blocked
+        ? 'Necesita revisión'
+        : p.status === 'REVIEW'
+          ? 'Revisa los datos'
+          : 'Lista';
+
+  return (
+    <li>
+      <article
+        aria-labelledby={`${id}-title`}
+        className={`flex flex-col gap-3 rounded-lg border-2 bg-white p-4 ${
+          row.status === 'created' ? 'border-green-700' : 'border-slate-900'
+        }`}
+      >
+        <header className="flex flex-wrap items-center justify-between gap-2">
+          <h3 id={`${id}-title`} className="text-base font-semibold break-words">
+            Clase {index + 1}: {d.title || p.title || 'Sin título'}
+          </h3>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium">{badge}</span>
+        </header>
+
+        <p className="text-sm text-slate-700 break-words">
+          Texto leído: <span className="font-medium">“{p.source.rawText}”</span>
+          {p.source.page > 1 && <> (página {p.source.page})</>}
+        </p>
+
+        {(notes.length > 0 || duplicate || conflicts.length > 0) && (
+          <ul
+            id={`${id}-warnings`}
+            className="flex list-disc flex-col gap-1 rounded-md bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-950"
+          >
+            {duplicate && <li>Esta clase parece estar ya en tu agenda.</li>}
+            {conflicts.map((c) => (
+              <li key={c.startAt + c.title}>{conflictText(c, timeZone)}</li>
+            ))}
+            {notes
+              .filter((w) => w.code !== 'POSSIBLE_DUPLICATE')
+              .map((w) => (
+                <li key={w.code}>{w.message}</li>
+              ))}
+          </ul>
+        )}
+
+        {row.status === 'error' && row.error && (
+          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+            {row.error}
+          </p>
+        )}
+
+        {row.status === 'created' ? (
+          <p role="status" className="text-sm text-green-900">
+            Clase importada: {d.title}, {WEEKDAY_LABELS[Number(d.weekday) as 1].toLowerCase()}{' '}
+            {d.startTime}–{d.endTime}, cada semana.
+          </p>
+        ) : (
+          <>
+            {suggested && d.subjectId === '' && (
+              <div className="flex flex-col gap-2 rounded-md border border-slate-300 p-3 text-sm">
+                <p>¿Quisiste decir {suggested.name}?</p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => onChange({ subjectId: suggested.id })}
+                    className="min-h-11 rounded-md border border-slate-400 px-4 py-2 font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                  >
+                    Sí, es {suggested.name}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {candidates.length > 1 && !suggested && (
+              <fieldset className="flex flex-col gap-2 rounded-md border border-slate-300 p-3">
+                <legend className="px-1 text-sm font-medium">¿A cuál te refieres?</legend>
+                {candidates.map((c) => (
+                  <label key={c.id} className="flex min-h-11 items-center gap-2 text-base">
+                    <input
+                      type="radio"
+                      name={`${id}-candidate`}
+                      checked={d.subjectId === c.id}
+                      onChange={() => onChange({ subjectId: c.id })}
+                      className="size-5"
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+
+            <SelectField
+              id={`${id}-subject`}
+              label="Asignatura"
+              placeholder="Elige una asignatura"
+              value={d.subjectId}
+              onChange={(subjectId) => onChange({ subjectId })}
+              options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+              error={row.errors.subjectId?.[0]}
+            />
+            <SelectField
+              id={`${id}-weekday`}
+              label="Día"
+              placeholder="Elige el día"
+              value={d.weekday}
+              onChange={(weekday) => onChange({ weekday })}
+              options={WEEKDAYS.map((w) => ({ value: String(w), label: WEEKDAY_LABELS[w] }))}
+              error={row.errors.date?.[0]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                id={`${id}-start`}
+                label="Inicio"
+                type="time"
+                value={d.startTime}
+                onChange={(startTime) => onChange({ startTime })}
+                error={row.errors.startTime?.[0]}
+              />
+              <FormField
+                id={`${id}-end`}
+                label="Fin"
+                type="time"
+                value={d.endTime}
+                onChange={(endTime) => onChange({ endTime })}
+                error={
+                  row.errors.endTime?.[0] ??
+                  (badRange ? 'La hora de fin debe ser posterior a la de inicio.' : undefined)
+                }
+              />
+            </div>
+            <FormField
+              id={`${id}-title-input`}
+              label="Título"
+              value={d.title}
+              onChange={(title) => onChange({ title })}
+              error={row.errors.title?.[0]}
+            />
+            <FormField
+              id={`${id}-until`}
+              label="Se repite cada semana hasta"
+              type="date"
+              value={d.until}
+              onChange={(until) => onChange({ until })}
+              error={row.errors.recurrence?.[0]}
+              hint={`Fin del periodo: ${periodEnd}`}
+            />
+
+            {(problems.length > 0 || badRange) && (
+              <p className="text-sm text-slate-700">
+                {problems.length > 0
+                  ? `Para importarla falta ${problems.join(', ')}.`
+                  : 'Corrige la hora de fin para importarla.'}
+              </p>
+            )}
+
+            <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={row.selected}
+                disabled={locked || blocked}
+                onChange={(e) => onSelect(e.target.checked)}
+                className="size-5"
+              />
+              Incluir en “Importar seleccionadas”
+            </label>
+          </>
+        )}
+      </article>
+    </li>
+  );
+}

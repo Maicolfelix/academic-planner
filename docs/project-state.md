@@ -8,27 +8,28 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 13 (PWA instalable)** (rama `feat/phase-13-pwa`, PR pendiente de fusionar por el usuario). Checkpoint previo: `main` `0ab869e` con tag `phase-12-complete`.
-- **Siguiente: Fase 14 (importación de horario / OCR), sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 14 (importación de horario con OCR)** (rama `feat/phase-14-schedule-import`, PR pendiente de fusionar por el usuario). Base: `main` `bfb7ea5` (Fase 13 fusionada). Checkpoint previo: tag `phase-12-complete` (`0ab869e`).
+- **Siguiente: Fase 15 (pulido de UX, accesibilidad y responsive), sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
 
-| Fase | Contenido                                                                    | Commit                    |
-| ---- | ---------------------------------------------------------------------------- | ------------------------- |
-| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a                       |
-| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e`                 |
-| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c`                 |
-| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9`                 |
-| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9`                 |
-| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb`                 |
-| 7    | Recordatorios internos automáticos para actividades                          | `404a032`                 |
-| 8    | Radar académico: categorías derivadas por tiempo restante                    | `c0698c0`                 |
-| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | `b7c7874`                 |
-| 10   | Progreso por asignatura y carga semanal (descriptivas)                       | PR #2 (`1848dff`)         |
-| 11   | Captura rápida: parser determinístico de frases cortas con vista previa      | PR #3                     |
-| 12   | Bandeja académica: mensajes largos a 0-10 propuestas revisables              | PR #4 (`6b21f49`)         |
-| 13   | PWA instalable: manifest, service worker, instalación, shell sin conexión    | PR de `feat/phase-13-pwa` |
+| Fase | Contenido                                                                    | Commit                                |
+| ---- | ---------------------------------------------------------------------------- | ------------------------------------- |
+| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a                                   |
+| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e`                             |
+| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c`                             |
+| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9`                             |
+| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9`                             |
+| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb`                             |
+| 7    | Recordatorios internos automáticos para actividades                          | `404a032`                             |
+| 8    | Radar académico: categorías derivadas por tiempo restante                    | `c0698c0`                             |
+| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | `b7c7874`                             |
+| 10   | Progreso por asignatura y carga semanal (descriptivas)                       | PR #2 (`1848dff`)                     |
+| 11   | Captura rápida: parser determinístico de frases cortas con vista previa      | PR #3                                 |
+| 12   | Bandeja académica: mensajes largos a 0-10 propuestas revisables              | PR #4 (`6b21f49`)                     |
+| 13   | PWA instalable: manifest, service worker, instalación, shell sin conexión    | PR #5 (`bfb7ea5`)                     |
+| 14   | Importación de horario (imagen/PDF) con OCR local y vista previa editable    | PR de `feat/phase-14-schedule-import` |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -53,6 +54,7 @@ Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migracione
 
 - **Progreso y carga (Fase 10):** `packages/core/src/insights.ts`. Progreso = la regla del Dashboard, por asignatura, alfabético, sin ponderar; "Sin actividades registradas" en vez de 0 %. Carga semanal lunes-domingo en la zona del perfil: actividades por el día local de `dueAt` (cualquier estado; una vencida de otra semana no cuenta) + ocurrencias de la agenda (reutiliza `expandBlock`), `scheduledMinutes` reales (una actividad es 1 compromiso y 0 horas), día con más compromisos (compromisos → minutos → día más temprano), sin niveles alta/baja. `GET /api/progress` y `GET /api/workload?week=` (solo periodo actual, consultas constantes). Detalle en [progress-and-workload.md](progress-and-workload.md).
 
+- **Importación de horario (Fase 14):** `POST /api/schedule-import/parse` (multipart, campo `file`). OCR local con `tesseract.js` 7 (WASM, modelo `spa` del paquete `@tesseract.js-data/spa`, sin descargas), texto de PDF con `unpdf` y render de páginas escaneadas con `@napi-rs/canvas`, subida con `multer` en memoria. Formatos PNG/JPG/PDF, 10 MB, 5 páginas, 60 s, una importación a la vez por usuario y 10 cada 10 min por IP (`SCHEDULE_IMPORT_RATE_LIMIT_MAX`). Extracción separada de la interpretación (`ExtractedDocument` → clases candidatas → propuestas); asignaturas `EXACT/LIKELY/AMBIGUOUS/MISSING` (nunca se aplica una aproximada sin confirmar); duplicados propios y conflictos vía `dryRun` del servicio de Agenda. Detalle en [schedule-import.md](schedule-import.md).
 - **PWA (Fase 13):** `vite-plugin-pwa` 2.0 + Workbox `generateSW`, `registerType: 'prompt'`. Manifest «Academic Planner» (`standalone`, `start_url` `/`), iconos propios en `apps/web/public`. Precache solo del shell estático; `/api/*` siempre `NetworkOnly` (nunca se guardan datos privados); navegación con fallback a `index.html` salvo `/api`. Alcance offline: solo el shell; las operaciones académicas requieren conexión (sin colas, background sync ni Web Push). Aviso «Sin conexión», aviso de nueva versión que nunca recarga solo, botón de instalar solo si el navegador lo ofrece y pista para iOS. El SW está desactivado en `npm run dev`. Detalle en [pwa.md](pwa.md).
 - **Bandeja académica (Fase 12):** `packages/core/src/academicInbox.ts` + `captureShared.ts` (bloques del parser compartidos con Captura rápida). Un mensaje de hasta 5000 caracteres produce de 0 a 10 propuestas (segmentación conservadora en oraciones y cláusulas, herencia de asignatura/fecha/hora solo por oración y solo si es inequívoca, ambigüedad con candidatos, propuestas incompletas válidas). `POST /api/academic-inbox/parse` solo propone y avisa de posibles duplicados del mismo usuario; la UI (`/inbox`) crea cada propuesta con el `POST /api/activities` normal, una por una, sin transacción global. Detalle en [academic-inbox.md](academic-inbox.md).
 - **Captura rápida (Fase 11):** `packages/core/src/quickCapture.ts`. Una frase corta se convierte en una **propuesta** de actividad (Capturar → Interpretar → Confirmar). Parser determinístico (sin IA ni servicios externos; el texto no se guarda): tipos, asignatura (exacta → palabras/prefijos inequívocos → ambigua o faltante, nunca inventada), fechas (hoy, mañana, día de la semana = próxima ocurrencia contando hoy salvo hora ya pasada, DD/MM[/AAAA], "10 de octubre"), horas y título residual, con certeza `EXACT/LIKELY/AMBIGUOUS/MISSING` y avisos. `POST /api/quick-capture/parse` solo propone; confirmar usa el `POST /api/activities` normal (sin camino de creación propio). Detalle en [quick-capture.md](quick-capture.md).
@@ -61,7 +63,7 @@ Documentos por área: [auth](auth.md), [academic](academic.md), [activities](act
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, OCR, importación de horarios, IA, sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
+Push/Web Push/correo/SMS, IA (incluida visión), sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
 
 ## Endpoints principales
 
@@ -71,9 +73,9 @@ Push/Web Push/correo/SMS, OCR, importación de horarios, IA, sincronización off
 
 Una rama por fase (`feat/phase-N-...`) desde `main`, un commit `feat: ...` por fase, un PR por fase que el usuario autoriza fusionar (merge commit). Tras fusionar, tag anotado de checkpoint (`phase-12-complete`). `main` es la fuente persistente del proyecto.
 
-## Totales de tests (tras la Fase 13)
+## Totales de tests (tras la Fase 14)
 
-Vitest: core 625, API 536, web 33 (1194). Playwright: 174 (móvil 360 px y escritorio 1366 px).
+Vitest: core 762, API 583, web 36 (1381). Playwright: 194 (móvil 360 px y escritorio 1366 px).
 
 ## Riesgos conocidos
 
@@ -81,7 +83,7 @@ Vitest: core 625, API 536, web 33 (1194). Playwright: 174 (móvil 360 px y escri
 - Los offsets de recordatorio son minutos absolutos: en un cambio de horario "1 día antes" son 24 h reales.
 - `/api/reminders/due` solo cubre el periodo actual.
 - **Resuelto en la Fase 9:** el flake de `activities.spec` ("activity flow") era del propio test: comprobaba `toContainText('En proceso')`, siempre cierto por ser también el texto de una `<option>`, y recargaba con el `PATCH` aún en vuelo (en la traza, estado `-1`). Ahora espera el valor del `<select>` controlado. Lección: en e2e, no esperar con una aserción que ya es cierta; esperar el efecto real antes de recargar.
-- **Problema conocido sin causa raíz (e2e):** en la Fase 10 una pasada completa de Playwright falló una vez (`dashboard.spec`, al final del test) con `net::ERR_CONNECTION_REFUSED`: un error de transporte, no una aserción sobre la app. En el stack con el servidor de desarrollo de Vite hubo varios casos (reproducido el mecanismo con 800 conexiones simultáneas); con `vite preview` apareció 1 vez en 11 pasadas completas y no se reprodujo en 8 pasadas completas seguidas ni en 80 repeticiones del test aislado, así que no se pudo capturar su traza. **No reapareció en las 6 pasadas completas de la Fase 11 ni en las 3 de la Fase 12 ni en las 3 de la Fase 13** (132 tests cada una, con registro de evidencia preparado): sigue en monitoreo, sin causa raíz. Si reaparece: guardar la traza de ese fallo, ver qué URL rechaza la conexión y no limitarse a repetir hasta que salga verde.
+- **Problema conocido sin causa raíz (e2e):** en la Fase 10 una pasada completa de Playwright falló una vez (`dashboard.spec`, al final del test) con `net::ERR_CONNECTION_REFUSED`: un error de transporte, no una aserción sobre la app. En el stack con el servidor de desarrollo de Vite hubo varios casos (reproducido el mecanismo con 800 conexiones simultáneas); con `vite preview` apareció 1 vez en 11 pasadas completas y no se reprodujo en 8 pasadas completas seguidas ni en 80 repeticiones del test aislado, así que no se pudo capturar su traza. **No reapareció en las 6 pasadas completas de la Fase 11 ni en las 3 de la Fase 12 ni en las 3 de la Fase 13. Reapareció en la Fase 14** (1 vez en 4 pasadas, más un fallo de `dashboard.spec` en otra pasada) y esta vez SÍ se guardó evidencia: la traza muestra que la petición rechazada fue **`http://localhost:5173/icon.svg`**, el favicon que la Fase 13 había convertido en archivo (antes era un `data:` URI): una petición iniciada por el navegador, fuera del control del test, contra `vite preview` bajo la carga de 4 navegadores en paralelo. El rechazo de conexiones de `vite preview` bajo carga sigue sin causa raíz; se quitó esa petición (favicon de nuevo en línea) y las 5 pasadas siguientes dieron 194/194. Si reaparece: la traza dirá qué URL se rechazó (132 tests cada una, con registro de evidencia preparado): sigue en monitoreo, sin causa raíz. Si reaparece: guardar la traza de ese fallo, ver qué URL rechaza la conexión y no limitarse a repetir hasta que salga verde.
 - El stack e2e (`npm run dev:e2e`) sirve el bundle compilado con `vite preview` y la API sin `--watch`: el servidor de desarrollo reiniciaba la API al re-emitir `dist` y rechazaba conexiones bajo carga (167 de 800 en una prueba).
 - `npm audit` reporta vulnerabilidades altas en dependencias de desarrollo del CLI de `prisma` (`mysql2`, `deepmerge-ts`); no se usa MySQL. Revisar en la fase de endurecimiento.
 - Sin notificaciones fuera de la app: solo recordatorios internos.

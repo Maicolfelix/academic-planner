@@ -7,7 +7,7 @@ import { createSessionService } from './auth/sessions.js';
 import { transactionRunner, type PrismaClient } from './db/prisma.js';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { originCheck } from './middleware/originCheck.js';
-import type { AuthRateLimits } from './middleware/rateLimit.js';
+import { createLimiter, type AuthRateLimits } from './middleware/rateLimit.js';
 import { createRequireAuth } from './middleware/requireAuth.js';
 import { createAcademicInboxController } from './controllers/academicInboxController.js';
 import { createActivityController } from './controllers/activityController.js';
@@ -22,6 +22,7 @@ import { createQuickCaptureController } from './controllers/quickCaptureControll
 import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
 import { createScheduleController } from './controllers/scheduleController.js';
+import { createScheduleImportController } from './controllers/scheduleImportController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
@@ -43,6 +44,7 @@ import { periodsRouter } from './routes/periods.js';
 import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
+import { scheduleImportRouter } from './routes/scheduleImport.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createAcademicInboxService } from './services/academicInboxService.js';
 import { createActivityService } from './services/activityService.js';
@@ -53,7 +55,13 @@ import { createProgressService } from './services/progressService.js';
 import { createQuickCaptureService } from './services/quickCaptureService.js';
 import { createRadarService } from './services/radarService.js';
 import { createReminderService } from './services/reminderService.js';
+import {
+  createScheduleImportService,
+  type ImportLogEvent,
+} from './services/scheduleImportService.js';
 import { createScheduleService } from './services/scheduleService.js';
+import type { ExtractionDeps } from './scheduleImport/pipeline.js';
+import { createOcrProvider, createPdfProvider } from './scheduleImport/providers.js';
 import { createWorkloadService } from './services/workloadService.js';
 import { createSubjectService } from './services/subjectService.js';
 
@@ -66,6 +74,14 @@ export interface AppDeps {
   rateLimits: AuthRateLimits;
   /** Source of "now" for rules that depend on it (overdue filter, completedAt). Defaults to the real clock. */
   clock?: () => Date;
+  /** Schedule import: rate limit and replaceable OCR/PDF engines (tests use fakes or close the real worker). */
+  scheduleImport?: {
+    limit?: number;
+    windowMs?: number;
+    timeoutMs?: number;
+    extraction?: ExtractionDeps;
+    log?: (event: ImportLogEvent) => void;
+  };
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -115,9 +131,33 @@ export function createApp(deps: AppDeps): Express {
   const attentionController = createAttentionController(
     createAttentionService(radarRepository, periodRepository, clock),
   );
-  const scheduleController = createScheduleController(
-    createScheduleService(scheduleRepository, periodRepository, subjectRepository, clock),
+  const scheduleService = createScheduleService(
+    scheduleRepository,
+    periodRepository,
+    subjectRepository,
+    clock,
   );
+  const scheduleController = createScheduleController(scheduleService);
+  const importOptions = deps.scheduleImport ?? {};
+  const scheduleImportController = createScheduleImportController(
+    createScheduleImportService({
+      periods: periodRepository,
+      subjects: subjectRepository,
+      schedule: scheduleRepository,
+      scheduleService,
+      extraction: importOptions.extraction ?? {
+        pdf: createPdfProvider(),
+        ocr: createOcrProvider(),
+      },
+      timeoutMs: importOptions.timeoutMs,
+      log: importOptions.log,
+    }),
+  );
+  // 10 imports per 10 minutes per client: OCR is the most expensive thing the API does.
+  const importLimiter = createLimiter({
+    windowMs: importOptions.windowMs ?? 10 * 60 * 1000,
+    limit: importOptions.limit ?? 10,
+  });
   const periodController = createPeriodController(createPeriodService(periodRepository));
   const subjectController = createSubjectController(
     createSubjectService(subjectRepository, periodRepository),
@@ -145,6 +185,10 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/workload', workloadRouter(workloadController, requireAuth));
   app.use('/api/attention', attentionRouter(attentionController, requireAuth));
   app.use('/api/schedule', scheduleRouter(scheduleController, requireAuth));
+  app.use(
+    '/api/schedule-import',
+    scheduleImportRouter(scheduleImportController, requireAuth, importLimiter),
+  );
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
 
   app.use(notFoundHandler);
