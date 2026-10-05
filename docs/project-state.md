@@ -6,24 +6,25 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 10 (Progreso y carga semanal)** (PR #2, pendiente de fusionar en `main` por el usuario).
-- **Siguiente: Fase 11, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
+- **Última fase completada y aprobada: Fase 11 (Captura rápida)** (PR #3, pendiente de fusionar en `main` por el usuario).
+- **Siguiente: Fase 12, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
 ## Fases completadas
 
-| Fase | Contenido                                                                    | Commit    |
-| ---- | ---------------------------------------------------------------------------- | --------- |
-| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a       |
-| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e` |
-| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c` |
-| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9` |
-| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9` |
-| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb` |
-| 7    | Recordatorios internos automáticos para actividades                          | `404a032` |
-| 8    | Radar académico: categorías derivadas por tiempo restante                    | `c0698c0` |
-| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | `b7c7874` |
-| 10   | Progreso por asignatura y carga semanal (descriptivas)                       | PR #2     |
+| Fase | Contenido                                                                    | Commit            |
+| ---- | ---------------------------------------------------------------------------- | ----------------- |
+| 0    | Contexto y decisiones (monorepo, PostgreSQL, sesiones propias, zona horaria) | n/a               |
+| 1    | Foundation: monorepo, API, web, Prisma, tooling, Playwright                  | `f542f5e`         |
+| 2    | Autenticación: registro, login, logout, sesiones en servidor                 | `095c12c`         |
+| 3    | Periodos académicos y asignaturas (CRUD, propiedad, onboarding)              | `da5eda9`         |
+| 4-5  | Actividades académicas y Dashboard                                           | `6501bd9`         |
+| 6    | Agenda, horarios y recurrencia semanal                                       | `7a031fb`         |
+| 7    | Recordatorios internos automáticos para actividades                          | `404a032`         |
+| 8    | Radar académico: categorías derivadas por tiempo restante                    | `c0698c0`         |
+| 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | `b7c7874`         |
+| 10   | Progreso por asignatura y carga semanal (descriptivas)                       | PR #2 (`1848dff`) |
+| 11   | Captura rápida: parser determinístico de frases cortas con vista previa      | PR #3             |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -48,15 +49,17 @@ Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migracione
 
 - **Progreso y carga (Fase 10):** `packages/core/src/insights.ts`. Progreso = la regla del Dashboard, por asignatura, alfabético, sin ponderar; "Sin actividades registradas" en vez de 0 %. Carga semanal lunes-domingo en la zona del perfil: actividades por el día local de `dueAt` (cualquier estado; una vencida de otra semana no cuenta) + ocurrencias de la agenda (reutiliza `expandBlock`), `scheduledMinutes` reales (una actividad es 1 compromiso y 0 horas), día con más compromisos (compromisos → minutos → día más temprano), sin niveles alta/baja. `GET /api/progress` y `GET /api/workload?week=` (solo periodo actual, consultas constantes). Detalle en [progress-and-workload.md](progress-and-workload.md).
 
-Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md), [progress-and-workload](progress-and-workload.md).
+- **Captura rápida (Fase 11):** `packages/core/src/quickCapture.ts`. Una frase corta se convierte en una **propuesta** de actividad (Capturar → Interpretar → Confirmar). Parser determinístico (sin IA ni servicios externos; el texto no se guarda): tipos, asignatura (exacta → palabras/prefijos inequívocos → ambigua o faltante, nunca inventada), fechas (hoy, mañana, día de la semana = próxima ocurrencia contando hoy salvo hora ya pasada, DD/MM[/AAAA], "10 de octubre"), horas y título residual, con certeza `EXACT/LIKELY/AMBIGUOUS/MISSING` y avisos. `POST /api/quick-capture/parse` solo propone; confirmar usa el `POST /api/activities` normal (sin camino de creación propio). Detalle en [quick-capture.md](quick-capture.md).
+
+Documentos por área: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md), [progress-and-workload](progress-and-workload.md), [quick-capture](quick-capture.md).
 
 ## Fuera de alcance hasta nueva orden
 
 Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
 
-## Totales de tests (tras la Fase 10)
+## Totales de tests (tras la Fase 11)
 
-Vitest: core 385, API 471, web 28 (884). Playwright: 104 (móvil 360 px y escritorio 1366 px).
+Vitest: core 547, API 502, web 28 (1077). Playwright: 132 (móvil 360 px y escritorio 1366 px).
 
 ## Riesgos conocidos
 
@@ -64,11 +67,11 @@ Vitest: core 385, API 471, web 28 (884). Playwright: 104 (móvil 360 px y escrit
 - Los offsets de recordatorio son minutos absolutos: en un cambio de horario "1 día antes" son 24 h reales.
 - `/api/reminders/due` solo cubre el periodo actual.
 - **Resuelto en la Fase 9:** el flake de `activities.spec` ("activity flow") era del propio test: comprobaba `toContainText('En proceso')`, siempre cierto por ser también el texto de una `<option>`, y recargaba con el `PATCH` aún en vuelo (en la traza, estado `-1`). Ahora espera el valor del `<select>` controlado. Lección: en e2e, no esperar con una aserción que ya es cierta; esperar el efecto real antes de recargar.
-- **Problema conocido sin causa raíz (e2e):** en la Fase 10 una pasada completa de Playwright falló una vez (`dashboard.spec`, al final del test) con `net::ERR_CONNECTION_REFUSED`: un error de transporte, no una aserción sobre la app. En el stack con el servidor de desarrollo de Vite hubo varios casos (reproducido el mecanismo con 800 conexiones simultáneas); con `vite preview` apareció 1 vez en 11 pasadas completas y no se reprodujo en 8 pasadas completas seguidas ni en 80 repeticiones del test aislado, así que no se pudo capturar su traza. Si reaparece: guardar la traza de ese fallo, ver qué URL rechaza la conexión y no limitarse a repetir hasta que salga verde.
+- **Problema conocido sin causa raíz (e2e):** en la Fase 10 una pasada completa de Playwright falló una vez (`dashboard.spec`, al final del test) con `net::ERR_CONNECTION_REFUSED`: un error de transporte, no una aserción sobre la app. En el stack con el servidor de desarrollo de Vite hubo varios casos (reproducido el mecanismo con 800 conexiones simultáneas); con `vite preview` apareció 1 vez en 11 pasadas completas y no se reprodujo en 8 pasadas completas seguidas ni en 80 repeticiones del test aislado, así que no se pudo capturar su traza. **No reapareció en las 6 pasadas completas de la Fase 11** (132 tests cada una, con registro de evidencia preparado): sigue en monitoreo, sin causa raíz. Si reaparece: guardar la traza de ese fallo, ver qué URL rechaza la conexión y no limitarse a repetir hasta que salga verde.
 - El stack e2e (`npm run dev:e2e`) sirve el bundle compilado con `vite preview` y la API sin `--watch`: el servidor de desarrollo reiniciaba la API al re-emitir `dist` y rechazaba conexiones bajo carga (167 de 800 en una prueba).
 - `npm audit` reporta vulnerabilidades altas en dependencias de desarrollo del CLI de `prisma` (`mysql2`, `deepmerge-ts`); no se usa MySQL. Revisar en la fase de endurecimiento.
 - Sin notificaciones fuera de la app: solo recordatorios internos.
-- Windows: Git avisa de conversión LF→CRLF; es inocuo. Los scripts de PowerShell 5.1 pueden corromper UTF-8 al leer/escribir; usar las herramientas de edición.
+- Windows: `.gitattributes` fija `eol=lf` para que `git pull` no deje archivos con CRLF (antes `format:check` fallaba en archivos sin cambios); un aviso LF→CRLF de `git add` es inocuo. Los scripts de PowerShell 5.1 pueden corromper UTF-8 al leer/escribir; usar las herramientas de edición.
 
 ## Comandos de validación
 
