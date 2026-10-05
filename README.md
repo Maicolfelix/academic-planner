@@ -1,7 +1,7 @@
 # Planificador Académico (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 9 — ¿Qué hago ahora?** (sobre autenticación, periodos, asignaturas, actividades y Dashboard).
+Estado actual: **Fase 12 completada (Bandeja académica)**; siguiente: Fase 13 (PWA). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 

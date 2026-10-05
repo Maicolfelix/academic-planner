@@ -56,4 +56,4 @@ Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se 
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos.
+Push/Web Push/correo/SMS, OCR, importación de horarios, IA, sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos.

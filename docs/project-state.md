@@ -4,9 +4,11 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 
 > Nota: se pidió "hasta la Fase 6", pero la Fase 7 ya está implementada, aprobada y commiteada (`404a032`), así que se incluye.
 
+**Principio:** «Organizarse no debe convertirse en otra tarea.» **Flujo UX:** Capturar → Interpretar → Confirmar (nada se crea sin confirmación).
+
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 12 (Bandeja académica)** (rama `feat/phase-12-academic-inbox`, PR pendiente de fusionar por el usuario).
+- **Última fase completada y aprobada: Fase 12 (Bandeja académica)** (PR #4, fusionada en `main`; tag `phase-12-complete`).
 - **Siguiente: Fase 13, sin empezar.** Solo se implementa cuando el usuario entregue su prompt. Nunca se avanza por iniciativa propia.
 - Árbol de trabajo limpio tras el commit de la Fase 7 (salvo este documento y `CLAUDE.md`).
 
@@ -25,6 +27,7 @@ PWA universitaria de planeación académica, construida por **fases estrictas**.
 | 9    | ¿Qué hago ahora?: motor de atención determinístico y explicable              | `b7c7874`         |
 | 10   | Progreso por asignatura y carga semanal (descriptivas)                       | PR #2 (`1848dff`) |
 | 11   | Captura rápida: parser determinístico de frases cortas con vista previa      | PR #3             |
+| 12   | Bandeja académica: mensajes largos a 0-10 propuestas revisables              | PR #4 (`6b21f49`) |
 
 Cada fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe termina con exactamente `FASE N APROBADA` o `FASE N BLOQUEADA`.
 
@@ -56,7 +59,15 @@ Documentos por área: [auth](auth.md), [academic](academic.md), [activities](act
 
 ## Fuera de alcance hasta nueva orden
 
-Push/Web Push/correo/SMS, service worker, OCR, importación, IA, captura rápida, bandeja, PWA instalable, carga semanal (usa `ScheduleBlock`), duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
+Push/Web Push/correo/SMS, OCR, importación de horarios, IA, sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos. Cada uno pertenece a una fase futura definida por el usuario.
+
+## Endpoints principales
+
+`/api/auth/*` (registro, login, logout, me), `/api/periods`, `/api/subjects`, `/api/activities`, `/api/schedule-blocks` y agenda, `/api/dashboard`, `/api/reminders`, `/api/radar`, `/api/attention`, `/api/progress`, `/api/workload`, `POST /api/quick-capture/parse`, `POST /api/academic-inbox/parse`. Todos exigen sesión salvo registro/login; ver cada `docs/*.md` por módulo.
+
+## Estrategia de ramas y PR
+
+Una rama por fase (`feat/phase-N-...`) desde `main`, un commit `feat: ...` por fase, un PR por fase que el usuario autoriza fusionar (merge commit). Tras fusionar, tag anotado de checkpoint (`phase-12-complete`). `main` es la fuente persistente del proyecto.
 
 ## Totales de tests (tras la Fase 12)
 
