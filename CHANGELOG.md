@@ -1,20 +1,30 @@
 # Changelog
 
-Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). La versión sigue [SemVer](https://semver.org/lang/es/); la primera es un **candidato a versión** (`1.0.0-rc.1`). Resumen por fase: [docs/phase-history.md](docs/phase-history.md). Notas completas del candidato: [docs/release-notes-1.0.0-rc.1.md](docs/release-notes-1.0.0-rc.1.md).
+Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). La versión sigue [SemVer](https://semver.org/lang/es/); las versiones actuales son **candidatos a versión** (`1.0.0-rc.1`, `1.0.0-rc.2`). Resumen por fase: [docs/phase-history.md](docs/phase-history.md). Notas de los candidatos: [rc.1](docs/release-notes-1.0.0-rc.1.md) · [rc.2](docs/release-notes-1.0.0-rc.2.md).
 
 ## Unreleased
+
+Sin cambios después de `1.0.0-rc.2`. Cualquier trabajo nuevo requiere un alcance explícito del propietario del proyecto.
+
+## 1.0.0-rc.2 — Release Candidate 2 (2026-10-06)
+
+Corrección de un defecto de la importación de horario encontrado al probar con un calendario visual real; sin funciones nuevas (la congelación de funcionalidades continúa). Reemplaza a `1.0.0-rc.1`, que no se modifica. Notas: [docs/release-notes-1.0.0-rc.2.md](docs/release-notes-1.0.0-rc.2.md).
 
 ### Fixed
 
 - Schedule import now recognizes compact 24-hour time ranges such as `1900-2030` (19:00–20:30), `1400-1615` and `0800-0930`. A valid range takes priority over isolated times in the same block, which also no longer end up in the title.
 - Schedule import filters calendar-axis time labels (`1pm 2pm 3pm …`) that previously could replace the real hours of a class or create a false proposal.
 - Compact ranges are conservative: invalid times (`2560-2700`, `1965-2030`), years (`2019-2024`) and room numbers (`207-215`) are not read as hours.
+- «Texto leído» de la vista previa ya no incluye la etiqueta de la escala del calendario cuando la celda trae su propia hora.
+
+### Cambios del candidato
+
+- Versión `1.0.0-rc.2` coherente en la raíz y los tres workspaces y en `package-lock.json` (sin cambios de dependencias).
+- Notas de la versión de rc.2 y estado del proyecto actualizado.
 
 ### Known
 
 - `npm audit` ahora reporta 6 (4 altas + 2 críticas): la base de avisos añadió `shell-quote` (crítica) vía `concurrently`, una herramienta solo de desarrollo; con `--omit=dev` siguen las 4 altas de Prisma. Sin cambios de dependencias.
-
-Corrección posterior al candidato `1.0.0-rc.1` (que no se modifica): no cambia versiones ni crea etiquetas; cualquier nueva versión (`rc.2`) requiere un alcance explícito del propietario.
 
 ## 1.0.0-rc.1 — Release Candidate (2026-10-06)
 

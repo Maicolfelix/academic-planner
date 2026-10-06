@@ -27,4 +27,4 @@ El proyecto se construyó por **fases estrictas**: solo se implementa la fase qu
 
 ## Después del roadmap
 
-El roadmap de las Fases 0–20 está **completo**; el proyecto es un **Release Candidate** (`1.0.0-rc.1`). No hay una Fase 21: cualquier trabajo posterior (correcciones, versión final, funciones nuevas) requiere un alcance explícito del propietario. Lo que sigue abierto antes de una versión final está en [final-checklist.md](final-checklist.md).
+El roadmap de las Fases 0–20 está **completo**; el proyecto es un **Release Candidate** (`1.0.0-rc.1`, y `1.0.0-rc.2` con una corrección de la importación de horario). No hay una Fase 21: cualquier trabajo posterior (correcciones, versión final, funciones nuevas) requiere un alcance explícito del propietario. Lo que sigue abierto antes de una versión final está en [final-checklist.md](final-checklist.md).

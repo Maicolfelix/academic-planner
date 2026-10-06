@@ -2,7 +2,7 @@
 
 Las pruebas son la segunda fuente de verdad después del código: si un documento contradice a una prueba, se corrige el documento. Este archivo explica **qué capas hay, qué cubre cada una y cómo ejecutarlas**. Resultados de la validación integral: [system-validation.md](system-validation.md). Trazabilidad requisito → prueba: [requirements.md](requirements.md).
 
-## Cifras actuales (candidato 1.0.0-rc.1)
+## Cifras actuales (candidato 1.0.0-rc.2)
 
 | Capa                     | Herramienta                                       | Pruebas                                                                                                                   |
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
