@@ -1,6 +1,6 @@
 {
   "name": "@planner/api",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",
-    "@planner/core": "^0.1.0",
+    "@planner/core": "^1.0.0-rc.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@tesseract.js-data/spa": "^1.0.0",

@@ -1,19 +1,57 @@
 # Changelog
 
-Todavía **no hay versiones publicadas**: el proyecto no usa números de versión ni etiquetas de lanzamiento (`package.json` declara `0.1.0` solo como valor técnico). La primera versión corresponde a la Fase 20 (candidato a versión). Resumen por fase en [docs/phase-history.md](docs/phase-history.md).
+Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). La versión sigue [SemVer](https://semver.org/lang/es/); la primera es un **candidato a versión** (`1.0.0-rc.1`). Resumen por fase: [docs/phase-history.md](docs/phase-history.md). Notas completas del candidato: [docs/release-notes-1.0.0-rc.1.md](docs/release-notes-1.0.0-rc.1.md).
 
 ## Unreleased
 
-### Añadido
+Sin cambios después del candidato. Cualquier trabajo nuevo requiere un alcance explícito del propietario del proyecto.
 
-- Fases 1–10: monorepo, autenticación con sesiones en servidor, periodos y asignaturas, actividades, Dashboard, agenda con recurrencia semanal y aviso de solapes, recordatorios internos, Radar académico, «¿Qué hago ahora?», progreso y carga semanal.
-- Fases 11–14: Captura rápida, Bandeja académica, PWA instalable e Importación de horario (OCR local).
-- Fases 15–16: pulido de UX y accesibilidad (evaluado con axe y pruebas de teclado) y endurecimiento de seguridad.
-- Fase 17: validación integral del sistema (escenario de un semestre completo, coherencia entre módulos, fallos inyectados, humo de rendimiento).
-- Fase 18: datos de demostración reproducibles (`npm run db:seed:demo -- --allow-demo`).
-- Fase 19: documentación final (índice, arquitectura, modelo de datos, API, requisitos, pruebas, despliegue, desarrollo, limitaciones, decisiones, lista final) y `npm run docs:check`.
+## 1.0.0-rc.1 — Release Candidate (2026-10-06)
 
-### Corregido
+Congelación de funcionalidades (_feature freeze_): esta versión no añade funciones; valida y prepara el sistema construido en las Fases 1–19. **No es una certificación para producción pública**: dispositivos móviles reales y un despliegue real con HTTPS y proxy siguen sin validar ([docs/limitations.md](docs/limitations.md)).
+
+### Core
+
+- Autenticación con sesiones en servidor (Argon2id, token del que solo se guarda el hash, cookie `HttpOnly`; `__Host-` y `Secure` bajo HTTPS).
+- Periodo académico (uno actual por usuario) y asignaturas.
+- Actividades (tipo, prioridad, estado, fecha y hora opcional) con filtros combinables.
+- Agenda con clases semanales y aviso (no bloqueo) de solapes.
+- Recordatorios internos automáticos por tipo de actividad y manuales.
+- Aislamiento por usuario: un recurso ajeno responde el mismo 404 que uno inexistente.
+
+### Planning
+
+- Radar académico (cinco categorías por tiempo restante).
+- «¿Qué hago ahora?» (determinístico y explicable, sin IA).
+- Progreso general y por asignatura, y carga semanal (descriptivos).
+- Dashboard derivado de los datos reales.
+
+### Capture
+
+- Captura rápida: una frase → una actividad propuesta.
+- Bandeja académica: un mensaje → hasta 10 actividades propuestas.
+- Las dos proponen y solo guardan al confirmar.
+
+### Platform
+
+- PWA instalable (el shell abre sin conexión; `/api/*` siempre por red).
+- Importación de horario (imagen o PDF) con OCR local y vista previa editable.
+
+### Quality
+
+- Accesibilidad evaluada con axe y pruebas de teclado (orientada a WCAG 2.1 AA; no certificada).
+- Endurecimiento de seguridad y pruebas de seguridad automatizadas (matriz IDOR, CSRF, CSP, límites, subidas).
+- Validación de extremo a extremo de un semestre completo, con fallos de red inyectados.
+- Datos de demostración reproducibles (`npm run db:seed:demo -- --allow-demo`).
+- Documentación final con índice, y `npm run docs:check`.
+
+### Cambios del candidato
+
+- Versión `1.0.0-rc.1` coherente en la raíz y los tres workspaces (`@planner/core`, `@planner/api`, `@planner/web`) y en `package-lock.json`.
+- Documentos del candidato: notas de la versión, manifiesto y evidencia de validación.
+- Estado del proyecto, `CLAUDE.md` y la lista final actualizados al candidato.
+
+### Corregido durante el desarrollo reciente
 
 - `test:browser` no arrancaba sin la base de test (Fase 18).
 - Escáner de seguridad que fallaba en un clon limpio por una URL falsa de prueba (Fase 17).
@@ -22,4 +60,4 @@ Todavía **no hay versiones publicadas**: el proyecto no usa números de versió
 
 ### Conocido
 
-`npm audit`: 4 vulnerabilidades altas en la cadena del CLI de Prisma (no alcanzables en tiempo de ejecución), pendientes de una versión estable que las corrija. Dispositivos móviles reales, HTTPS y proxy reales sin validar. Ver [docs/limitations.md](docs/limitations.md).
+`npm audit`: 4 vulnerabilidades altas en la cadena del CLI de Prisma (no alcanzables en tiempo de ejecución según el análisis actual; sin versión estable posterior que las corrija). Límites de frecuencia en memoria; el registro revela si un correo existe; sin verificación de correo, recuperación de contraseña ni MFA; sesión fija de 7 días. `MaxListenersExceededWarning` en las pruebas de API (ruido de Supertest). Ver [docs/limitations.md](docs/limitations.md) y [docs/security.md](docs/security.md).

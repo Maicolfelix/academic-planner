@@ -55,7 +55,7 @@ node apps/api/dist/server.js
 
 > `npm run start -w @planner/api` ejecuta `node --env-file=../../.env dist/server.js`: **falla si no existe un archivo `.env` en la raíz** (Node lo exige). En una plataforma que inyecta variables, usa el comando de arriba; si prefieres archivo, créalo fuera del control de versiones y con permisos restringidos.
 
-Comprobación mínima tras arrancar (topología local de producción verificada en la Fase 19: salud 200, la app servida, `Strict-Transport-Security` y CSP presentes):
+Comprobación mínima tras arrancar (topología local de producción verificada con el candidato `1.0.0-rc.1`: salud 200, la app servida, `Strict-Transport-Security` y CSP presentes):
 
 ```bash
 curl -i https://planner.ejemplo.edu/api/health      # 200 {"status":"ok","database":"up",…}

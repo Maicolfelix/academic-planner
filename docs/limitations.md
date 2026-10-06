@@ -1,6 +1,6 @@
 # Limitaciones conocidas
 
-Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Cada punto se verificó contra el código o las pruebas en la Fase 19. Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas).
+Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Cada punto se verificó contra el código o las pruebas al preparar el candidato `1.0.0-rc.1` (Fase 20). Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas).
 
 ## Lo que aún no está validado
 
@@ -53,7 +53,7 @@ Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. 
 
 ## Pruebas y herramientas
 
-- `MaxListenersExceededWarning` (11 listeners en `Server`) al ejecutar las pruebas de API con Supertest: ruido de las pruebas, sin efecto funcional ni en el servidor (registrado como P17-04; **sigue presente** en la Fase 19).
+- `MaxListenersExceededWarning` (11 listeners en `Server`) al ejecutar las pruebas de API: **ruido del arnés**, sin efecto funcional ni en el servidor. Causa confirmada con `--trace-warnings`: `supertest` (`Test.end`) registra un listener por solicitud cuando una prueba lanza más de 10 solicitudes concurrentes sobre la misma aplicación; no hay código del producto en la traza. Sigue presente en el candidato `1.0.0-rc.1` (BAJA, P17-04); no se refactoriza en un candidato.
 - Una `npm run dev` huérfana (el vigilante `node --watch` vuelve a levantar la API) contamina `test:browser`; ver [development.md](development.md#problemas-comunes).
 - Los archivos de importación de prueba son sintéticos; no se usaron horarios reales.
 

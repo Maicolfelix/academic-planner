@@ -9,7 +9,9 @@ Academic Planner: PWA universitaria de planeación académica (asignaturas, acti
 - **Commit solo cuando el usuario lo pida** (las fases lo piden explícitamente si quedan aprobadas). Mensajes con prefijo (`feat:`, `test:`, `docs:`); `git commit -F <archivo>` para mensajes con comillas. Un PR por fase, **sin fusionarlo** salvo orden del usuario.
 - Responder y documentar en español; código y nombres en inglés.
 - Fuente de verdad: **código → pruebas → documentos**. Si un documento contradice al código, se corrige el documento. No afirmar impacto académico (rendimiento, estrés, notas): el software no lo ha medido.
-- Fase actual: **19 aprobada. Fase 20 (candidato a versión) sin empezar** (esperar el prompt del usuario).
+- **Roadmap completo (Fases 0–20). Estado del proyecto: Release Candidate `1.0.0-rc.1`** ([docs/release-manifest.md](docs/release-manifest.md)). **No existe una Fase 21** y no se debe inventar ni proponer una: cualquier trabajo nuevo (arreglos, versión final, nuevas funciones) requiere un **alcance explícito del usuario**.
+- **Congelación de funcionalidades:** sin pantallas, entidades, endpoints funcionales, reglas de dominio ni integraciones nuevas. Una idea nueva se documenta como trabajo futuro, no se implementa. Hallazgos: BLOCKER/HIGH se corrigen; MEDIUM/LOW se documentan salvo arreglo trivial y seguro.
+- **Versiones y etiquetas:** el tag `v1.0.0-rc.1` se crea **solo después de fusionar** el PR del candidato, desde `main` (nunca desde una rama sin fusionar); no se publica un `v1.0.0` final ni un GitHub Release sin orden del usuario.
 
 ## Comandos
 

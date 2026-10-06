@@ -2,7 +2,7 @@
 
 Marca solo lo que **se comprobó de verdad** y deja el resto sin marcar. «Hecho» significa ejecutado y verificado, con la evidencia enlazada. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales del proyecto ([limitations.md](limitations.md)).
 
-Estado a la Fase 19 (documentación final). Cada ítem hecho se comprobó al cerrar esta fase.
+Estado del **Release Candidate `1.0.0-rc.1`** (Fase 20). Cada ítem hecho se comprobó con evidencia enlazada en [release-validation.md](release-validation.md).
 
 ## Reproducibilidad
 
@@ -30,7 +30,9 @@ Estado a la Fase 19 (documentación final). Cada ítem hecho se comprobó al cer
 - [ ] **Prueba de carga** si se espera uso concurrente real (hoy solo hay pruebas de humo).
 - [ ] **Almacén compartido para los límites de frecuencia** si se ejecuta más de una instancia.
 - [ ] **Corrección de las limitaciones de cuentas** que se consideren necesarias para un servicio público: verificación de correo, recuperación de contraseña, MFA.
-- [ ] **Etiqueta de versión** (`v1.0.0` o la que corresponda) y notas de la versión: corresponde a la Fase 20 (candidato a versión), no a esta.
+- [x] **Notas y manifiesto del candidato** preparados ([release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md)).
+- [ ] **Etiqueta `v1.0.0-rc.1`** y GitHub Release (pre-release): se crean **después de fusionar** el PR del candidato, por el propietario.
+- [ ] **Versión final `v1.0.0`:** no forma parte de este candidato; requiere cerrar los pendientes de arriba.
 
 ## Antes de cada demostración
 

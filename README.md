@@ -2,7 +2,7 @@
 
 Aplicación web progresiva (PWA) para **organizar asignaturas, actividades, agenda y progreso académico** de un estudiante universitario. Centraliza la información en un solo lugar, calcula qué requiere atención primero y reduce los pasos operativos para registrar compromisos (escribiendo una frase, pegando un mensaje o subiendo un horario). Todo el procesamiento ocurre en el servidor de la aplicación: no usa IA generativa ni servicios de terceros.
 
-> Estado: **Fase 19 completada (documentación final)**; siguiente: Fase 20 (candidato a versión). Sin versiones publicadas ni despliegue. El software **no ha medido** efectos sobre el rendimiento o el bienestar académico; las pruebas demuestran que funciona como se describe. Limitaciones: [docs/limitations.md](docs/limitations.md).
+> Estado: **Release Candidate `1.0.0-rc.1`** (roadmap de las Fases 0–20 completo; congelación de funcionalidades). Candidato para entrega y evaluación académica: **no es una certificación para producción pública**, no se ha desplegado y no hay versión final. Notas: [docs/release-notes-1.0.0-rc.1.md](docs/release-notes-1.0.0-rc.1.md). El software **no ha medido** efectos sobre el rendimiento o el bienestar académico; las pruebas demuestran que funciona como se describe. Limitaciones: [docs/limitations.md](docs/limitations.md).
 
 ## Funcionalidades
 
@@ -91,13 +91,14 @@ Endurecimiento de seguridad realizado (no es una prueba de penetración ni una g
 
 Índice completo: **[docs/README.md](docs/README.md)**. Lo esencial:
 
-| Quiero…                       | Documento                                                                                                |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Entender qué hace y cómo      | [system-overview.md](docs/system-overview.md), [architecture.md](docs/architecture.md)                   |
-| Ver requisitos y su evidencia | [requirements.md](docs/requirements.md)                                                                  |
-| Continuar el desarrollo       | [development.md](docs/development.md), [CLAUDE.md](CLAUDE.md), [project-state.md](docs/project-state.md) |
-| Desplegar                     | [deployment.md](docs/deployment.md), [final-checklist.md](docs/final-checklist.md)                       |
-| Presentar el proyecto         | [demo.md](docs/demo.md)                                                                                  |
+| Quiero…                       | Documento                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entender qué hace y cómo      | [system-overview.md](docs/system-overview.md), [architecture.md](docs/architecture.md)                                                                                |
+| Ver requisitos y su evidencia | [requirements.md](docs/requirements.md)                                                                                                                               |
+| Continuar el desarrollo       | [development.md](docs/development.md), [CLAUDE.md](CLAUDE.md), [project-state.md](docs/project-state.md)                                                              |
+| Desplegar                     | [deployment.md](docs/deployment.md), [final-checklist.md](docs/final-checklist.md)                                                                                    |
+| Ver el candidato a versión    | [release-notes-1.0.0-rc.1.md](docs/release-notes-1.0.0-rc.1.md), [release-validation.md](docs/release-validation.md), [release-manifest.md](docs/release-manifest.md) |
+| Presentar el proyecto         | [demo.md](docs/demo.md)                                                                                                                                               |
 
 ## Limitaciones principales
 

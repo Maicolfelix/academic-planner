@@ -4,9 +4,11 @@ Estado **actual y compacto**. Para entender el sistema: [system-overview.md](sys
 
 ## Fase actual
 
-- **Última fase completada y aprobada: Fase 19 (documentación final)**, rama `docs/phase-19-final-documentation`, PR pendiente de fusionar por el usuario. Base: `main` `a4b9920` (Fase 18 fusionada, PR #10). Checkpoint: tag `phase-18-complete`.
-- **Siguiente: Fase 20 (candidato a versión), sin empezar.** Solo se implementa cuando el usuario entregue su prompt; nunca se avanza por iniciativa propia.
-- Fases 0–18 aprobadas y fusionadas en `main`. Sin versiones publicadas ([CHANGELOG.md](../CHANGELOG.md)).
+- **Estado: Release Candidate `1.0.0-rc.1`.** Roadmap completo (Fases 0–20); la Fase 20 (candidato a versión) está en la rama `release/phase-20-rc`, con el PR pendiente de revisión y fusión por el usuario. Código congelado desde `main` `151f6b31` (Fase 19 fusionada, PR #11).
+- **No existe una Fase 21.** Cualquier trabajo nuevo (correcciones, versión final, nuevas funciones) requiere un alcance explícito del usuario; nunca se avanza por iniciativa propia.
+- El tag `v1.0.0-rc.1` se crea **después de fusionar** el PR ([release-manifest.md](release-manifest.md)). Fases 0–19 aprobadas y fusionadas. Tags actuales: `phase-12-complete`, `phase-18-complete`.
+- **Validaciones externas pendientes:** dispositivos iOS/Android reales, HTTPS y proxy reales, despliegue de prueba, decisión de licencia. Ver [final-checklist.md](final-checklist.md).
+- Documentos del candidato: [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md), [release-validation.md](release-validation.md).
 
 ## Producto en una línea
 
@@ -18,7 +20,7 @@ Monorepo npm workspaces: `apps/api` (Express 5, Prisma 7, PostgreSQL 17), `apps/
 
 Documentos por módulo: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md), [progress-and-workload](progress-and-workload.md), [quick-capture](quick-capture.md), [academic-inbox](academic-inbox.md), [schedule-import](schedule-import.md), [pwa](pwa.md), [ux-accessibility](ux-accessibility.md), [security](security.md), [demo](demo.md).
 
-## Totales de tests (Fase 19)
+## Totales de tests (candidato 1.0.0-rc.1)
 
 Vitest: core 766, API 782, web 37 (**1585**). Playwright: 258 por pasada (254 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
 
