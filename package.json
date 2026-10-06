@@ -27,6 +27,7 @@
     "db:generate": "npm run db:generate -w @planner/api",
     "db:migrate": "npm run db:migrate -w @planner/api",
     "db:deploy": "npm run db:deploy -w @planner/api",
+    "db:seed:demo": "npm run db:seed:demo -w @planner/api --",
     "security:scan": "node scripts/security-scan.mjs",
     "test:security": "npm run security:scan && npm test -w @planner/api -- src/security",
     "test:security:browser": "playwright test --config playwright.security.config.ts"

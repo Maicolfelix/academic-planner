@@ -436,6 +436,9 @@ test('when the session ends, the student is told so and sent to the login, once'
   await richUser(page);
   await page.goto('/dashboard');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  // Let the Dashboard finish loading: a request still in flight when the cookie goes would be answered 401 and the app
+  // would already be on the login before the click (the product is right; the test would not be testing the click).
+  await page.waitForLoadState('networkidle');
   await context.clearCookies(); // the server no longer knows this session
   await page.getByRole('link', { name: 'Actividades' }).click();
   await expect(page).toHaveURL(/\/login$/);

@@ -35,6 +35,25 @@ export function getTestDatabaseUrl(): string {
   return url;
 }
 
+/**
+ * Playwright starts its web server BEFORE its global setup, and that API needs the test database to answer its health
+ * check. On a fresh machine (or after `docker compose down -v`) the database does not exist yet, so the configs call this
+ * first: it creates and migrates it in a child process (once per run; workers inherit the flag).
+ */
+export function ensureTestDatabaseSync(): void {
+  if (process.env.PLANNER_TEST_DB_READY) return;
+  execFileSync(
+    process.execPath,
+    ['--import', 'tsx', fileURLToPath(new URL('./prepareTestDb.ts', import.meta.url))],
+    {
+      cwd: fileURLToPath(new URL('../../..', import.meta.url)),
+      stdio: 'inherit',
+      env: process.env,
+    },
+  );
+  process.env.PLANNER_TEST_DB_READY = '1';
+}
+
 /** Creates the test database if missing, then applies every migration to it (never the dev DB). */
 export async function prepareTestDatabase(): Promise<void> {
   const url = getTestDatabaseUrl();

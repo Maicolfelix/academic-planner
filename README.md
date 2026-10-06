@@ -1,7 +1,7 @@
 # Academic Planner (PWA)
 
 Aplicación web progresiva para organizar asignaturas, actividades, agenda y progreso académico.
-Estado actual: **Fase 17 completada (validación integral del sistema)**; siguiente: Fase 18 (datos de demostración / seed). Evidencia de validación: [docs/system-validation.md](docs/system-validation.md). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
+Estado actual: **Fase 18 completada (datos de demostración reproducibles)**; siguiente: Fase 19 (documentación final). Evidencia de validación: [docs/system-validation.md](docs/system-validation.md). Estado, arquitectura, riesgos y cómo levantarlo desde cero: [docs/project-state.md](docs/project-state.md). Reglas de trabajo para sesiones de Claude: [CLAUDE.md](CLAUDE.md).
 
 ## Requisitos
 
@@ -60,6 +60,7 @@ Migraciones actuales:
 | `npm run test:security:browser`         | Playwright en topología de producción (la API sirve la app, puerto 4300)           |
 | `npm run db:up` / `db:down`             | Inicia / detiene PostgreSQL                                                        |
 | `npm run db:migrate` / `db:deploy`      | Migraciones (ver arriba)                                                           |
+| `npm run db:seed:demo -- --allow-demo`  | Datos de demostración (solo desarrollo; ver [docs/demo.md](docs/demo.md))          |
 
 ### Tests
 
@@ -133,6 +134,10 @@ Recordatorios **internos** de la app solo para actividades (sin push, correo ni 
 ## Importación asistida de horarios
 
 Desde la Agenda, «Importar horario» (`/calendar/import`) permite subir una imagen (PNG/JPG) o un PDF de tu horario: se lee con OCR local (Tesseract) o con el texto del PDF, se te muestra una **propuesta editable** y solo se crean las clases que confirmes (como clases semanales). No importa «cualquier horario automáticamente»: el OCR puede equivocarse, así que revisa siempre las horas. Sin IA, el archivo no se envía a terceros ni se guarda. Máx. 10 MB y 5 páginas. Detalle en [docs/schedule-import.md](docs/schedule-import.md).
+
+## Demo local
+
+`npm run db:seed:demo -- --allow-demo` crea un estudiante ficticio con un semestre completo (6 asignaturas, 6 clases semanales, 15 actividades, fechas relativas a «hoy») y se puede repetir para restablecerlo. Nunca corre solo ni en producción. Credenciales, recorrido de presentación y límites: [docs/demo.md](docs/demo.md).
 
 ## Seguridad
 
