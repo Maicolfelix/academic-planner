@@ -840,3 +840,197 @@ describe('robustness', () => {
     expect(buildScheduleProposals([], ctx)).toEqual([]);
   });
 });
+
+// ───────────────────────── Post-RC fix: compact ranges and calendar-axis noise ─────────────────────────
+
+describe('compact time ranges (HHMM-HHMM)', () => {
+  it.each([
+    ['1900-2030', '19:00', '20:30'],
+    ['1400-1615', '14:00', '16:15'],
+    ['0800-0930', '08:00', '09:30'],
+    ['800-930', '08:00', '09:30'],
+    ['900-1030', '09:00', '10:30'],
+    ['1900 – 2030', '19:00', '20:30'], // en dash, with spaces
+    ['1900—2030', '19:00', '20:30'], // em dash
+    ['1900−2030', '19:00', '20:30'], // minus sign
+  ])('reads %s as %s–%s', (text, start, end) => {
+    expect(parseTimeRange(text)).toMatchObject({ startTime: start, endTime: end, valid: true });
+  });
+
+  it('reports where the range sits, so the title can drop it', () => {
+    const text = '1900-2030 ZISXA-Proyectos II REMOTO Proyecto';
+    const r = parseTimeRange(text)!;
+    expect(text.slice(r.index, r.index + r.length)).toBe('1900-2030');
+  });
+
+  it.each(['2560-2700', '1965-2030', '1900-2060', '9999-0000', '2400-2500'])(
+    'does not accept %s as a time range',
+    (text) => {
+      expect(parseTimeRange(text)).toBeNull();
+    },
+  );
+
+  it.each([
+    '2019-2024', // a year range: only 5 minutes apart
+    '207-215', // room numbers: the hour would be 2 a. m.
+    '1900-1900',
+    '2030-1900', // not increasing
+    'Folio 120045-130045', // longer numbers are never cut into pieces
+  ])('does not confuse %s with a class time', (text) => {
+    expect(parseTimeRange(text)).toBeNull();
+  });
+
+  it('keeps the existing behaviour of regular ranges', () => {
+    expect(parseTimeRange('08:00-10:00')).toMatchObject({ startTime: '08:00', endTime: '10:00' });
+    expect(parseTimeRange('Aula 12 - 14 1900-2030')).toMatchObject({
+      startTime: '19:00',
+      endTime: '20:30',
+    });
+  });
+});
+
+// The calendar of the real case: day columns, an hour axis on the left, class blocks whose text starts with a compact range.
+const GRID = { mie: 640, sab: 1300 };
+const dayHeader = () => [
+  ...at('Lunes', 200, 30),
+  ...at('Martes', 420, 30),
+  ...at('Miércoles', GRID.mie, 30),
+  ...at('Jueves', 860, 30),
+  ...at('Viernes', 1080, 30),
+  ...at('Sábado', GRID.sab, 30),
+];
+const axis = () =>
+  ['9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm', '8pm'].flatMap(
+    (t, i) => at(t, 20, 110 + i * 90),
+  );
+/** The block of the Wednesday class as OCR returned it, with the stray axis label "12pm" at the end. */
+const proyectosBlock = () => [
+  ...at('1900-2030', GRID.mie, 920),
+  ...at('ZISXA-Proyectos II', GRID.mie, 944),
+  ...at('REMOTO Proyecto 12pm', GRID.mie, 968),
+];
+const practicasBlock = () => [
+  ...at('1400-1615', GRID.sab, 560),
+  ...at('ZISXA-Practicas', GRID.sab, 584),
+  ...at('Empresariales Practica', GRID.sab, 608),
+  ...at('Empresariales 207 12pm', GRID.sab, 632),
+];
+const axisAsOneBlock = () => at('1pm 2pm 3pm 4pm 5pm pm 7pm E 12pm', 640 - 400, 300);
+
+describe('compact ranges win over axis labels, and the axis is not a class', () => {
+  it('the range is the time of the class; the stray "12pm" is ignored and leaves the title', () => {
+    const d = doc(dayHeader(), axis(), proyectosBlock());
+    expect(summarize(d)).toEqual([[3, '19:00', '20:30', 'ZISXA-Proyectos II REMOTO Proyecto']]);
+  });
+
+  it('the Saturday block: range 14:00–16:15, no new field for the room', () => {
+    const d = doc(dayHeader(), axis(), practicasBlock());
+    const [c] = extractClassCandidates(d).candidates;
+    expect(c).toMatchObject({ weekday: 6, startTime: '14:00', endTime: '16:15' });
+    expect(c!.label).not.toMatch(/1400|1615|12pm/);
+    expect(c!.label).toMatch(/^ZISXA-Practicas Empresariales Practica Empresariales/);
+  });
+
+  it('the full case: exactly 2 classes, on Wednesday and Saturday, and no proposal made of the axis', () => {
+    const d = doc(dayHeader(), axis(), proyectosBlock(), practicasBlock(), axisAsOneBlock());
+    const found = summarize(d);
+    expect(found).toHaveLength(2);
+    expect(found.map((f) => f.slice(0, 3))).toEqual([
+      [3, '19:00', '20:30'],
+      [6, '14:00', '16:15'],
+    ]);
+    for (const [, , , label] of found) expect(label).not.toMatch(/\d{4}-\d{4}|\b\d{1,2}\s?pm\b/i);
+  });
+
+  it('the exact OCR strings of the real case, one line per block', () => {
+    const d = doc(
+      dayHeader(),
+      axis(),
+      at('1900-2030 ZISXA-Proyectos II REMOTO Proyecto 12pm', GRID.mie, 920),
+      at('1400-1615 ZISXA-Practicas Empresariales Practica Empresariales 207 12pm', GRID.sab, 560),
+      at('1pm 2pm 3pm 4pm 5pm pm 7pm E 12pm', 200, 300),
+    );
+    const found = extractClassCandidates(d).candidates;
+    expect(found.map((c) => [c.weekday, c.startTime, c.endTime])).toEqual([
+      [3, '19:00', '20:30'],
+      [6, '14:00', '16:15'],
+    ]);
+    expect(found[0]!.label).toBe('ZISXA-Proyectos II REMOTO Proyecto');
+    // the room number the OCR read ("207") may stay: there is no room field and nothing is invented for it
+    expect(found[1]!.label).toMatch(/^ZISXA-Practicas Empresariales Practica Empresariales\b/);
+    expect(found[1]!.label).not.toMatch(/12pm|1400|1615/);
+  });
+
+  it('a cell with its own time does not borrow the label of the axis row into the text it shows', () => {
+    const d = doc(dayHeader(), axis(), [
+      ...at('1900-2030', GRID.mie, 920),
+      ...at('ZISXA-Proyectos II', GRID.mie, 944),
+      ...at('REMOTO Proyecto', GRID.mie, 968),
+    ]);
+    const [c] = extractClassCandidates(d).candidates;
+    expect(c!.raw).toBe('1900-2030 ZISXA-Proyectos II REMOTO Proyecto');
+    // a cell WITHOUT its own time still shows the row label it took its time from
+    const bare = extractClassCandidates(doc(dayHeader(), axis(), at('Redes', GRID.mie, 920)))
+      .candidates[0]!;
+    expect(bare.raw).toMatch(/Redes .*(pm|am)/);
+  });
+
+  it('a line made almost only of axis labels is not a class (whatever the OCR slips)', () => {
+    for (const text of [
+      '1pm 2pm 3pm 4pm 5pm 6pm 7pm 8pm',
+      '1pm 2pm 3pm 4pm 5pm pm 7pm E 12pm',
+      'lpm 2pm 3pm 4pm Spm 6pm 7pm',
+      '9am 10am 11am 12pm 1pm',
+    ]) {
+      expect(summarize(doc(dayHeader(), axis(), at(text, 200, 400))), text).toEqual([]);
+    }
+    // the same noise in a list layout, under a day heading
+    expect(
+      summarize(doc(at('Sábado', 20, 30), at('1pm 2pm 3pm 4pm 5pm 6pm 7pm 8pm', 20, 70))),
+    ).toEqual([]);
+  });
+
+  it('a real class whose title has a number is still a class', () => {
+    const list = doc(at('Sábado', 20, 30), at('1400-1615 Proyecto 2', 20, 70));
+    expect(summarize(list)).toEqual([[6, '14:00', '16:15', 'Proyecto 2']]);
+    const grid = doc(dayHeader(), axis(), [
+      ...at('1400-1615', GRID.sab, 560),
+      ...at('Proyecto 2', GRID.sab, 584),
+    ]);
+    expect(summarize(grid)).toEqual([[6, '14:00', '16:15', 'Proyecto 2']]);
+  });
+
+  it('a lone time is still the start of a class when there is no range (nothing is invented)', () => {
+    expect(summarize(doc(at('Sábado', 20, 30), at('Redes 7pm', 20, 70)))).toEqual([
+      [6, '19:00', null, 'Redes'],
+    ]);
+  });
+
+  it('subjects: the label that CONTAINS a whole subject name matches it (existing rule); one that does not stays unmatched', () => {
+    const subjects: SubjectRef[] = [
+      { id: '66666666-6666-4666-8666-666666666666', name: 'Proyectos II' },
+      { id: '77777777-7777-4777-8777-777777777777', name: 'Prácticas Empresariales' },
+    ];
+    const d = doc(dayHeader(), axis(), proyectosBlock(), practicasBlock());
+    const proposals = buildScheduleProposals(extractClassCandidates(d).candidates, {
+      subjects,
+      period: PERIOD,
+    });
+    expect(
+      proposals.map((p) => [p.weekday, p.startTime, p.endTime, p.subjectMatch.status]),
+    ).toEqual([
+      [3, '19:00', '20:30', 'EXACT'],
+      [6, '14:00', '16:15', 'EXACT'],
+    ]);
+    // a similar but different name is never guessed
+    const close = buildScheduleProposals(
+      extractClassCandidates(doc(dayHeader(), axis(), proyectosBlock())).candidates,
+      {
+        subjects: [{ id: '88888888-8888-4888-8888-888888888888', name: 'Proyecto II' }],
+        period: PERIOD,
+      },
+    );
+    expect(close[0]!.subjectId).toBeNull();
+    expect(close[0]!.status).toBe('REVIEW');
+  });
+});

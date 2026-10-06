@@ -6,6 +6,7 @@ import {
   scannedTwoClassPdf,
   tableItems,
   twoClassTable,
+  weeklyCalendarImage,
 } from '../apps/api/test/scheduleImportFixtures';
 import {
   addSubjectViaUi,
@@ -327,4 +328,63 @@ test('tabular input with room lines and merged hours is read like the table it i
   await expect(card(page, 0).getByLabel('Inicio', { exact: true })).toHaveValue('08:00');
   await expect(card(page, 0).getByLabel('Fin', { exact: true })).toHaveValue('10:00');
   await expect(card(page, 1).getByLabel('Día')).toHaveValue('3');
+});
+
+test('a visual calendar with compact ranges and an hour axis: two real classes, no card made of the axis', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page, ['Proyectos II', 'Prácticas Empresariales']);
+  await readFile(page, file('calendario.png', 'image/png', weeklyCalendarImage()));
+
+  // Exactly two classes (before the fix the axis labels made a third one and spoiled the hours).
+  await expect(page.getByRole('heading', { level: 2, name: '2 clases detectadas' })).toBeVisible();
+  await expect(cards(page)).toHaveCount(2);
+  const proyectos = card(page, 0);
+  const practicas = card(page, 1);
+  await expect(proyectos.getByLabel('Día')).toHaveValue('3'); // Wednesday
+  await expect(proyectos.getByLabel('Inicio', { exact: true })).toHaveValue('19:00');
+  await expect(proyectos.getByLabel('Fin', { exact: true })).toHaveValue('20:30');
+  await expect(proyectos.getByLabel('Título')).toHaveValue('Proyectos II');
+  await expect(practicas.getByLabel('Día')).toHaveValue('6'); // Saturday
+  await expect(practicas.getByLabel('Inicio', { exact: true })).toHaveValue('14:00');
+  await expect(practicas.getByLabel('Fin', { exact: true })).toHaveValue('16:15');
+  await expect(practicas.getByLabel('Título')).toHaveValue('Prácticas Empresariales');
+  await expectNoHorizontalOverflow(page);
+
+  // Reading only proposes.
+  expect(await blockCount(page)).toBe(0);
+
+  // Confirming creates the two weekly classes with those hours.
+  for (const c of [proyectos, practicas]) await c.getByLabel(/Incluir/).check();
+  await page.getByRole('button', { name: 'Importar seleccionadas' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: /2 clases importadas, 0 necesitan corrección/ }),
+  ).toBeVisible();
+  const clock = (iso: string) =>
+    new Date(iso).toLocaleTimeString('en-GB', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  const week = (
+    await (
+      await page.request.get('/api/schedule?from=' + bogotaToday(0) + '&to=' + bogotaToday(6))
+    ).json()
+  ).occurrences as { title: string; startAt: string; endAt: string }[];
+  expect(
+    week
+      .map((o) => [o.title, clock(o.startAt), clock(o.endAt)])
+      .sort((a, b) => a[0]!.localeCompare(b[0]!)),
+  ).toEqual([
+    ['Prácticas Empresariales', '14:00', '16:15'],
+    ['Proyectos II', '19:00', '20:30'],
+  ]);
+
+  // The same picture again: both classes are already in the agenda.
+  await readFile(page, file('calendario.png', 'image/png', weeklyCalendarImage()));
+  await expect(cards(page)).toHaveCount(2);
+  for (const n of [0, 1])
+    await expect(card(page, n)).toContainText('Esta clase parece estar ya en tu agenda.');
+  assertClean();
 });

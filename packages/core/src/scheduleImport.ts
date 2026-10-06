@@ -96,10 +96,21 @@ const MERIDIEM = String.raw`(a\.?\s?m\.?|p\.?\s?m\.?)`;
 const CLOCK = String.raw`(\d{1,2})(?:[:.h](\d{2}))?\s*${MERIDIEM}?`;
 const SEPARATOR = String.raw`\s*(?:-|–|—|−|a|hasta)\s*`;
 const RANGE_RE = new RegExp(String.raw`(?<![\d:.])${CLOCK}${SEPARATOR}${CLOCK}(?![\d:])`, 'i');
-const LONE_RE = new RegExp(
-  String.raw`(?<![\d:.])(\d{1,2})(?:[:.h](\d{2})\s*${MERIDIEM}?|\s*${MERIDIEM})(?![\d:])`,
-  'i',
+const LONE_SOURCE = String.raw`(?<![\d:.])(\d{1,2})(?:[:.h](\d{2})\s*${MERIDIEM}?|\s*${MERIDIEM})(?![\d:])`;
+const LONE_RE = new RegExp(LONE_SOURCE, 'i');
+/** Every isolated time of a text (global): used to drop the ones that are noise next to a valid range. */
+const LONE_ALL_RE = new RegExp(LONE_SOURCE, 'gi');
+
+// A visual calendar prints 24-hour times without a colon on its blocks: "1900-2030", "800-930". Only HHMM / HMM with a
+// dash is accepted; a longer digit run is never cut into pieces ("Folio 120045-130045").
+const COMPACT_RE = new RegExp(
+  String.raw`(?<![\d:.])(\d{3,4})\s*[-–—−]\s*(\d{3,4})(?![\d:]|\.\d)`,
+  'g',
 );
+/** Shortest and longest class a compact range may describe: it keeps "2019-2024" (years) and "207-215" (rooms) out. */
+const COMPACT_MIN_MINUTES = 15;
+const COMPACT_MAX_MINUTES = 12 * 60;
+const COMPACT_EARLIEST_START = 5 * 60;
 
 export interface TimeRange {
   /** HH:mm, 24 h. */
@@ -142,11 +153,46 @@ function toMinutes(c: Clock): number | null {
 
 const format = (min: number) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
 
+/** "1900" -> 1140 minutes, "930" -> 570. null when it is not a real time of day (2560, 1965). */
+function compactMinutes(digits: string): number | null {
+  const hour = Number(digits.slice(0, -2));
+  const minute = Number(digits.slice(-2));
+  return hour > 23 || minute > 59 ? null : hour * 60 + minute;
+}
+
 /**
- * The first time range of a text: "08:00-10:00", "8:00 – 10:00", "8 a 10", "8:00 a.m. - 10:00 a.m.", "2-4pm".
- * A bare "8-10" (no minutes, no am/pm) only counts for plausible class hours (6-23), so "Grupo 1-2" is not a range.
+ * The first compact range of a text ("1900-2030", "0800–0930"). Both ends must be real times, the start a plausible class
+ * hour and the span a plausible class length; anything else ("2560-2700", "1965-2030", "2019-2024") is not a time at all
+ * and stays in the text untouched.
+ */
+function parseCompactRange(text: string): TimeRange | null {
+  for (const m of text.matchAll(COMPACT_RE)) {
+    const start = compactMinutes(m[1]!);
+    const end = compactMinutes(m[2]!);
+    if (start === null || end === null || start < COMPACT_EARLIEST_START) continue;
+    const span = end - start;
+    if (span < COMPACT_MIN_MINUTES || span > COMPACT_MAX_MINUTES) continue;
+    return {
+      startTime: format(start),
+      endTime: format(end),
+      index: m.index,
+      length: m[0].length,
+      valid: true,
+    };
+  }
+  return null;
+}
+
+/**
+ * The first time range of a text: "08:00-10:00", "8:00 – 10:00", "8 a 10", "8:00 a.m. - 10:00 a.m.", "2-4pm", and the
+ * compact "1900-2030". A bare "8-10" (no minutes, no am/pm) only counts for plausible class hours (6-23), so "Grupo 1-2"
+ * is not a range.
  */
 export function parseTimeRange(text: string): TimeRange | null {
+  return parseRegularRange(text) ?? parseCompactRange(text);
+}
+
+function parseRegularRange(text: string): TimeRange | null {
   const m = RANGE_RE.exec(text);
   if (!m) return null;
   const a = readClock(m[1]!, m[2], m[3]);
@@ -343,6 +389,10 @@ function takeTime(lines: string[]): { rest: string[]; time: Rangeish; consumed: 
     if (range) {
       const rest = [...lines];
       rest[i] = `${lines[i]!.slice(0, range.index)} ${lines[i]!.slice(range.index + range.length)}`;
+      // A valid range IS the time of the class: isolated times around it ("12pm" from the calendar's hour axis) neither
+      // replace it nor stay in the title.
+      if (range.valid)
+        for (let k = 0; k < rest.length; k++) rest[k] = rest[k]!.replace(LONE_ALL_RE, ' ');
       return {
         rest,
         time: {
@@ -537,15 +587,23 @@ function parseTable(
     const effective: Rangeish = own.consumed ? own.time : time;
     const labelFromOwn = own.consumed ? labelOf(own.rest) : label;
     if (labelFromOwn === '') return;
+    // The label of the table row is part of what was read only when it gave the time: a cell with its own time does not
+    // borrow it, so the hour axis ("12pm") does not leak into the text shown to the student nor into its confidence.
+    const usesRowLabel = !own.consumed;
     out.push({
       weekday: col.weekday,
       startTime: effective.startTime,
       endTime: effective.endTime,
       label: labelFromOwn,
-      raw: `${lines.map((l) => l.text).join(' ')} ${extraRaw}`.replace(/\s+/g, ' ').trim(),
+      raw: `${lines.map((l) => l.text).join(' ')} ${usesRowLabel ? extraRaw : ''}`
+        .replace(/\s+/g, ' ')
+        .trim(),
       page: pageNo,
       invalidTime: effective.invalid,
-      lowConfidence: confidenceOf([...lines.flatMap((l) => l.words), ...extraWords]),
+      lowConfidence: confidenceOf([
+        ...lines.flatMap((l) => l.words),
+        ...(usesRowLabel ? extraWords : []),
+      ]),
     });
   };
 
@@ -638,6 +696,27 @@ function parseTable(
   return out;
 }
 
+// ───────────────────────── Calendar axis noise ─────────────────────────
+
+/** "12pm", "5pm", "10am" — and the digits OCR confuses in them ("lpm", "Spm"). */
+const AXIS_TIME = /^[0-9IlOoSsZz|]{1,2}(?:[:.h][0-9]{2})?\s?(?:a\.?m\.?|p\.?m\.?)$/i;
+const AM_PM_ONLY = /^(?:a\.?m\.?|p\.?m\.?)$/i;
+const MIN_AXIS_LABELS = 4;
+
+/**
+ * Whether a text is the hour axis of a visual calendar ("1pm 2pm 3pm 4pm 5pm pm 7pm E 12pm") and not a class: four or
+ * more isolated hours and not a single word of at least three letters. It is structural, so it holds whatever the OCR
+ * slips are, and a real title that merely contains a number ("Proyecto 2") has words and is never affected.
+ */
+export function isCalendarAxisNoise(text: string): boolean {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (tokens.filter((t) => AXIS_TIME.test(t)).length < MIN_AXIS_LABELS) return false;
+  const words = tokens.filter(
+    (t) => !AXIS_TIME.test(t) && !AM_PM_ONLY.test(t) && (t.match(/\p{L}/gu) ?? []).length >= 3,
+  );
+  return words.length === 0;
+}
+
 // ───────────────────────── Document -> candidates ─────────────────────────
 
 /** Interprets the pages of a document. Returns the candidates, the layout and the amount of text read. */
@@ -656,8 +735,9 @@ export function extractClassCandidates(doc: ExtractedDocument): {
     const found = header
       ? parseTable(page.page, lines, header, wordHeight)
       : parseList(page.page, lines);
-    if (found.length > 0 && layout === 'UNKNOWN') layout = header ? 'TABLE' : 'LIST';
-    candidates.push(...found);
+    const classes = found.filter((c) => !isCalendarAxisNoise(c.raw));
+    if (classes.length > 0 && layout === 'UNKNOWN') layout = header ? 'TABLE' : 'LIST';
+    candidates.push(...classes);
   }
   // The same class read twice (e.g. repeated on two pages) counts once.
   const seen = new Set<string>();

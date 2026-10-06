@@ -195,3 +195,42 @@ export const scannedTwoClassPdf = () =>
 /** The same two classes as a list. */
 export const twoClassListItems = () =>
   listItems(['Lunes', '08:00 - 10:00 Redes', 'Miércoles', '10:00 - 12:00 Bases de Datos']);
+
+/**
+ * A visual weekly calendar (the pattern of a real timetable, anonymised): day columns, an hour axis down the left side
+ * ("9am"… "8pm") and class blocks whose text starts with a COMPACT 24-hour range ("1900-2030"): Wednesday 19:00–20:30
+ * "Proyectos II" and Saturday 14:00–16:15 "Prácticas Empresariales" (room A207).
+ */
+export const weeklyCalendarItems = (): DrawnText[] => {
+  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const colX = (i: number) => 200 + i * 230;
+  const items: DrawnText[] = days.map((label, i) => ({ text: label, x: colX(i), y: 50 }));
+  const axis = [
+    '9am',
+    '10am',
+    '11am',
+    '12pm',
+    '1pm',
+    '2pm',
+    '3pm',
+    '4pm',
+    '5pm',
+    '6pm',
+    '7pm',
+    '8pm',
+  ];
+  axis.forEach((t, i) => items.push({ text: t, x: 20, y: 130 + i * 70 }));
+  // Wednesday (column 2), at the 7pm row.
+  items.push({ text: '1900-2030', x: colX(2), y: 830 });
+  items.push({ text: 'ZISXA-Proyectos II', x: colX(2), y: 862 });
+  items.push({ text: 'REMOTO Proyecto', x: colX(2), y: 894 });
+  // Saturday (column 5), at the 2pm row.
+  items.push({ text: '1400-1615', x: colX(5), y: 480 });
+  items.push({ text: 'ZISXA-Practicas', x: colX(5), y: 512 });
+  items.push({ text: 'Empresariales Practica', x: colX(5), y: 544 });
+  items.push({ text: 'Empresariales A207', x: colX(5), y: 576 });
+  return items;
+};
+
+export const weeklyCalendarImage = (format: 'png' | 'jpeg' = 'png') =>
+  drawTextImage(weeklyCalendarItems(), { width: 1700, height: 960 }, format, 24);
