@@ -87,7 +87,7 @@ Se realizó un **endurecimiento de seguridad** (no es una prueba de penetración
 
 ## Validación
 
-Ver [testing.md](testing.md) y [system-validation.md](system-validation.md). En resumen: reglas de dominio y API probadas con una base de datos real (1585 pruebas Vitest), recorridos de navegador a 360 y 1366 px (258 ejecuciones por pasada), pruebas de seguridad, evaluación de accesibilidad con axe y teclado, un escenario de un semestre completo contrastado con la API, e instalación desde cero reproducida. Se **validó mediante pruebas automatizadas, de integración y de extremo a extremo**; eso no equivale a «sin errores».
+Ver [testing.md](testing.md) y [system-validation.md](system-validation.md). En resumen: reglas de dominio y API probadas con una base de datos real (1618 pruebas Vitest), recorridos de navegador a 360 y 1366 px (260 ejecuciones por pasada), pruebas de seguridad, evaluación de accesibilidad con axe y teclado, un escenario de un semestre completo contrastado con la API, e instalación desde cero reproducida. Se **validó mediante pruebas automatizadas, de integración y de extremo a extremo**; eso no equivale a «sin errores».
 
 ## Limitaciones principales
 

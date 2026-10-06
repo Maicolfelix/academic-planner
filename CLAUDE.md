@@ -55,7 +55,7 @@ Vitest (core/api/web), Supertest contra BD real, Playwright con `watch(page, als
 
 ## Limitaciones vigentes ([docs/limitations.md](docs/limitations.md))
 
-Sin validar en dispositivos iOS/Android reales ni tras HTTPS/proxy reales; sin despliegue. `npm audit` = 4 altas de la cadena del CLI de Prisma (no alcanzables; esperar una estable que las corrija, nunca `--force`). Límites de frecuencia en memoria; el registro revela si un correo existe; sesión fija de 7 días; sin verificación de correo, recuperación de contraseña ni MFA; sin UI para editar el periodo ni la zona horaria. Sin licencia explícita (decisión del propietario).
+Sin validar en dispositivos iOS/Android reales ni tras HTTPS/proxy reales; sin despliegue. `npm audit` = 4 altas de la cadena del CLI de Prisma (no alcanzables; esperar una estable que las corrija, nunca `--force`). Desde el RC además 2 críticas de `shell-quote` vía `concurrently` (solo desarrollo; `--omit=dev` sigue en 4). Límites de frecuencia en memoria; el registro revela si un correo existe; sesión fija de 7 días; sin verificación de correo, recuperación de contraseña ni MFA; sin UI para editar el periodo ni la zona horaria. Sin licencia explícita (decisión del propietario).
 
 ## Fuera de alcance hasta nueva orden
 

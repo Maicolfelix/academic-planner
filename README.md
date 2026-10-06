@@ -75,7 +75,7 @@ PostgreSQL usa el puerto **5433** del host para no chocar con una instalación l
 
 ## Pruebas
 
-Vitest (1585 pruebas: núcleo, API con PostgreSQL real, interfaz), Playwright (258 ejecuciones por pasada a 360 y 1366 px, 4 omitidas a propósito), pruebas de seguridad (API y navegador), axe y teclado para accesibilidad, y una validación integral de un semestre completo. La base de test (`academic_planner_test`) se crea y migra sola y las pruebas se niegan a tocar otra. Antes de `test:browser`, nada debe escuchar en los puertos 3000/5173:
+Vitest (1618 pruebas: núcleo, API con PostgreSQL real, interfaz), Playwright (260 ejecuciones por pasada a 360 y 1366 px, 4 omitidas a propósito), pruebas de seguridad (API y navegador), axe y teclado para accesibilidad, y una validación integral de un semestre completo. La base de test (`academic_planner_test`) se crea y migra sola y las pruebas se niegan a tocar otra. Antes de `test:browser`, nada debe escuchar en los puertos 3000/5173:
 
 ```bash
 PW_CHANNEL=msedge npm run test:browser      # PowerShell: $env:PW_CHANNEL='msedge'; npm run test:browser
@@ -85,7 +85,7 @@ Estrategia y cifras: [docs/testing.md](docs/testing.md). Validación integral: [
 
 ## Seguridad
 
-Endurecimiento de seguridad realizado (no es una prueba de penetración ni una garantía): Argon2id, sesiones en servidor con token cuyo hash es lo único almacenado, cookie `HttpOnly` (`__Host-` y `Secure` bajo HTTPS), verificación de origen contra CSRF, CSP estricta, aislamiento por usuario (un recurso ajeno responde el mismo 404 que uno inexistente), límites de frecuencia y de archivos, API sin caché. `npm audit` reporta **4 vulnerabilidades altas** en la cadena del CLI de Prisma (no alcanzables en tiempo de ejecución según el análisis actual; pendiente de una versión estable que las corrija). Detalle y limitaciones: [docs/security.md](docs/security.md).
+Endurecimiento de seguridad realizado (no es una prueba de penetración ni una garantía): Argon2id, sesiones en servidor con token cuyo hash es lo único almacenado, cookie `HttpOnly` (`__Host-` y `Secure` bajo HTTPS), verificación de origen contra CSRF, CSP estricta, aislamiento por usuario (un recurso ajeno responde el mismo 404 que uno inexistente), límites de frecuencia y de archivos, API sin caché. `npm audit` reporta **4 vulnerabilidades altas** en la cadena del CLI de Prisma (no alcanzables en tiempo de ejecución según el análisis actual; pendiente de una versión estable que las corrija). Tras el candidato apareció además un aviso crítico de `shell-quote` en `concurrently` (solo herramienta de desarrollo; `npm audit --omit=dev` sigue en 4). Detalle y limitaciones: [docs/security.md](docs/security.md).
 
 ## Documentación
 

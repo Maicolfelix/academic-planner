@@ -10,6 +10,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 - Schedule import filters calendar-axis time labels (`1pm 2pm 3pm …`) that previously could replace the real hours of a class or create a false proposal.
 - Compact ranges are conservative: invalid times (`2560-2700`, `1965-2030`), years (`2019-2024`) and room numbers (`207-215`) are not read as hours.
 
+### Known
+
+- `npm audit` ahora reporta 6 (4 altas + 2 críticas): la base de avisos añadió `shell-quote` (crítica) vía `concurrently`, una herramienta solo de desarrollo; con `--omit=dev` siguen las 4 altas de Prisma. Sin cambios de dependencias.
+
 Corrección posterior al candidato `1.0.0-rc.1` (que no se modifica): no cambia versiones ni crea etiquetas; cualquier nueva versión (`rc.2`) requiere un alcance explícito del propietario.
 
 ## 1.0.0-rc.1 — Release Candidate (2026-10-06)
