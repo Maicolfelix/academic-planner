@@ -13,7 +13,7 @@ Estado **actual y compacto**. Para entender el sistema: [system-overview.md](sys
 
 - **Estado: Release Candidate `1.0.0-rc.2`** (corrección de la importación de horario sobre rc.1). Roadmap completo (Fases 0–20); `v1.0.0-rc.1` está publicado como pre-release y no se modifica. Código de rc.1 congelado desde `main` `151f6b31`; rc.2 añade solo la corrección de rangos compactos y ruido de escala.
 - **No existe una Fase 21.** Cualquier trabajo nuevo (correcciones, versión final, nuevas funciones) requiere un alcance explícito del usuario; nunca se avanza por iniciativa propia. El nuevo ciclo está en [roadmap-post-rc.md](roadmap-post-rc.md).
-- El tag `v1.0.0-rc.2` se crea **después de fusionar** el PR del candidato ([release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md)). Fases 0–19 aprobadas y fusionadas. Tags: `phase-12-complete`, `phase-18-complete`, `v1.0.0-rc.1`.
+- El tag `v1.0.0-rc.2` se creó después de fusionar el PR del candidato y está publicado como pre-release ([release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md)). Fases 0–19 aprobadas y fusionadas. Tags: `phase-12-complete`, `phase-18-complete`, `v1.0.0-rc.1`, `v1.0.0-rc.2`.
 - **Validaciones externas pendientes:** dispositivos iOS/Android reales, HTTPS y proxy reales, despliegue de prueba, decisión de licencia. Ver [final-checklist.md](final-checklist.md).
 - Documentos del candidato: [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) (vigente), [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md) y [release-validation.md](release-validation.md) (de rc.1, históricos).
 

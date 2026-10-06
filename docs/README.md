@@ -67,7 +67,7 @@
 | [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md) | Notas del Release Candidate: qué incluye, límites, pendientes             |
 | [release-manifest.md](release-manifest.md)                 | Ficha técnica del candidato: versión, requisitos, migraciones, etiquetado |
 | [release-validation.md](release-validation.md)             | Evidencia de la validación del candidato                                  |
-| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (sin versiones publicadas todavía)                                |
+| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (candidatos rc.1 y rc.2; sin v1.0.0 final)                        |
 | [../ARCHITECTURE_PLAN_v1.md](../ARCHITECTURE_PLAN_v1.md)   | Plan original de la Fase 0 (documento histórico)                          |
 
 ## Terminología
