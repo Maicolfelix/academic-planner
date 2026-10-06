@@ -73,7 +73,7 @@ Rutas secundarias con carga diferida (`React.lazy`), precacheadas por el service
 ## Limitaciones conocidas
 
 - Sin dispositivo móvil real: ver la lista siguiente (pendiente).
-- No hay interfaz para cambiar la zona horaria ni para gestionar periodos (funcionalidad nueva, fuera de esta fase).
+- No hay interfaz para cambiar la zona horaria ni para gestionar periodos (funcionalidad que no existe; ver [limitations.md](limitations.md)).
 - Los selectores de archivo y de hora usan el control nativo del navegador (su apariencia y textos los decide el navegador).
 - Axe cubre lo automatizable; no se probó con un lector de pantalla real.
 - El preguntar al descartar también salta si el estudiante escribe y luego deshace.

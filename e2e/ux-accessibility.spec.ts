@@ -170,6 +170,12 @@ test('times use one 12-hour style (a. m./p. m.) for classes and deadlines alike'
   for (const route of ['/dashboard', '/calendar', '/activities']) {
     await page.goto(route);
     await page.waitForLoadState('networkidle');
+    // The seeded classes are on Mondays. Below 1024 px the Agenda lists one day at a time (today's), so on any other
+    // weekday there would be no class on screen: choose a Monday explicitly instead of depending on the day the suite runs.
+    if (route === '/calendar') {
+      if ((page.viewportSize()?.width ?? 1366) < 1024)
+        await page.getByRole('button', { name: /^Lunes \d/ }).click();
+    }
     const text = await page.locator('main').innerText();
     expect(text, `${route}: 24-hour range`).not.toMatch(/\b\d{2}:\d{2}\s?[–-]\s?\d{2}:\d{2}\b/);
     expect(text, `${route}: has a 12-hour time`).toMatch(/\d{1,2}:\d{2}.{0,3}[ap]\.\s?m\./);

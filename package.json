@@ -29,6 +29,8 @@
     "db:deploy": "npm run db:deploy -w @planner/api",
     "db:seed:demo": "npm run db:seed:demo -w @planner/api --",
     "security:scan": "node scripts/security-scan.mjs",
+    "docs:check": "node scripts/docs-check.mjs",
+    "test:docs": "node --test \"scripts/*.test.mjs\"",
     "test:security": "npm run security:scan && npm test -w @planner/api -- src/security",
     "test:security:browser": "playwright test --config playwright.security.config.ts"
   },

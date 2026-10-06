@@ -1,8 +1,10 @@
 # Validación integral del sistema (Fase 17)
 
+> Este documento registra la validación hecha en la **Fase 17** y sus cifras de entonces (Vitest 1557, Playwright 256 por pasada). Las cifras actuales están en [testing.md](testing.md); los resultados de la Fase 19 en [final-checklist.md](final-checklist.md).
+
 Objetivo: comprobar el producto **como un todo**, no módulo por módulo. No se añadió ninguna funcionalidad. Se escribió una suite de validación que recorre al estudiante de principio a fin, se contrastó cada pantalla con una lectura independiente de la API (un «oráculo»), se repitieron los recorridos con fallos inyectados, relojes fijos y varios navegadores, y se reprodujo la instalación desde cero siguiendo el README.
 
-Lo que **no** se afirma: no es una prueba de penetración, no es una prueba de carga real, no se probó en iOS ni Android físicos (ver [Pendiente](#pendiente-y-limites-honestos)).
+Lo que **no** se afirma: no es una prueba de penetración, no es una prueba de carga real, no se probó en iOS ni Android físicos (ver [Pendiente](#pendiente-y-límites-honestos)).
 
 ## Qué se añadió
 

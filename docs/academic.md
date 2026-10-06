@@ -78,5 +78,5 @@ El frontend nunca habla con Prisma: usa TanStack Query (`useAcademic.ts`) y no d
 
 - Un usuario sin periodo actual es llevado a `/onboarding` (nombre prellenado según la fecha, inicio y fin) y después a `/subjects`.
 - `/subjects` muestra las asignaturas del periodo actual. Formulario rápido: nombre + color; profesor y descripción en "Más opciones".
-- Estado vacío con una sola llamada a la acción. Aún **no** hay botón de "Importar horario" (Fase 14): se añadirá junto al estado vacío.
+- Estado vacío con una sola llamada a la acción. La importación de horario no se ofrece aquí sino en la Agenda («Importar horario», [schedule-import.md](schedule-import.md)).
 - Diálogos con `<dialog>` nativo (foco atrapado, Esc cierra, el foco vuelve al botón que lo abrió). Eliminar pide confirmación y enfoca "Cancelar" por defecto.

@@ -92,7 +92,7 @@ Estrategia en capas: (1) **`SameSite=Lax`**; (2) verificación de origen en **to
 
 **Relajaciones de la CSP, cada una por un motivo medido:** `style-src-attr 'unsafe-inline'` (atributos `style` de React: posiciones de la cuadrícula semanal y barras de progreso; solo atributos, los elementos `<style>` y los scripts en línea siguen bloqueados) e `img-src data:` (el favicon es un SVG en línea). `script-src` no lleva `unsafe-inline` ni `unsafe-eval`.
 
-**Hallazgo corregido en esta fase:** con la CSP real, la app intentaba compilar validadores de Zod con `new Function`; el navegador lo bloqueaba y lo reportaba como violación. Ahora el paquete de core declara `jitless` en el navegador (en el servidor se mantiene la ruta rápida), de modo que hay **cero violaciones de CSP** en todas las pantallas, el diálogo y el service worker.
+**Hallazgo corregido durante el endurecimiento de la Fase 16:** con la CSP real, la app intentaba compilar validadores de Zod con `new Function`; el navegador lo bloqueaba y lo reportaba como violación. Ahora el paquete de core declara `jitless` en el navegador (en el servidor se mantiene la ruta rápida), de modo que hay **cero violaciones de CSP** en todas las pantallas, el diálogo y el service worker.
 
 **Desarrollo:** el servidor de Vite no aplica estas cabeceras (la CSP real se ve con la topología de producción, abajo). En desarrollo la API sí las envía a sus respuestas JSON.
 

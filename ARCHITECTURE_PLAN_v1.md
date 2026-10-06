@@ -1,6 +1,8 @@
 # ARCHITECTURE PLAN v1 — PWA de Planificación Académica
 
-Estado: Fase 0 (análisis). No se escribió código de producto.
+> **Documento histórico (Fase 0).** Es el análisis inicial y se conserva como registro de cómo se pensó el proyecto. **No describe el estado actual**: versiones, decisiones y alcance cambiaron durante el desarrollo (por ejemplo, la importación de horario sí se implementó con OCR local). Para el sistema real, ver [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md) y [docs/README.md](docs/README.md).
+
+Estado al escribirlo: Fase 0 (análisis). No se escribió código de producto.
 
 ## 1. Estado actual del repositorio
 

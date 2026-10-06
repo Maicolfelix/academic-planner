@@ -1,68 +1,60 @@
 # CLAUDE.md
 
-Academic Planner: PWA universitaria de planeación académica. Monorepo npm workspaces (`apps/api`, `apps/web`, `packages/core`, `e2e`). Estado completo, arquitectura y riesgos en [docs/project-state.md](docs/project-state.md).
+Academic Planner: PWA universitaria de planeación académica (asignaturas, actividades, agenda, Radar, «¿Qué hago ahora?», progreso, Captura rápida, Bandeja académica, importación de horario con OCR local). Monorepo npm workspaces: `apps/api` (Express 5 + Prisma 7 + PostgreSQL 17), `apps/web` (React 19 + Vite + Tailwind + TanStack Query), `packages/core` (reglas puras + Zod compartidos), `e2e` (Playwright). Estado actual y riesgos: [docs/project-state.md](docs/project-state.md). Índice de documentación: [docs/README.md](docs/README.md).
 
 ## Reglas de trabajo (obligatorias)
 
 - **Sistema de fases estricto.** Solo se implementa la fase que el usuario entrega explícitamente. Nunca avanzar a la siguiente por iniciativa propia ni adelantar trabajo de fases futuras.
 - Una fase se aprueba solo tras lint, format, typecheck, tests, build, migraciones, verificación en navegador y sin defectos bloqueantes. El informe final termina exactamente con `FASE N APROBADA` o `FASE N BLOQUEADA`.
-- **Commit solo cuando el usuario lo pida.** Mensajes con prefijo `feat:`; usar `git commit -F <archivo>` para mensajes con comillas.
-- Responder y documentar en español.
-- Fase actual: **18 aprobada. Fase 19 (documentación final) sin empezar** (esperar el prompt del usuario).
+- **Commit solo cuando el usuario lo pida** (las fases lo piden explícitamente si quedan aprobadas). Mensajes con prefijo (`feat:`, `test:`, `docs:`); `git commit -F <archivo>` para mensajes con comillas. Un PR por fase, **sin fusionarlo** salvo orden del usuario.
+- Responder y documentar en español; código y nombres en inglés.
+- Fuente de verdad: **código → pruebas → documentos**. Si un documento contradice al código, se corrige el documento. No afirmar impacto académico (rendimiento, estrés, notas): el software no lo ha medido.
+- Fase actual: **19 aprobada. Fase 20 (candidato a versión) sin empezar** (esperar el prompt del usuario).
 
 ## Comandos
 
 ```bash
-npm run db:up                       # PostgreSQL 17 (Docker) en :5433
-npm run db:deploy                   # aplicar migraciones (dev)
+npm run db:up && npm run db:deploy     # PostgreSQL 17 (Docker, host :5433) y migraciones (dev)
+npm run dev                            # core + api :3000 + web :5173
 npm run lint && npm run format:check && npm run typecheck
-npm test                            # Vitest: core, api (BD real *_test), web
+npm test                               # Vitest: core, api (BD real *_test), web
 npm run build
-PW_CHANNEL=msedge npm run test:browser   # Playwright 360 px y 1366 px; usa `dev:e2e` (bundle compilado + API sin watch) y comparte el puerto 5173: no tener `npm run dev` corriendo
-npm run dev                         # core + api + web (web en :5173)
-npm run db:seed:demo -- --allow-demo   # datos de demostración (solo desarrollo; ver docs/demo.md)
+PW_CHANNEL=msedge npm run test:browser # Playwright 360/1366 px; stack propio `dev:e2e` en :5173
+npm run test:security && npm run test:security:browser   # seguridad (API y navegador, puerto 4300)
+npm run docs:check                     # enlaces, archivos y scripts de la documentación
+npm run db:seed:demo -- --allow-demo   # datos demo (solo desarrollo; docs/demo.md)
 ```
 
-Los tests de API usan PostgreSQL real; Docker debe estar arriba. Las pruebas se niegan a correr contra una BD que no termine en `_test`.
+Los tests de API usan PostgreSQL real (Docker arriba); se niegan a correr contra una BD que no termine en `_test`, que se crea y migra sola (`ensureTestDatabaseSync` también para Playwright). Guía completa: [docs/development.md](docs/development.md).
 
-## Arquitectura (resumen)
+## Invariantes (no romperlos)
 
-- API por capas: rutas → controladores delgados (Zod, dueño desde la sesión) → servicios (reglas) → repositorios (siempre con `userId`) → Prisma.
-- Reglas puras y esquemas Zod compartidos en `packages/core` (se compila a `dist`; reconstruir con `npm run build -w @planner/core` tras cambiarlo).
-- Un recurso ajeno o inexistente responde el **mismo 404**. Esquemas `strictObject`: rechazan `userId` y campos internos.
-- Fechas: instantes UTC + `User.timezone` (America/Bogota). Toda la lógica horaria en `packages/core/src/time.ts` y `calendar.ts`; nunca matemática de zonas en la UI. "Vencida" se deriva, no se guarda. Reloj inyectable (`clock`) para tests.
-- Invariantes críticas en la BD con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). Nunca editar una migración ya aplicada: crear otra.
-- Escrituras que tocan varias tablas van en una transacción; ediciones concurrentes de una actividad se serializan con `FOR UPDATE` (`activities.lock`).
-- Sin N+1: Prisma con `relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas constantes.
-- Datos demo (Fase 18): ver [docs/demo.md](docs/demo.md). `apps/api/src/demo/` (`demoPlan.ts` datos puros con fechas relativas a un único `now`; `seedDemo.ts` guardas + regeneración idempotente; `cli.ts`). Es infraestructura, **no lógica de negocio**: ningún código de producción depende de él, no hay modo demo ni login automático. Reglas: dos candados (`NODE_ENV` ≠ `production`, que el flag no anula, y `--allow-demo` en la línea de comandos, no variable de entorno); solo toca al usuario `demo@academicplanner.local` y nunca a otros; crea todo con los servicios reales (hash Argon2id, recordatorios AUTO, validación de agenda, completado) con un reloj inyectable; no guarda nada derivado. Dato de diseño: el motor de Atención pone toda vencida de ≤ 7 días por encima de las «inmediatas», así que la única vencida del demo lleva 9 días para que «Parcial 1 de Redes» lidere. Si cambias reglas de Radar/Atención/recordatorios, `demoSeed.test.ts` y `demo-seed.spec.ts` lo dirán. Restablecer revoca las sesiones demo (hay que volver a iniciar sesión).
-- Validación integral (Fase 17): ver [docs/system-validation.md](docs/system-validation.md). `e2e/system-validation.spec.ts` (escenario MASTER + multiusuario + fallos inyectados + Tokyo/teclado/768 px) y `apps/api/src/systemValidation/` (coherencia entre módulos con reloj fijo, medianoche, bordes del periodo, errores, rendimiento con 500 actividades). Regla: toda pantalla nueva con datos se contrasta contra la API (oráculo), no solo contra el texto esperado. Para inyectar fallos de red con `page.route` hay que usar `test.use({ serviceWorkers: 'block' })` (el service worker se salta `page.route`).
-- Seguridad (Fase 16): ver [docs/security.md](docs/security.md). Reglas vigentes: toda ruta no-GET pasa por `originCheck` (CSRF) y debe añadirse a la matriz de `http.security.test.ts` (una prueba de inventario falla si falta); todo recurso nuevo con id debe entrar en la matriz de `ownership.security.test.ts` (ajeno = mismo 404 que inexistente, BD sin cambios); toda la API responde `Cache-Control: no-store`; esquemas de escritura `strict` (el login es la única excepción, a propósito); cookie de sesión `__Host-` bajo HTTPS (`sessionCookieName`); inicio de sesión revoca el token anterior y hay tope de 20 sesiones por usuario; `TRUST_PROXY` con número exacto de proxies (nunca `true`), `CORS_ORIGIN` exacto (nunca `*`), `WEB_DIST_DIR` sirve la app en producción con la CSP real (`script-src 'self'`, sin `unsafe-inline`/`unsafe-eval`); en el navegador Zod va `jitless` (`zodRuntime.ts` de core, primer import) para no violar la CSP. Comprobaciones: `npm run security:scan`, `npm run test:security`, `npm run test:security:browser` (topología de producción en el puerto 4300).
-- UX/accesibilidad (Fase 15): ver [docs/ux-accessibility.md](docs/ux-accessibility.md). Reglas vigentes: `Modal` pregunta antes de descartar si el estudiante escribió algo (Escape/clic fuera); un refresco fallido **no** reemplaza datos ya mostrados (`QueryError`); horas siempre 12 h con a. m./p. m. (`formatClockRange`/`formatClock` de core; nunca `HH:mm` en pantalla); cuadrícula de Agenda solo desde 1024 px; rutas secundarias con `React.lazy`; un `h1` por pantalla y título de documento por ruta; 401 con sesión = aviso «Tu sesión expiró» y login. `npm run dev:e2e` escucha en IPv4+IPv6 (`WEB_HOST=::`).
-- Importación de horario (Fase 14): interpretación pura en `packages/core/src/scheduleImport.ts` sobre una representación intermedia (palabras con posición); extracción en `apps/api/src/scheduleImport/` (Tesseract local para imágenes y PDF escaneados, texto nativo `unpdf` primero). Solo **propone** (nunca crea); el archivo vive en memoria y no se guarda ni se registra su contenido; cada clase confirmada se crea con el `POST /api/schedule` normal. La asignatura LIKELY nunca se aplica sin confirmar; no se crean asignaturas. Ver [docs/schedule-import.md](docs/schedule-import.md).
-- PWA (Fase 13): `vite-plugin-pwa` (Workbox `generateSW`, `registerType: 'prompt'`) en `apps/web/vite.config.ts`; UI en `apps/web/src/pwa/`. Solo precachea el shell estático; **`/api/*` siempre `NetworkOnly`, nunca se guardan respuestas privadas**; sin offline de datos ni escrituras offline. El SW no corre en `npm run dev`. La actualización nunca recarga sola. Ver [docs/pwa.md](docs/pwa.md).
-- Bandeja académica (Fase 12): `packages/core/src/academicInbox.ts` (segmentación, contexto por oración, duplicados) sobre los bloques compartidos de `captureShared.ts` (también usados por Captura rápida). Pega → Interpretar → Revisar → Confirmar; máx. 5000 caracteres y 10 propuestas; no guarda el texto ni crea nada: cada propuesta se confirma con el `POST /api/activities` normal, una por una. `/inbox`. Ver [docs/academic-inbox.md](docs/academic-inbox.md).
-- Captura rápida (Fase 11): `packages/core/src/quickCapture.ts`. Parser determinístico sin IA; solo **propone** (Capturar → Interpretar → Confirmar). Confirmar usa el `POST /api/activities` y la mutación del formulario manual: la captura rápida **no tiene camino de creación propio**. Nunca inventa una asignatura (ambigua o faltante se pregunta), no corrige en silencio una fecha fuera del periodo y no guarda el texto.
-- Progreso y carga (Fase 10): descriptivos, derivados y nunca guardados (`packages/core/src/insights.ts`). Progreso por asignatura = la regla del Dashboard, alfabético y sin ponderar; carga semanal lunes-domingo en la zona del perfil, reutilizando `expandBlock` de la agenda; una actividad es 1 compromiso y 0 horas; sin niveles de carga ni lenguaje de juicio ("sobrecargado", "deberías").
-- Atención (Fase 9): motor determinístico en `packages/core/src/attention.ts` (reutiliza `calculateRadarStatus`); el score es interno y nunca se muestra ni se persiste; las razones son plantillas fijas; el servicio siempre aplica el comparador, nunca el orden de la BD; tono neutral ("requiere mayor atención"), sin órdenes ni culpa.
-- Radar (Fase 8): categoría derivada por duración real en `packages/core/src/radar.ts` (`calculateRadarStatus`); nunca se persiste ni se duplica la regla; no es prioridad.
-- Recordatorios (Fase 7): solo `Activity`; AUTO se recalcula solo si cambian `dueAt`, `type` o el cruce a `COMPLETED`; MANUAL nunca se sobrescribe; el mensaje se deriva, no se guarda.
+- **Capas de la API:** ruta → controlador delgado (Zod `strictObject`, dueño desde la **sesión**) → servicio (reglas) → repositorio (siempre con `userId`) → Prisma. Un recurso ajeno o inexistente responde el **mismo 404**.
+- **Reglas puras en `packages/core`** (se compila a `dist`: `npm run build -w @planner/core` tras cambiarlo). Reloj inyectable (`clock`) para tests.
+- **Fechas:** instantes UTC + `User.timezone` (America/Bogota). Toda la lógica horaria en `core/time.ts` y `calendar.ts`; **nunca** matemática de zonas en la UI. Semana lunes–domingo. Actividad sin hora vence al final del día local. Horas en pantalla siempre 12 h con a. m./p. m. (`formatClock`/`formatClockRange`).
+- **Derivado, no guardado:** «vencida», Radar, puntaje de Atención, progreso y carga se calculan al leer.
+- **Proponer, no crear:** Captura rápida, Bandeja e Importación no tienen camino de creación propio; confirmar usa `POST /api/activities` / `POST /api/schedule`. Nunca inventan una asignatura. Determinísticos, sin IA; no guardan el texto ni el archivo.
+- **Recordatorios:** solo de `Activity`; AUTO se recalcula solo si cambian `dueAt`, `type` o el cruce a `COMPLETED`; MANUAL nunca se sobrescribe.
+- **Atención:** el motor pone toda vencida de ≤ 7 días por encima de las «inmediatas»; el puntaje es interno. Tono neutral, sin órdenes ni culpa. Progreso y carga son descriptivos, sin juicios.
+- **BD:** invariantes críticas con SQL a mano al final de la migración (índices únicos parciales, `CHECK`). **Nunca editar una migración aplicada**: crear otra. Escrituras multi-tabla en transacción; ediciones concurrentes de una actividad con `FOR UPDATE`. Sin N+1 (`relationLoadStrategy: 'join'`; el Dashboard usa 9 consultas).
+- **Seguridad** ([docs/security.md](docs/security.md)): toda ruta no-GET pasa por `originCheck` y entra en la matriz de `http.security.test.ts`; todo recurso con id entra en la matriz de `ownership.security.test.ts`; la API responde `Cache-Control: no-store`; cookie `__Host-` bajo HTTPS; `TRUST_PROXY` con número exacto (nunca `true`), `CORS_ORIGIN` exacto (nunca `*`); CSP real sin `unsafe-inline`/`unsafe-eval` (Zod `jitless` en el navegador, `zodRuntime.ts` primer import). Seed demo: se niega con `NODE_ENV=production` y exige `--allow-demo`; solo toca a `demo@academicplanner.local`.
+- **PWA** ([docs/pwa.md](docs/pwa.md)): solo precachea el shell; `/api/*` siempre `NetworkOnly`; sin offline de datos; la actualización nunca recarga sola. El SW no corre en `npm run dev`.
+- **UI:** legible a 360 px, sin desbordes, controles táctiles ≥ 44 px, estados con texto (no solo color), `aria-label` en botones sin texto, un `h1` por pantalla, `Modal` pregunta antes de descartar, un refresco fallido no reemplaza datos mostrados ([docs/ux-accessibility.md](docs/ux-accessibility.md)). Mutaciones de actividades invalidan `['activities']`, `DASHBOARD_KEY` y `['reminders']`.
 
-## Convenciones
+## Convenciones de pruebas
 
-- TanStack Query: invalidar `['activities']`, `DASHBOARD_KEY` y `['reminders']` desde las mutaciones de actividades.
-- UI: legible a 360 px, sin desbordamiento horizontal, controles táctiles ≥ 44 px, estados siempre con texto (no solo color), `aria-label` en botones sin texto claro.
-- E2E: tras abrir un diálogo que carga datos (editar bloque), esperar a un campo del formulario antes de medirlo (hay un diálogo provisional con el mismo nombre).
-- E2E: nunca esperar con una aserción ya cierta (p. ej. el texto de una `<option>` dentro de la propia tarjeta) antes de recargar o navegar: espera el efecto real (valor de un control controlado, aparición/desaparición de elementos) o el `PATCH` queda abortado.
-- Tests: Vitest (core/api/web), Supertest contra BD real, Playwright con el helper `watch(page, alsoExpected)`. Hacer _mutation checks_ en reglas críticas y revertirlos (`grep MUTATION` debe dar 0). Las capturas de revisión van en un spec temporal que se borra.
-- Zona horaria en tests e2e: probar navegador en `Asia/Tokyo` con perfil Bogotá.
+Vitest (core/api/web), Supertest contra BD real, Playwright con `watch(page, alsoExpected)`. Hacer _mutation checks_ en reglas críticas y revertirlos (`grep MUTATION` debe dar 0). En e2e: no esperar con una aserción ya cierta; esperar el efecto real; antes de cerrar sesión o borrar la cookie esperar a que cargue la pantalla (`networkidle`); para fallos de red con `page.route` usar `serviceWorkers: 'block'`; navegador en `Asia/Tokyo` con perfil Bogotá para zona horaria. Una falla intermitente se investiga con su traza, no se repite hasta que pase. Capturas de revisión en un script temporal que se borra. Ver [docs/testing.md](docs/testing.md).
 
 ## Trampas del entorno (Windows)
 
-- Antes de `test:browser` comprueba que **nada escucha en :3000/:5173**. Matar `npm run dev` solo por puerto deja vivo el vigilante `node --watch`, que revive la API (con la BD de **desarrollo**) y el e2e se ejecuta contra ella: 429 en el registro, decenas de fallos y usuarios basura en la BD de desarrollo. Mata el árbol completo del `npm run dev` (`taskkill /PID <npm> /T /F`) y verifica con `netstat`.
-- Docker Desktop puede no estar arrancado: abrirlo y esperar a `docker info` antes de `npm run db:up`.
-- PowerShell 5.1 corrompe UTF-8 al leer/escribir con `Get-Content`/`Set-Content`; usar Read/Write/Edit. Heredocs largos en Bash pueden fallar al parsear: preferir Write.
-- `.gitattributes` fija `eol=lf`; si `format:check` falla tras un `pull` por CRLF, `npx prettier --write .` lo normaliza sin cambiar contenido. Un aviso LF→CRLF de `git add` es inocuo.
+- Antes de `test:browser` comprobar que **nada escucha en :3000/:5173**. Matar `npm run dev` solo por puerto deja vivo el vigilante `node --watch`, que revive la API (con la BD de **desarrollo**) y el e2e corre contra ella. Matar el árbol (`taskkill /PID <npm> /T /F`) y verificar con `netstat`.
+- Docker Desktop puede no estar arrancado (esperar a `docker info`). El contenedor `academic-planner-db` tiene nombre fijo: `docker compose down -v` se ejecuta en la carpeta que lo creó.
+- PowerShell 5.1 corrompe UTF-8 con `Get-Content`/`Set-Content`: usar Read/Write/Edit. `.gitattributes` fija `eol=lf` (si `format:check` falla por CRLF: `npx prettier --write .`). Un aviso LF→CRLF de `git add` es inocuo.
+
+## Limitaciones vigentes ([docs/limitations.md](docs/limitations.md))
+
+Sin validar en dispositivos iOS/Android reales ni tras HTTPS/proxy reales; sin despliegue. `npm audit` = 4 altas de la cadena del CLI de Prisma (no alcanzables; esperar una estable que las corrija, nunca `--force`). Límites de frecuencia en memoria; el registro revela si un correo existe; sesión fija de 7 días; sin verificación de correo, recuperación de contraseña ni MFA; sin UI para editar el periodo ni la zona horaria. Sin licencia explícita (decisión del propietario).
 
 ## Fuera de alcance hasta nueva orden
 
-Verificación de correo, recuperación de contraseña, MFA, OAuth, roles, eliminación de cuenta y CAPTCHA externo (documentados como mejoras futuras en docs/security.md). Push/Web Push/correo/SMS, IA (incluida visión), sincronización offline completa (escrituras offline, colas, background sync), integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos.
+Verificación de correo, recuperación de contraseña, MFA, OAuth, roles, eliminación de cuenta y CAPTCHA externo. Push/Web Push/correo/SMS, IA (incluida visión), sincronización offline completa, integración con calendarios externos, duración estimada, dificultad y recomendaciones basadas en hábitos.
