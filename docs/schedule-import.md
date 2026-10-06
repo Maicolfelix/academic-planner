@@ -69,6 +69,12 @@ El worker de OCR se crea al primer uso, procesa **una imagen a la vez** y se lib
 
 **Horas y rangos:** `07:00`, `7:00`, `7am`, `07:00 AM`, `14:00`, `2pm`; rangos `08:00-10:00`, `08:00 – 10:00`, `8 a 10`, `8:00 a.m. - 10:00 a.m.`, `2-4pm`. Un número suelto como `Salón 301` o `Grupo 1-2` no es una hora. Un rango que no crece (`10:00-08:00`) se conserva para corregirlo y se avisa. **Sin hora de fin no se inventa duración** (`MISSING_END_TIME`).
 
+**Rangos compactos de 24 horas (`HHMM-HHMM`):** los calendarios visuales (tipo calendario semanal) imprimen en cada bloque horas sin dos puntos, p. ej. `1900-2030` (19:00–20:30), `1400-1615`, `0800-0930` o `900-1030`. Se aceptan con guion, raya corta o raya larga (también con espacios). Es **conservador**: ambos extremos deben ser horas reales (`2560-2700` y `1965-2030` no lo son), el inicio una hora de clase plausible (desde las 05:00), y la duración entre 15 minutos y 12 horas, de modo que `2019-2024` (años) o `207-215` (aulas) no se toman por horas; un número más largo nunca se parte (`Folio 120045-130045`). Lo que no cumple queda en el texto sin tocar.
+
+**Un rango válido manda:** si el bloque trae un rango válido (compacto o normal), las demás horas sueltas del mismo bloque (p. ej. un `12pm` de la escala del calendario) **no lo reemplazan ni quedan en el título**. Sin ningún rango, una hora suelta sigue siendo el inicio de la clase y el fin queda vacío (no se inventa). Además, una celda que trae su propia hora **no toma prestada** la etiqueta de la fila de la escala: esa etiqueta no se añade a «Texto leído» ni afecta a su confianza.
+
+**La escala del calendario no es una clase:** un texto compuesto por **cuatro o más horas aisladas** (`1pm 2pm 3pm 4pm 5pm pm 7pm E 12pm`, también con los deslices del OCR como `lpm` o `Spm`) y **ninguna palabra** de al menos tres letras se descarta como escala de horas, no como propuesta. Es una heurística estructural, no una lista fija: un título legítimo con números (`Proyecto 2`) tiene palabras y no se ve afectado. Puede fallar con escalas muy deformadas por el OCR; en ese caso aparecerá una tarjeta que el estudiante puede desmarcar. **No se promete reconocimiento perfecto.**
+
 **Formato A — tabla por días:** una línea de cabecera con ≥ 2 días fija las columnas; cada celda se asigna a la columna más cercana. Si hay una columna de horas a la izquierda, cada celda pertenece a la última etiqueta de hora que está a su altura o por encima; con etiquetas de hora única, la clase termina donde empieza la fila siguiente (solo si el salto es coherente con el paso de la tabla) y **la misma asignatura en filas contiguas se une** (08:00 + 09:00 → 08:00–10:00). Sin columna de horas, cada celda trae su propio rango.
 
 **Formato B — lista:** encabezados de día y líneas `08:00 - 10:00 Redes` (el nombre puede ir antes o después, o en la línea siguiente).
@@ -125,7 +131,7 @@ Medido con fixtures sintéticos: imagen sencilla ≈ 0,5 s (incluye arranque en 
 - El OCR se equivoca: p. ej. en pruebas leyó «12:00» como «17:00» con ciertos tamaños de letra. **Revisa siempre las horas** antes de importar; por eso hay vista previa editable.
 - No hace preprocesado de imagen ni corrige la rotación (una imagen girada puede fallar).
 - Horarios muy visuales (colores, celdas fusionadas complejas, varias semanas) pueden requerir corrección o no leerse.
-- No interpreta salones ni profesores y no crea asignaturas.
+- No interpreta salones ni profesores y no crea asignaturas. Un número de aula leído por el OCR (p. ej. `207` de «A207») puede quedar al final del título: se corrige en la vista previa; no hay un campo de aula.
 - Solo español; PNG/JPG/PDF; máx. 10 MB y 5 páginas.
 - No importa actividades ni tareas (solo clases) y no lee fotos de tareas.
 - No hay cola de trabajos: una importación a la vez por usuario y 10 cada 10 minutos por IP (el límite es por proceso).

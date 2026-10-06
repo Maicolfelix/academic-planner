@@ -22,7 +22,7 @@ Documentos por módulo: [auth](auth.md), [academic](academic.md), [activities](a
 
 ## Totales de tests (candidato 1.0.0-rc.1)
 
-Vitest: core 766, API 782, web 37 (**1585**). Playwright: 258 por pasada (254 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
+Vitest: core 795, API 786, web 37 (**1618**). Playwright: 260 por pasada (256 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
 
 ## Riesgos y limitaciones vigentes
 
@@ -30,6 +30,7 @@ Lista completa en [limitations.md](limitations.md). Lo esencial:
 
 - **Sin validar:** dispositivos iOS/Android reales, HTTPS y proxy reales, despliegue y carga. La lista previa a publicar está en [final-checklist.md](final-checklist.md).
 - **Dependencias:** `npm audit` = 4 altas, todas de la cadena del **CLI** `prisma@7.10.0` (`@prisma/config` → `deepmerge-ts`, y `mysql2`): no alcanzables (configuración propia; nunca se conecta a MySQL). El arreglo que propone npm es retroceder a `prisma@6.19.3`; se rechazó. La versión más reciente (`8.0.0-rc.20`) es un candidato, no estable. Pendiente: pasar a la siguiente estable que la corrija. Nunca `npm audit fix --force`.
+- **Dependencias (actualización posterior al RC):** la base de avisos añadió `shell-quote` (**crítica**) vía `concurrently`, una herramienta solo de desarrollo; `npm audit` = 6 (4 altas + 2 críticas) y con `--omit=dev` siguen las 4 altas de Prisma. Sin cambios ni `--force` ([security.md](security.md#15-dependencias-npm-audit)).
 - **Seguridad:** límites de frecuencia en memoria y por proceso; el registro revela si un correo existe; sin verificación de correo, recuperación de contraseña ni MFA; sesión fija de 7 días ([security.md](security.md)).
 - **Interfaz:** no hay pantalla para editar el periodo ni la zona horaria después del onboarding.
 - **Recordatorios:** un AUTO eliminado no vuelve hasta que cambie la fecha, el tipo o el estado; los desfases son minutos absolutos; `/api/reminders/due` solo cubre el periodo actual.

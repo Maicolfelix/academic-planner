@@ -33,6 +33,7 @@ Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. 
 - Sesión de duración fija de 7 días (sin renovación ni cierre por inactividad) y sin lista de sesiones activas.
 - Límites de frecuencia **en memoria y por proceso**: se reinician con el servidor y no se comparten entre instancias.
 - `npm audit`: 4 vulnerabilidades altas en la cadena del **CLI** de Prisma (no alcanzables en tiempo de ejecución según el análisis actual). Ver [security.md](security.md#15-dependencias-npm-audit).
+- **Nuevo tras el candidato:** un aviso **crítico** de `shell-quote` (vía `concurrently`, solo herramienta de desarrollo con comandos fijos; no se instala con `npm audit --omit=dev`). `npm audit` = 6 (4 altas + 2 críticas); en producción siguen las 4 altas. Detalle en [security.md](security.md#15-dependencias-npm-audit).
 - No se hizo prueba de penetración ni revisión de la infraestructura de despliegue.
 - La cuenta demo (contraseña pública) **no debe existir** en un despliegue público ([demo.md](demo.md)).
 

@@ -4,6 +4,7 @@ import {
   SCHEDULE_IMPORT_MAX_BYTES,
   SCHEDULE_IMPORT_MAX_PAGES,
   scheduleImportResultSchema,
+  toLocalParts,
   type ExtractedWord,
   type ScheduleImportResult,
 } from '@planner/core';
@@ -20,6 +21,7 @@ import {
   tableItems,
   twoClassListItems,
   twoClassTable,
+  weeklyCalendarImage,
 } from '../../test/scheduleImportFixtures.js';
 import { validateFile, sniffKind, MAX_IMAGE_PIXELS } from './fileValidation.js';
 import { extractContent, MIN_PDF_TEXT_WORDS, type ExtractionDeps } from './pipeline.js';
@@ -649,6 +651,80 @@ describe('importing the proposals', () => {
     for (const p of chosen)
       expect((await agent.post('/api/schedule').send(toBody(p))).status).toBe(201);
     expect(await prisma.scheduleBlock.count()).toBe(3);
+  });
+});
+
+// ───────────────────────── Post-RC fix: a visual calendar (compact ranges + hour axis) ─────────────────────────
+
+describe('a visual weekly calendar: compact ranges and an hour axis (real OCR)', () => {
+  const app = appWith({ pdf, ocr: realOcr });
+
+  async function subjects(email = 'cal@example.com') {
+    const u = await setupUser(app, email, 'Proyectos II');
+    await u.agent
+      .post('/api/subjects')
+      .send({ periodId: u.period.id, name: 'Prácticas Empresariales' });
+    return u;
+  }
+
+  it('reads exactly two classes with their real days and hours; the hour axis is not a class', async () => {
+    const { agent } = await subjects();
+    const r = parsed(await upload(agent, weeklyCalendarImage()));
+    expect(r.proposals.map((p) => [p.weekday, p.startTime, p.endTime, p.title])).toEqual([
+      [3, '19:00', '20:30', 'Proyectos II'],
+      [6, '14:00', '16:15', 'Prácticas Empresariales'],
+    ]);
+    // Matched by the existing rule (the label contains the whole subject name); nothing is guessed.
+    expect(r.proposals.map((p) => p.subjectMatch.status)).toEqual(['EXACT', 'EXACT']);
+    for (const p of r.proposals) {
+      expect(p.title).not.toMatch(/\b\d{1,2}\s?pm\b|\d{4}-\d{4}/i); // no axis label or range left in the title
+      expect(p.missingFields).toEqual([]);
+    }
+  });
+
+  it('only proposes: nothing is stored until the student confirms', async () => {
+    const { agent } = await subjects();
+    parsed(await upload(agent, weeklyCalendarImage()));
+    expect(await prisma.scheduleBlock.count()).toBe(0);
+  });
+
+  it('confirming creates the two weekly classes with the right hours; importing again warns about duplicates', async () => {
+    const { agent } = await subjects();
+    const r = parsed(await upload(agent, weeklyCalendarImage()));
+    for (const p of r.proposals) {
+      const res = await agent.post('/api/schedule').send({
+        type: p.type,
+        subjectId: p.subjectId,
+        title: p.title,
+        date: p.date,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        recurrence: p.recurrence,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(201);
+    }
+    const blocks = await prisma.scheduleBlock.findMany({ orderBy: { startAt: 'asc' } });
+    expect(
+      blocks.map((b) => [
+        b.title,
+        toLocalParts(b.startAt, 'America/Bogota').time,
+        toLocalParts(b.endAt, 'America/Bogota').time,
+      ]),
+    ).toEqual([
+      ['Proyectos II', '19:00', '20:30'],
+      ['Prácticas Empresariales', '14:00', '16:15'],
+    ]);
+    const again = parsed(await upload(agent, weeklyCalendarImage()));
+    expect(again.proposals).toHaveLength(2);
+    expect(again.proposals.every((p) => p.duplicateOf !== null)).toBe(true);
+  });
+
+  it('a subject whose name is only SIMILAR is never applied: the student chooses', async () => {
+    const { agent } = await setupUser(app, 'sim@example.com', 'Proyecto II');
+    const r = parsed(await upload(agent, weeklyCalendarImage()));
+    expect(r.proposals[0]).toMatchObject({ weekday: 3, startTime: '19:00', endTime: '20:30' });
+    expect(r.proposals[0]!.subjectId).toBeNull();
+    expect(r.proposals[0]!.status).toBe('REVIEW');
   });
 });
 
