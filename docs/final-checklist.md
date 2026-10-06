@@ -6,8 +6,8 @@ Estado del **Release Candidate `1.0.0-rc.1`** (Fase 20). Cada ítem hecho se com
 
 ## Reproducibilidad
 
-- [x] **Instalación limpia** siguiendo solo el README (clon nuevo, `docker compose down -v`, `npm ci`, `.env`, `db:up`, `db:deploy`, lint, formato, tipos, pruebas, build, Playwright). Hecha en las Fases 17, 18 y 19 ([system-validation.md](system-validation.md)).
-- [x] **Migraciones** aplicadas desde cero sin errores (6 migraciones).
+- [x] **Instalación limpia** siguiendo solo el README (clon nuevo del remoto, `docker compose down -v`, `npm ci`, `.env`, `db:up`, `db:deploy`, `dev`, build, pruebas, Playwright). Hecha en las Fases 17, 18 y 19 y de nuevo con el candidato `1.0.0-rc.1` ([release-validation.md](release-validation.md#instalación-limpia-solo-con-el-readme)).
+- [x] **Migraciones** aplicadas desde cero sin errores (6 migraciones) y **sin deriva de esquema** (`prisma migrate diff` → «No difference detected»).
 - [x] **Base de test** se crea y migra sola, también para Playwright.
 - [x] **Datos de demostración:** `npm run db:seed:demo -- --allow-demo` crea el dataset, se puede repetir y el login demo funciona ([demo.md](demo.md)).
 
@@ -15,10 +15,13 @@ Estado del **Release Candidate `1.0.0-rc.1`** (Fase 20). Cada ítem hecho se com
 
 - [x] `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build` sin errores.
 - [x] **Pruebas Vitest** (core, API con PostgreSQL real, web) en verde ([testing.md](testing.md)).
-- [x] **Playwright** completo (360 y 1366 px), sin fallos; las pruebas omitidas lo son a propósito.
+- [x] **Playwright** completo (360 y 1366 px): **5 pasadas consecutivas verdes sobre el mismo commit** del candidato, sin `ERR_CONNECTION_REFUSED`; las pruebas omitidas lo son a propósito ([release-validation.md](release-validation.md#cinco-pasadas-completas-consecutivas-de-playwright)).
 - [x] **Seguridad:** `npm run security:scan`, `npm run test:security` y `npm run test:security:browser` en verde.
 - [x] **Auditoría revisada:** `npm audit` = 4 altas de la cadena del CLI de Prisma, analizadas y aceptadas (no alcanzables en tiempo de ejecución); sin `--force` ([security.md](security.md#15-dependencias-npm-audit)).
-- [x] **Documentación:** índice, arquitectura, modelo de datos, API, requisitos, decisiones, limitaciones, despliegue, desarrollo, `npm run docs:check` en verde.
+- [x] **Documentación:** índice, arquitectura, modelo de datos, API, requisitos, decisiones, limitaciones, despliegue, desarrollo, notas, manifiesto y evidencia del candidato; `npm run docs:check` y `npm run test:docs` en verde.
+- [x] **Arranque tipo producción** (local, HTTP en `localhost`): `NODE_ENV=production` con la API sirviendo la app en el mismo origen; salud, cabeceras, cookie `__Host-`, CSRF y humo funcional verificados. **No sustituye** una prueba con HTTPS y proxy reales (abajo).
+- [x] **Recorrido de la demo** (`docs/demo.md`) y humo solo con teclado sobre el _build_ de producción, con revisión visual de capturas reales.
+- [x] **Notas y manifiesto del candidato** preparados ([release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md)).
 
 ## Pendiente (sin marcar a propósito)
 
@@ -30,7 +33,6 @@ Estado del **Release Candidate `1.0.0-rc.1`** (Fase 20). Cada ítem hecho se com
 - [ ] **Prueba de carga** si se espera uso concurrente real (hoy solo hay pruebas de humo).
 - [ ] **Almacén compartido para los límites de frecuencia** si se ejecuta más de una instancia.
 - [ ] **Corrección de las limitaciones de cuentas** que se consideren necesarias para un servicio público: verificación de correo, recuperación de contraseña, MFA.
-- [x] **Notas y manifiesto del candidato** preparados ([release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md)).
 - [ ] **Etiqueta `v1.0.0-rc.1`** y GitHub Release (pre-release): se crean **después de fusionar** el PR del candidato, por el propietario.
 - [ ] **Versión final `v1.0.0`:** no forma parte de este candidato; requiere cerrar los pendientes de arriba.
 
