@@ -10,7 +10,7 @@
 | Desarrollador nuevo              | [README principal](../README.md) → [development.md](development.md) → [architecture.md](architecture.md) → [testing.md](testing.md)                             |
 | Quien va a presentar el proyecto | [demo.md](demo.md)                                                                                                                                              |
 | Quien va a desplegarlo           | [deployment.md](deployment.md) → [security.md](security.md) → [final-checklist.md](final-checklist.md)                                                          |
-| Una sesión nueva de Claude       | [CLAUDE.md](../CLAUDE.md) → [project-state.md](project-state.md)                                                                                                |
+| Una sesión nueva de Claude       | [CLAUDE.md](../CLAUDE.md) → [project-state.md](project-state.md) → [roadmap-post-rc.md](roadmap-post-rc.md)                                                     |
 
 ## Visión general y arquitectura
 
@@ -61,6 +61,7 @@
 | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
 | [demo.md](demo.md)                                         | Datos de demostración, credenciales sintéticas y guion                    |
 | [project-state.md](project-state.md)                       | Estado actual compacto, riesgos y comandos                                |
+| [roadmap-post-rc.md](roadmap-post-rc.md)                   | Ciclo de producto post-RC: visión, etapas, decisiones (planificación)     |
 | [phase-history.md](phase-history.md)                       | Resumen de las fases 0–20                                                 |
 | [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) | Notas del Release Candidate 2 (vigente): qué corrige, límites, pendientes |
 | [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md) | Notas del Release Candidate: qué incluye, límites, pendientes             |

@@ -4,7 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## Unreleased
 
-Sin cambios después de `1.0.0-rc.2`. Cualquier trabajo nuevo requiere un alcance explícito del propietario del proyecto.
+- Planning: reopened product scope for the post-RC automation and academic-assistance cycle ([docs/roadmap-post-rc.md](docs/roadmap-post-rc.md)). Documentation only: no code, dependency, schema, endpoint or version changes.
+
+Sin cambios de código después de `1.0.0-rc.2`. Cualquier trabajo nuevo requiere un alcance explícito del propietario del proyecto.
 
 ## 1.0.0-rc.2 — Release Candidate 2 (2026-10-06)
 
