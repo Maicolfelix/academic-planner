@@ -64,7 +64,7 @@ El **texto** del Radar (`radarExplanation`):
 
 ## Radar ≠ prioridad ≠ estado ≠ recordatorio
 
-- **Prioridad:** una actividad `LOW` que vence en 2 h es `IMMEDIATE`; una `HIGH` que vence en 10 días es `UNDER_CONTROL`. No hay fórmula `urgencia + prioridad` (es de una fase posterior).
+- **Prioridad:** una actividad `LOW` que vence en 2 h es `IMMEDIATE`; una `HIGH` que vence en 10 días es `UNDER_CONTROL`. El Radar no combina urgencia con prioridad: eso lo hace «¿Qué hago ahora?» ([attention-engine.md](attention-engine.md)).
 - **Estado:** `PENDING` e `IN_PROGRESS` participan; `COMPLETED` no tiene categoría. `OVERDUE` es una condición del Radar, nunca un valor de `status`.
 - **Recordatorios:** independientes. Una actividad puede ser `IMMEDIATE` sin tener ningún recordatorio vencido; el Radar no los lee.
 - **Progreso:** la fórmula no cambia; el Radar no la afecta.

@@ -53,7 +53,7 @@ No propone prioridad ni descripción; el estado siempre será `PENDING`, como en
 Solo se comparan las asignaturas **del usuario autenticado en su periodo actual**. Orden de preferencia, sin coincidencia aproximada agresiva (una asignatura equivocada es peor que ninguna):
 
 1. **Nombre completo normalizado** (sin acentos ni mayúsculas): `EXACT`.
-2. _(Alias propios: no se implementan en esta fase.)_
+2. _(Alias propios: no están implementados.)_
 3. **Palabras o prefijos inequívocos** de al menos 3 letras ("bases", "anato", "datos"): `LIKELY` si queda una sola asignatura.
 4. Si varias asignaturas encajan: **`AMBIGUOUS`**, nunca se elige una al azar. La vista previa pregunta "¿A cuál te refieres?" con los candidatos (operable con teclado). Una palabra más que las distinga ("programación ii") lo resuelve.
 5. Si ninguna encaja: `subjectId = null` y aviso "No reconocí una asignatura". **Nunca se crea una asignatura.**
