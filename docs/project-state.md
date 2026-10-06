@@ -2,11 +2,18 @@
 
 Estado **actual y compacto**. Para entender el sistema: [system-overview.md](system-overview.md) y [architecture.md](architecture.md). Para continuar el trabajo: [CLAUDE.md](../CLAUDE.md) y [development.md](development.md). Historia por fase: [phase-history.md](phase-history.md). Actualízalo al cerrar cada fase.
 
-## Fase actual
+## Ciclo actual
+
+- **Current release:** `v1.0.0-rc.2` (pre-release publicado; `v1.0.0-rc.1` y `v1.0.0-rc.2` son inmutables).
+- **Current work:** ciclo de producto post-RC (automatización de entrada y asistencia académica), en planificación: [roadmap-post-rc.md](roadmap-post-rc.md). Este ciclo **no es una Fase 21**; avanza por etapas y PR pequeños, y cada etapa necesita aprobación explícita.
+- **Next implementation target:** **A1 — Schedule Import crea las asignaturas faltantes** (propuesta, vista previa y confirmación en lote). **No implementado y no se inicia sin aprobación explícita.** Hoy la importación no crea asignaturas.
+- Lo descrito abajo es el estado del RC (el código actual). Nada del roadmap existe todavía.
+
+## Fase actual (RC)
 
 - **Estado: Release Candidate `1.0.0-rc.2`** (corrección de la importación de horario sobre rc.1). Roadmap completo (Fases 0–20); `v1.0.0-rc.1` está publicado como pre-release y no se modifica. Código de rc.1 congelado desde `main` `151f6b31`; rc.2 añade solo la corrección de rangos compactos y ruido de escala.
-- **No existe una Fase 21.** Cualquier trabajo nuevo (correcciones, versión final, nuevas funciones) requiere un alcance explícito del usuario; nunca se avanza por iniciativa propia.
-- El tag `v1.0.0-rc.2` se crea **después de fusionar** el PR del candidato ([release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md)). Fases 0–19 aprobadas y fusionadas. Tags: `phase-12-complete`, `phase-18-complete`, `v1.0.0-rc.1`.
+- **No existe una Fase 21.** Cualquier trabajo nuevo (correcciones, versión final, nuevas funciones) requiere un alcance explícito del usuario; nunca se avanza por iniciativa propia. El nuevo ciclo está en [roadmap-post-rc.md](roadmap-post-rc.md).
+- El tag `v1.0.0-rc.2` se creó después de fusionar el PR del candidato y está publicado como pre-release ([release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md)). Fases 0–19 aprobadas y fusionadas. Tags: `phase-12-complete`, `phase-18-complete`, `v1.0.0-rc.1`, `v1.0.0-rc.2`.
 - **Validaciones externas pendientes:** dispositivos iOS/Android reales, HTTPS y proxy reales, despliegue de prueba, decisión de licencia. Ver [final-checklist.md](final-checklist.md).
 - Documentos del candidato: [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) (vigente), [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md), [release-manifest.md](release-manifest.md) y [release-validation.md](release-validation.md) (de rc.1, históricos).
 
