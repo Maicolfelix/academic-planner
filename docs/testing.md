@@ -2,7 +2,7 @@
 
 Las pruebas son la segunda fuente de verdad después del código: si un documento contradice a una prueba, se corrige el documento. Este archivo explica **qué capas hay, qué cubre cada una y cómo ejecutarlas**. Resultados de la validación integral: [system-validation.md](system-validation.md). Trazabilidad requisito → prueba: [requirements.md](requirements.md).
 
-## Cifras actuales (Fase 19)
+## Cifras actuales (candidato 1.0.0-rc.1)
 
 | Capa                     | Herramienta                                       | Pruebas                                                                                                                   |
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -74,6 +74,7 @@ npm run test:security                          # escaneo + pruebas de seguridad 
 PW_CHANNEL=msedge npm run test:browser         # Playwright 360/1366 px (PowerShell: $env:PW_CHANNEL='msedge')
 PW_CHANNEL=msedge npm run test:security:browser # seguridad en navegador (puerto 4300)
 npm run docs:check                             # enlaces y scripts de la documentación
+npm run test:docs                              # prueba del propio verificador (node:test, 5 pruebas)
 ```
 
 - `PW_CHANNEL=msedge` usa Edge instalado; sin él, Playwright necesita su Chromium (`npx playwright install chromium`).
@@ -107,4 +108,4 @@ Medidas de la Fase 17 (siguen siendo válidas: el código de esos caminos no cam
 
 ## Falla conocida de las pruebas
 
-`MaxListenersExceededWarning` de Node (11 listeners en `Server`) al correr las pruebas de API con Supertest. Aparece sin los archivos de la Fase 17, no afecta al servidor y no se ha corregido ([limitations.md](limitations.md)).
+`MaxListenersExceededWarning` de Node (11 listeners en `Server`) al correr las pruebas de API: `supertest` añade un listener por solicitud cuando una prueba lanza más de 10 concurrentes sobre la misma aplicación. No afecta al servidor y no se ha corregido ([limitations.md](limitations.md)).

@@ -1,6 +1,6 @@
 {
   "name": "@planner/web",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@planner/core": "^0.1.0",
+    "@planner/core": "^1.0.0-rc.1",
     "@tanstack/react-query": "^5.104.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
