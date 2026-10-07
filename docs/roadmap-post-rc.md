@@ -159,7 +159,7 @@ Métricas a observar (sin afirmar que ya se cumplen): tiempo de registro a «mi 
 
 Tres investigaciones de bajo costo, antes de construir producto:
 
-1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil.
+1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0, clientes reales aún sin probar): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md).
 2. **Datos reales.** Recolectar, anonimizados, ~10 horarios, ~10 syllabus y ~5 archivos `.ics` como línea base. **No se agregan al repositorio sin anonimización explícita.**
 3. **Notas.** Probar «¿cuánto necesito sacar?» con 3 estudiantes en una hoja de cálculo o prototipo; preguntar escala, cortes, pesos y reglas de redondeo.
 

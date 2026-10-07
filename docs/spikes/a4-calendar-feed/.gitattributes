@@ -1,0 +1,3 @@
+# The fixtures must keep their CRLF line endings (RFC 5545): git must not normalise them, and
+# `git diff --check` must not call the CR of CRLF trailing whitespace.
+*.ics -text whitespace=cr-at-eol
