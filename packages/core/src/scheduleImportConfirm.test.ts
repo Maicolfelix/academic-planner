@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SUBJECT_COLOR_VALUES, pickSubjectColor } from './academic.js';
+import { proposeSubjectName, subjectPrefixOf } from './scheduleImport.js';
 import {
   confirmScheduleImportSchema,
+  findSubjectNameConflicts,
   planImportSubjects,
   toScheduleBlockInput,
   type ConfirmImportClass,
@@ -159,6 +161,18 @@ describe('confirmScheduleImportSchema', () => {
     ).toBe(true);
   });
 
+  it('takes the review evidence of a NEW subject, bounded, and nothing else', () => {
+    const ok = (subject: object) =>
+      confirmScheduleImportSchema.safeParse(body(aClass({ subject }))).success;
+    expect(ok({ kind: 'NEW', name: 'Redes', sourcePrefix: 'ABCDE', mergeConfirmed: true })).toBe(
+      true,
+    );
+    expect(ok({ kind: 'NEW', name: 'Redes', sourcePrefix: '' })).toBe(false);
+    expect(ok({ kind: 'NEW', name: 'Redes', sourcePrefix: 'X'.repeat(17) })).toBe(false);
+    expect(ok({ kind: 'NEW', name: 'Redes', mergeConfirmed: 'yes' })).toBe(false);
+    expect(ok({ kind: 'EXISTING', subjectId: REDES.id, sourcePrefix: 'ABCDE' })).toBe(false);
+  });
+
   it('trims the names it accepts', () => {
     const r = confirmScheduleImportSchema.parse(
       body(aClass({ subject: { kind: 'NEW', name: '  Proyectos II ' }, title: ' Proyectos II ' })),
@@ -229,5 +243,123 @@ describe('toScheduleBlockInput', () => {
       subjectId: REDES.id,
       recurrence: { frequency: 'WEEKLY', until: '2026-11-28' },
     });
+  });
+});
+
+// ───────────────────────── Same cleaned name, different institutional code ─────────────────────────
+
+describe('subjectPrefixOf / the cleaning evidence', () => {
+  it('names the code that proposeSubjectName drops, and only that', () => {
+    expect(subjectPrefixOf('ZISXA-Proyectos II REMOTO Proyecto')).toBe('ZISXA');
+    expect(proposeSubjectName('ZISXA-Proyectos II')).toBe('Proyectos II');
+    expect(subjectPrefixOf('  ABCDE-Redes ')).toBe('ABCDE');
+  });
+
+  it('is null whenever nothing is dropped (no aggressive stripping of unrecognised prefixes)', () => {
+    for (const label of [
+      'Redes',
+      'TCP-IP Redes',
+      'HTML-CSS',
+      'abcde-Redes',
+      'ZISXA-redes',
+      'ABC-Redes',
+      'ABCDEFGHI-Redes',
+      'FÍSICA-Mecánica',
+    ]) {
+      expect(subjectPrefixOf(label), label).toBeNull();
+      expect(proposeSubjectName(label), label).toBe(label); // and nothing was cleaned
+    }
+  });
+});
+
+describe('findSubjectNameConflicts', () => {
+  const cls = (
+    clientId: string,
+    name: string,
+    extra: { sourcePrefix?: string; mergeConfirmed?: boolean } = {},
+  ): Pick<ConfirmImportClass, 'clientId' | 'subject'> => ({
+    clientId,
+    subject: { kind: 'NEW', name, ...extra },
+  });
+
+  it('same prefix twice: one subject, nothing to review', () => {
+    expect(
+      findSubjectNameConflicts([
+        cls('a', 'Proyectos II', { sourcePrefix: 'ZISXA' }),
+        cls('b', 'Proyectos II', { sourcePrefix: 'ZISXA' }),
+      ]),
+    ).toEqual([]);
+    // a single prefix is the normal case too
+    expect(findSubjectNameConflicts([cls('a', 'Proyectos II', { sourcePrefix: 'ZISXA' })])).toEqual(
+      [],
+    );
+  });
+
+  it('different prefixes that clean to the same name need review, every class of the group', () => {
+    expect(
+      findSubjectNameConflicts([
+        cls('a', 'Redes', { sourcePrefix: 'ABCDE' }),
+        cls('b', 'redes', { sourcePrefix: 'FGHIJ' }),
+        cls('c', 'Otra', { sourcePrefix: 'KLMNO' }),
+      ]),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('a class without evidence in the same group is reviewed with the rest', () => {
+    expect(
+      findSubjectNameConflicts([
+        cls('a', 'Redes', { sourcePrefix: 'ABCDE' }),
+        cls('b', 'Redes', { sourcePrefix: 'FGHIJ' }),
+        cls('c', 'Redes'),
+      ]),
+    ).toEqual(['a', 'b', 'c']);
+  });
+
+  it('the student can resolve it: "same subject" (confirmed) or different names', () => {
+    const confirmed = [
+      cls('a', 'Redes', { sourcePrefix: 'ABCDE', mergeConfirmed: true }),
+      cls('b', 'Redes', { sourcePrefix: 'FGHIJ', mergeConfirmed: true }),
+    ];
+    expect(findSubjectNameConflicts(confirmed)).toEqual([]);
+    expect(planImportSubjects(confirmed, []).toCreate).toHaveLength(1); // then it IS one subject
+    const renamed = [
+      cls('a', 'Redes A', { sourcePrefix: 'ABCDE' }),
+      cls('b', 'Redes B', { sourcePrefix: 'FGHIJ' }),
+    ];
+    expect(findSubjectNameConflicts(renamed)).toEqual([]);
+    expect(planImportSubjects(renamed, []).toCreate.map((n) => n.name)).toEqual([
+      'Redes A',
+      'Redes B',
+    ]);
+  });
+
+  it('different prefixes with different names are two normal subjects', () => {
+    expect(
+      findSubjectNameConflicts([
+        cls('a', 'Redes', { sourcePrefix: 'ABCDE' }),
+        cls('b', 'Bases', { sourcePrefix: 'FGHIJ' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('no prefixes at all (Redes / redes) is the plain normalised grouping, as before', () => {
+    const plain = [cls('a', 'Redes'), cls('b', 'redes')];
+    expect(findSubjectNameConflicts(plain)).toEqual([]);
+    expect(planImportSubjects(plain, []).toCreate).toHaveLength(1);
+  });
+
+  it('prefixes are compared normalised (ZISXA / zisxa is the same code); existing subjects are not involved', () => {
+    expect(
+      findSubjectNameConflicts([
+        cls('a', 'Redes', { sourcePrefix: 'ZISXA' }),
+        cls('b', 'Redes', { sourcePrefix: 'zisxa' }),
+      ]),
+    ).toEqual([]);
+    expect(
+      findSubjectNameConflicts([
+        { clientId: 'a', subject: { kind: 'EXISTING', subjectId: REDES.id } },
+        cls('b', 'Redes', { sourcePrefix: 'ABCDE' }),
+      ]),
+    ).toEqual([]);
   });
 });

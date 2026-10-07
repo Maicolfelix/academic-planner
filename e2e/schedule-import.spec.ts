@@ -473,6 +473,84 @@ test('A1: several classes of the same new subject create ONE subject', async ({ 
   ]);
 });
 
+const TWO_CODES = () =>
+  file(
+    'h.png',
+    'image/png',
+    drawTextImage(
+      listItems(['Lunes', '08:00 - 10:00 ABCDE-Redes', 'Miércoles', '10:00 - 12:00 FGHIJ-Redes']),
+      { width: 800, height: 320 },
+    ),
+  );
+const includeAll = async (cs: Locator[]) => {
+  for (const c of cs) if (!(await include(c).isChecked())) await include(c).check();
+};
+
+test('A1: two codes that clean to the same name are not merged silently: the student says "same subject"', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await newUser(page, []);
+  await readFile(page, TWO_CODES());
+  await expect(cards(page)).toHaveCount(2);
+  const [first, second] = [card(page, 0), card(page, 1)];
+
+  // Both would become "Redes": the preview asks instead of presenting them as settled NEW subjects.
+  for (const c of [first, second]) {
+    await expect(nameInput(c)).toHaveValue('Redes');
+    await expect(c).toContainText('vienen de códigos diferentes');
+    await expect(c).toContainText('Revisa si pertenecen a la misma asignatura');
+    await expect(c).not.toContainText(NEW_BADGE);
+    await expect(c.getByText('Revisar', { exact: true })).toBeVisible();
+    await expect(include(c)).toBeDisabled();
+    await expect(include(c)).not.toBeChecked();
+    await expect(c).toContainText('falta decidir si es la misma asignatura');
+  }
+  await expect(importButton(page)).toBeDisabled();
+  await expectNoHorizontalOverflow(page);
+  const violations = (
+    await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  ).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
+  expect(violations, 'axe on the conflicting-codes preview').toEqual([]);
+  expect(await apiSubjects(page)).toEqual([]);
+
+  // "Sí, es la misma asignatura": one subject, both classes.
+  await first.getByRole('button', { name: 'Sí, es la misma asignatura' }).click();
+  for (const c of [first, second]) {
+    await expect(c).not.toContainText('vienen de códigos diferentes');
+    await expect(c).toContainText('Nueva');
+  }
+  await includeAll([first, second]);
+  await expect(page.getByText('Al importar se creará una asignatura nueva: Redes.')).toBeVisible();
+  await importButton(page).click();
+  await expect(page.getByRole('status').filter({ hasText: '2 clases importadas.' })).toBeVisible();
+  expect(await subjectNames(page)).toEqual(['Redes']);
+  // both classes are in the agenda, attached to that one subject (the hours are not the point of this test)
+  expect((await agenda(page)).map((o) => o[0])).toEqual(['Redes', 'Redes']);
+});
+
+test('A1: two codes that clean to the same name: naming them differently makes two subjects', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await newUser(page, []);
+  await readFile(page, TWO_CODES());
+  const [first, second] = [card(page, 0), card(page, 1)];
+  await expect(first).toContainText('vienen de códigos diferentes');
+
+  await nameInput(first).fill('Redes A');
+  await expect(first).not.toContainText('vienen de códigos diferentes'); // the group no longer shares a name
+  await expect(second).not.toContainText('vienen de códigos diferentes');
+  await nameInput(second).fill('Redes B');
+  await includeAll([first, second]);
+  await expect(
+    page.getByText('Al importar se crearán 2 asignaturas nuevas: Redes A, Redes B.'),
+  ).toBeVisible();
+  await importButton(page).click();
+  await expect(page.getByRole('status').filter({ hasText: '2 clases importadas.' })).toBeVisible();
+  expect(await subjectNames(page)).toEqual(['Redes A', 'Redes B']);
+});
+
 test('A1: leaving the preview creates nothing', async ({ page }) => {
   test.setTimeout(120_000);
   await newUser(page, []);

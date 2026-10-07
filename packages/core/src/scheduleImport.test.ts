@@ -1093,6 +1093,7 @@ describe('compact ranges win over axis labels, and the axis is not a class', () 
     expect(close[0]!.subjectMatch.status).toBe('MISSING');
     expect(close[0]!.status).toBe('READY');
     expect(close[0]!.proposedName).toBe('Proyectos II REMOTO Proyecto');
+    expect(close[0]!.sourcePrefix).toBe('ZISXA'); // the code the cleaning dropped, kept as review evidence
   });
 });
 

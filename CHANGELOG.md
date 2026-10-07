@@ -6,7 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ### Changed
 
-- Schedule Import can propose and create missing subjects after explicit confirmation (A1). The preview marks each class as **Existente**, **Nueva — se creará al importar** or **Revisar**; confirming is one request, `POST /api/schedule-import/confirm`, that creates the new subjects and the classes in a single all-or-nothing transaction (same Schedule rules as the manual form; duplicates are refused with `409`; concurrent confirmations are serialised per user). A subject that nobody matches no longer blocks a class. `multipart` is now accepted only on `/api/schedule-import/parse`. See [docs/schedule-import.md](docs/schedule-import.md).
+- Schedule Import can propose and create missing subjects after explicit confirmation (A1). The preview marks each class as **Existente**, **Nueva — se creará al importar** or **Revisar**; confirming is one request, `POST /api/schedule-import/confirm`, that creates the new subjects and the classes in a single all-or-nothing transaction (same Schedule rules as the manual form; duplicates are refused with `409`; concurrent confirmations are serialised per user). A subject that nobody matches no longer blocks a class. `multipart` is now accepted only on `/api/schedule-import/parse`. See [docs/schedule-import.md](docs/schedule-import.md). Classes whose different institutional codes clean to the same name are never merged into one subject without an explicit confirmation.
 
 - Planning: reopened product scope for the post-RC automation and academic-assistance cycle ([docs/roadmap-post-rc.md](docs/roadmap-post-rc.md)). Documentation only: no code, dependency, schema, endpoint or version changes.
 

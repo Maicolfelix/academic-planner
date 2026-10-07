@@ -340,7 +340,16 @@ export function cleanLabel(raw: string): string {
 }
 
 /** An institutional code glued to the name ("ZISXA-Proyectos II"): 4-8 capitals, a hyphen, then a Capitalised word. */
-const LEADING_CODE = /^[A-ZÑ]{4,8}-(?=[A-ZÁÉÍÓÚÑ][a-záéíóúñ])/;
+const LEADING_CODE = /^([A-ZÑ]{4,8})-(?=[A-ZÁÉÍÓÚÑ][a-záéíóúñ])/;
+
+/**
+ * The institutional code that `proposeSubjectName` drops from the start of a label ("ZISXA"), or null when it drops
+ * none. It is the one piece of evidence the cleaning throws away: two classes whose names become the same only
+ * because their (different) codes were removed must not be merged without the student saying so.
+ */
+export function subjectPrefixOf(label: string): string | null {
+  return label.replace(/\s+/g, ' ').trim().match(LEADING_CODE)?.[1] ?? null;
+}
 
 /**
  * The name proposed for a subject that does not exist yet, from the label as it was read. Deliberately timid: it
@@ -917,6 +926,8 @@ export const scheduleImportProposalSchema = z.object({
   title: z.string(),
   /** Name to give a NEW subject (the label as read, lightly tidied) or, for an exact match, that subject's name. */
   proposedName: z.string(),
+  /** The institutional code the proposed name was cleaned of (null when none): review evidence, never stored. */
+  sourcePrefix: z.string().nullable(),
   /** First occurrence (first such weekday on or after the period start) and where the series ends. */
   date: dateOnlySchema.nullable(),
   recurrence: z.object({ frequency: z.literal('WEEKLY'), until: dateOnlySchema }),
@@ -1024,6 +1035,7 @@ export function buildScheduleProposals(
       },
       title: subject?.name ?? c.label,
       proposedName: subject?.name ?? proposeSubjectName(c.label),
+      sourcePrefix: subject ? null : subjectPrefixOf(c.label),
       date,
       recurrence: { frequency: 'WEEKLY' as const, until: ctx.period.endDate },
       status: warnings.length > 0 ? ('REVIEW' as const) : ('READY' as const),

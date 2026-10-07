@@ -1,5 +1,7 @@
 import {
   DUPLICATE_CLASS_MESSAGE,
+  SUBJECT_REVIEW_MESSAGE,
+  findSubjectNameConflicts,
   createScheduleBlockSchema,
   fieldErrorsOf,
   findDuplicateClass,
@@ -53,6 +55,9 @@ export function createScheduleImportConfirmService(opts: {
       actor: Actor,
       input: ConfirmScheduleImportInput,
     ): Promise<ConfirmScheduleImportResponse> {
+      // Same name from different institutional codes, not confirmed as one subject: pure, decided before any query.
+      const toReview = new Set(findSubjectNameConflicts(input.classes));
+
       return runInTransaction(async (tx) => {
         // Bounded wait: a confirmation queued behind another one holds a connection, so it gives up with a clear
         // answer instead of waiting for ever (or until the transaction itself times out with an opaque error).
@@ -133,6 +138,15 @@ export function createScheduleImportConfirmService(opts: {
         const usedExisting = new Set<string>();
 
         for (const [i, c] of input.classes.entries()) {
+          if (toReview.has(c.clientId)) {
+            refused.push({
+              clientId: c.clientId,
+              code: 'SUBJECT_REVIEW',
+              message: SUBJECT_REVIEW_MESSAGE,
+              fields: {},
+            });
+            continue;
+          }
           const { target } = plan.targets[i]!;
           const subjectId =
             target.kind === 'EXISTING' ? target.subjectId : byKey.get(target.key)!.id;
@@ -207,7 +221,7 @@ export function createScheduleImportConfirmService(opts: {
         }
 
         if (refused.length > 0) {
-          const invalid = refused.some((r) => r.code === 'VALIDATION_ERROR');
+          const invalid = refused.some((r) => r.code !== 'DUPLICATE_CLASS');
           throw new AppError(
             invalid ? 400 : 409,
             invalid ? 'VALIDATION_ERROR' : 'DUPLICATE_CLASS',

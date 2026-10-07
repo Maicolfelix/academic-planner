@@ -16,7 +16,11 @@ import {
   setupUser,
   signUp,
 } from '../../test/helpers.js';
-import { weeklyCalendarImage } from '../../test/scheduleImportFixtures.js';
+import {
+  drawTextImage,
+  listItems,
+  weeklyCalendarImage,
+} from '../../test/scheduleImportFixtures.js';
 import { createSubjectRepository } from '../repositories/subjectRepository.js';
 import { createOcrProvider, createPdfProvider } from './providers.js';
 
@@ -821,5 +825,123 @@ describe('confirm: a refused body points at its classes', () => {
     expect(items[2]!.fields).toHaveProperty('_');
     expect(JSON.stringify(res.body)).not.toContain('x"'); // keys and messages only, never the submitted values
     expect(await counts()).toEqual({ subjects: 0, blocks: 0 });
+  });
+});
+
+// ───────────────────────── Same cleaned name, different institutional code ─────────────────────────
+
+describe('confirm: classes whose different codes clean to the same name are not merged silently', () => {
+  const redes = (clientId: string, sourcePrefix: string, extra: object = {}, over: object = {}) =>
+    cls({
+      clientId,
+      title: 'Redes',
+      subject: { kind: 'NEW', name: 'Redes', sourcePrefix, ...extra },
+      ...over,
+    });
+  const monday = { weekday: 1, startTime: '08:00', endTime: '10:00' };
+  const wednesday = { weekday: 3, startTime: '10:00', endTime: '12:00' };
+
+  it('reading proposes the evidence: both names are "Redes", with their own codes', async () => {
+    const { agent } = await userWithoutSubjects('read-prefix@example.com');
+    const items = listItems([
+      'Lunes',
+      '08:00 - 10:00 ABCDE-Redes',
+      'Miércoles',
+      '10:00 - 12:00 FGHIJ-Redes',
+    ]);
+    const res = await agent
+      .post('/api/schedule-import/parse')
+      .attach('file', drawTextImage(items, { width: 800, height: 320 }), {
+        filename: 'h.png',
+        contentType: 'image/png',
+      });
+    const r = scheduleImportResultSchema.parse(res.body);
+    // (the OCR may slip a letter of a code, e.g. read ABCDE as ABEDE: the evidence is whatever was read)
+    expect(r.proposals.map((p) => p.proposedName)).toEqual(['Redes', 'Redes']);
+    const [first, second] = r.proposals.map((p) => p.sourcePrefix);
+    expect(first).toMatch(/^[A-Z]{4,8}$/);
+    expect(second).toMatch(/^[A-Z]{4,8}$/);
+    expect(first).not.toBe(second);
+    expect(await counts()).toEqual({ subjects: 0, blocks: 0 });
+  });
+
+  it('unconfirmed, the batch is refused as a whole and every class involved is pointed out', async () => {
+    const { agent } = await userWithoutSubjects('conflict@example.com');
+    const res = await confirm(
+      agent,
+      redes('a', 'ABCDE', {}, monday),
+      redes('b', 'FGHIJ', {}, wednesday),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect(res.body.error.details.items).toEqual([
+      expect.objectContaining({ clientId: 'a', code: 'SUBJECT_REVIEW' }),
+      expect.objectContaining({ clientId: 'b', code: 'SUBJECT_REVIEW' }),
+    ]);
+    expect(await counts()).toEqual({ subjects: 0, blocks: 0 }); // no silent merge, nothing saved
+  });
+
+  it('it is reported together with the other problems of the batch', async () => {
+    const { agent } = await userWithoutSubjects('conflict-more@example.com');
+    const res = await confirm(
+      agent,
+      redes('a', 'ABCDE', {}, monday),
+      redes('b', 'FGHIJ', {}, wednesday),
+      cls({ clientId: 'late', weekday: 5, until: '2027-03-01', subject: NEW('Física') }),
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.items.map((i: { clientId: string }) => i.clientId)).toEqual([
+      'a',
+      'b',
+      'late',
+    ]);
+    expect(await counts()).toEqual({ subjects: 0, blocks: 0 });
+  });
+
+  it('resolved as "the same subject": ONE subject, both classes', async () => {
+    const { agent } = await userWithoutSubjects('same@example.com');
+    const res = await confirm(
+      agent,
+      redes('a', 'ABCDE', { mergeConfirmed: true }, monday),
+      redes('b', 'FGHIJ', { mergeConfirmed: true }, wednesday),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(await counts()).toEqual({ subjects: 1, blocks: 2 });
+  });
+
+  it('resolved as different subjects (the student names them): TWO subjects', async () => {
+    const { agent } = await userWithoutSubjects('different@example.com');
+    const res = await confirm(
+      agent,
+      cls({
+        clientId: 'a',
+        title: 'Redes A',
+        subject: { kind: 'NEW', name: 'Redes A', sourcePrefix: 'ABCDE' },
+        ...monday,
+      }),
+      cls({
+        clientId: 'b',
+        title: 'Redes B',
+        subject: { kind: 'NEW', name: 'Redes B', sourcePrefix: 'FGHIJ' },
+        ...wednesday,
+      }),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(await counts()).toEqual({ subjects: 2, blocks: 2 });
+    expect(
+      (await prisma.subject.findMany({ orderBy: { name: 'asc' } })).map((s) => s.name),
+    ).toEqual(['Redes A', 'Redes B']);
+  });
+
+  it('TRUST BOUNDARY: the server keeps no OCR text, so a client that declares no code is not stopped', async () => {
+    // Same names, no evidence: indistinguishable from a student who typed "Redes" twice. This is the documented limit;
+    // what the server guarantees is the refusal of a batch that declares contradictory codes (above).
+    const { agent } = await userWithoutSubjects('hidden@example.com');
+    const res = await confirm(
+      agent,
+      cls({ clientId: 'a', title: 'Redes', subject: NEW('Redes'), ...monday }),
+      cls({ clientId: 'b', title: 'Redes', subject: NEW('Redes'), ...wednesday }),
+    );
+    expect(res.status).toBe(201);
+    expect(await counts()).toEqual({ subjects: 1, blocks: 2 });
   });
 });

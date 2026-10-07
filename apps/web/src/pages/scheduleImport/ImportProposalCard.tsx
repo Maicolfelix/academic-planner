@@ -20,6 +20,7 @@ import {
   type Conflict,
   type ImportDraft,
   type ImportRow,
+  type NameConflict,
 } from './importDraft';
 
 /** A reading warning stays only while the student has not fixed what it is about. */
@@ -52,6 +53,9 @@ interface Props {
   periodEnd: string;
   onChange: (patch: Partial<ImportDraft>) => void;
   onSelect: (selected: boolean) => void;
+  /** Set when this card's NEW subject would merge classes of different codes and nobody has decided yet. */
+  nameConflict?: NameConflict;
+  onSameSubject?: () => void;
 }
 
 const conflictText = (c: Conflict, timeZone: string) => {
@@ -68,13 +72,15 @@ export function ImportProposalCard({
   periodEnd,
   onChange,
   onSelect,
+  nameConflict,
+  onSameSubject,
 }: Props) {
   const { proposal: p, draft: d } = row;
   const id = `import-${index}`;
   const locked = row.status === 'created' || row.status === 'creating';
   const problems = problemsOf(d);
   const badRange = endsBeforeStart(d);
-  const blocked = problems.length > 0 || badRange;
+  const blocked = problems.length > 0 || badRange || nameConflict !== undefined;
   const conflicts = row.liveConflicts ?? p.conflicts;
   const suggested = p.subjectMatch.suggestedId
     ? subjects.find((s) => s.id === p.subjectMatch.suggestedId)
@@ -88,8 +94,9 @@ export function ImportProposalCard({
 
   // Where this class's subject stands, in words (never color alone): an existing one, a new one, or still undecided.
   const typedMatch = isNewSubject(d) ? findSubjectByName(d.newName, subjects) : undefined;
-  const subjectState =
-    d.subjectId === ''
+  const subjectState = nameConflict
+    ? { chip: 'Revisar', help: 'Puede ser la misma asignatura que otra clase: decídelo abajo.' }
+    : d.subjectId === ''
       ? { chip: 'Revisar', help: 'Elige una asignatura o crea una nueva.' }
       : typedMatch
         ? { chip: 'Existente', help: 'Esa asignatura ya existe: se usará, no se creará otra.' }
@@ -298,18 +305,40 @@ export function ImportProposalCard({
               hint={`Fin del periodo: ${periodEnd}`}
             />
 
-            {(problems.length > 0 || badRange) && (
+            {nameConflict && (
+              <div className="flex flex-col gap-2 rounded-md border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">
+                <p>
+                  Dos clases parecen tener el mismo nombre de asignatura («{d.newName.trim()}»),
+                  pero vienen de códigos diferentes ({nameConflict.prefixes.join(' y ')}). Revisa si
+                  pertenecen a la misma asignatura.
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={onSameSubject}
+                    className="min-h-11 rounded-md border border-slate-500 bg-white px-4 py-2 font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                  >
+                    Sí, es la misma asignatura
+                  </button>
+                </div>
+                <p>Si son distintas, cambia el nombre de una de ellas.</p>
+              </div>
+            )}
+
+            {(problems.length > 0 || badRange || nameConflict) && (
               <p className="text-sm text-slate-700">
                 {problems.length > 0
                   ? `Para importarla falta ${problems.join(', ')}.`
-                  : 'Corrige la hora de fin para importarla.'}
+                  : badRange
+                    ? 'Corrige la hora de fin para importarla.'
+                    : 'Para importarla falta decidir si es la misma asignatura que otra clase.'}
               </p>
             )}
 
             <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
-                checked={row.selected}
+                checked={row.selected && !nameConflict}
                 disabled={locked || blocked}
                 onChange={(e) => onSelect(e.target.checked)}
                 className="size-5"

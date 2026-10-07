@@ -8,6 +8,7 @@ import {
   findSubjectByName,
   firstWeekdayOnOrAfter,
   formatDateOnly,
+  normalizeNameKey,
   type ScheduleImportResult,
   type Weekday,
 } from '@planner/core';
@@ -29,6 +30,8 @@ import {
   cardField,
   endsBeforeStart,
   isNewSubject,
+  nameConflicts,
+  prefixEvidence,
   problemsOf,
   subjectsToCreate,
   toConfirmClass,
@@ -97,6 +100,8 @@ export function ScheduleImportPage() {
   const [creating, setCreating] = useState(false);
   const [summary, setSummary] = useState<string>();
   const [submitError, setSubmitError] = useState<string>();
+  /** Name keys the student confirmed as ONE subject although their classes came from different codes. */
+  const [merged, setMerged] = useState<ReadonlySet<string>>(new Set());
 
   const abort = useRef<AbortController | null>(null);
   const submitErrorRef = useRef<HTMLParagraphElement>(null);
@@ -221,8 +226,11 @@ export function ScheduleImportPage() {
     );
   }
 
+  // Classes whose NEW subject would silently merge different institutional codes wait for the student's decision.
+  const conflicts = nameConflicts(rows, merged);
   const importable = rows.filter(
-    (r) =>
+    (r, i) =>
+      !conflicts.has(i) &&
       r.status !== 'created' &&
       r.status !== 'creating' &&
       problemsOf(r.draft).length === 0 &&
@@ -230,7 +238,7 @@ export function ScheduleImportPage() {
   );
   const toImport = rows
     .map((row, i) => ({ row, i }))
-    .filter(({ row }) => row.selected && row.status !== 'created');
+    .filter(({ row, i }) => row.selected && row.status !== 'created' && !conflicts.has(i));
   const importedCount = rows.filter((r) => r.status === 'created').length;
   // The subjects this confirmation would create, once per name (what the server does too).
   const newSubjects = subjectsToCreate(
@@ -259,7 +267,12 @@ export function ScheduleImportPage() {
 
     const chosen = toImport.map(({ row, i }) => ({ row, i }));
     const parsed = confirmScheduleImportSchema.safeParse({
-      classes: chosen.map(({ row, i }) => toConfirmClass(row.draft, String(i))),
+      classes: chosen.map(({ row, i }) =>
+        toConfirmClass(row.draft, String(i), {
+          sourcePrefix: prefixEvidence(row),
+          mergeConfirmed: merged.has(normalizeNameKey(row.draft.newName)),
+        }),
+      ),
     });
     if (!parsed.success) {
       // The same rules as the server: point at the card and the field before sending anything.
@@ -334,6 +347,7 @@ export function ScheduleImportPage() {
     setSummary(undefined);
     setSubmitError(undefined);
     setInputError(undefined);
+    setMerged(new Set());
   }
 
   return (
@@ -510,6 +524,11 @@ export function ScheduleImportPage() {
                 periodEnd={formatDateOnly(result.period.endDate)}
                 onChange={(change) => edit(i, change)}
                 onSelect={(selected) => patchRow(i, { selected })}
+                nameConflict={conflicts.get(i)}
+                onSameSubject={() => {
+                  const key = conflicts.get(i)?.key;
+                  if (key) setMerged((all) => new Set(all).add(key));
+                }}
               />
             ))}
           </ul>

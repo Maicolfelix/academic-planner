@@ -37,7 +37,18 @@ const title = z
 
 export const importSubjectChoiceSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EXISTING'), subjectId: z.uuid('Asignatura inválida.') }),
-  z.strictObject({ kind: z.literal('NEW'), name: subjectNameSchema }),
+  z.strictObject({
+    kind: z.literal('NEW'),
+    name: subjectNameSchema,
+    /**
+     * Review evidence, not data: the institutional code the preview removed from this name ("ABCDE" of
+     * "ABCDE-Redes"). The server keeps no OCR text, so this is only what the client declares; see
+     * `findSubjectNameConflicts`.
+     */
+    sourcePrefix: z.string().trim().min(1).max(16).optional(),
+    /** The student said that the classes sharing this name, from different codes, are the same subject. */
+    mergeConfirmed: z.boolean().optional(),
+  }),
 ]);
 
 export const confirmImportClassSchema = z
@@ -86,13 +97,43 @@ export type ConfirmScheduleImportResponse = z.infer<typeof confirmScheduleImport
 /** What `details.items` of a refused confirmation says about each class that could not be imported. */
 export const confirmImportItemErrorSchema = z.object({
   clientId: z.string(),
-  code: z.enum(['VALIDATION_ERROR', 'DUPLICATE_CLASS']),
+  code: z.enum(['VALIDATION_ERROR', 'DUPLICATE_CLASS', 'SUBJECT_REVIEW']),
   message: z.string(),
   fields: z.record(z.string(), z.array(z.string())),
 });
 export type ConfirmImportItemError = z.infer<typeof confirmImportItemErrorSchema>;
 
 export const DUPLICATE_CLASS_MESSAGE = 'Esta clase ya está en tu agenda.';
+export const SUBJECT_REVIEW_MESSAGE =
+  'Dos clases tienen el mismo nombre de asignatura pero vienen de códigos distintos. Confirma que son la misma asignatura o cambia el nombre de una.';
+
+// ───────────────────────── Same name, different origin ─────────────────────────
+
+/**
+ * The classes that would be merged into one NEW subject although what the client declares says they come from
+ * DIFFERENT institutional codes ("ABCDE-Redes" and "FGHIJ-Redes" both cleaned to "Redes"), and that the student has
+ * not confirmed as the same subject. Empty when there is nothing to review.
+ *
+ * Scope: only the code the cleaning itself removes; the rest of the OCR text is never identity (a one-letter OCR
+ * slip must not stop a valid grouping), and a name the student typed by hand carries no code at all. Trust boundary:
+ * the server does not keep the OCR text, so it can check the batch against the evidence the client declares but not
+ * invent it. A client that leaves `sourcePrefix` out is not stopped (and could equally have typed any names): the
+ * guarantee is that the screen asks, and that an inconsistent declared batch is refused.
+ */
+export function findSubjectNameConflicts(
+  classes: readonly Pick<ConfirmImportClass, 'clientId' | 'subject'>[],
+): string[] {
+  const groups = new Map<string, { prefixes: Set<string>; unconfirmed: string[] }>();
+  for (const { clientId, subject } of classes) {
+    if (subject.kind !== 'NEW') continue;
+    const key = normalizeNameKey(subject.name);
+    const group = groups.get(key) ?? { prefixes: new Set<string>(), unconfirmed: [] };
+    if (subject.sourcePrefix) group.prefixes.add(normalizeNameKey(subject.sourcePrefix));
+    if (!subject.mergeConfirmed) group.unconfirmed.push(clientId);
+    groups.set(key, group);
+  }
+  return [...groups.values()].flatMap((g) => (g.prefixes.size > 1 ? g.unconfirmed : []));
+}
 
 // ───────────────────────── Resolving subjects ─────────────────────────
 

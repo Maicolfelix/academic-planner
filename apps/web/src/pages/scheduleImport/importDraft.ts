@@ -90,10 +90,56 @@ export function cardErrors(fields: Record<string, string[]>): Record<string, str
   return out;
 }
 
+/**
+ * The institutional code the preview cleaned off this class's name ("ABCDE" of "ABCDE-Redes"), only while the name is
+ * still the proposed one: a name the student typed is their decision and carries no such evidence.
+ */
+export function prefixEvidence(row: Pick<ImportRow, 'proposal' | 'draft'>): string | null {
+  const { proposal: p, draft: d } = row;
+  if (!isNewSubject(d) || !p.sourcePrefix) return null;
+  return normalizeNameKey(d.newName) === normalizeNameKey(p.proposedName) ? p.sourcePrefix : null;
+}
+
+/** A group of NEW classes that share a name once cleaned although they come from different institutional codes. */
+export interface NameConflict {
+  key: string;
+  /** The codes involved, as they were read ("ABCDE", "FGHIJ"). */
+  prefixes: string[];
+}
+
+/**
+ * Cards (by index) whose NEW subject would merge classes of different institutional codes ("ABCDE-Redes",
+ * "FGHIJ-Redes" → "Redes") and that the student has not yet confirmed as the same subject (`merged` holds the name
+ * keys they did). Changing a name to a different one, on any of them, resolves it too. Same name key as the server uses.
+ */
+export function nameConflicts(
+  rows: readonly ImportRow[],
+  merged: ReadonlySet<string>,
+): Map<number, NameConflict> {
+  const groups = new Map<string, { prefixes: Map<string, string>; cards: number[] }>();
+  rows.forEach((row, i) => {
+    if (row.status === 'created' || !isNewSubject(row.draft) || newNameProblem(row.draft)) return;
+    const key = normalizeNameKey(row.draft.newName);
+    const group = groups.get(key) ?? { prefixes: new Map<string, string>(), cards: [] };
+    const prefix = prefixEvidence(row);
+    if (prefix) group.prefixes.set(normalizeNameKey(prefix), prefix);
+    group.cards.push(i);
+    groups.set(key, group);
+  });
+  const out = new Map<number, NameConflict>();
+  for (const [key, g] of groups) {
+    if (g.prefixes.size < 2 || merged.has(key)) continue;
+    for (const i of g.cards) out.set(i, { key, prefixes: [...g.prefixes.values()] });
+  }
+  return out;
+}
+
 /** One class as the confirmation endpoint takes it. The card index is the client id: it never leaves the page. */
 export function toConfirmClass(
   d: ImportDraft,
   clientId: string,
+  /** Review evidence for a NEW subject (see `prefixEvidence`) and the student's "same subject" decision. */
+  evidence: { sourcePrefix?: string | null; mergeConfirmed?: boolean } = {},
 ): ConfirmScheduleImportRequest['classes'][number] {
   return {
     clientId,
@@ -103,7 +149,12 @@ export function toConfirmClass(
     title: d.title,
     until: d.until,
     subject: isNewSubject(d)
-      ? { kind: 'NEW', name: d.newName }
+      ? {
+          kind: 'NEW',
+          name: d.newName,
+          ...(evidence.sourcePrefix ? { sourcePrefix: evidence.sourcePrefix } : {}),
+          ...(evidence.mergeConfirmed ? { mergeConfirmed: true } : {}),
+        }
       : { kind: 'EXISTING', subjectId: d.subjectId },
   };
 }
