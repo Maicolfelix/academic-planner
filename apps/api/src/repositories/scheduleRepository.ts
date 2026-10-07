@@ -1,5 +1,5 @@
 import type { ScheduleBlockType } from '@planner/core';
-import type { PrismaClient } from '../db/prisma.js';
+import type { Db } from '../db/prisma.js';
 import { fromDateOnly } from '../mappers.js';
 
 // Subject (name, color) and the period's days come back in the SAME query as the block: no N+1.
@@ -33,7 +33,7 @@ export interface ScheduleCreateData {
 export type ScheduleUpdateData = Omit<ScheduleCreateData, 'userId' | 'periodId'>;
 
 /** Every query is scoped by userId: a block id alone never reaches data. */
-export function createScheduleRepository(prisma: PrismaClient) {
+export function createScheduleRepository(prisma: Db) {
   return {
     findOwned: (userId: string, id: string) =>
       prisma.scheduleBlock.findFirst({

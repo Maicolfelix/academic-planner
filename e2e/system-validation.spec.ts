@@ -287,9 +287,7 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
   await page.getByRole('button', { name: 'Procesar horario' }).click();
   await expect(page.getByRole('article')).toHaveCount(2, { timeout: 30_000 });
   await page.getByRole('button', { name: 'Importar seleccionadas' }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: '2 clases importadas, 0 necesitan corrección' }),
-  ).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '2 clases importadas.' })).toBeVisible();
   // The same file again: both classes are recognised as already in the agenda.
   await page.getByRole('button', { name: 'Subir otro archivo' }).click();
   await page
@@ -761,7 +759,7 @@ test.describe('failures injected into the network', () => {
     expect((await oracle(page)).activities).toHaveLength(2);
   });
 
-  test('E2E-17: when one class of the import fails the others stay and the failed one can be fixed and retried', async ({
+  test('E2E-17: when the import request fails nothing is saved (all or nothing) and it can be retried', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -772,11 +770,16 @@ test.describe('failures injected into the network', () => {
       .setInputFiles({ name: 'horario.png', mimeType: 'image/png', buffer: twoClassTable() });
     await page.getByRole('button', { name: 'Procesar horario' }).click();
     await expect(page.getByRole('article')).toHaveCount(2, { timeout: 30_000 });
+    const week = async () =>
+      (
+        await (
+          await page.request.get(`/api/schedule?from=${bogotaToday(-6)}&to=${bogotaToday(7)}`)
+        ).json()
+      ).occurrences as { blockId: string }[];
     let posts = 0;
-    await page.route('**/api/schedule', (route) => {
-      if (route.request().method() !== 'POST') return route.continue();
+    await page.route('**/api/schedule-import/confirm', (route) => {
       posts += 1;
-      return posts === 2
+      return posts === 1
         ? route.fulfill({
             status: 500,
             contentType: 'application/json',
@@ -785,20 +788,16 @@ test.describe('failures injected into the network', () => {
         : route.continue();
     });
     await page.getByRole('button', { name: 'Importar seleccionadas' }).click();
-    await expect(
-      page.getByRole('status').filter({ hasText: '1 clase importada, 1 necesita corrección' }),
-    ).toBeVisible();
-    await page.unroute('**/api/schedule');
+    const alert = page.getByRole('alert').filter({ hasText: 'No se guardó nada' });
+    await expect(alert).toBeVisible();
+    await expect(alert).toBeFocused();
+    expect(await week()).toEqual([]); // not even one of the two classes
+    await page.unroute('**/api/schedule-import/confirm');
     await page.getByRole('button', { name: 'Importar seleccionadas' }).click();
     await expect(
-      page.getByRole('status').filter({ hasText: '1 clase importada, 0 necesitan corrección' }),
+      page.getByRole('status').filter({ hasText: '2 clases importadas.' }),
     ).toBeVisible();
-    const occurrences = (
-      await (
-        await page.request.get(`/api/schedule?from=${bogotaToday(-6)}&to=${bogotaToday(7)}`)
-      ).json()
-    ).occurrences as { blockId: string }[];
-    expect(new Set(occurrences.map((o) => o.blockId)).size).toBe(2); // two classes (each repeats weekly)
+    expect(new Set((await week()).map((o) => o.blockId)).size).toBe(2); // two classes (each repeats weekly)
   });
 });
 

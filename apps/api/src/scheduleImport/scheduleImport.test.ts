@@ -474,7 +474,7 @@ describe('POST /api/schedule-import/parse — interpretation', () => {
     expect(ocr.calls).toBe(before + 1);
   });
 
-  it('a partial name is only suggested; an unknown subject asks for a manual choice', async () => {
+  it('a partial name is only suggested; an unknown subject is proposed as a NEW one (and does not block)', async () => {
     const u = await setupUser(app, 'likely@example.com', 'Redes de Computadores');
     const items = listItems(['Lunes', '08:00 - 10:00 Redes', 'Martes', '10:00 - 12:00 Quimica']);
     const r = parsed(await upload(u.agent, drawTextImage(items, { width: 800, height: 320 })));
@@ -483,7 +483,13 @@ describe('POST /api/schedule-import/parse — interpretation', () => {
     expect(likely!.subjectMatch).toMatchObject({ status: 'LIKELY', suggestedId: u.subject.id });
     expect(likely!.warnings.map((w) => w.code)).toContain('SUBJECT_LIKELY');
     expect(missing!.subjectMatch.status).toBe('MISSING');
-    expect(missing!.warnings.map((w) => w.code)).toContain('SUBJECT_MISSING');
+    expect(missing).toMatchObject({
+      subjectId: null,
+      status: 'READY',
+      missingFields: [],
+      proposedName: 'Quimica',
+    });
+    expect(missing!.warnings).toEqual([]);
   });
 
   it('an image with no text: 200 with an honest message, not an error', async () => {
@@ -724,7 +730,9 @@ describe('a visual weekly calendar: compact ranges and an hour axis (real OCR)',
     const r = parsed(await upload(agent, weeklyCalendarImage()));
     expect(r.proposals[0]).toMatchObject({ weekday: 3, startTime: '19:00', endTime: '20:30' });
     expect(r.proposals[0]!.subjectId).toBeNull();
-    expect(r.proposals[0]!.status).toBe('REVIEW');
+    // nothing is applied: it is a NEW subject proposal (the student can still pick Proyecto II in the card)
+    expect(r.proposals[0]!.subjectMatch.status).toBe('MISSING');
+    expect(r.proposals[0]!.proposedName).toBe('Proyectos II REMOTO Proyecto');
   });
 });
 

@@ -53,6 +53,23 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ['post', '/api/quick-capture/parse', { text: 'parcial' }],
   ['post', '/api/academic-inbox/parse', { text: 'parcial' }],
   ['post', '/api/schedule-import/parse'],
+  [
+    'post',
+    '/api/schedule-import/confirm',
+    {
+      classes: [
+        {
+          clientId: 'a',
+          weekday: 1,
+          startTime: '08:00',
+          endTime: '10:00',
+          title: 'X',
+          until: '2026-11-28',
+          subject: { kind: 'NEW', name: 'X' },
+        },
+      ],
+    },
+  ],
 ];
 
 describe('CSRF: a request that does not come from our own origin never changes anything', () => {

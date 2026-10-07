@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateOnlySchema, normalizeNameKey, type DateOnly } from './academic.js';
+import { SUBJECT_NAME_MAX, dateOnlySchema, normalizeNameKey, type DateOnly } from './academic.js';
 import { firstWeekdayOnOrAfter, weekdayOf, type Weekday } from './calendar.js';
 import { SCHEDULE_BLOCK_TYPES } from './schedule.js';
 import { toLocalParts } from './time.js';
@@ -31,7 +31,7 @@ export const SCHEDULE_IMPORT_MESSAGES = {
   MISSING_START_TIME: 'No se leyó la hora de inicio: indícala para importar.',
   MISSING_WEEKDAY: 'No se reconoció el día: elígelo para importar.',
   INVALID_TIME: 'La hora de fin debe ser posterior a la de inicio.',
-  SUBJECT_MISSING: 'Asignatura sin reconocer: elige una de tus asignaturas.',
+  SUBJECT_MISSING: 'Nueva asignatura propuesta. Revisa el nombre antes de importar.',
   SUBJECT_AMBIGUOUS: 'Hay varias asignaturas parecidas: elige la correcta.',
   SUBJECT_LIKELY: 'La asignatura no coincide exactamente: confirma la sugerencia.',
   LOW_CONFIDENCE: 'El texto se leyó con poca claridad: revisa los datos.',
@@ -336,6 +336,33 @@ export function cleanLabel(raw: string): string {
     .replace(GROUP_TAG, '')
     .replace(/^[\s\-–—:|•·,.]+|[\s\-–—:|•·,.]+$/g, '')
     .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** An institutional code glued to the name ("ZISXA-Proyectos II"): 4-8 capitals, a hyphen, then a Capitalised word. */
+const LEADING_CODE = /^([A-ZÑ]{4,8})-(?=[A-ZÁÉÍÓÚÑ][a-záéíóúñ])/;
+
+/**
+ * The institutional code that `proposeSubjectName` drops from the start of a label ("ZISXA"), or null when it drops
+ * none. It is the one piece of evidence the cleaning throws away: two classes whose names become the same only
+ * because their (different) codes were removed must not be merged without the student saying so.
+ */
+export function subjectPrefixOf(label: string): string | null {
+  return label.replace(/\s+/g, ' ').trim().match(LEADING_CODE)?.[1] ?? null;
+}
+
+/**
+ * The name proposed for a subject that does not exist yet, from the label as it was read. Deliberately timid: it
+ * only drops that leading institutional code and tidies spaces and edge punctuation. Modality (REMOTO, VIRTUAL),
+ * repeated words, rooms and anything else stay for the student to edit: a wrong subject is worse than a long name.
+ */
+export function proposeSubjectName(label: string): string {
+  return label
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(LEADING_CODE, '')
+    .replace(/^[\s\-–—:|•·,.]+|[\s\-–—:|•·,.]+$/g, '')
+    .slice(0, SUBJECT_NAME_MAX)
     .trim();
 }
 
@@ -897,6 +924,10 @@ export const scheduleImportProposalSchema = z.object({
   }),
   /** The subject name, or the text as read when no subject matched. */
   title: z.string(),
+  /** Name to give a NEW subject (the label as read, lightly tidied) or, for an exact match, that subject's name. */
+  proposedName: z.string(),
+  /** The institutional code the proposed name was cleaned of (null when none): review evidence, never stored. */
+  sourcePrefix: z.string().nullable(),
   /** First occurrence (first such weekday on or after the period start) and where the series ends. */
   date: dateOnlySchema.nullable(),
   recurrence: z.object({ frequency: z.literal('WEEKLY'), until: dateOnlySchema }),
@@ -968,15 +999,11 @@ export function buildScheduleProposals(
     const warn = (code: (typeof SCHEDULE_IMPORT_WARNING_CODES)[number]) =>
       warnings.push({ code, message: MESSAGE_OF[code] });
 
-    if (!exact) {
+    // A subject nobody has (MISSING) is not a problem: the import proposes to create it. Only a doubtful match
+    // (LIKELY, AMBIGUOUS) asks the student to decide.
+    if (!exact && match.status !== 'MISSING') {
       missingFields.push('subject');
-      warn(
-        match.status === 'MISSING'
-          ? 'SUBJECT_MISSING'
-          : match.status === 'AMBIGUOUS'
-            ? 'SUBJECT_AMBIGUOUS'
-            : 'SUBJECT_LIKELY',
-      );
+      warn(match.status === 'AMBIGUOUS' ? 'SUBJECT_AMBIGUOUS' : 'SUBJECT_LIKELY');
     }
     if (c.weekday === null) {
       missingFields.push('weekday');
@@ -1007,6 +1034,8 @@ export function buildScheduleProposals(
         candidates: match.candidates,
       },
       title: subject?.name ?? c.label,
+      proposedName: subject?.name ?? proposeSubjectName(c.label),
+      sourcePrefix: subject ? null : subjectPrefixOf(c.label),
       date,
       recurrence: { frequency: 'WEEKLY' as const, until: ctx.period.endDate },
       status: warnings.length > 0 ? ('REVIEW' as const) : ('READY' as const),
@@ -1051,14 +1080,23 @@ export interface ExistingClass {
   endAt: Date | string;
   /** Weekly series (recurrenceUntil set) or a single block. */
   recurring: boolean;
+  /** Last day of the series, when known: lets two series of the same class on disjoint dates coexist. */
+  until?: DateOnly | null;
 }
 
 /**
- * "This class is already in the agenda": same subject, same weekday, same start and end time, and a weekly
- * series. It is NOT an overlap with a different class (that is a conflict, reported by the Schedule service).
+ * "This class is already in the agenda": same subject, same weekday, same start and end time, and a weekly series
+ * that runs on some of the same dates. The title is irrelevant (the same subject at the same time is the same class)
+ * and it is NOT an overlap with a different class (that is a conflict, reported by the Schedule service).
+ *
+ * When both sides tell their dates (`range` of the proposal, `until` of the existing series) two series of the same
+ * class on DISJOINT dates (say, one until mid-term and another from then on) are not duplicates. Without them the
+ * answer is the old one: same subject, weekday and times.
  */
 export function findDuplicateClass(
-  proposal: Pick<ScheduleImportProposal, 'subjectId' | 'weekday' | 'startTime' | 'endTime'>,
+  proposal: Pick<ScheduleImportProposal, 'subjectId' | 'weekday' | 'startTime' | 'endTime'> & {
+    range?: { from: DateOnly; until: DateOnly };
+  },
   existing: readonly ExistingClass[],
   timeZone: string,
 ): ExistingClass | undefined {
@@ -1068,10 +1106,14 @@ export function findDuplicateClass(
     if (e.type !== 'CLASS' || !e.recurring || e.subjectId !== proposal.subjectId) return false;
     const start = toLocalParts(e.startAt, timeZone);
     const end = toLocalParts(e.endAt, timeZone);
-    return (
-      weekdayOf(start.date) === proposal.weekday &&
-      start.time === proposal.startTime &&
-      end.time === proposal.endTime
-    );
+    if (
+      weekdayOf(start.date) !== proposal.weekday ||
+      start.time !== proposal.startTime ||
+      end.time !== proposal.endTime
+    ) {
+      return false;
+    }
+    if (!proposal.range || !e.until) return true;
+    return start.date <= proposal.range.until && proposal.range.from <= e.until;
   });
 }

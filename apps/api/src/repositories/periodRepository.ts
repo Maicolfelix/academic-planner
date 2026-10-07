@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../db/prisma.js';
+import type { Db, PrismaClient } from '../db/prisma.js';
 import { fromDateOnly } from '../mappers.js';
 
 export interface PeriodData {
@@ -13,20 +13,32 @@ const dates = (d: PeriodData) => ({
   ...(d.endDate !== undefined && { endDate: fromDateOnly(d.endDate) }),
 });
 
+/**
+ * The two period lookups the Schedule rules need. They accept a transaction client too, so a write that runs in
+ * one transaction (the schedule import confirmation) reads the period through the same connection.
+ */
+export function createPeriodLookup(db: Db) {
+  return {
+    findOwned: (userId: string, id: string) =>
+      db.academicPeriod.findFirst({ where: { id, userId } }),
+
+    findCurrent: (userId: string) =>
+      db.academicPeriod.findFirst({ where: { userId, isCurrent: true } }),
+  };
+}
+
+export type PeriodLookup = ReturnType<typeof createPeriodLookup>;
+
 /** Every query is scoped by userId: a period id alone never reaches data. */
 export function createPeriodRepository(prisma: PrismaClient) {
   return {
+    ...createPeriodLookup(prisma),
+
     list: (userId: string) =>
       prisma.academicPeriod.findMany({
         where: { userId },
         orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
       }),
-
-    findOwned: (userId: string, id: string) =>
-      prisma.academicPeriod.findFirst({ where: { id, userId } }),
-
-    findCurrent: (userId: string) =>
-      prisma.academicPeriod.findFirst({ where: { userId, isCurrent: true } }),
 
     hasCurrent: async (userId: string) =>
       (await prisma.academicPeriod.count({ where: { userId, isCurrent: true } })) > 0,

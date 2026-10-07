@@ -44,13 +44,13 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 ### Etapa A — Automatización de entrada (apunta a la serie `1.1.x`)
 
-| Id  | Objetivo                                                                                      |
-| --- | --------------------------------------------------------------------------------------------- |
-| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**siguiente objetivo**)          |
-| A4  | Feed/exportación `.ics` personal                                                              |
-| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida) |
-| A2  | Importación de un archivo `.ics`                                                              |
-| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))     |
+| Id  | Objetivo                                                                                              |
+| --- | ----------------------------------------------------------------------------------------------------- |
+| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**implementado, pendiente de revisión**) |
+| A4  | Feed/exportación `.ics` personal                                                                      |
+| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida)         |
+| A2  | Importación de un archivo `.ics`                                                                      |
+| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))             |
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 
@@ -97,16 +97,16 @@ Surgieron del análisis del código y se decidirán al iniciar la etapa correspo
 
 El detalle y el motivo de cada una están en [decisions.md](decisions.md) (D15–D22).
 
-### Flujo futuro de A1 (NO implementado)
+### Flujo de A1 (implementado en su PR, pendiente de revisión)
 
-**NEXT IMPLEMENTATION TARGET.** Hoy el Schedule Import **no crea asignaturas**: solo asigna una clase a una asignatura que ya existe (coincidencia exacta) y cada clase confirmada se crea con su propio `POST /api/schedule`. El flujo objetivo es:
+Antes de A1 el Schedule Import no creaba asignaturas: solo asignaba una clase a una asignatura existente (coincidencia exacta) y cada clase confirmada se creaba con su propio `POST /api/schedule`. El flujo implementado es:
 
 ```
 Horario → interpretación → asignaturas detectadas → asignaturas faltantes propuestas
 → vista previa → confirmación → creación de Subject → creación de ScheduleBlock
 ```
 
-Requiere una confirmación **en lote y transaccional** (`POST /api/schedule-import/confirm` o equivalente final): crear las asignaturas y los bloques en una sola transacción, con las mismas reglas de los servicios existentes. **El endpoint no existe; este PR no lo crea.**
+Usa una confirmación **en lote y transaccional** (`POST /api/schedule-import/confirm`): crea las asignaturas y los bloques en una sola transacción, con las mismas reglas de los servicios existentes. Detalle y decisiones: [schedule-import.md](schedule-import.md), D16 en [decisions.md](decisions.md).
 
 ### Syllabus después del modelo de notas
 

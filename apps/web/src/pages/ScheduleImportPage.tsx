@@ -2,10 +2,13 @@ import {
   DEFAULT_TIMEZONE,
   SCHEDULE_IMPORT_MAX_BYTES,
   SCHEDULE_IMPORT_MESSAGES,
+  confirmImportItemErrorSchema,
+  confirmScheduleImportSchema,
   createScheduleBlockSchema,
-  fieldErrorsOf,
+  findSubjectByName,
   firstWeekdayOnOrAfter,
   formatDateOnly,
+  normalizeNameKey,
   type ScheduleImportResult,
   type Weekday,
 } from '@planner/core';
@@ -16,15 +19,25 @@ import { ApiRequestError } from '../api/client';
 import { saveScheduleBlock } from '../api/schedule';
 import { useMe } from '../auth/useAuth';
 import { OFFLINE_MESSAGE } from '../pwa/pwaState';
-import { useSaveScheduleBlock } from '../schedule/useSchedule';
-import { useParseScheduleImport } from '../scheduleImport/useScheduleImport';
 import {
-  ImportProposalCard,
+  useConfirmScheduleImport,
+  useParseScheduleImport,
+} from '../scheduleImport/useScheduleImport';
+import { ImportProposalCard } from './scheduleImport/ImportProposalCard';
+import {
+  NEW_SUBJECT,
+  cardErrors,
+  cardField,
   endsBeforeStart,
+  isNewSubject,
+  nameConflicts,
+  prefixEvidence,
   problemsOf,
+  subjectsToCreate,
+  toConfirmClass,
   type ImportDraft,
   type ImportRow,
-} from './scheduleImport/ImportProposalCard';
+} from './scheduleImport/importDraft';
 
 const ACCEPT = 'image/png,image/jpeg,application/pdf,image/*';
 const READ_ERROR =
@@ -38,12 +51,16 @@ const primary =
 
 const toRows = (result: ScheduleImportResult): ImportRow[] =>
   result.proposals.map((proposal) => {
+    // A subject nobody has is proposed as NEW (the default, so the student only reviews the name); a doubtful match
+    // (a suggestion, several candidates) starts undecided and asks.
+    const isNew = proposal.subjectMatch.status === 'MISSING';
     const draft: ImportDraft = {
-      subjectId: proposal.subjectId ?? '',
+      subjectId: isNew ? NEW_SUBJECT : (proposal.subjectId ?? ''),
+      newName: proposal.proposedName,
       weekday: proposal.weekday === null ? '' : String(proposal.weekday),
       startTime: proposal.startTime ?? '',
       endTime: proposal.endTime ?? '',
-      title: proposal.title,
+      title: isNew ? proposal.proposedName : proposal.title,
       until: proposal.recurrence.until,
     };
     return {
@@ -63,16 +80,17 @@ const toRows = (result: ScheduleImportResult): ImportRow[] =>
   });
 
 /**
- * Schedule import: FILE -> READ (text or OCR) -> PROPOSALS -> REVIEW/CORRECT -> CONFIRM. Reading never saves; each
- * confirmed class is created, one after another, through the same Schedule API as the manual form (so conflicts,
- * the period's limits and every cache refresh work exactly the same). What was created stays created.
+ * Schedule import: FILE -> READ (text or OCR) -> PROPOSALS -> REVIEW/CORRECT -> CONFIRM. Reading never saves. Confirming
+ * is ONE request: the selected classes and the new subjects they need are created together, all or nothing (the
+ * server applies the same Schedule rules as the manual form). If a class is refused, nothing is saved and that card
+ * says why.
  */
 export function ScheduleImportPage() {
   const { period } = useCurrentPeriod();
   const subjects = useSubjects(period?.id).data ?? [];
   const timeZone = useMe().data?.timezone ?? DEFAULT_TIMEZONE;
   const parse = useParseScheduleImport();
-  const save = useSaveScheduleBlock();
+  const confirmImport = useConfirmScheduleImport();
 
   const [file, setFile] = useState<File>();
   const [dragging, setDragging] = useState(false);
@@ -81,8 +99,12 @@ export function ScheduleImportPage() {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [summary, setSummary] = useState<string>();
+  const [submitError, setSubmitError] = useState<string>();
+  /** Name keys the student confirmed as ONE subject although their classes came from different codes. */
+  const [merged, setMerged] = useState<ReadonlySet<string>>(new Set());
 
   const abort = useRef<AbortController | null>(null);
+  const submitErrorRef = useRef<HTMLParagraphElement>(null);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const resultsRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -98,6 +120,9 @@ export function ScheduleImportPage() {
   useEffect(() => {
     if (inputError) errorRef.current?.focus();
   }, [inputError]);
+  useEffect(() => {
+    if (submitError) submitErrorRef.current?.focus();
+  }, [submitError]);
   useEffect(() => {
     const pending = timers.current;
     return () => {
@@ -161,15 +186,21 @@ export function ScheduleImportPage() {
   function edit(i: number, change: Partial<ImportDraft>) {
     const row = rows[i]!;
     const draft = { ...row.draft, ...change };
-    const subjectName = subjects.find((s) => s.id === draft.subjectId)?.name;
-    // A class takes the name of its subject until the student types their own title.
+    // A class takes the name of its subject (the existing one, or the new name being typed) until the student types
+    // their own title.
+    const subjectName = isNewSubject(draft)
+      ? (findSubjectByName(draft.newName, subjects)?.name ?? draft.newName.trim())
+      : subjects.find((s) => s.id === draft.subjectId)?.name;
     const autoTitle = 'title' in change ? false : row.autoTitle;
-    if ('subjectId' in change && autoTitle && subjectName) draft.title = subjectName;
+    if (('subjectId' in change || 'newName' in change) && autoTitle && subjectName) {
+      draft.title = subjectName;
+    }
     const blocked = problemsOf(draft).length > 0 || endsBeforeStart(draft);
     patchRow(i, { draft, autoTitle, errors: {}, selected: blocked ? false : row.selected });
 
     clearTimeout(timers.current.get(i));
-    if (blocked || !result || !period) return;
+    // A class of a subject that does not exist yet cannot be checked against the agenda (no subject id to test with).
+    if (blocked || isNewSubject(draft) || !result || !period) return;
     timers.current.set(
       i,
       setTimeout(() => {
@@ -195,8 +226,11 @@ export function ScheduleImportPage() {
     );
   }
 
+  // Classes whose NEW subject would silently merge different institutional codes wait for the student's decision.
+  const conflicts = nameConflicts(rows, merged);
   const importable = rows.filter(
-    (r) =>
+    (r, i) =>
+      !conflicts.has(i) &&
       r.status !== 'created' &&
       r.status !== 'creating' &&
       problemsOf(r.draft).length === 0 &&
@@ -204,52 +238,106 @@ export function ScheduleImportPage() {
   );
   const toImport = rows
     .map((row, i) => ({ row, i }))
-    .filter(({ row }) => row.selected && row.status !== 'created');
+    .filter(({ row, i }) => row.selected && row.status !== 'created' && !conflicts.has(i));
   const importedCount = rows.filter((r) => r.status === 'created').length;
+  // The subjects this confirmation would create, once per name (what the server does too).
+  const newSubjects = subjectsToCreate(
+    toImport.map(({ row }) => row.draft),
+    subjects,
+  );
 
   function setAll(selected: boolean) {
     setRows((all) => all.map((r) => (importable.includes(r) ? { ...r, selected } : r)));
   }
+
+  /** What the confirmation tells about each refused class (`details.items`), or [] when it says nothing. */
+  const itemsOf = (details: unknown) => {
+    const parsed = confirmImportItemErrorSchema
+      .array()
+      .safeParse((details as { items?: unknown } | undefined)?.items);
+    return parsed.success ? parsed.data : [];
+  };
 
   async function confirm() {
     if (importing.current || !result) return; // a double click must not import twice
     importing.current = true;
     setCreating(true);
     setSummary(undefined);
-    let ok = 0;
-    let failed = 0;
-    for (const { row, i } of toImport) {
-      const parsed = createScheduleBlockSchema.safeParse(
-        toInput(row.draft, result.period.startDate),
-      );
-      if (!parsed.success) {
-        failed++;
-        patchRow(i, {
-          status: 'error',
-          error: 'Revisa los campos marcados.',
-          errors: fieldErrorsOf(parsed.error),
-        });
-        continue;
+    setSubmitError(undefined);
+
+    const chosen = toImport.map(({ row, i }) => ({ row, i }));
+    const parsed = confirmScheduleImportSchema.safeParse({
+      classes: chosen.map(({ row, i }) =>
+        toConfirmClass(row.draft, String(i), {
+          sourcePrefix: prefixEvidence(row),
+          mergeConfirmed: merged.has(normalizeNameKey(row.draft.newName)),
+        }),
+      ),
+    });
+    if (!parsed.success) {
+      // The same rules as the server: point at the card and the field before sending anything.
+      const byCard = new Map<number, Record<string, string[]>>();
+      for (const issue of parsed.error.issues) {
+        const k = issue.path[0] === 'classes' ? issue.path[1] : undefined;
+        if (typeof k !== 'number') continue;
+        const errors = byCard.get(k) ?? {};
+        (errors[cardField(issue.path.slice(2).join('.') || 'title')] ??= []).push(issue.message);
+        byCard.set(k, errors);
       }
-      patchRow(i, { status: 'creating', error: undefined, errors: {} });
-      try {
-        await save.mutateAsync({ input: parsed.data });
-        ok++;
-        patchRow(i, { status: 'created', selected: false });
-      } catch (err) {
-        failed++;
-        patchRow(i, {
-          status: 'error',
-          error: err instanceof Error ? err.message : 'No se pudo importar la clase.',
-          errors: err instanceof ApiRequestError ? err.fieldErrors : {},
-        });
+      for (const [k, errors] of byCard) {
+        patchRow(chosen[k]!.i, { status: 'error', error: 'Revisa los campos marcados.', errors });
       }
+      setSubmitError('Revisa las clases marcadas: no se importó nada.');
+      importing.current = false;
+      setCreating(false);
+      return;
     }
-    setSummary(
-      `${ok} ${ok === 1 ? 'clase importada' : 'clases importadas'}, ${failed} ${failed === 1 ? 'necesita corrección' : 'necesitan corrección'}.`,
-    );
-    importing.current = false;
-    setCreating(false);
+
+    for (const { i } of chosen) patchRow(i, { status: 'creating', error: undefined, errors: {} });
+    try {
+      const out = await confirmImport.mutateAsync(parsed.data);
+      const saved = new Set(out.createdBlocks.map((b) => b.clientId));
+      setRows((all) =>
+        all.map((r, j) =>
+          saved.has(String(j))
+            ? { ...r, status: 'created', selected: false, error: undefined, errors: {} }
+            : r,
+        ),
+      );
+      const n = out.createdBlocks.length;
+      const made = out.createdSubjects.map((s) => s.name);
+      setSummary(
+        `${n} ${n === 1 ? 'clase importada' : 'clases importadas'}.` +
+          (made.length === 0
+            ? ''
+            : ` ${made.length === 1 ? 'Se creó la asignatura' : 'Se crearon las asignaturas'} ${made.join(', ')}.`),
+      );
+    } catch (err) {
+      // All or nothing: nothing was saved. The refused classes (if the server says which) show why.
+      const items = err instanceof ApiRequestError ? itemsOf(err.details) : [];
+      const refused = new Map(items.map((it) => [Number(it.clientId), it]));
+      for (const { i } of chosen) {
+        const it = refused.get(i);
+        patchRow(
+          i,
+          it
+            ? { status: 'error', error: it.message, errors: cardErrors(it.fields) }
+            : { status: 'idle', error: undefined, errors: {} },
+        );
+      }
+      setSubmitError(
+        err instanceof ApiRequestError && err.status === 0
+          ? `${OFFLINE_MESSAGE} Importar necesita conexión. No se importó nada.`
+          : err instanceof ApiRequestError && err.status === 404
+            ? 'Una de las asignaturas elegidas ya no existe. Corrige la elección e inténtalo de nuevo: no se importó nada.'
+            : err instanceof ApiRequestError && err.status < 500
+              ? err.message
+              : 'No se pudo importar el horario. No se guardó nada: inténtalo de nuevo.',
+      );
+    } finally {
+      importing.current = false;
+      setCreating(false);
+    }
   }
 
   function reset() {
@@ -257,7 +345,9 @@ export function ScheduleImportPage() {
     setRows([]);
     setFile(undefined);
     setSummary(undefined);
+    setSubmitError(undefined);
     setInputError(undefined);
+    setMerged(new Set());
   }
 
   return (
@@ -305,7 +395,8 @@ export function ScheduleImportPage() {
           </div>
           <p id="schedule-file-help" className="text-sm text-slate-600">
             Máximo 10 MB; los PDF, hasta 5 páginas. El archivo se lee en el servidor de Academic
-            Planner, no se envía a terceros y no se guarda: solo se crean las clases que confirmes.
+            Planner, no se envía a terceros y no se guarda: solo se crean las clases (y las
+            asignaturas nuevas que necesiten) que confirmes.
           </p>
           {inputError && (
             <p
@@ -379,6 +470,17 @@ export function ScheduleImportPage() {
             </p>
           )}
 
+          {submitError && (
+            <p
+              ref={submitErrorRef}
+              tabIndex={-1}
+              role="alert"
+              className="rounded-md bg-red-50 p-3 text-sm text-red-800 outline-none"
+            >
+              {submitError}
+            </p>
+          )}
+
           {summary && (
             <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
               {summary}{' '}
@@ -422,9 +524,23 @@ export function ScheduleImportPage() {
                 periodEnd={formatDateOnly(result.period.endDate)}
                 onChange={(change) => edit(i, change)}
                 onSelect={(selected) => patchRow(i, { selected })}
+                nameConflict={conflicts.get(i)}
+                onSameSubject={() => {
+                  const key = conflicts.get(i)?.key;
+                  if (key) setMerged((all) => new Set(all).add(key));
+                }}
               />
             ))}
           </ul>
+
+          {newSubjects.length > 0 && (
+            <p className="text-sm text-slate-800">
+              {newSubjects.length === 1
+                ? 'Al importar se creará una asignatura nueva: '
+                : `Al importar se crearán ${newSubjects.length} asignaturas nuevas: `}
+              <span className="font-medium break-words">{newSubjects.join(', ')}</span>.
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             {rows.length > 0 && (

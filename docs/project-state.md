@@ -6,8 +6,9 @@ Estado **actual y compacto**. Para entender el sistema: [system-overview.md](sys
 
 - **Current release:** `v1.0.0-rc.2` (pre-release publicado; `v1.0.0-rc.1` y `v1.0.0-rc.2` son inmutables).
 - **Current work:** ciclo de producto post-RC (automatización de entrada y asistencia académica), en planificación: [roadmap-post-rc.md](roadmap-post-rc.md). Este ciclo **no es una Fase 21**; avanza por etapas y PR pequeños, y cada etapa necesita aprobación explícita.
-- **Next implementation target:** **A1 — Schedule Import crea las asignaturas faltantes** (propuesta, vista previa y confirmación en lote). **No implementado y no se inicia sin aprobación explícita.** Hoy la importación no crea asignaturas.
-- Lo descrito abajo es el estado del RC (el código actual). Nada del roadmap existe todavía.
+- **A1 — Schedule Import crea las asignaturas faltantes:** **implementado, pendiente de revisión** (rama `feat/schedule-import-create-missing-subjects`; no fusionado). La importación propone las asignaturas que no existen y, al confirmar, las crea junto con las clases en una transacción todo-o-nada (`POST /api/schedule-import/confirm`). Detalle: [schedule-import.md](schedule-import.md), [decisions.md](decisions.md#d16-confirmación-en-lote-en-la-importación-de-horario-y-enmienda-de-d5).
+- **Next implementation target:** **A4 — feed `.ics`** según el orden del [roadmap](roadmap-post-rc.md). **No se inicia sin aprobación explícita.**
+- Salvo A1, lo demás del roadmap no existe todavía; lo descrito abajo es el estado del RC más A1.
 
 ## Fase actual (RC)
 
@@ -27,9 +28,9 @@ Monorepo npm workspaces: `apps/api` (Express 5, Prisma 7, PostgreSQL 17), `apps/
 
 Documentos por módulo: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md), [progress-and-workload](progress-and-workload.md), [quick-capture](quick-capture.md), [academic-inbox](academic-inbox.md), [schedule-import](schedule-import.md), [pwa](pwa.md), [ux-accessibility](ux-accessibility.md), [security](security.md), [demo](demo.md).
 
-## Totales de tests (candidato 1.0.0-rc.2)
+## Totales de tests (rc.2 + A1)
 
-Vitest: core 795, API 786, web 37 (**1618**). Playwright: 260 por pasada (256 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
+Vitest: core 829, API 833, web 51 (**1713**). Playwright: 284 por pasada (280 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
 
 ## Riesgos y limitaciones vigentes
 

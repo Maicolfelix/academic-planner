@@ -75,7 +75,7 @@ PostgreSQL usa el puerto **5433** del host para no chocar con una instalación l
 
 ## Pruebas
 
-Vitest (1618 pruebas: núcleo, API con PostgreSQL real, interfaz), Playwright (260 ejecuciones por pasada a 360 y 1366 px, 4 omitidas a propósito), pruebas de seguridad (API y navegador), axe y teclado para accesibilidad, y una validación integral de un semestre completo. La base de test (`academic_planner_test`) se crea y migra sola y las pruebas se niegan a tocar otra. Antes de `test:browser`, nada debe escuchar en los puertos 3000/5173:
+Vitest (1713 pruebas: núcleo, API con PostgreSQL real, interfaz), Playwright (284 ejecuciones por pasada a 360 y 1366 px, 4 omitidas a propósito), pruebas de seguridad (API y navegador), axe y teclado para accesibilidad, y una validación integral de un semestre completo. La base de test (`academic_planner_test`) se crea y migra sola y las pruebas se niegan a tocar otra. Antes de `test:browser`, nada debe escuchar en los puertos 3000/5173:
 
 ```bash
 PW_CHANNEL=msedge npm run test:browser      # PowerShell: $env:PW_CHANNEL='msedge'; npm run test:browser

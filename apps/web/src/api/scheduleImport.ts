@@ -1,4 +1,9 @@
-import { scheduleImportResultSchema, type ScheduleImportResult } from '@planner/core';
+import {
+  confirmScheduleImportResponseSchema,
+  scheduleImportResultSchema,
+  type ConfirmScheduleImportRequest,
+  type ScheduleImportResult,
+} from '@planner/core';
 import { apiFetch } from './client';
 
 /** Sends the file to be read. It only proposes: nothing is created and the file is not stored. */
@@ -15,3 +20,14 @@ export function parseScheduleImportRequest(
     schema: scheduleImportResultSchema,
   });
 }
+
+/**
+ * Creates what the student reviewed, in ONE request: the classes and the new subjects they need, all or nothing. A refused
+ * class comes back in `details.items` (by client id) and nothing is saved.
+ */
+export const confirmScheduleImportRequest = (input: ConfirmScheduleImportRequest) =>
+  apiFetch('/api/schedule-import/confirm', {
+    method: 'POST',
+    body: input,
+    schema: confirmScheduleImportResponseSchema,
+  });

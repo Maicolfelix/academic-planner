@@ -39,6 +39,15 @@ const END_AFTER_START_MESSAGE = 'La fecha de fin debe ser posterior a la de inic
 export const normalizeNameKey = (name: string): string =>
   name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+/** The subject (of the given list) that has this name once normalised, if any: never by similarity. */
+export const findSubjectByName = <T extends { name: string }>(
+  name: string,
+  subjects: readonly T[],
+): T | undefined => {
+  const key = normalizeNameKey(name);
+  return subjects.find((s) => normalizeNameKey(s.name) === key);
+};
+
 /** Optional text: '' and null both mean "no value"; undefined means "not provided" (PATCH). */
 const optionalText = (max: number, label: string) =>
   z
@@ -152,14 +161,29 @@ export const SUBJECT_COLOR_NAMES: Record<SubjectColor, string> = {
 
 export const DEFAULT_SUBJECT_COLOR: SubjectColor = '#3B82F6';
 
+/**
+ * The color for a subject the server creates on its own (the schedule import): the first palette color the period
+ * does not use yet, so the agenda tells the subjects apart; once the palette is exhausted it starts over.
+ */
+export function pickSubjectColor(used: readonly string[]): SubjectColor {
+  const taken = new Set(used.map((c) => c.toUpperCase()));
+  return (
+    SUBJECT_COLOR_VALUES.find((c) => !taken.has(c)) ??
+    SUBJECT_COLOR_VALUES[used.length % SUBJECT_COLOR_VALUES.length]!
+  );
+}
+
 export const subjectColorSchema = z
   .string({ error: 'Elige un color de la paleta.' })
   .trim()
   .toUpperCase()
   .pipe(z.enum(SUBJECT_COLOR_VALUES, { error: 'Elige un color de la paleta.' }));
 
+/** The one rule for a subject's name (create, edit and the schedule-import confirmation all use it). */
+export const subjectNameSchema = requiredName(SUBJECT_NAME_MAX);
+
 const subjectFields = {
-  name: requiredName(SUBJECT_NAME_MAX),
+  name: subjectNameSchema,
   color: subjectColorSchema,
   professor: optionalText(SUBJECT_PROFESSOR_MAX, 'El nombre del profesor'),
   description: optionalText(SUBJECT_DESCRIPTION_MAX, 'La descripción'),
