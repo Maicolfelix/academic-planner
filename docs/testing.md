@@ -6,14 +6,14 @@ Las pruebas son la segunda fuente de verdad después del código: si un document
 
 | Capa                     | Herramienta                                       | Pruebas                                                                                                                   |
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Núcleo (`packages/core`) | Vitest                                            | 795 en 15 archivos                                                                                                        |
-| API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 786 en 31 archivos (incluye 155 de seguridad y 28 del seed demo)                                                          |
-| Interfaz (`apps/web`)    | Vitest                                            | 37 en 8 archivos                                                                                                          |
-| **Total Vitest**         |                                                   | **1618**                                                                                                                  |
-| Navegador                | Playwright (360 px y 1366 px)                     | 260 registrados por pasada: 256 pasan y 4 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
+| Núcleo (`packages/core`) | Vitest                                            | 816 en 16 archivos                                                                                                        |
+| API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 820 en 32 archivos (incluye 157 de seguridad y 28 del seed demo)                                                          |
+| Interfaz (`apps/web`)    | Vitest                                            | 43 en 8 archivos                                                                                                          |
+| **Total Vitest**         |                                                   | **1679**                                                                                                                  |
+| Navegador                | Playwright (360 px y 1366 px)                     | 278 registrados por pasada: 274 pasan y 4 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
 | Seguridad en navegador   | Playwright (puerto 4300, topología de producción) | 9 (configuración aparte)                                                                                                  |
 
-Las cifras de Playwright cuentan **ejecuciones** (cada prueba corre en dos proyectos: móvil y escritorio). Nada se cuenta dos veces: las pruebas de seguridad de la API están dentro de las 782, y las de seguridad en navegador son un conjunto distinto de las 258.
+Las cifras de Playwright cuentan **ejecuciones** (cada prueba corre en dos proyectos: móvil y escritorio). Nada se cuenta dos veces: las pruebas de seguridad de la API están dentro de las 820, y las de seguridad en navegador son un conjunto distinto de las 258.
 
 ## Capas
 

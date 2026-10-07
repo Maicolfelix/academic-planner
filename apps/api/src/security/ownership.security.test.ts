@@ -460,6 +460,7 @@ describe('every protected route refuses an anonymous caller', () => {
     ['post', '/api/quick-capture/parse'],
     ['post', '/api/academic-inbox/parse'],
     ['post', '/api/schedule-import/parse'],
+    ['post', '/api/schedule-import/confirm'],
   ];
   it.each(routes)('%s %s -> 401', async (method, path) => {
     const res = await (request(app) as unknown as Record<string, (p: string) => request.Test>)[

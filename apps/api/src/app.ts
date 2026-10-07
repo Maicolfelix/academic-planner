@@ -61,6 +61,7 @@ import {
   createScheduleImportService,
   type ImportLogEvent,
 } from './services/scheduleImportService.js';
+import { createScheduleImportConfirmService } from './services/scheduleImportConfirmService.js';
 import { createScheduleService } from './services/scheduleService.js';
 import type { ExtractionDeps } from './scheduleImport/pipeline.js';
 import { createOcrProvider, createPdfProvider } from './scheduleImport/providers.js';
@@ -158,6 +159,7 @@ export function createApp(deps: AppDeps): Express {
       timeoutMs: importOptions.timeoutMs,
       log: importOptions.log,
     }),
+    createScheduleImportConfirmService({ runInTransaction, clock }),
   );
   // 10 imports per 10 minutes per client: OCR is the most expensive thing the API does.
   const importLimiter = createLimiter({
@@ -177,7 +179,7 @@ export function createApp(deps: AppDeps): Express {
   app.use(cors({ origin: corsOrigins, credentials: true }));
   // Cheapest checks first: a forged origin or an odd content type is refused before any body is read.
   app.use('/api', originCheck(corsOrigins));
-  app.use('/api', requireKnownBodyType({ multipartPaths: ['/schedule-import'] }));
+  app.use('/api', requireKnownBodyType({ multipartPaths: ['/schedule-import/parse'] }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 

@@ -19,7 +19,7 @@ import {
   toScheduleBlockDto,
   type ScheduleBlockRow,
 } from '../mappers.js';
-import type { PeriodRepository } from '../repositories/periodRepository.js';
+import type { PeriodLookup } from '../repositories/periodRepository.js';
 import type { ScheduleRepository } from '../repositories/scheduleRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
 import type { Actor } from './activityService.js';
@@ -57,8 +57,8 @@ export interface WriteResult {
 
 export function createScheduleService(
   schedule: ScheduleRepository,
-  periods: PeriodRepository,
-  subjects: SubjectRepository,
+  periods: PeriodLookup,
+  subjects: Pick<SubjectRepository, 'findOwned'>,
   /** Injected so the default week (and tests) control "now". */
   clock: () => Date,
 ) {

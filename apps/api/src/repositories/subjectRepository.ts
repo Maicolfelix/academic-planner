@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../db/prisma.js';
+import type { Db } from '../db/prisma.js';
 
 export interface SubjectCreateData {
   userId: string;
@@ -19,7 +19,7 @@ export interface SubjectUpdateData {
 }
 
 /** Every query is scoped by userId: a subject id alone never reaches data. */
-export function createSubjectRepository(prisma: PrismaClient) {
+export function createSubjectRepository(prisma: Db) {
   return {
     list: (userId: string, periodId?: string) =>
       prisma.subject.findMany({
@@ -30,6 +30,22 @@ export function createSubjectRepository(prisma: PrismaClient) {
     findOwned: (userId: string, id: string) => prisma.subject.findFirst({ where: { id, userId } }),
 
     create: (data: SubjectCreateData) => prisma.subject.create({ data }),
+
+    findByNameKey: (userId: string, periodId: string, nameKey: string) =>
+      prisma.subject.findFirst({ where: { userId, periodId, nameKey } }),
+
+    /**
+     * Creates the subject unless the period already has one with that name key, and says which happened. It is
+     * `INSERT … ON CONFLICT DO NOTHING`, so a concurrent insert of the same name does not raise an error that would
+     * abort the surrounding transaction: the existing subject is simply the one returned.
+     */
+    async createIfAbsent(data: SubjectCreateData) {
+      const { count } = await prisma.subject.createMany({ data: [data], skipDuplicates: true });
+      const subject = await prisma.subject.findFirst({
+        where: { userId: data.userId, periodId: data.periodId, nameKey: data.nameKey },
+      });
+      return { subject: subject!, created: count > 0 };
+    },
 
     /** What still hangs from a subject: its presence blocks deletion (no silent cascades). */
     async countDependents(subjectId: string) {

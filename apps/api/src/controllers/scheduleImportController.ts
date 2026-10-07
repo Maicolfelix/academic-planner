@@ -1,8 +1,13 @@
-import { SCHEDULE_IMPORT_MAX_BYTES, SCHEDULE_IMPORT_MESSAGES } from '@planner/core';
+import {
+  SCHEDULE_IMPORT_MAX_BYTES,
+  SCHEDULE_IMPORT_MESSAGES,
+  confirmScheduleImportSchema,
+} from '@planner/core';
 import type { RequestHandler } from 'express';
 import multer from 'multer';
 import { AppError, validationError } from '../errors/AppError.js';
 import { authOf } from '../middleware/requireAuth.js';
+import type { ScheduleImportConfirmService } from '../services/scheduleImportConfirmService.js';
 import type { ScheduleImportService } from '../services/scheduleImportService.js';
 
 /**
@@ -17,8 +22,18 @@ const upload = multer({
 
 const NO_FILE = validationError({ file: ['Selecciona un archivo de imagen o PDF.'] });
 
-export function createScheduleImportController(service: ScheduleImportService) {
+export function createScheduleImportController(
+  service: ScheduleImportService,
+  confirmService: ScheduleImportConfirmService,
+) {
   return {
+    /** Creates the reviewed classes (and the new subjects they need) in one transaction; see the service. */
+    confirm: (async (req, res) => {
+      const input = confirmScheduleImportSchema.parse(req.body ?? {});
+      const { id, timezone } = authOf(req).user;
+      res.status(201).json(await confirmService.confirm({ id, timezone }, input));
+    }) satisfies RequestHandler,
+
     parse: ((req, res, next) => {
       upload(req, res, (err: unknown) => {
         if (err instanceof multer.MulterError) {

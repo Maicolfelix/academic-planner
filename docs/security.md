@@ -53,7 +53,7 @@ Estrategia en capas: (1) **`SameSite=Lax`**; (2) verificación de origen en **to
 
 - **CORS:** lista exacta (`CORS_ORIGIN`) con credenciales. La configuración **se rechaza al arrancar** si contiene `*` o algo que no sea un origen `http(s)` exacto. Un origen ajeno no recibe ninguna cabecera CORS. En producción el origen es el mismo (la API sirve la app), sin necesidad de CORS.
 - El orden de middlewares es: cabeceras → `no-store` → CORS → origen → tipo de contenido → cuerpo → cookies. Un origen falsificado o un tipo raro se rechaza **antes** de leer el cuerpo.
-- Una prueba de inventario falla si aparece una ruta no-GET que no esté en la matriz de CSRF.
+- Una prueba de inventario falla si aparece una ruta no-GET que no esté en la matriz de CSRF. `POST /api/schedule-import/confirm` (A1: crea asignaturas y clases) está en esa matriz y en la de autenticación, y tiene su propia batería (`scheduleImportConfirm.test.ts`): propiedad (una asignatura ajena responde el **mismo** 404 que una inexistente, también dentro de un lote), periodo derivado en el servidor, campos internos rechazados (`strictObject` en todos los niveles), todo o nada, simultaneidad real y cuerpos mal formados.
 
 ## 5. Autorización, propiedad e IDOR
 
@@ -67,7 +67,7 @@ Estrategia en capas: (1) **`SameSite=Lax`**; (2) verificación de origen en **to
 ## 6. Validación y parámetros
 
 - Esquemas Zod `strict` en todas las escrituras; consultas con valores inválidos → 400; **parámetros repetidos** (`?status=A&status=B`) → 400; claves tipo operador (`status[$ne]=…`, `__proto__[x]`) son **claves desconocidas inertes**: no filtran nada ni contaminan prototipos.
-- **Tipos de contenido:** JSON en todas las rutas; `multipart/form-data` solo en la importación (un solo campo `file`, un solo archivo, sin otros campos). Otro tipo → 415 antes de leer el cuerpo. Cuerpo JSON > 100 kB → 413 (y el servidor sigue respondiendo).
+- **Tipos de contenido:** JSON en todas las rutas; `multipart/form-data` solo en `POST /api/schedule-import/parse` (desde A1 ya no en el resto de `/api/schedule-import/*`; un solo campo `file`, un solo archivo, sin otros campos). Otro tipo → 415 antes de leer el cuerpo. Cuerpo JSON > 100 kB → 413 (y el servidor sigue respondiendo).
 - **Texto de entrada:** Captura rápida 300 caracteres (2000 duro), Bandeja 5000 (20 000 duro). Cadenas hostiles (repetitivas, cercanas a los límites) responden en < 1,5 s sin 500 (no hay expresiones regulares con retroceso catastrófico en los parsers).
 - **UTF-8 y marcado:** no se «sanitiza» destructivamente; `<script>`, comillas, tildes y emoji se guardan y devuelven tal cual, y React los escapa al mostrarlos.
 
@@ -108,11 +108,12 @@ Límite de memoria conocido: cada solicitud en curso retiene hasta 10 MB; el top
 
 ## 11. Límites de frecuencia
 
-| Ruta                              | Límite                                               | Notas                                         |
-| --------------------------------- | ---------------------------------------------------- | --------------------------------------------- |
-| `POST /api/auth/login`            | 10 **fallos** / 15 min / IP (`LOGIN_RATE_LIMIT_MAX`) | los éxitos no cuentan                         |
-| `POST /api/auth/register`         | 20 / hora / IP (`REGISTER_RATE_LIMIT_MAX`)           |                                               |
-| `POST /api/schedule-import/parse` | 10 / 10 min / IP (`SCHEDULE_IMPORT_RATE_LIMIT_MAX`)  | además una importación simultánea por usuario |
+| Ruta                                | Límite                                               | Notas                                                                                                                                 |
+| ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`              | 10 **fallos** / 15 min / IP (`LOGIN_RATE_LIMIT_MAX`) | los éxitos no cuentan                                                                                                                 |
+| `POST /api/auth/register`           | 20 / hora / IP (`REGISTER_RATE_LIMIT_MAX`)           |                                                                                                                                       |
+| `POST /api/schedule-import/parse`   | 10 / 10 min / IP (`SCHEDULE_IMPORT_RATE_LIMIT_MAX`)  | además una importación simultánea por usuario                                                                                         |
+| `POST /api/schedule-import/confirm` | ninguno propio                                       | escribe, pero no es costoso (como `POST /api/schedule`); las confirmaciones de un usuario se serializan con un bloqueo de transacción |
 
 Respuesta 429 con `Retry-After` y mensaje genérico (nunca dice si un correo tiene cuenta). **Limitación:** el almacén es **en memoria y por proceso**: un reinicio vuelve a cero los contadores y varias instancias no los comparten. Es aceptable con **una sola instancia**; con varias hace falta un almacén compartido (p. ej. Redis), no incluido a propósito. **Detrás de un proxy** `req.ip` sería la IP del proxy (todos compartirían cubo): configurar `TRUST_PROXY` con el **número exacto de proxies** (o direcciones); `true` se rechaza al arrancar porque haría evitable cualquier límite (un `X-Forwarded-For` falsificado). Sin `TRUST_PROXY` la cabecera se ignora (probado).
 

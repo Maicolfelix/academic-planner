@@ -11,6 +11,7 @@ import {
   parseScheduleDocument,
   parseTimeRange,
   parseWeekday,
+  proposeSubjectName,
   type ExtractedDocument,
   type ExtractedWord,
   type SubjectRef,
@@ -627,12 +628,41 @@ describe('proposals', () => {
     expect(p.warnings.map((w) => w.code)).toContain('SUBJECT_AMBIGUOUS');
   });
 
-  it('an unknown subject keeps the text and asks for a manual choice', () => {
+  it('an unknown subject keeps the text and is proposed as a NEW subject, without blocking the class', () => {
     const p = build(doc(at('Lunes', 30, 30), at('08:00 - 10:00 Química', 30, 70))).proposals[0]!;
     expect(p.subjectMatch.status).toBe('MISSING');
+    expect(p.subjectId).toBeNull();
     expect(p.title).toBe('Química');
-    expect(p.status).toBe('REVIEW');
-    expect(p.warnings.map((w) => w.code)).toEqual(['SUBJECT_MISSING']);
+    expect(p.proposedName).toBe('Química');
+    // creating the subject is the default, so nothing is missing and the class is ready as it is
+    expect(p.status).toBe('READY');
+    expect(p.missingFields).toEqual([]);
+    expect(p.warnings).toEqual([]);
+  });
+
+  it('a doubtful match still asks the student; an exact one proposes the subject own name', () => {
+    const subjects: SubjectRef[] = [
+      { id: '11111111-1111-4111-8111-111111111111', name: 'Programación I' },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Programación II' },
+      { id: '33333333-3333-4333-8333-333333333333', name: 'Redes' },
+    ];
+    const r = buildScheduleProposals(
+      extractClassCandidates(
+        doc(
+          at('Lunes', 30, 30),
+          at('08:00 - 10:00 Programación', 30, 70),
+          at('10:00 - 12:00 Redes', 30, 110),
+        ),
+      ).candidates,
+      { subjects, period: PERIOD },
+    );
+    expect(r[0]).toMatchObject({ status: 'REVIEW', missingFields: ['subject'] });
+    expect(r[0]!.subjectMatch.status).toBe('AMBIGUOUS');
+    expect(r[1]).toMatchObject({
+      status: 'READY',
+      subjectId: '33333333-3333-4333-8333-333333333333',
+      proposedName: 'Redes',
+    });
   });
 
   it('missing end time, missing weekday and an invalid range are flagged for review', () => {
@@ -1031,6 +1061,37 @@ describe('compact ranges win over axis labels, and the axis is not a class', () 
       },
     );
     expect(close[0]!.subjectId).toBeNull();
-    expect(close[0]!.status).toBe('REVIEW');
+    // too different to suggest: it is a NEW subject proposal, with the text as read (minus the institutional code)
+    expect(close[0]!.subjectMatch.status).toBe('MISSING');
+    expect(close[0]!.status).toBe('READY');
+    expect(close[0]!.proposedName).toBe('Proyectos II REMOTO Proyecto');
+  });
+});
+
+// ───────────────────────── A1: the name proposed for a new subject ─────────────────────────
+
+describe('proposeSubjectName', () => {
+  it('keeps the text as read, tidying spaces and edge punctuation only', () => {
+    expect(proposeSubjectName('Química')).toBe('Química');
+    expect(proposeSubjectName('  Cálculo   Diferencial  ')).toBe('Cálculo Diferencial');
+    expect(proposeSubjectName('- Física II :')).toBe('Física II');
+  });
+
+  it('drops only a leading institutional code (4-8 capitals, a hyphen, a Capitalised word)', () => {
+    expect(proposeSubjectName('ZISXA-Proyectos II REMOTO Proyecto')).toBe(
+      'Proyectos II REMOTO Proyecto',
+    );
+    expect(proposeSubjectName('ZISXA-Practicas Empresariales')).toBe('Practicas Empresariales');
+  });
+
+  it('does not touch what could be part of a real name', () => {
+    expect(proposeSubjectName('TCP-IP Redes')).toBe('TCP-IP Redes'); // 3 capitals
+    expect(proposeSubjectName('HTML-CSS')).toBe('HTML-CSS'); // what follows is not a Capitalised word
+    expect(proposeSubjectName('Proyectos II REMOTO')).toBe('Proyectos II REMOTO'); // modality stays
+    expect(proposeSubjectName('Redes-Computadores')).toBe('Redes-Computadores');
+  });
+
+  it('never exceeds the length of a subject name', () => {
+    expect(proposeSubjectName('A'.repeat(300)).length).toBe(100);
   });
 });

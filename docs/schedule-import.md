@@ -1,4 +1,4 @@
-# Importación de horario con imagen o PDF (Fase 14)
+# Importación de horario con imagen o PDF (Fase 14; confirmación y asignaturas nuevas: A1)
 
 ## Objetivo
 
@@ -8,7 +8,7 @@ Evitar teclear a mano cada clase («lunes 08:00–10:00 Redes…»): el estudian
 ARCHIVO → EXTRACCIÓN → INTERPRETACIÓN → PREVIEW → CORRECCIÓN → CONFIRMACIÓN → SCHEDULEBLOCK
 ```
 
-Nunca se crea nada al leer el archivo. Cada clase confirmada se crea con el `POST /api/schedule` de siempre.
+Nunca se crea nada al leer el archivo ni al revisar la vista previa. Al confirmar, **una sola operación** (`POST /api/schedule-import/confirm`) crea las clases seleccionadas y, para las que pertenecen a una asignatura que todavía no existe, también esa asignatura: todo o nada ([confirmación](#previsualización-y-confirmación)).
 
 ## Alcance honesto
 
@@ -33,6 +33,8 @@ Pipeline (`POST /api/schedule-import/parse`, `multipart/form-data`, campo `file`
 4. `matchSubject` — contra las asignaturas del periodo actual del usuario.
 5. `buildScheduleProposals` — propuestas con fecha de primera ocurrencia y repetición semanal.
 6. Duplicados y conflictos contra la agenda del usuario.
+
+Confirmación (`POST /api/schedule-import/confirm`, JSON): ver [Previsualización y confirmación](#previsualización-y-confirmación). El estudiante no tiene que crear asignaturas antes de importar.
 
 ## Tecnología elegida y por qué
 
@@ -83,38 +85,78 @@ El worker de OCR se crea al primer uso, procesa **una imagen a la vez** y se lib
 
 ## Asignaturas
 
-Contra las asignaturas del **periodo actual del usuario** (nunca de otro usuario). Nunca se crea una asignatura.
+El matcher (`matchSubject`) compara contra las asignaturas del **periodo actual del usuario** (nunca de otro usuario) y **no cambió** con A1. Lo nuevo es qué se hace con «nada encaja»: se **propone crear** la asignatura, y solo se crea al confirmar.
 
-| Resultado   | Cuándo                                                                                                                                                           | Qué hace la interfaz                                    |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `EXACT`     | mismo nombre sin acentos/mayúsculas, o la etiqueta contiene el nombre completo                                                                                   | se asigna sola                                          |
-| `LIKELY`    | la etiqueta es el inicio de **un** nombre («Redes» / «Redes de Computadores») o está a un desliz de OCR (≤ 25 % de distancia de edición, con variantes `rn`→`m`) | «¿Quisiste decir X?»: **nunca se aplica sin confirmar** |
-| `AMBIGUOUS` | varios nombres encajan                                                                                                                                           | selector «¿A cuál te refieres?»; no se elige ninguno    |
-| `MISSING`   | nada encaja                                                                                                                                                      | selector manual entre las asignaturas existentes        |
+| Resultado   | Cuándo                                                                                                                                                           | Qué hace la interfaz                                                                                        |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `EXACT`     | mismo nombre sin acentos/mayúsculas, o la etiqueta contiene el nombre completo                                                                                   | se asigna sola; etiqueta «Existente»                                                                        |
+| `LIKELY`    | la etiqueta es el inicio de **un** nombre («Redes» / «Redes de Computadores») o está a un desliz de OCR (≤ 25 % de distancia de edición, con variantes `rn`→`m`) | «¿Quisiste decir X?» con «Sí, es X» o «No, crear una asignatura nueva»; **nunca se aplica sola**; «Revisar» |
+| `AMBIGUOUS` | varios nombres encajan                                                                                                                                           | selector «¿A cuál te refieres?» (con «Ninguna: crear una asignatura nueva»); no se elige ninguno            |
+| `MISSING`   | nada encaja                                                                                                                                                      | **«Nueva — se creará al importar»**, preseleccionada y con el nombre editable; no bloquea ni pide revisión  |
+
+Cualquiera puede además resolverse eligiendo una asignatura existente en el selector, o «Crear una asignatura nueva». No se agregó ningún enum: la interfaz reutiliza los cuatro estados del matcher.
+
+### Nombre propuesto para una asignatura nueva
+
+La propuesta trae `proposedName`, separado del texto leído. Es **deliberadamente tímido** (`proposeSubjectName`): recorta espacios y puntuación de los extremos, limita a 100 caracteres y quita **solo** un código institucional pegado al inicio (4–8 mayúsculas, un guion y una palabra capitalizada: `ZISXA-Proyectos II` → `Proyectos II`; no toca `TCP-IP` ni `HTML-CSS`). La modalidad (`REMOTO`, `VIRTUAL`), las palabras repetidas y los números de aula **se dejan**: es preferible un nombre largo y editable que una asignatura basura. Con el calendario sintético del caso real el OCR propone `Proyectos II REMOTO Proyecto` y `Practicas Empresariales Practica Empresariales A707`: el estudiante los corrige en la tarjeta antes de importar.
 
 ## Propuestas
 
-Cada una: `CLASS` (nunca `Activity`), día, hora de inicio y fin, asignatura, título (= nombre de la asignatura, como en el formulario manual), `recurrence WEEKLY` hasta el **fin del periodo**, fecha de la primera ocurrencia (`firstWeekdayOnOrAfter` del inicio del periodo: la misma lógica que el formulario manual), texto leído (`source.rawText`, no se guarda) y avisos. Estado `READY` o `REVIEW`. Máximo 40 propuestas.
+Cada una: `CLASS` (nunca `Activity`), día, hora de inicio y fin, asignatura (`subjectId` solo con coincidencia exacta), `proposedName`, título (= nombre de la asignatura, como en el formulario manual; en una asignatura nueva sigue al nombre que se escriba), `recurrence WEEKLY` hasta el **fin del periodo**, fecha de la primera ocurrencia (`firstWeekdayOnOrAfter` del inicio del periodo: la misma lógica que el formulario manual), texto leído (`source.rawText`, no se guarda) y avisos. Estado `READY` o `REVIEW`. Máximo 40 propuestas.
 
-Pide revisión (`REVIEW`) si falta o es dudoso: asignatura, día, hora de inicio/fin, rango inválido, o si el OCR leyó con poca confianza las letras del nombre o los números de la hora. La confianza del OCR **no se muestra como número**. La revisión no bloquea por sí sola; **sí se bloquea importar con campos obligatorios vacíos** o con fin ≤ inicio.
+Pide revisión (`REVIEW`) si falta o es dudoso: una asignatura **dudosa** (`LIKELY`, `AMBIGUOUS`; una asignatura inexistente ya no cuenta), día, hora de inicio/fin, rango inválido, o si el OCR leyó con poca confianza las letras del nombre o los números de la hora. La confianza del OCR **no se muestra como número**. La revisión no bloquea por sí sola; **sí se bloquea importar con campos obligatorios vacíos** o con fin ≤ inicio.
 
 ## Previsualización y confirmación
 
-`/calendar/import` (botón «Importar horario» en la Agenda; no hay entrada nueva en la navegación). Tarjetas verticales editables: asignatura, día, inicio, fin, título y «se repite hasta». Casilla «Incluir», «Seleccionar todas» / «Deseleccionar todas». Empiezan marcadas solo las propuestas limpias y nuevas.
+`/calendar/import` (botón «Importar horario» en la Agenda; no hay entrada nueva en la navegación). Tarjetas verticales editables: asignatura (con su estado en texto: **Existente**, **Nueva — se creará al importar** o **Revisar**), nombre de la asignatura nueva si corresponde, día, inicio, fin, título y «se repite hasta». Casilla «Incluir», «Seleccionar todas» / «Deseleccionar todas». Empiezan marcadas solo las propuestas limpias y nuevas (una asignatura nueva limpia **sí** empieza marcada: confirmar basta). Un resumen sobre el botón dice qué se creará: «Al importar se crearán 2 asignaturas nuevas: A, B.», agrupadas por nombre normalizado.
 
-«Importar seleccionadas» crea las clases **una tras otra** con el mismo servicio de Agenda (`POST /api/schedule`): sin endpoint por lotes ni transacción global. Si 4 de 5 se crean, se muestra «4 clases importadas, 1 necesita corrección» y no se revierten las cuatro. Una clase importada se marca «Importada ✓» y no se puede crear de nuevo; un doble clic no importa dos veces.
+«Importar seleccionadas» envía **una sola solicitud** `POST /api/schedule-import/confirm`:
+
+```json
+{
+  "classes": [
+    {
+      "clientId": "0",
+      "weekday": 3,
+      "startTime": "19:00",
+      "endTime": "20:30",
+      "title": "Proyectos II",
+      "until": "2026-11-28",
+      "subject": { "kind": "NEW", "name": "Proyectos II" }
+    },
+    {
+      "clientId": "1",
+      "weekday": 1,
+      "startTime": "08:00",
+      "endTime": "10:00",
+      "title": "Redes",
+      "until": "2026-11-28",
+      "subject": { "kind": "EXISTING", "subjectId": "…" }
+    }
+  ]
+}
+```
+
+- **El servidor deriva** usuario (sesión), periodo (el actual), `nameKey`, color y la fecha de la primera ocurrencia: un campo así en el cuerpo se rechaza (`strictObject`, también dentro de `subject`). El color de una asignatura nueva es el primer color de la paleta que el periodo aún no usa.
+- **Resolución de asignaturas** (`planImportSubjects`, reglas puras en core): una clase `EXISTING` usa esa asignatura; una `NEW` cuyo nombre **normalizado** (la misma `normalizeNameKey` de la base) ya existe en el periodo la **reutiliza**; varias clases con el mismo nombre nuevo comparten **una** asignatura. La decisión usa los nombres **finales** confirmados. **No hay fusión por parecido** al confirmar («Proyecto II» y «Proyectos II» son dos asignaturas): lo difuso vive solo en la vista previa.
+- **Todo o nada.** Una transacción de base de datos: bloqueo por usuario → periodo actual → crear/reutilizar asignaturas → crear cada clase con el **mismo `ScheduleService`** que el formulario manual (límites del periodo, propiedad y periodo de la asignatura, instantes) → `COMMIT`. Si alguna clase se rechaza (reglas de agenda, o ya está en la agenda), no se guarda **nada**, ni siquiera las clases válidas ni las asignaturas ya insertadas, y se responden **todas** las rechazadas a la vez en `error.details.items` (`clientId`, `code`, `message`, `fields`). Esto reemplaza el comportamiento anterior (una solicitud por clase, con éxito parcial).
+- **Respuesta `201`:** `createdSubjects`, `reusedSubjects` (las del estudiante a las que se ligaron clases) y `createdBlocks` (con su `clientId`).
+- **Errores:** `400 VALIDATION_ERROR` (cuerpo o clases inválidas; `items` indica cuáles), `409 DUPLICATE_CLASS` (la clase ya está en la agenda, o está repetida en el lote), `404` (asignatura inexistente **o de otro usuario**: la misma respuesta), `400 NO_CURRENT_PERIOD`, y `415`/`413`/`INVALID_JSON` como el resto de la API (este endpoint solo acepta JSON; `multipart` solo en `/parse`).
+- **Concurrencia.** Las confirmaciones de un mismo usuario se serializan con un bloqueo asesor de transacción, así que un doble clic (o dos pestañas) no crea clases dos veces: la segunda ve lo de la primera y se rechaza como duplicado. Las asignaturas se insertan con `ON CONFLICT DO NOTHING` sobre la restricción única `(periodId, nameKey)`, de modo que una asignatura creada a la vez por otra vía (`POST /api/subjects`, que no toma el bloqueo) se reutiliza en lugar de producir un error.
+- **En la interfaz:** el botón se deshabilita mientras confirma (y un `ref` evita el doble envío); un fallo devuelve el foco a un aviso (`role="alert"`) con «no se importó nada» y la tarjeta rechazada explica el motivo; las que se guardaron pasan a «Importada ✓». No se guarda el archivo ni el texto leído.
 
 ## Duplicados y conflictos (conceptos distintos)
 
-- **Duplicado:** misma asignatura, mismo día de la semana, misma hora de inicio y fin y serie semanal ya existente → «Esta clase parece estar ya en tu agenda.» No bloquea; la tarjeta empieza sin marcar.
+- **Duplicado:** misma asignatura, mismo día de la semana, misma hora de inicio y fin y serie semanal ya existente → en la vista previa «Esta clase parece estar ya en tu agenda.» y la tarjeta empieza sin marcar. **Al confirmar, el servidor sí lo rechaza** (`409 DUPLICATE_CLASS`, «Esta clase ya está en tu agenda.»): antes de A1 el formulario aceptaba un duplicado deliberado; ahora hay que desmarcarlo. También se rechaza una clase repetida dentro del mismo lote.
 - **Conflicto:** se solapa con una clase **distinta**. Se calcula con el **mismo servicio de Agenda en `dryRun`** (sin duplicar el detector) → «Conflicto con Redes, lunes 08:00–10:00». Solo avisa. Al editar una tarjeta se recalcula (con una pausa de 400 ms). Un duplicado no se reporta además como conflicto consigo mismo.
 - Solo se comparan clases **del propio usuario**.
+- Una clase de una asignatura **nueva** no puede compararse con la agenda mientras se edita (aún no hay `subjectId` con qué probar): no muestra avisos de conflicto, que de todos modos solo informan.
 
 ## Privacidad
 
 - El archivo se procesa **localmente en Academic Planner**: no se envía a terceros ni a servicios de IA.
 - **No se guarda** (solo memoria durante la solicitud) ni se construye una biblioteca de horarios.
-- Solo se guardan `ScheduleBlock`s, y solo tras confirmar.
+- Solo se guardan `ScheduleBlock`s y las asignaturas nuevas que necesiten, y solo tras confirmar.
 - Los registros contienen tipo, tamaño, duración y resultado; **nunca** el texto leído, la imagen ni datos académicos (un test lo comprueba).
 - Sin telemetría externa.
 
@@ -131,9 +173,10 @@ Medido con fixtures sintéticos: imagen sencilla ≈ 0,5 s (incluye arranque en 
 - El OCR se equivoca: p. ej. en pruebas leyó «12:00» como «17:00» con ciertos tamaños de letra. **Revisa siempre las horas** antes de importar; por eso hay vista previa editable.
 - No hace preprocesado de imagen ni corrige la rotación (una imagen girada puede fallar).
 - Horarios muy visuales (colores, celdas fusionadas complejas, varias semanas) pueden requerir corrección o no leerse.
-- No interpreta salones ni profesores y no crea asignaturas. Un número de aula leído por el OCR (p. ej. `207` de «A207») puede quedar al final del título: se corrige en la vista previa; no hay un campo de aula.
+- No interpreta salones ni profesores. Las asignaturas nuevas se crean solo con nombre y color (sin profesor ni descripción). Un número de aula leído por el OCR (p. ej. `207` de «A207») puede quedar al final del título: se corrige en la vista previa; no hay un campo de aula.
 - Solo español; PNG/JPG/PDF; máx. 10 MB y 5 páginas.
 - No importa actividades ni tareas (solo clases) y no lee fotos de tareas.
+- **Nombres de asignaturas nuevas:** el nombre propuesto es el texto leído apenas ordenado; en calendarios con modalidad, códigos o texto repetido (el caso real sintético) casi siempre hay que corregirlo. No se probó con horarios reales de más de una institución.
 - No hay cola de trabajos: una importación a la vez por usuario y 10 cada 10 minutos por IP (el límite es por proceso).
 
 ## Trabajo futuro (no incluido)
