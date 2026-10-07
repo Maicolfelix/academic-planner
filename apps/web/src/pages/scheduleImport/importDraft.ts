@@ -1,5 +1,6 @@
 import {
   SUBJECT_NAME_MAX,
+  findSubjectByName,
   normalizeNameKey,
   type ConfirmScheduleImportRequest,
   type ScheduleImportProposal,
@@ -72,9 +73,22 @@ export function problemsOf(d: ImportDraft): string[] {
 export const endsBeforeStart = (d: ImportDraft) =>
   d.startTime !== '' && d.endTime !== '' && d.endTime <= d.startTime;
 
-/** The existing subject a new name would land on (the server compares names the same way). */
-export const existingNamed = (name: string, subjects: readonly Subject[]) =>
-  subjects.find((s) => normalizeNameKey(s.name) === normalizeNameKey(name));
+/** The card field a zod or server field key (`subject.name`, `until`…) belongs to. */
+export function cardField(key: string): string {
+  if (key === 'subject.name') return 'newName';
+  if (key === 'subject' || key.startsWith('subject.')) return 'subjectId';
+  if (key === 'until') return 'recurrence';
+  if (key === 'weekday') return 'date';
+  return key;
+}
+
+/** The server's field errors of one class, keyed by what the card shows. */
+export function cardErrors(fields: Record<string, string[]>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, messages] of Object.entries(fields))
+    (out[cardField(key)] ??= []).push(...messages);
+  return out;
+}
 
 /** One class as the confirmation endpoint takes it. The card index is the client id: it never leaves the page. */
 export function toConfirmClass(
@@ -103,7 +117,7 @@ export function subjectsToCreate(drafts: readonly ImportDraft[], subjects: reado
   for (const d of drafts) {
     if (!isNewSubject(d) || newNameProblem(d)) continue;
     const key = normalizeNameKey(d.newName);
-    if (!seen.has(key) && !existingNamed(d.newName, subjects)) seen.set(key, d.newName.trim());
+    if (!seen.has(key) && !findSubjectByName(d.newName, subjects)) seen.set(key, d.newName.trim());
   }
   return [...seen.values()];
 }

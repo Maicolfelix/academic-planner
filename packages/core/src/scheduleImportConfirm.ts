@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   dateOnlySchema,
+  findSubjectByName,
   normalizeNameKey,
   pickSubjectColor,
   subjectNameSchema,
@@ -127,11 +128,6 @@ export function planImportSubjects(
   classes: readonly Pick<ConfirmImportClass, 'clientId' | 'subject'>[],
   existing: readonly ExistingSubjectRef[],
 ): ImportSubjectPlan {
-  const byKey = new Map<string, ExistingSubjectRef>();
-  for (const s of existing) {
-    const key = normalizeNameKey(s.name);
-    if (!byKey.has(key)) byKey.set(key, s);
-  }
   const toCreate: NewSubjectPlan[] = [];
   const colors = existing.map((s) => s.color);
 
@@ -140,7 +136,7 @@ export function planImportSubjects(
       return { clientId, target: { kind: 'EXISTING', subjectId: subject.subjectId } as const };
     }
     const key = normalizeNameKey(subject.name);
-    const found = byKey.get(key);
+    const found = findSubjectByName(subject.name, existing);
     if (found) return { clientId, target: { kind: 'EXISTING', subjectId: found.id } as const };
     if (!toCreate.some((n) => n.key === key)) {
       const color = pickSubjectColor(colors);

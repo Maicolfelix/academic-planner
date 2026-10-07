@@ -3,12 +3,14 @@ import {
   createScheduleBlockSchema,
   fieldErrorsOf,
   findDuplicateClass,
+  firstWeekdayOnOrAfter,
   planImportSubjects,
   toScheduleBlockInput,
   type ConfirmImportItemError,
   type ConfirmScheduleImportInput,
   type ConfirmScheduleImportResponse,
   type ExistingClass,
+  type Weekday,
 } from '@planner/core';
 import type { RunInTransaction } from '../db/prisma.js';
 import { AppError } from '../errors/AppError.js';
@@ -19,6 +21,9 @@ import { createSubjectRepository } from '../repositories/subjectRepository.js';
 import type { Actor } from './activityService.js';
 import { windowOf } from './scheduleOccurrences.js';
 import { createScheduleService } from './scheduleService.js';
+
+/** 40 classes are a few hundred queries: well beyond Prisma's 5 s default on a database that is not local. */
+const TRANSACTION = { maxWait: 5_000, timeout: 30_000 };
 
 /**
  * Confirmation of a reviewed schedule import: the NEW subjects and every class, in ONE database transaction. Either
@@ -37,8 +42,11 @@ import { createScheduleService } from './scheduleService.js';
 export function createScheduleImportConfirmService(opts: {
   runInTransaction: RunInTransaction;
   clock: () => Date;
+  /** How long a confirmation waits for another one of the same user before answering 429. */
+  lockTimeoutMs?: number;
 }) {
   const { runInTransaction, clock } = opts;
+  const lockTimeoutMs = Math.trunc(opts.lockTimeoutMs ?? 10_000);
 
   return {
     async confirm(
@@ -46,7 +54,22 @@ export function createScheduleImportConfirmService(opts: {
       input: ConfirmScheduleImportInput,
     ): Promise<ConfirmScheduleImportResponse> {
       return runInTransaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule-import:${actor.id}`}, 0))`;
+        // Bounded wait: a confirmation queued behind another one holds a connection, so it gives up with a clear
+        // answer instead of waiting for ever (or until the transaction itself times out with an opaque error).
+        // (`set_config(…, true)` is SET LOCAL with a bound parameter: the timeout lasts for this transaction only.)
+        await tx.$executeRaw`SELECT set_config('lock_timeout', ${`${lockTimeoutMs}ms`}, true)`;
+        try {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule-import:${actor.id}`}, 0))`;
+        } catch (err) {
+          if (/lock timeout|55P03/i.test(String(err))) {
+            throw new AppError(
+              429,
+              'IMPORT_IN_PROGRESS',
+              'Ya estamos importando un horario tuyo. Espera a que termine e inténtalo de nuevo.',
+            );
+          }
+          throw err;
+        }
 
         const periods = createPeriodLookup(tx);
         const subjects = createSubjectRepository(tx);
@@ -100,6 +123,7 @@ export function createScheduleImportConfirmService(opts: {
           startAt: r.startAt,
           endAt: r.endAt,
           recurring: r.recurrenceType === 'WEEKLY' && r.recurrenceUntil !== null,
+          until: r.recurrenceUntil ? toDateOnly(r.recurrenceUntil) : null,
         }));
 
         // 3. Save every class. A class the rules refuse is recorded and the others still run, so the student gets
@@ -128,7 +152,16 @@ export function createScheduleImportConfirmService(opts: {
 
           if (
             findDuplicateClass(
-              { subjectId, weekday: c.weekday, startTime: c.startTime, endTime: c.endTime },
+              {
+                subjectId,
+                weekday: c.weekday,
+                startTime: c.startTime,
+                endTime: c.endTime,
+                range: {
+                  from: firstWeekdayOnOrAfter(days.from, c.weekday as Weekday),
+                  until: c.until,
+                },
+              },
               present,
               actor.timezone,
             )
@@ -153,6 +186,7 @@ export function createScheduleImportConfirmService(opts: {
               startAt: block!.startAt,
               endAt: block!.endAt,
               recurring: true,
+              until: c.until,
             });
             if (known.has(subjectId)) usedExisting.add(subjectId);
           } catch (err) {
@@ -189,7 +223,7 @@ export function createScheduleImportConfirmService(opts: {
           reusedSubjects: [...usedExisting].map((id) => ({ id, name: known.get(id) ?? '' })),
           createdBlocks,
         };
-      });
+      }, TRANSACTION);
     },
   };
 }

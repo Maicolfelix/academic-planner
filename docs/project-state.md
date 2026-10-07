@@ -30,7 +30,7 @@ Documentos por módulo: [auth](auth.md), [academic](academic.md), [activities](a
 
 ## Totales de tests (rc.2 + A1)
 
-Vitest: core 816, API 820, web 43 (**1679**). Playwright: 278 por pasada (274 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
+Vitest: core 819, API 827, web 45 (**1691**). Playwright: 280 por pasada (276 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
 
 ## Riesgos y limitaciones vigentes
 

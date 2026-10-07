@@ -674,3 +674,152 @@ describe('confirm: the request', () => {
     expect(res.body.createdBlocks[0].block.title).toBe(name);
   });
 });
+
+// ───────────────────────── Review follow-ups: what counts as a duplicate, bounded waits, error mapping ─────────────────────────
+
+describe('confirm: duplicate semantics (a block is refused only when it is the same class on the same dates)', () => {
+  /** The class already in the agenda: Wednesdays 19:00-20:30, made through the ordinary form. */
+  async function withSeries(date = '2026-08-05', until = '2026-09-30') {
+    const u = await setupUser(app, `dups${Math.random()}@example.com`, 'Proyectos II');
+    const res = await u.agent.post('/api/schedule').send({
+      type: 'CLASS',
+      subjectId: u.subject.id,
+      title: 'Proyectos II',
+      date,
+      startTime: '19:00',
+      endTime: '20:30',
+      recurrence: { frequency: 'WEEKLY', until },
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    return u;
+  }
+
+  it('A/B: the same class on overlapping dates is refused, whatever its title', async () => {
+    const { agent, subject } = await withSeries();
+    const res = await confirm(
+      agent,
+      cls({ title: 'Otro título', subject: EXISTING(subject.id), until: '2026-11-28' }),
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error.details.items[0]).toMatchObject({
+      clientId: 'a',
+      code: 'DUPLICATE_CLASS',
+    });
+    expect(await prisma.scheduleBlock.count()).toBe(1);
+  });
+
+  it('E: a second series of the same class on DISJOINT dates is legitimate and is imported', async () => {
+    // already in the agenda: Wednesdays from October 7th; the student ends the imported series on September 30th
+    const { agent, subject } = await withSeries('2026-10-07', '2026-11-25');
+    const disjoint = await confirm(
+      agent,
+      cls({ subject: EXISTING(subject.id), until: '2026-09-30' }),
+    );
+    expect(disjoint.status, JSON.stringify(disjoint.body)).toBe(201);
+    expect(await prisma.scheduleBlock.count()).toBe(2);
+    // one more Wednesday of overlap and it is the same class again
+    const touching = await confirm(
+      agent,
+      cls({ clientId: 'b', subject: EXISTING(subject.id), until: '2026-10-14', title: 'Otra vez' }),
+    );
+    expect(touching.status).toBe(409);
+    expect(await prisma.scheduleBlock.count()).toBe(2);
+  });
+
+  it('C: a partial overlap (other time) is a warning, never a refusal', async () => {
+    const { agent, subject } = await withSeries();
+    const res = await confirm(
+      agent,
+      cls({ subject: EXISTING(subject.id), startTime: '20:00', endTime: '21:00' }),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(await prisma.scheduleBlock.count()).toBe(2);
+  });
+
+  it('D: the same subject and time on ANOTHER weekday is a different class', async () => {
+    const { agent, subject } = await withSeries();
+    const res = await confirm(agent, cls({ subject: EXISTING(subject.id), weekday: 4 }));
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+  });
+});
+
+describe('confirm: all or nothing with an EXISTING subject', () => {
+  it('a valid class of an existing subject is not saved when another class of the batch is refused', async () => {
+    const { agent, subject } = await setupUser(app, 'exist-fail@example.com', 'Redes');
+    const before = await counts();
+    const res = await confirm(
+      agent,
+      cls({ clientId: 'ok', title: 'Redes', subject: EXISTING(subject.id) }),
+      cls({ clientId: 'bad', weekday: 5, until: '2027-03-01', subject: NEW('Física') }),
+    );
+    expect(res.status).toBe(400);
+    expect(await counts()).toEqual(before); // no block of the batch, no new subject
+    expect(await prisma.subject.findMany({ select: { name: true } })).toEqual([{ name: 'Redes' }]);
+  });
+});
+
+describe('confirm: a waiting confirmation gives up instead of holding a connection for ever', () => {
+  it('answers 429 IMPORT_IN_PROGRESS when another confirmation of the same user keeps the lock', async () => {
+    const patient = buildApp({
+      scheduleImport: {
+        extraction: { ocr: realOcr, pdf: createPdfProvider() },
+        confirmLockTimeoutMs: 300,
+      },
+    });
+    const { agent, user } = await userWithoutSubjects('lockwait@example.com');
+    const impatient = request.agent(patient);
+    // sign in the same user on the app with the short wait
+    const login = await impatient
+      .post('/api/auth/login')
+      .send({ email: 'lockwait@example.com', password: 'correct horse battery' });
+    expect(login.status).toBe(200);
+
+    let released: () => void = () => undefined;
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule-import:${user.id}`}, 0))`;
+        await new Promise<void>((resolve) => (released = resolve));
+      },
+      { timeout: 20_000 },
+    );
+    await new Promise((r) => setTimeout(r, 100)); // the holder has the lock
+    const started = Date.now();
+    const res = await confirm(impatient, cls());
+    const waited = Date.now() - started;
+    released();
+    await holder;
+
+    expect(res.status, JSON.stringify(res.body)).toBe(429);
+    expect(res.body.error.code).toBe('IMPORT_IN_PROGRESS');
+    expect(waited).toBeGreaterThanOrEqual(250);
+    expect(waited).toBeLessThan(5000);
+    expect(await counts()).toEqual({ subjects: 0, blocks: 0 });
+    // and once the lock is free the same user imports normally
+    expect((await confirm(agent, cls())).status).toBe(201);
+  });
+});
+
+describe('confirm: a refused body points at its classes', () => {
+  it('returns every invalid class at once, with its clientId and its fields', async () => {
+    const { agent } = await userWithoutSubjects('items@example.com');
+    const res = await confirm(
+      agent,
+      cls({ clientId: 'good' }),
+      cls({ clientId: 'badName', weekday: 2, subject: NEW('   ') }),
+      cls({ clientId: 'badTime', weekday: 4, startTime: '10:00', endTime: '09:00' }),
+      cls({ clientId: 'extra', weekday: 5, userId: 'x' }),
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    const items = res.body.error.details.items as {
+      clientId: string;
+      fields: Record<string, string[]>;
+    }[];
+    expect(items.map((i) => i.clientId)).toEqual(['badName', 'badTime', 'extra']);
+    expect(items[0]!.fields).toEqual({ 'subject.name': ['Ingresa un nombre.'] });
+    expect(items[1]!.fields).toHaveProperty('endTime');
+    expect(items[2]!.fields).toHaveProperty('_');
+    expect(JSON.stringify(res.body)).not.toContain('x"'); // keys and messages only, never the submitted values
+    expect(await counts()).toEqual({ subjects: 0, blocks: 0 });
+  });
+});

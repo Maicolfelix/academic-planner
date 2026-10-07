@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Subject } from '@planner/core';
+import { findSubjectByName, type Subject } from '@planner/core';
 import {
   NEW_SUBJECT,
+  cardErrors,
+  cardField,
   endsBeforeStart,
-  existingNamed,
   newNameProblem,
   problemsOf,
   subjectsToCreate,
@@ -99,11 +100,29 @@ describe('subjectsToCreate', () => {
 
   it('a name that is already a subject creates nothing, and invalid names are ignored', () => {
     expect(subjectsToCreate([nuevo('REDES'), nuevo('   ')], [redes])).toEqual([]);
-    expect(existingNamed('redes', [redes])).toBe(redes);
-    expect(existingNamed('Red', [redes])).toBeUndefined(); // never by similarity
+    expect(findSubjectByName('redes', [redes])).toBe(redes);
+    expect(findSubjectByName('Red', [redes])).toBeUndefined(); // never by similarity
   });
 
   it('ignores classes of existing subjects', () => {
     expect(subjectsToCreate([draft], [redes])).toEqual([]);
+  });
+});
+
+describe('cardField / cardErrors', () => {
+  it('maps zod and server field keys to what the card shows', () => {
+    expect(cardField('subject.name')).toBe('newName');
+    expect(cardField('subject.subjectId')).toBe('subjectId');
+    expect(cardField('subject')).toBe('subjectId');
+    expect(cardField('until')).toBe('recurrence');
+    expect(cardField('weekday')).toBe('date');
+    expect(cardField('endTime')).toBe('endTime');
+    expect(cardField('title')).toBe('title');
+  });
+
+  it('keeps every message, grouped by card field', () => {
+    expect(
+      cardErrors({ 'subject.name': ['Ingresa un nombre.'], until: ['a'], recurrence: ['b'] }),
+    ).toEqual({ newName: ['Ingresa un nombre.'], recurrence: ['a', 'b'] });
   });
 });

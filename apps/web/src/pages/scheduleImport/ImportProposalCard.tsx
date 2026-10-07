@@ -2,6 +2,7 @@ import {
   SCHEDULE_IMPORT_MESSAGES,
   WEEKDAY_LABELS,
   WEEKDAYS,
+  findSubjectByName,
   formatClockRange,
   toLocalParts,
   weekdayOf,
@@ -13,7 +14,6 @@ import { SelectField } from '../../components/SelectField';
 import {
   NEW_SUBJECT,
   endsBeforeStart,
-  existingNamed,
   isNewSubject,
   newNameProblem,
   problemsOf,
@@ -83,18 +83,26 @@ export function ImportProposalCard({
   const notes = p.warnings.filter((w) => stillApplies(w.code, d, suggested !== undefined));
   const duplicate = p.duplicateOf !== null;
 
+  // The reading itself was unsure (OCR): a NEW subject must not look like a settled one.
+  const doubtful = p.warnings.some((w) => w.code === 'LOW_CONFIDENCE');
+
   // Where this class's subject stands, in words (never color alone): an existing one, a new one, or still undecided.
-  const typedMatch = isNewSubject(d) ? existingNamed(d.newName, subjects) : undefined;
+  const typedMatch = isNewSubject(d) ? findSubjectByName(d.newName, subjects) : undefined;
   const subjectState =
     d.subjectId === ''
       ? { chip: 'Revisar', help: 'Elige una asignatura o crea una nueva.' }
       : typedMatch
         ? { chip: 'Existente', help: 'Esa asignatura ya existe: se usará, no se creará otra.' }
         : isNewSubject(d)
-          ? {
-              chip: 'Nueva — se creará al importar',
-              help: SCHEDULE_IMPORT_MESSAGES.SUBJECT_MISSING,
-            }
+          ? doubtful
+            ? {
+                chip: 'Nueva — revisa el nombre',
+                help: 'Se leyó con poca claridad: corrige el nombre si hace falta antes de importar.',
+              }
+            : {
+                chip: 'Nueva — se creará al importar',
+                help: SCHEDULE_IMPORT_MESSAGES.SUBJECT_MISSING,
+              }
           : { chip: 'Existente', help: '' };
 
   const badge =

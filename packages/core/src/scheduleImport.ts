@@ -1068,14 +1068,23 @@ export interface ExistingClass {
   endAt: Date | string;
   /** Weekly series (recurrenceUntil set) or a single block. */
   recurring: boolean;
+  /** Last day of the series, when known: lets two series of the same class on disjoint dates coexist. */
+  until?: DateOnly | null;
 }
 
 /**
- * "This class is already in the agenda": same subject, same weekday, same start and end time, and a weekly
- * series. It is NOT an overlap with a different class (that is a conflict, reported by the Schedule service).
+ * "This class is already in the agenda": same subject, same weekday, same start and end time, and a weekly series
+ * that runs on some of the same dates. The title is irrelevant (the same subject at the same time is the same class)
+ * and it is NOT an overlap with a different class (that is a conflict, reported by the Schedule service).
+ *
+ * When both sides tell their dates (`range` of the proposal, `until` of the existing series) two series of the same
+ * class on DISJOINT dates (say, one until mid-term and another from then on) are not duplicates. Without them the
+ * answer is the old one: same subject, weekday and times.
  */
 export function findDuplicateClass(
-  proposal: Pick<ScheduleImportProposal, 'subjectId' | 'weekday' | 'startTime' | 'endTime'>,
+  proposal: Pick<ScheduleImportProposal, 'subjectId' | 'weekday' | 'startTime' | 'endTime'> & {
+    range?: { from: DateOnly; until: DateOnly };
+  },
   existing: readonly ExistingClass[],
   timeZone: string,
 ): ExistingClass | undefined {
@@ -1085,10 +1094,14 @@ export function findDuplicateClass(
     if (e.type !== 'CLASS' || !e.recurring || e.subjectId !== proposal.subjectId) return false;
     const start = toLocalParts(e.startAt, timeZone);
     const end = toLocalParts(e.endAt, timeZone);
-    return (
-      weekdayOf(start.date) === proposal.weekday &&
-      start.time === proposal.startTime &&
-      end.time === proposal.endTime
-    );
+    if (
+      weekdayOf(start.date) !== proposal.weekday ||
+      start.time !== proposal.startTime ||
+      end.time !== proposal.endTime
+    ) {
+      return false;
+    }
+    if (!proposal.range || !e.until) return true;
+    return start.date <= proposal.range.until && proposal.range.from <= e.until;
   });
 }

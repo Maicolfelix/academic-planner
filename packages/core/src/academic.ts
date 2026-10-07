@@ -39,6 +39,15 @@ const END_AFTER_START_MESSAGE = 'La fecha de fin debe ser posterior a la de inic
 export const normalizeNameKey = (name: string): string =>
   name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+/** The subject (of the given list) that has this name once normalised, if any: never by similarity. */
+export const findSubjectByName = <T extends { name: string }>(
+  name: string,
+  subjects: readonly T[],
+): T | undefined => {
+  const key = normalizeNameKey(name);
+  return subjects.find((s) => normalizeNameKey(s.name) === key);
+};
+
 /** Optional text: '' and null both mean "no value"; undefined means "not provided" (PATCH). */
 const optionalText = (max: number, label: string) =>
   z

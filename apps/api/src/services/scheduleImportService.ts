@@ -7,7 +7,7 @@ import {
   type ScheduleImportResult,
 } from '@planner/core';
 import { AppError } from '../errors/AppError.js';
-import { toPeriodDto } from '../mappers.js';
+import { toDateOnly, toPeriodDto } from '../mappers.js';
 import type { PeriodRepository } from '../repositories/periodRepository.js';
 import type { ScheduleRepository } from '../repositories/scheduleRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
@@ -162,11 +162,16 @@ export function createScheduleImportService(opts: {
       startAt: r.startAt,
       endAt: r.endAt,
       recurring: r.recurrenceType === 'WEEKLY' && r.recurrenceUntil !== null,
+      until: r.recurrenceUntil ? toDateOnly(r.recurrenceUntil) : null,
     }));
 
     const out: ScheduleImportProposal[] = [];
     for (const p of proposals) {
-      const duplicate = findDuplicateClass(p, existing, actor.timezone);
+      const duplicate = findDuplicateClass(
+        { ...p, range: p.date ? { from: p.date, until: p.recurrence.until } : undefined },
+        existing,
+        actor.timezone,
+      );
       let conflicts: ScheduleImportProposal['conflicts'] = [];
       const complete =
         p.subjectId && p.date && p.startTime && p.endTime && p.endTime > p.startTime && p.weekday;

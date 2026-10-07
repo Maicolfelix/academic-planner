@@ -803,6 +803,34 @@ describe('findDuplicateClass', () => {
     ).toBeUndefined();
   });
 
+  describe('by dates (the series of both sides are known)', () => {
+    // existing series: Mondays from 2026-08-03 to 2026-09-28
+    const series = { ...existing, until: '2026-09-28' };
+    const range = (from: string, until: string) => ({ ...proposal, range: { from, until } });
+
+    it('the same class on overlapping dates is a duplicate', () => {
+      expect(findDuplicateClass(range('2026-08-03', '2026-11-28'), [series], tz)?.id).toBe(
+        existing.id,
+      );
+      expect(findDuplicateClass(range('2026-09-28', '2026-11-28'), [series], tz)?.id).toBe(
+        existing.id,
+      ); // they share the last Monday
+    });
+
+    it('the same class on DISJOINT dates is a legitimate second series, not a duplicate', () => {
+      expect(findDuplicateClass(range('2026-10-05', '2026-11-28'), [series], tz)).toBeUndefined();
+      expect(findDuplicateClass(range('2026-07-06', '2026-07-27'), [series], tz)).toBeUndefined();
+    });
+
+    it('a title that differs does not matter, and without dates the answer is the old one', () => {
+      expect(
+        findDuplicateClass(range('2026-08-03', '2026-11-28'), [{ ...series, title: 'Otro' }], tz),
+      ).toBeDefined();
+      expect(findDuplicateClass(proposal, [series], tz)).toBeDefined(); // no range: as before
+      expect(findDuplicateClass(range('2026-10-05', '2026-11-28'), [existing], tz)).toBeDefined(); // no `until`
+    });
+  });
+
   it('a one-off block or a non-class is never a duplicate of a weekly class', () => {
     expect(findDuplicateClass(proposal, [{ ...existing, recurring: false }], tz)).toBeUndefined();
     expect(findDuplicateClass(proposal, [{ ...existing, type: 'STUDY' }], tz)).toBeUndefined();

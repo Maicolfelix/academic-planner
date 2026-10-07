@@ -10,13 +10,22 @@ export type { PrismaClient };
 /** Either the shared client or the client bound to one transaction: repositories accept both. */
 export type Db = PrismaClient | Prisma.TransactionClient;
 
-export type RunInTransaction = <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
+/** `timeout` (ms) bounds the whole transaction, `maxWait` the wait for a connection; Prisma's defaults are 5 s and 2 s. */
+export interface TransactionOptions {
+  maxWait?: number;
+  timeout?: number;
+}
+
+export type RunInTransaction = <T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  options?: TransactionOptions,
+) => Promise<T>;
 
 /** Runs `fn` in one database transaction: it commits only if `fn` finishes, and rolls back if it throws. */
 export const transactionRunner =
   (prisma: PrismaClient): RunInTransaction =>
-  (fn) =>
-    prisma.$transaction(fn);
+  (fn, options) =>
+    prisma.$transaction(fn, options);
 
 /** Resolves true when the database answers a trivial query. */
 export async function pingDatabase(prisma: PrismaClient): Promise<boolean> {

@@ -333,10 +333,15 @@ test('A1: a student with no subjects imports a real calendar: subjects are propo
 
   // Reading proposes; both subjects are NEW and nothing blocks them. Nothing exists yet.
   for (const c of [proyectos, practicas]) {
-    await expect(c).toContainText(NEW_BADGE);
     await expect(c).toContainText('Se creará al importar.');
     await expect(c).not.toContainText('Asignatura sin reconocer');
   }
+  await expect(proyectos).toContainText(NEW_BADGE);
+  // The second one was read with low confidence (OCR): it says NEW, but also that the name needs a look, next to
+  // the name itself, and it does not start selected.
+  await expect(practicas).toContainText('Nueva — revisa el nombre');
+  await expect(practicas).toContainText('Se leyó con poca claridad');
+  await expect(practicas).not.toContainText(NEW_BADGE);
   await expect(proyectos.getByLabel('Día')).toHaveValue('3');
   await expect(proyectos.getByLabel('Inicio', { exact: true })).toHaveValue('19:00');
   await expect(proyectos.getByLabel('Fin', { exact: true })).toHaveValue('20:30');
@@ -400,7 +405,7 @@ test('A1: an existing subject is reused, not duplicated; only the missing one is
   await expect(proyectos).not.toContainText(NEW_BADGE);
   await expect(subjectSelect(proyectos)).toContainText('Proyectos II');
   await expect(nameInput(proyectos)).toHaveCount(0); // an existing subject needs no name
-  await expect(practicas).toContainText(NEW_BADGE);
+  await expect(practicas).toContainText('Nueva — revisa el nombre');
 
   await nameInput(practicas).fill('Prácticas Empresariales');
   await include(practicas).check();
@@ -556,27 +561,33 @@ test('A1: all or nothing: a class the server refuses saves nothing and says whic
   assertClean();
 });
 
-test('A1: a hostile subject name is shown as plain text, never as markup', async ({ page }) => {
-  await newUser(page, []);
-  const items = listItems(['Lunes', '08:00 - 10:00 Quimica']);
-  await readFile(
+for (const hostile of [
+  '<img src=x onerror="window.__xss=1">Quimica',
+  '<script>window.__xss=1</script>Quimica',
+]) {
+  test(`A1: a hostile subject name is shown as plain text, never as markup (${hostile.slice(0, 8)}…)`, async ({
     page,
-    file('h.png', 'image/png', drawTextImage(items, { width: 800, height: 200 })),
-  );
-  const hostile = '<img src=x onerror="window.__xss=1">Quimica';
-  await nameInput(card(page, 0)).fill(hostile);
-  await expect(card(page, 0).getByLabel('Título')).toHaveValue(hostile);
-  await importButton(page).click();
-  await expect(page.getByRole('status').filter({ hasText: '1 clase importada.' })).toBeVisible();
-  await expect(card(page, 0)).toContainText(hostile); // as text
+  }) => {
+    await newUser(page, []);
+    const items = listItems(['Lunes', '08:00 - 10:00 Quimica']);
+    await readFile(
+      page,
+      file('h.png', 'image/png', drawTextImage(items, { width: 800, height: 200 })),
+    );
+    await nameInput(card(page, 0)).fill(hostile);
+    await expect(card(page, 0).getByLabel('Título')).toHaveValue(hostile);
+    await importButton(page).click();
+    await expect(page.getByRole('status').filter({ hasText: '1 clase importada.' })).toBeVisible();
+    await expect(card(page, 0)).toContainText(hostile); // as text
 
-  await page.goto('/subjects');
-  await expect(page.getByText(hostile)).toBeVisible();
-  await expect(page.locator('img[src="x"]')).toHaveCount(0);
-  expect(
-    await page.evaluate(() => (window as unknown as { __xss?: number }).__xss),
-  ).toBeUndefined();
-});
+    await page.goto('/subjects');
+    await expect(page.getByText(hostile)).toBeVisible();
+    await expect(page.locator('img[src="x"], main script')).toHaveCount(0);
+    expect(
+      await page.evaluate(() => (window as unknown as { __xss?: number }).__xss),
+    ).toBeUndefined();
+  });
+}
 
 test('offline: a clear message, nothing pretends to work, and it recovers', async ({ page }) => {
   await newUser(page, ['Redes', 'Bases de Datos']);

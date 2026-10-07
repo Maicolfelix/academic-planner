@@ -5,6 +5,7 @@ import {
   confirmImportItemErrorSchema,
   confirmScheduleImportSchema,
   createScheduleBlockSchema,
+  findSubjectByName,
   firstWeekdayOnOrAfter,
   formatDateOnly,
   type ScheduleImportResult,
@@ -24,8 +25,9 @@ import {
 import { ImportProposalCard } from './scheduleImport/ImportProposalCard';
 import {
   NEW_SUBJECT,
+  cardErrors,
+  cardField,
   endsBeforeStart,
-  existingNamed,
   isNewSubject,
   problemsOf,
   subjectsToCreate,
@@ -182,7 +184,7 @@ export function ScheduleImportPage() {
     // A class takes the name of its subject (the existing one, or the new name being typed) until the student types
     // their own title.
     const subjectName = isNewSubject(draft)
-      ? (existingNamed(draft.newName, subjects)?.name ?? draft.newName.trim())
+      ? (findSubjectByName(draft.newName, subjects)?.name ?? draft.newName.trim())
       : subjects.find((s) => s.id === draft.subjectId)?.name;
     const autoTitle = 'title' in change ? false : row.autoTitle;
     if (('subjectId' in change || 'newName' in change) && autoTitle && subjectName) {
@@ -261,22 +263,12 @@ export function ScheduleImportPage() {
     });
     if (!parsed.success) {
       // The same rules as the server: point at the card and the field before sending anything.
-      const field = (path: PropertyKey[]) =>
-        path[2] === 'subject'
-          ? path[3] === 'name'
-            ? 'newName'
-            : 'subjectId'
-          : path[2] === 'until'
-            ? 'recurrence'
-            : path[2] === 'weekday'
-              ? 'date'
-              : String(path[2] ?? 'title');
       const byCard = new Map<number, Record<string, string[]>>();
       for (const issue of parsed.error.issues) {
         const k = issue.path[0] === 'classes' ? issue.path[1] : undefined;
         if (typeof k !== 'number') continue;
         const errors = byCard.get(k) ?? {};
-        (errors[field(issue.path)] ??= []).push(issue.message);
+        (errors[cardField(issue.path.slice(2).join('.') || 'title')] ??= []).push(issue.message);
         byCard.set(k, errors);
       }
       for (const [k, errors] of byCard) {
@@ -316,7 +308,7 @@ export function ScheduleImportPage() {
         patchRow(
           i,
           it
-            ? { status: 'error', error: it.message, errors: it.fields }
+            ? { status: 'error', error: it.message, errors: cardErrors(it.fields) }
             : { status: 'idle', error: undefined, errors: {} },
         );
       }

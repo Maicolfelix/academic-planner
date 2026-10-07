@@ -86,6 +86,8 @@ export interface AppDeps {
     limit?: number;
     windowMs?: number;
     timeoutMs?: number;
+    /** Test hook: how long a confirmation waits for another one of the same user. */
+    confirmLockTimeoutMs?: number;
     extraction?: ExtractionDeps;
     log?: (event: ImportLogEvent) => void;
   };
@@ -159,7 +161,11 @@ export function createApp(deps: AppDeps): Express {
       timeoutMs: importOptions.timeoutMs,
       log: importOptions.log,
     }),
-    createScheduleImportConfirmService({ runInTransaction, clock }),
+    createScheduleImportConfirmService({
+      runInTransaction,
+      clock,
+      lockTimeoutMs: importOptions.confirmLockTimeoutMs,
+    }),
   );
   // 10 imports per 10 minutes per client: OCR is the most expensive thing the API does.
   const importLimiter = createLimiter({
