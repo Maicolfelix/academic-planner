@@ -6,8 +6,8 @@ Estado **actual y compacto**. Para entender el sistema: [system-overview.md](sys
 
 - **Current release:** `v1.0.0-rc.2` (pre-release publicado; `v1.0.0-rc.1` y `v1.0.0-rc.2` son inmutables).
 - **Current work:** ciclo de producto post-RC (automatización de entrada y asistencia académica), en planificación: [roadmap-post-rc.md](roadmap-post-rc.md). Este ciclo **no es una Fase 21**; avanza por etapas y PR pequeños, y cada etapa necesita aprobación explícita.
-- **A1 — Schedule Import crea las asignaturas faltantes:** **implementado, pendiente de revisión** (rama `feat/schedule-import-create-missing-subjects`; no fusionado). La importación propone las asignaturas que no existen y, al confirmar, las crea junto con las clases en una transacción todo-o-nada (`POST /api/schedule-import/confirm`). Detalle: [schedule-import.md](schedule-import.md), [decisions.md](decisions.md#d16-confirmación-en-lote-en-la-importación-de-horario-y-enmienda-de-d5).
-- **Next implementation target:** **A4 — feed `.ics`** según el orden del [roadmap](roadmap-post-rc.md). **No se inicia sin aprobación explícita.**
+- **A1 — Schedule Import crea las asignaturas faltantes:** **fusionado** (PR #18, merge `00f63ac`; sin cambio de versión ni tag). La importación propone las asignaturas que no existen y, al confirmar, las crea junto con las clases en una transacción todo-o-nada (`POST /api/schedule-import/confirm`). Detalle: [schedule-import.md](schedule-import.md), [decisions.md](decisions.md#d16-confirmación-en-lote-en-la-importación-de-horario-y-enmienda-de-d5).
+- **Next implementation target:** **A4 — feed `.ics`** según el orden del [roadmap](roadmap-post-rc.md). Solo existe un diseño (discovery); **no hay rama ni código y no se inicia sin aprobación explícita.**
 - Salvo A1, lo demás del roadmap no existe todavía; lo descrito abajo es el estado del RC más A1.
 
 ## Fase actual (RC)

@@ -182,6 +182,10 @@ Contando solo acciones del estudiante, con el archivo ya elegido:
 
 Es una reducción clara pero **no cero**: con este calendario el estudiante sigue editando cada nombre, porque la limpieza del nombre es deliberadamente tímida (arriba). Con horarios cuyo texto ya es el nombre limpio (el caso de las listas y tablas de las pruebas), basta procesar e importar: 2 acciones. No se midió con horarios físicos reales.
 
+## Criterio para nuevas heurísticas de nombres
+
+No se añaden reglas nuevas de limpieza del nombre (modalidad `REMOTO`/`VIRTUAL`/`PRESENCIAL`, aulas, texto repetido, otros códigos institucionales) **sin fixtures reales anonimizados** de horarios que las justifiquen: una regla por intuición puede crear asignaturas basura o fusionar identidades. La única regla vigente (el código inicial) se apoya en una sola muestra. Ver D16 en [decisions.md](decisions.md).
+
 ## Privacidad
 
 - El archivo se procesa **localmente en Academic Planner**: no se envía a terceros ni a servicios de IA.
