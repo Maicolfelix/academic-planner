@@ -44,13 +44,13 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 ### Etapa A — Automatización de entrada (apunta a la serie `1.1.x`)
 
-| Id  | Objetivo                                                                                      |
-| --- | --------------------------------------------------------------------------------------------- |
-| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**fusionado**, PR #18)           |
-| A4  | Feed/exportación `.ics` personal                                                              |
-| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida) |
-| A2  | Importación de un archivo `.ics`                                                              |
-| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))     |
+| Id  | Objetivo                                                                                                                                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**fusionado**, PR #18)                                                                                                |
+| A4  | Integración con calendario externo: **A4.1** «Añadir al calendario» (`.ics` por actividad; implementado en su PR); **A4.2** feed sincronizado (**diferido** hasta tener evidencia) |
+| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida)                                                                                      |
+| A2  | Importación de un archivo `.ics`                                                                                                                                                   |
+| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))                                                                                          |
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 
@@ -114,7 +114,8 @@ El syllabus puede detectar porcentajes, pero hoy **no existe** una estructura do
 
 ### Decisión: ICS
 
-- **Feed `.ics` primero:** entrega alcance sin scheduler, sin riesgo SSRF y sin guardar credenciales de un LMS. Token de alta entropía (solo se guardaría su hash), revocable y regenerable; quien tenga la URL puede leer el calendario, y así se avisa al usuario.
+- **Actualización (A4-0b, A4.1):** la comparación con los RFC ([normative-validation.md](spikes/a4-calendar-feed/normative-validation.md)) concluyó que el feed **aún no está justificado** frente a «Añadir al calendario»: depende por completo del refresco del cliente (horas, sin control del estudiante), exige token, ruta pública y migración, y nadie ha pedido que se actualice solo. Por eso A4 se divide: **A4.1 «Añadir al calendario»** (un `.ics` por actividad, con sesión, sin token ni migración; [calendar-export.md](calendar-export.md)) y **A4.2 feed sincronizado, diferido** hasta que estudiantes reales lo pidan y clientes reales muestren un refresco aceptable. A4.2 reutilizaría el serializador de A4.1.
+- **Feed `.ics` (A4.2, diferido):** entregaría alcance sin scheduler, sin riesgo SSRF y sin guardar credenciales de un LMS. Token de alta entropía (solo se guardaría su hash), revocable y regenerable; quien tenga la URL puede leer el calendario, y así se avisa al usuario.
 - **Importación manual de archivo `.ics` después:** estructura información sin conexión externa.
 - **Suscripción por URL diferida:** riesgos de SSRF, tokens de LMS dentro de las URL, redirects, DNS rebinding y necesidad de cifrado en reposo. **No se implementa A3 ahora.**
 - **Notificaciones:** el feed _permite integrar eventos con calendarios externos; el comportamiento de las notificaciones depende del cliente._ No se promete que el feed garantice notificaciones. Google Calendar, Apple Calendar y Outlook deben validarse con un spike real antes de prometer comportamiento alguno (refresco, alarmas, experiencia móvil).
@@ -159,7 +160,7 @@ Métricas a observar (sin afirmar que ya se cumplen): tiempo de registro a «mi 
 
 Tres investigaciones de bajo costo, antes de construir producto:
 
-1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0, clientes reales aún sin probar): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md).
+1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0 y A4-0b; Google/Apple/Outlook sin probar en clientes reales): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md). Lo implementado (A4.1): [calendar-export.md](calendar-export.md).
 2. **Datos reales.** Recolectar, anonimizados, ~10 horarios, ~10 syllabus y ~5 archivos `.ics` como línea base. **No se agregan al repositorio sin anonimización explícita.**
 3. **Notas.** Probar «¿cuánto necesito sacar?» con 3 estudiantes en una hoja de cálculo o prototipo; preguntar escala, cortes, pesos y reglas de redondeo.
 

@@ -8,6 +8,8 @@ import {
   type ActivityStatus,
   type Subject,
 } from '@planner/core';
+import { useMutation } from '@tanstack/react-query';
+import { downloadActivityCalendar } from '../../api/activities';
 import { RadarBadge } from '../radar/RadarBadge';
 import { PriorityBadge, StatusBadge, TypeBadge } from './badges';
 
@@ -38,6 +40,8 @@ export function ActivityCard({
   // Derived from the clock on every render (see core/radar.ts): null for a finished activity.
   const radar = calculateRadarStatus(activity, now);
   const done = activity.status === 'COMPLETED';
+  // Read-only: nothing to invalidate. The browser/OS decides what opens the downloaded file.
+  const addToCalendar = useMutation({ mutationFn: () => downloadActivityCalendar(activity.id) });
 
   return (
     <li className="flex min-w-0 overflow-hidden rounded-lg border border-slate-300">
@@ -99,6 +103,15 @@ export function ActivityCard({
           </button>
           <button
             type="button"
+            aria-label={`Añadir al calendario: ${activity.title}`}
+            disabled={addToCalendar.isPending}
+            onClick={() => addToCalendar.mutate()}
+            className={button}
+          >
+            Añadir al calendario
+          </button>
+          <button
+            type="button"
             aria-label={`Eliminar ${activity.title}`}
             onClick={onDelete}
             className={`${button} text-red-800`}
@@ -106,6 +119,11 @@ export function ActivityCard({
             Eliminar
           </button>
         </div>
+        {addToCalendar.isError && (
+          <p role="alert" className="text-sm text-red-800 break-words">
+            No se pudo descargar el archivo del calendario. Inténtalo de nuevo.
+          </p>
+        )}
       </div>
     </li>
   );

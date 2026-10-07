@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## Unreleased
 
+### Added
+
+- **Añadir al calendario (A4.1).** Each activity has an «Añadir al calendario» button that downloads that activity as an `.ics` file (`GET /api/activities/:id/calendar.ics`, session required, foreign or missing activity = the same 404). No-time activities are all-day events on the user's local day; timed ones are a 15-minute block that ends at the due time. The file contains only the title, the subject name and the dates (no description, reminders, user data, `METHOD`, `VALARM`, `SEQUENCE` or refresh hints), has an opaque stable `UID`, and the same activity always exports the same bytes. The title is treated as untrusted text (no CRLF/property injection, folded at 75 octets). It is a snapshot: no feed, token, sync or migration; the synchronised feed (A4.2) is deferred. Not tested in Google, Apple or Outlook clients. See [docs/calendar-export.md](docs/calendar-export.md).
+- Calendar spike documentation (A4-0, A4-0b): RFC verification, independent validation and the feed vs add-to-calendar comparison under [docs/spikes/a4-calendar-feed](docs/spikes/a4-calendar-feed/README.md).
+
 ### Changed
 
 - Schedule Import can propose and create missing subjects after explicit confirmation (A1). The preview marks each class as **Existente**, **Nueva — se creará al importar** or **Revisar**; confirming is one request, `POST /api/schedule-import/confirm`, that creates the new subjects and the classes in a single all-or-nothing transaction (same Schedule rules as the manual form; duplicates are refused with `409`; concurrent confirmations are serialised per user). A subject that nobody matches no longer blocks a class. `multipart` is now accepted only on `/api/schedule-import/parse`. See [docs/schedule-import.md](docs/schedule-import.md). Classes whose different institutional codes clean to the same name are never merged into one subject without an explicit confirmation.

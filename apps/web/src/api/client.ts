@@ -28,6 +28,16 @@ interface RequestOptions<T> {
   schema?: ZodType<T>;
 }
 
+/** The error of a non-2xx answer: the API's envelope when it sent one, a generic one otherwise. */
+function responseError(status: number, payload: unknown): ApiRequestError {
+  const parsed = apiErrorSchema.safeParse(payload);
+  if (parsed.success) {
+    const { code, message, details } = parsed.data.error;
+    return new ApiRequestError(status, code, message, details);
+  }
+  return new ApiRequestError(status, 'UNEXPECTED_RESPONSE', `Respuesta inesperada (${status}).`);
+}
+
 /**
  * Single door to the API. Sends the session cookie (same-origin via the Vite proxy),
  * turns the error envelope into `ApiRequestError`, and validates success payloads.
@@ -57,18 +67,7 @@ export async function apiFetch<T = void>(path: string, opts: RequestOptions<T> =
 
   const payload: unknown = res.status === 204 ? null : await res.json().catch(() => null);
 
-  if (!res.ok) {
-    const parsed = apiErrorSchema.safeParse(payload);
-    if (parsed.success) {
-      const { code, message, details } = parsed.data.error;
-      throw new ApiRequestError(res.status, code, message, details);
-    }
-    throw new ApiRequestError(
-      res.status,
-      'UNEXPECTED_RESPONSE',
-      `Respuesta inesperada (${res.status}).`,
-    );
-  }
+  if (!res.ok) throw responseError(res.status, payload);
 
   if (!opts.schema) return undefined as T;
   const parsed = opts.schema.safeParse(payload);
@@ -80,6 +79,18 @@ export async function apiFetch<T = void>(path: string, opts: RequestOptions<T> =
     );
   }
   return parsed.data;
+}
+
+/** A GET whose success answer is a file (e.g. the .ics of an activity): the bytes, with the same error handling. */
+export async function apiDownload(path: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(path, { credentials: 'include' });
+  } catch {
+    throw new ApiRequestError(0, 'NETWORK_ERROR', 'No se pudo conectar con el servidor.');
+  }
+  if (!res.ok) throw responseError(res.status, await res.json().catch(() => null));
+  return res.blob();
 }
 
 /** Fetches /api/health. A 503 (database down) is still a valid, parseable health payload. */

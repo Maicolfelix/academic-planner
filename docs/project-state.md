@@ -7,7 +7,9 @@ Estado **actual y compacto**. Para entender el sistema: [system-overview.md](sys
 - **Current release:** `v1.0.0-rc.2` (pre-release publicado; `v1.0.0-rc.1` y `v1.0.0-rc.2` son inmutables).
 - **Current work:** ciclo de producto post-RC (automatización de entrada y asistencia académica), en planificación: [roadmap-post-rc.md](roadmap-post-rc.md). Este ciclo **no es una Fase 21**; avanza por etapas y PR pequeños, y cada etapa necesita aprobación explícita.
 - **A1 — Schedule Import crea las asignaturas faltantes:** **fusionado** (PR #18, merge `00f63ac`; sin cambio de versión ni tag). La importación propone las asignaturas que no existen y, al confirmar, las crea junto con las clases en una transacción todo-o-nada (`POST /api/schedule-import/confirm`). Detalle: [schedule-import.md](schedule-import.md), [decisions.md](decisions.md#d16-confirmación-en-lote-en-la-importación-de-horario-y-enmienda-de-d5).
-- **Next implementation target:** **A4 — feed `.ics`** según el orden del [roadmap](roadmap-post-rc.md). Solo existe un diseño (discovery); **no hay rama ni código y no se inicia sin aprobación explícita.**
+- **A4-0 / A4-0b — spike del calendario:** **fusionado** (PR #20, merge `6c9a673`). Solo documentación y herramientas: verificación de los RFC, validación independiente y comparación feed vs «Añadir al calendario» ([spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md)). Clientes reales y estudiantes: sin probar.
+- **A4.1 — Añadir al calendario:** **implementado en su PR (rama `feat/add-activity-to-calendar`), pendiente de revisión y no fusionado.** Descarga un `.ics` por actividad, sin feed, token ni migración ([calendar-export.md](calendar-export.md), [D23](decisions.md#d23-añadir-al-calendario-antes-que-el-feed-sincronizado)). **A4.2 (feed sincronizado) está diferido** hasta que haya evidencia.
+- **Next implementation target:** el siguiente del [roadmap](roadmap-post-rc.md) (A5, Web Share Target) **no se inicia sin aprobación explícita.**
 - Salvo A1, lo demás del roadmap no existe todavía; lo descrito abajo es el estado del RC más A1.
 
 ## Fase actual (RC)
@@ -28,9 +30,9 @@ Monorepo npm workspaces: `apps/api` (Express 5, Prisma 7, PostgreSQL 17), `apps/
 
 Documentos por módulo: [auth](auth.md), [academic](academic.md), [activities](activities.md), [dashboard](dashboard.md), [schedule](schedule.md), [reminders](reminders.md), [radar](radar.md), [attention-engine](attention-engine.md), [progress-and-workload](progress-and-workload.md), [quick-capture](quick-capture.md), [academic-inbox](academic-inbox.md), [schedule-import](schedule-import.md), [pwa](pwa.md), [ux-accessibility](ux-accessibility.md), [security](security.md), [demo](demo.md).
 
-## Totales de tests (rc.2 + A1)
+## Totales de tests (rc.2 + A1 + A4.1)
 
-Vitest: core 829, API 833, web 51 (**1713**). Playwright: 284 por pasada (280 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
+Vitest: core 869, API 845, web 54 (**1768**). Playwright: 296 por pasada (292 se ejecutan y 4 se omiten a propósito según el viewport: teclado solo en escritorio, tamaño táctil solo en móvil), más 9 de seguridad en navegador (`npm run test:security:browser`, configuración aparte). `npm audit`: 4 altas (cadena del CLI de Prisma). Detalle: [testing.md](testing.md), [system-validation.md](system-validation.md).
 
 ## Riesgos y limitaciones vigentes
 

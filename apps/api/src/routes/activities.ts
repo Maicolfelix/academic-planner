@@ -10,6 +10,7 @@ export function activitiesRouter(
   router.get('/', controller.list);
   router.post('/', controller.create);
   router.get('/:id', controller.get);
+  router.get('/:id/calendar.ics', controller.calendar);
   router.patch('/:id', controller.update);
   router.delete('/:id', controller.remove);
   return router;

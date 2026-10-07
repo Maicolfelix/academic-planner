@@ -1,4 +1,6 @@
 import {
+  CALENDAR_CONTENT_TYPE,
+  CALENDAR_EXPORT_FILENAME,
   createActivitySchema,
   listActivitiesQuerySchema,
   updateActivitySchema,
@@ -21,6 +23,19 @@ export function createActivityController(service: ActivityService) {
     list: (async (req, res) => {
       const query = listActivitiesQuerySchema.parse(req.query);
       res.json({ activities: await service.list(actor(req), query) });
+    }) satisfies RequestHandler,
+
+    /** A read-only download for the signed-in owner: a fixed, safe file name (never built from the title). */
+    calendar: (async (req, res) => {
+      const id = parseIdParam(req.params.id, NOT_FOUND);
+      const ics = await service.calendarExport(actor(req), id);
+      res
+        .status(200)
+        .set({
+          'Content-Type': CALENDAR_CONTENT_TYPE,
+          'Content-Disposition': `attachment; filename="${CALENDAR_EXPORT_FILENAME}"`,
+        })
+        .send(ics);
     }) satisfies RequestHandler,
 
     create: (async (req, res) => {
