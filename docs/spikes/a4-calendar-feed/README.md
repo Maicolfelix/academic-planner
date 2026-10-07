@@ -1,6 +1,8 @@
 # A4-0: spike de clientes de calendario para el feed `.ics`
 
 > **Estado: protocolo y herramientas listos; resultados de los clientes reales: NOT TESTED.** Esto es documentación y herramientas de prueba, **no código de producto**: A4 no está implementado y este spike no toca Prisma, API, web, `packages/core` de producto, dependencias ni versión. Los resultados que no se probaron de verdad están marcados `NOT TESTED` en [results.md](results.md): no se inventó ninguno.
+>
+> **A4-0b** ([normative-validation.md](normative-validation.md)): validación contra el texto de los RFC, segunda validación independiente, contrato del serializador y comparación «feed» vs «Añadir al calendario». Resultado: el feed **aún no está justificado** frente a la alternativa más simple.
 
 ## Para qué sirve
 
@@ -8,15 +10,18 @@ Antes de escribir el feed `.ics` de A4 ([diseño en el roadmap](../../roadmap-po
 
 ## Archivos
 
-| Archivo                                        | Qué es                                                                                                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [spike-v1.ics](spike-v1.ics)                   | Feed sintético, versión 1 (9 eventos). Fechas fijas de octubre de 2026                                                                           |
-| [spike-v2.ics](spike-v2.ics)                   | Versión 2: mismos UID, con cambios, una baja y un alta (ver [tabla](#qué-cambia-de-v1-a-v2))                                                     |
-| `spike-v1-nohints.ics`, `spike-v2-nohints.ics` | Las mismas versiones **sin** `REFRESH-INTERVAL` ni `X-PUBLISHED-TTL`, para separar el efecto de las pistas del refresco por defecto del cliente  |
-| [generate.mjs](generate.mjs)                   | Genera los cuatro archivos (y otras fechas, p. ej. alarmas a 50 min de «ahora»). Serializador desechable: A4-1 escribirá el real                 |
-| [serve.mjs](serve.mjs)                         | Servidor estático mínimo que **registra cada petición** (hora exacta, agente, `If-None-Match`…) para medir el refresco también del lado servidor |
-| [validate.mjs](validate.mjs)                   | Validador: parsea con `ical.js` (implementación independiente) y comprueba reglas estructurales de RFC 5545                                      |
-| [results.md](results.md)                       | Tabla de resultados (la que hay que completar) y lo que ya se verificó localmente                                                                |
+| Archivo                                            | Qué es                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [spike-v1.ics](spike-v1.ics)                       | Feed sintético, versión 1 (9 eventos). Fechas fijas de octubre de 2026                                                                            |
+| [spike-v2.ics](spike-v2.ics)                       | Versión 2: mismos UID, con cambios, una baja y un alta (ver [tabla](#qué-cambia-de-v1-a-v2))                                                      |
+| `spike-v1-nohints.ics`, `spike-v2-nohints.ics`     | Las mismas versiones **sin** `REFRESH-INTERVAL` ni `X-PUBLISHED-TTL`, para separar el efecto de las pistas del refresco por defecto del cliente   |
+| [spike-robustness.ics](spike-robustness.ics)       | 16 títulos adversos (comas, punto y coma, barras, saltos de línea, inyección de CRLF, emoji, marcas combinantes, 75 octetos…), un evento por caso |
+| [serializer-cases.mjs](serializer-cases.mjs)       | El **contrato ejecutable** del serializador (normalizar, escapar, plegar) y los 16 casos; lo usan el generador y el validador                     |
+| [normative-validation.md](normative-validation.md) | A4-0b: RFC propiedad por propiedad, decisiones, comparación feed vs «Añadir al calendario», tabla de decisiones                                   |
+| [generate.mjs](generate.mjs)                       | Genera los cinco archivos (y otras fechas, p. ej. alarmas a 50 min de «ahora»). Serializador desechable: A4-1 escribirá el real                   |
+| [serve.mjs](serve.mjs)                             | Servidor estático mínimo que **registra cada petición** (hora exacta, agente, `If-None-Match`…) para medir el refresco también del lado servidor  |
+| [validate.mjs](validate.mjs)                       | Validador: parsea con `ical.js` (implementación independiente) y comprueba reglas estructurales de RFC 5545                                       |
+| [results.md](results.md)                           | Tabla de resultados (la que hay que completar) y lo que ya se verificó localmente                                                                 |
 
 Los `.ics` conservan fin de línea CRLF (RFC 5545): un `.gitattributes` local (`*.ics -text`) impide que git los normalice a LF.
 
@@ -36,7 +41,9 @@ Todo es sintético; las horas «Bogotá» son UTC-5.
 | 8   | `spike-alarm-relative`                | `VALARM` `TRIGGER:-PT30M`                                                           | Alarma relativa                                                |
 | 9   | `spike-alarm-absolute`                | `VALARM` `TRIGGER;VALUE=DATE-TIME:…Z`                                               | Alarma absoluta                                                |
 
-Decisiones deliberadas del fixture (a confirmar o descartar con los resultados): sin `METHOD` (ver [DTSTAMP](#dtstamp-last-modified-y-sequence-rfc-5545)); eventos de actividad `TRANSP:TRANSPARENT`; `DTSTAMP` y `LAST-MODIFIED` fijos y deterministas; ningún evento lleva `DESCRIPTION` (datos mínimos); `X-WR-CALNAME`; y, solo en las versiones con pistas, `REFRESH-INTERVAL;VALUE=DURATION:PT10M` y `X-PUBLISHED-TTL:PT10M` (10 minutos a propósito, para distinguirlo del refresco por defecto, que suele ser de horas).
+Decisiones deliberadas del fixture (verificadas contra el RFC en [normative-validation.md](normative-validation.md)): sin `METHOD`; `UID` **opacos**, sin dominio (RFC 7986 §5.3; una versión anterior del spike usaba `@academic-planner`); eventos de actividad `TRANSP:TRANSPARENT`; `DTSTAMP` y `LAST-MODIFIED` fijos, iguales y deterministas; ningún evento lleva `DESCRIPTION` (datos mínimos); `X-WR-CALNAME`; y, solo en las versiones con pistas, `REFRESH-INTERVAL;VALUE=DURATION:PT10M` y `X-PUBLISHED-TTL:PT10M`.
+
+**Las pistas son un experimento, no una propuesta.** `REFRESH-INTERVAL` (RFC 7986) es un intervalo **mínimo** sugerido: un valor corto **no puede acelerar** el refresco (el RFC pide incluso que los clientes avisen si es menor que ~1 día) y `X-PUBLISHED-TTL` no es estándar. Las variantes con pistas solo sirven para observar si algún cliente reacciona de forma distinta; el MVP no las emite.
 
 Las alarmas están fijadas el viernes 23 de octubre de 2026 (para que existan sin depender de «ahora»). **Para probar que realmente suenan**, regenera con alarmas próximas:
 
@@ -67,7 +74,7 @@ Si los eventos con y sin `SEQUENCE` se actualizan igual, `SEQUENCE` no hace falt
 
 **Lo que se ejecutó en esta sesión (verificado):** generación de los fixtures, validación con `ical.js` 2.2.1 y comprobaciones estructurales (incluidos controles negativos), y el servidor `serve.mjs` en `localhost` (cabeceras, `ETag`, `304`, cambio de versión, 404). Detalle en [results.md](results.md).
 
-**Lo que no se pudo ejecutar:** ningún cliente real (Google, Apple, Outlook): no hay cuentas ni dispositivos conectados a esta sesión y el repositorio es privado, así que tampoco hay una URL HTTPS pública donde suscribirse. Se dejan las instrucciones exactas abajo. Para validar con un validador RFC de terceros (p. ej. el de icalendar.org) hay que subir el archivo a un servicio externo: no se hizo; son datos sintéticos y se puede hacer manualmente.
+**Lo que no se pudo ejecutar:** ningún cliente real (Google, Apple, Outlook): no hay cuentas ni dispositivos conectados a esta sesión y el repositorio es privado, así que tampoco hay una URL HTTPS pública donde suscribirse. Se dejan las instrucciones exactas abajo. Un validador RFC de terceros (icalendar.org v1.22) **sí** se ejecutó en A4-0b con los fixtures sintéticos; ver [normative-validation.md](normative-validation.md#5-segunda-validación-independiente).
 
 ### Cómo servirlo por HTTPS público
 
@@ -106,7 +113,7 @@ npm install --prefix <carpeta temporal fuera del repositorio> ical.js   # NO es 
 node docs/spikes/a4-calendar-feed/validate.mjs --lib <esa carpeta> docs/spikes/a4-calendar-feed/spike-v1.ics docs/spikes/a4-calendar-feed/spike-v2.ics
 ```
 
-Lo que hace: parsea con `ical.js` (independiente del generador) y lee los eventos de vuelta; y exige CRLF, líneas ≤ 75 octetos, UTF-8 válido, `BEGIN/END` balanceados, `UID` y `DTSTAMP` únicos/presentes, `DTEND` posterior a `DTSTART`. **No es un validador RFC completo**: es un parser independiente más reglas estructurales propias. El resultado (y sus controles negativos) está en [results.md](results.md). Pendiente, manual: pasar los archivos por un validador RFC de terceros y anotar errores y avisos. **No se corrige una incompatibilidad solo porque un cliente la tolere.**
+Lo que hace: parsea con `ical.js` (independiente del generador) y lee los eventos de vuelta; exige CRLF, líneas ≤ 75 octetos, UTF-8 válido, sin caracteres de control, `BEGIN/END` balanceados, `UID` y `DTSTAMP` únicos/presentes, `DTEND` posterior a `DTSTART`; y para `spike-robustness*.ics` comprueba que cada título se lee de vuelta **exactamente** y que no se inyectó ningún componente o propiedad. **No es un validador RFC completo**: es un parser independiente más reglas estructurales propias. El resultado, sus controles negativos y la segunda validación (icalendar.org) están en [results.md](results.md). **No se corrige una incompatibilidad solo porque un cliente la tolere.**
 
 ## Microprueba con estudiantes (preparada; sin estudiantes disponibles en esta sesión)
 
@@ -132,30 +139,30 @@ Preguntas:
 
 ## DTSTAMP, LAST-MODIFIED y SEQUENCE (RFC 5545)
 
-Investigación documental, previa a A4-1; **no se implementa nada**. Lo siguiente es lo que dice el RFC según el conocimiento del autor del spike (a verificar contra el texto del RFC antes de implementar):
+Investigación documental, previa a A4-1; **no se implementa nada**. **Verificado en A4-0b contra el texto de los RFC** (tabla completa y decisiones en [normative-validation.md](normative-validation.md)); lo que sigue es el resumen original:
 
 - **`DTSTAMP`** (RFC 5545 §3.8.7.2): obligatorio en cada `VEVENT`, en UTC. Su significado **depende de `METHOD`**: si el objeto especifica `METHOD`, es la fecha de **creación de esa instancia del objeto iCalendar**; si **no** especifica `METHOD`, es la fecha en que la información del componente **se revisó por última vez** en el almacén de calendarios.
 - **`LAST-MODIFIED`** (§3.8.7.3): opcional; la fecha de la última revisión del componente en el almacén (análogo a la fecha de modificación de un archivo).
 - **`SEQUENCE`** (§3.8.7.4): número de revisión; se incrementa ante cambios «significativos» (nacido en iTIP, RFC 5546, para ordenar actualizaciones de invitaciones; `DTSTAMP` desempata). En un feed de solo lectura que el cliente reemplaza entero es probable que no importe, pero **eso es lo que el spike debe medir**.
-- **`REFRESH-INTERVAL`** (RFC 7986 §5.7): intervalo mínimo sugerido entre consultas; **`X-PUBLISHED-TTL`** es una extensión informal (Microsoft/Apple). Que un cliente las respete es justo lo que se prueba.
+- **`REFRESH-INTERVAL`** (RFC 7986 §5.7): intervalo **mínimo** sugerido entre consultas (no acelera el refresco); **`X-PUBLISHED-TTL`** es una extensión informal **no estándar**. Ninguna entra en el MVP.
 
 **Implicación para A4:** no asumir `DTSTAMP == LAST-MODIFIED` por costumbre. Con `METHOD:PUBLISH`, el RFC pediría que `DTSTAMP` fuera la hora de **generación** del feed, que cambia en cada consulta y haría que todo parezca modificado y que la salida deje de ser determinista. Sin `METHOD` (y sin el parámetro `method` en el `Content-Type`, coherente con `text/calendar; charset=utf-8`), `DTSTAMP` es la última revisión y puede ser igual a `LAST-MODIFIED` **sin violar el RFC**. Los timestamps reales que existen: `Activity.updatedAt`, `ScheduleBlock.updatedAt` y `Subject.updatedAt` (el nombre de la asignatura va en el título); no hay marcas por campo. Decisión **provisional** para A4-1 (sujeta a los resultados): sin `METHOD`; `LAST-MODIFIED` = máximo de los `updatedAt` implicados; `DTSTAMP` = el mismo valor; nunca la hora actual. Si algún cliente exige `METHOD` o ignora las actualizaciones sin `SEQUENCE`, se revisa.
 
 ## Puertas de decisión de A4-1
 
-A4-1 **no empieza** hasta responder estas nueve preguntas. Estado actual (todas abiertas: faltan los resultados de los clientes y la microprueba):
+A4-1 **no empieza** hasta responder estas nueve preguntas **y** hasta que el feed quede justificado frente a «Añadir al calendario» ([comparación](normative-validation.md#7-opción-a-feed-por-url-vs-opción-b-añadir-al-calendario)). Estado actual: las 7 y 9 las cierra el RFC; el resto sigue abierto (faltan los clientes y la microprueba). Tabla de decisiones con estados: [normative-validation.md](normative-validation.md#13-tabla-de-decisiones).
 
-| #   | Pregunta                                                       | Recomendación provisional (de diseño, no de evidencia)                         | Qué evidencia la cierra                                            |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| 1   | ¿El deadline termina en `dueAt` o se representa de otra forma? | Bloque corto que **termina** en `dueAt`                                        | Observación visual de las filas 1–2 en los tres clientes           |
-| 2   | ¿Cómo se tratan `EXAM`/`QUIZ`/`PRESENTATION`?                  | Igual que el resto por ahora; **candidato**: inicio en `dueAt` para esos tipos | ¿Se siente incorrecto 08:15–08:30? + respuesta de estudiantes      |
-| 3   | ¿El feed incluye `CLASS` por defecto?                          | Sí, con opción de excluirlas si hay duplicación                                | Microprueba (preguntas 1 y 2)                                      |
-| 4   | ¿Las actividades completadas desaparecen?                      | Sí (omitirlas)                                                                 | Microprueba (pregunta 3) + latencia de baja medida                 |
-| 5   | ¿`VALARM` entra o no?                                          | No por ahora                                                                   | Resultados de alarmas relativa y absoluta por cliente/dispositivo  |
-| 6   | ¿Hace falta `SEQUENCE`?                                        | No                                                                             | Eventos de v2 con y sin `SEQUENCE`                                 |
-| 7   | ¿`REFRESH-INTERVAL` aporta algo?                               | Solo emitirlo si algún cliente lo respeta                                      | Suscripción con pistas frente a `-nohints` (registro del servidor) |
-| 8   | ¿Un token por usuario es aceptable?                            | Sí, mientras la microprueba (pregunta 4) no diga lo contrario                  | Microprueba (pregunta 4)                                           |
-| 9   | ¿Cómo se generan `DTSTAMP` y `LAST-MODIFIED`?                  | Sin `METHOD`; ambos desde `updatedAt`, nunca la hora actual                    | Investigación RFC (arriba) + que ningún cliente falle sin `METHOD` |
+| #   | Pregunta                                                       | Recomendación provisional (de diseño, no de evidencia)                          | Qué evidencia la cierra                                                                 |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | ¿El deadline termina en `dueAt` o se representa de otra forma? | Bloque corto que **termina** en `dueAt`                                         | Observación visual de las filas 1–2 en los tres clientes                                |
+| 2   | ¿Cómo se tratan `EXAM`/`QUIZ`/`PRESENTATION`?                  | Igual que el resto por ahora; **candidato**: inicio en `dueAt` para esos tipos  | ¿Se siente incorrecto 08:15–08:30? + respuesta de estudiantes                           |
+| 3   | ¿El feed incluye `CLASS` por defecto?                          | Sí, con opción de excluirlas si hay duplicación                                 | Microprueba (preguntas 1 y 2)                                                           |
+| 4   | ¿Las actividades completadas desaparecen?                      | Sí (omitirlas)                                                                  | Microprueba (pregunta 3) + latencia de baja medida                                      |
+| 5   | ¿`VALARM` entra o no?                                          | No por ahora                                                                    | Resultados de alarmas relativa y absoluta por cliente/dispositivo                       |
+| 6   | ¿Hace falta `SEQUENCE`?                                        | No                                                                              | Eventos de v2 con y sin `SEQUENCE`                                                      |
+| 7   | ¿`REFRESH-INTERVAL` aporta algo?                               | **No emitirlo** (RFC 7986: es un mínimo, no acelera); `X-PUBLISHED-TTL` tampoco | Cerrada por el RFC; la medición con `-nohints` queda como curiosidad                    |
+| 8   | ¿Un token por usuario es aceptable?                            | Sí, mientras la microprueba (pregunta 4) no diga lo contrario                   | Microprueba (pregunta 4)                                                                |
+| 9   | ¿Cómo se generan `DTSTAMP` y `LAST-MODIFIED`?                  | Sin `METHOD`; ambos desde `updatedAt`, nunca la hora actual                     | **Confirmada por el RFC** (A4-0b); pendiente solo que ningún cliente falle sin `METHOD` |
 
 ## Cambios respecto a la recomendación inicial de A4
 

@@ -7,12 +7,13 @@
 //   node docs/spikes/a4-calendar-feed/generate.mjs --no-hints --suffix -nohints   same, without REFRESH-INTERVAL/TTL
 //   options: --out <dir> (default: this folder)  --anchor YYYY-MM-DD (a Monday; default 2026-10-19)
 //
-// The serializer below is a throwaway for the spike (escape, fold by OCTETS, CRLF); A4-1 will write the real one.
+// The text rules (escape, fold by OCTETS, CRLF, control characters) live in serializer-cases.mjs; A4-1 will write the
+// real serializer against them.
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { Buffer } from 'node:buffer';
 import { fileURLToPath } from 'node:url';
+import { ROBUSTNESS_CASES, escapeText, fold } from './serializer-cases.mjs';
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -41,30 +42,6 @@ const bogota = (offset, hhmm) => {
 };
 const minus = (date, minutes) => new Date(date.getTime() - minutes * 60_000);
 const plus = (date, minutes) => new Date(date.getTime() + minutes * 60_000);
-
-// ── RFC 5545 text rules (3.3.11 escaping, 3.1 folding at 75 OCTETS, CRLF) ──
-const escapeText = (s) =>
-  s.replaceAll('\\', '\\\\').replaceAll(';', '\\;').replaceAll(',', '\\,').replaceAll('\n', '\\n');
-function fold(line) {
-  const chunks = [];
-  let current = '';
-  let bytes = 0;
-  for (const ch of line) {
-    const size = Buffer.byteLength(ch);
-    const limit = chunks.length === 0 ? 75 : 74; // continuation lines start with one space
-    if (bytes + size > limit) {
-      // never end a physical line in a space (tools that trim trailing whitespace would corrupt the text)
-      const trailing = / +$/.exec(current)?.[0] ?? '';
-      chunks.push(current.slice(0, current.length - trailing.length));
-      current = trailing;
-      bytes = Buffer.byteLength(trailing);
-    }
-    current += ch;
-    bytes += size;
-  }
-  chunks.push(current);
-  return chunks.map((c, i) => (i === 0 ? c : ` ${c}`)).join('\r\n');
-}
 
 const V1_STAMP = new Date('2026-10-07T12:00:00Z');
 const V2_STAMP = new Date('2026-10-07T18:00:00Z');
@@ -106,13 +83,13 @@ function build(version) {
     // 1. deadline with time, 23:59 Bogotá. v2: TIME change, no SEQUENCE bump.
     v2
       ? deadline(
-          'spike-activity-entrega@academic-planner',
+          'spike-activity-entrega',
           bogota(4, '23:30'),
           'Entrega Proyecto (Bases de Datos)',
           V2_STAMP,
         )
       : deadline(
-          'spike-activity-entrega@academic-planner',
+          'spike-activity-entrega',
           bogota(4, '23:59'),
           'Entrega Proyecto (Bases de Datos)',
           V1_STAMP,
@@ -121,7 +98,7 @@ function build(version) {
     v2
       ? {
           ...deadline(
-            'spike-activity-parcial@academic-planner',
+            'spike-activity-parcial',
             bogota(2, '09:30'),
             'Parcial de Redes (Redes de Computadores)',
             V2_STAMP,
@@ -129,7 +106,7 @@ function build(version) {
           sequence: 1,
         }
       : deadline(
-          'spike-activity-parcial@academic-planner',
+          'spike-activity-parcial',
           bogota(2, '08:30'),
           'Parcial de Redes (Redes de Computadores)',
           V1_STAMP,
@@ -137,22 +114,17 @@ function build(version) {
     // 3. all-day (no time). v2: TITLE change, no SEQUENCE bump.
     v2
       ? allDay(
-          'spike-activity-taller@academic-planner',
+          'spike-activity-taller',
           day(3),
           'Taller de Bioestadística (título cambiado en v2)',
           V2_STAMP,
         )
-      : allDay(
-          'spike-activity-taller@academic-planner',
-          day(3),
-          'Taller de Bioestadística (sin hora)',
-          V1_STAMP,
-        ),
+      : allDay('spike-activity-taller', day(3), 'Taller de Bioestadística (sin hora)', V1_STAMP),
     // 4. class 08:00-10:00 Bogotá. v2: TITLE change WITH SEQUENCE:1.
     v2
       ? {
           ...klass(
-            `spike-class-redes-${ymd(day(0))}@academic-planner`,
+            `spike-class-redes-${ymd(day(0))}`,
             bogota(0, '08:00'),
             bogota(0, '10:00'),
             'Redes de Computadores (aula cambiada en v2)',
@@ -161,7 +133,7 @@ function build(version) {
           sequence: 1,
         }
       : klass(
-          `spike-class-redes-${ymd(day(0))}@academic-planner`,
+          `spike-class-redes-${ymd(day(0))}`,
           bogota(0, '08:00'),
           bogota(0, '10:00'),
           'Redes de Computadores',
@@ -169,7 +141,7 @@ function build(version) {
         ),
     // 5. second occurrence, same pattern the next week: byte-identical in v2.
     klass(
-      `spike-class-redes-${ymd(day(7))}@academic-planner`,
+      `spike-class-redes-${ymd(day(7))}`,
       bogota(7, '08:00'),
       bogota(7, '10:00'),
       'Redes de Computadores',
@@ -177,7 +149,7 @@ function build(version) {
     ),
     // 8/9. alarms, byte-identical in v2.
     {
-      uid: 'spike-alarm-relative@academic-planner',
+      uid: 'spike-alarm-relative',
       stamp: V1_STAMP,
       start: relStart,
       end: plus(relStart, 15),
@@ -185,7 +157,7 @@ function build(version) {
       alarm: { trigger: 'TRIGGER:-PT30M' },
     },
     {
-      uid: 'spike-alarm-absolute@academic-planner',
+      uid: 'spike-alarm-absolute',
       stamp: V1_STAMP,
       start: absStart,
       end: plus(absStart, 15),
@@ -193,33 +165,21 @@ function build(version) {
       alarm: { trigger: `TRIGGER;VALUE=DATE-TIME:${utc(absTrigger)}` },
     },
     // 7. long title (folding by octets), byte-identical in v2.
-    klass(
-      'spike-long-title@academic-planner',
-      bogota(1, '14:00'),
-      bogota(1, '14:30'),
-      LONG_TITLE,
-      V1_STAMP,
-    ),
+    klass('spike-long-title', bogota(1, '14:00'), bogota(1, '14:30'), LONG_TITLE, V1_STAMP),
   ];
   // 6. unicode/escaping: present in v1, DELETED in v2.
   if (!v2) {
     events.splice(
       5,
       0,
-      klass(
-        'spike-unicode@academic-planner',
-        bogota(1, '10:00'),
-        bogota(1, '10:30'),
-        UNICODE_TITLE,
-        V1_STAMP,
-      ),
+      klass('spike-unicode', bogota(1, '10:00'), bogota(1, '10:30'), UNICODE_TITLE, V1_STAMP),
     );
   }
   // v2 ADDS one event.
   if (v2) {
     events.push(
       klass(
-        'spike-new-in-v2@academic-planner',
+        'spike-new-in-v2',
         bogota(2, '15:00'),
         bogota(2, '16:00'),
         'Evento nuevo en v2',
@@ -269,7 +229,36 @@ function build(version) {
   return `${lines.map(fold).join('\r\n')}\r\n`;
 }
 
+/** One robustness event per case: the title goes through the serializer rules, nothing else is special. */
+function buildRobustness() {
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Academic Planner//A4 spike//ES',
+    'CALSCALE:GREGORIAN',
+  ];
+  ROBUSTNESS_CASES.forEach(([id, raw], i) => {
+    const start = bogota(1, '09:00');
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:spike-robustness-${id}`,
+      `DTSTAMP:${utc(V1_STAMP)}`,
+      `LAST-MODIFIED:${utc(V1_STAMP)}`,
+      `DTSTART:${utc(plus(start, i * 30))}`,
+      `DTEND:${utc(plus(start, i * 30 + 15))}`,
+      `SUMMARY:${escapeText(raw)}`,
+      'END:VEVENT',
+    );
+  });
+  lines.push('END:VCALENDAR');
+  return `${lines.map(fold).join('\r\n')}\r\n`;
+}
+
 fs.mkdirSync(out, { recursive: true });
+if (suffix === '') {
+  fs.writeFileSync(path.join(out, 'spike-robustness.ics'), buildRobustness(), 'utf8');
+  process.stdout.write(`wrote ${path.join(out, 'spike-robustness.ics')}\n`);
+}
 for (const version of [1, 2]) {
   const file = path.join(out, `spike-v${version}${suffix}.ics`);
   fs.writeFileSync(file, build(version), 'utf8');

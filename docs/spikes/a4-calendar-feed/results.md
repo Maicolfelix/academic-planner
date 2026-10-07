@@ -89,6 +89,7 @@ Estas **sí se ejecutaron** (2026-10-07, Windows, Node 24.19). No sustituyen a l
 
 - Generados por [generate.mjs](generate.mjs); regenerar da **exactamente los mismos bytes** (comparado por SHA-256).
 - Fin de línea CRLF preservado en git (`*.ics -text`).
+- Los `UID` son opacos (sin `@dominio`, RFC 7986 §5.3). Regenerados en A4-0b; las filas de arriba siguen sin probarse en clientes.
 - Cambios v1 → v2 verificados por UID: **cambiados** 4 (`entrega`, `parcial`, `taller`, `class-redes-20261019`), **byte-idénticos** 4 (`class-redes-20261026`, `alarm-relative`, `alarm-absolute`, `long-title`), **eliminado** 1 (`unicode`), **añadido** 1 (`new-in-v2`).
 - Las variantes `-nohints` no contienen `REFRESH-INTERVAL` ni `X-PUBLISHED-TTL` y sus eventos son idénticos a los de v1.
 
@@ -96,15 +97,20 @@ Estas **sí se ejecutaron** (2026-10-07, Windows, Node 24.19). No sustituyen a l
 
 Herramienta: [validate.mjs](validate.mjs) con **ical.js 2.2.1** (instalado fuera del repositorio, no es una dependencia del proyecto) más reglas estructurales propias de RFC 5545.
 
-| Archivo        | Eventos leídos por ical.js | Errores | Avisos  |
-| -------------- | -------------------------- | ------- | ------- |
-| `spike-v1.ics` | 9                          | ninguno | ninguno |
-| `spike-v2.ics` | 9                          | ninguno | ninguno |
+| Archivo                | Eventos leídos por ical.js | Errores | Avisos  |
+| ---------------------- | -------------------------- | ------- | ------- |
+| `spike-v1.ics`         | 9                          | ninguno | ninguno |
+| `spike-v2.ics`         | 9                          | ninguno | ninguno |
+| `spike-v1-nohints.ics` | 9                          | ninguno | ninguno |
+| `spike-v2-nohints.ics` | 9                          | ninguno | ninguno |
+| `spike-robustness.ics` | 16 (+ contrato exacto)     | ninguno | ninguno |
 
 - Lectura de vuelta **exacta** (comparación de cadenas) del título largo y del título con `ñ á é í ó ú ¿? , ; \` (escapes `\,` `\;` `\\` correctos); 3 líneas plegadas en v1, ninguna con más de 75 octetos.
 - Instantes UTC correctos: la entrega de las 23:59 Bogotá es `2026-10-24T04:59:00Z`; la clase 08:00–10:00 es 13:00–15:00Z; el evento de día completo es `DATE` 2026-10-22 → 2026-10-23.
 - **Controles negativos** (el validador debe fallar con archivos rotos): fin de línea LF → falla; línea de 142 octetos → falla; `DTEND` anterior a `DTSTART` → falla; UTF-8 inválido → falla; falta `DTSTAMP` → falla (5 de 5).
-- **No ejecutado:** un validador RFC de terceros (por ejemplo el de icalendar.org): exige subir el archivo a un servicio externo; pendiente, manual. `ical.js` es un parser, no un validador RFC completo.
+- **Contrato del serializador** (`spike-robustness.ics`): 16 títulos adversos (CRLF/CR/LF, inyección de componentes y propiedades, caracteres de control, emoji y marcas combinantes en el límite de 75 octetos, CJK, RTL, sustituto suelto) se leen de vuelta **exactamente**. Dos serializadores ingenuos (escape sin CR/control; plegado por bytes) **fallan** el validador (13 y 14 errores): el contrato detecta lo que debe detectar.
+- **Segunda validación independiente** (2026-10-07): **iCalendar Validator v1.22 (icalendar.org)**, contra RFC 5545: `spike-v1.ics` (9 eventos) y `spike-v2.ics` (9) y `spike-robustness.ics` (16): «Success! No errors found». Control negativo: **4 errores** detectados. Se enviaron datos sintéticos; la copia de robustness se verificó por SHA-256 igual al archivo. Detalle en [normative-validation.md](normative-validation.md#5-segunda-validación-independiente).
+- `ical.js` es un parser, no un validador RFC completo; ningún validador sustituye a un cliente real.
 
 ### Servidor del spike (localhost)
 
@@ -112,4 +118,4 @@ Probado con `curl` contra [serve.mjs](serve.mjs): `Content-Type: text/calendar; 
 
 ## Conclusión del estado del spike
 
-**Incompleto:** el protocolo, los fixtures, la validación local y el cuestionario están hechos; faltan los tres clientes reales (y un validador RFC de terceros) y la microprueba con estudiantes. Las [puertas de decisión](README.md#puertas-de-decisión-de-a4-1) siguen abiertas.
+**Incompleto:** el protocolo, los fixtures, la validación (local y de terceros) y el cuestionario están hechos; faltan los tres clientes reales y la microprueba con estudiantes. Las [puertas de decisión](README.md#puertas-de-decisión-de-a4-1) siguen abiertas; la comparación de A4-0b concluye que el feed **aún no está justificado** frente a «Añadir al calendario» ([normative-validation.md](normative-validation.md#14-puerta-de-a4-1)).

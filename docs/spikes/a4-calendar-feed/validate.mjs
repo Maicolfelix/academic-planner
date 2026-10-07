@@ -13,6 +13,7 @@ import { Buffer } from 'node:buffer';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
+import { ROBUSTNESS_CASES, normalizeText } from './serializer-cases.mjs';
 
 const argv = process.argv.slice(2);
 const libAt = argv.indexOf('--lib');
@@ -53,7 +54,7 @@ for (const file of files) {
   lines.forEach((l, i) => {
     const octets = Buffer.byteLength(l);
     if (octets > 75) problems.push(`line ${i + 1} has ${octets} octets (> 75)`);
-    if ([...l].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127)) {
+    if ([...l].some((ch) => (ch.charCodeAt(0) < 32 && ch !== '\t') || ch.charCodeAt(0) === 127)) {
       problems.push(`line ${i + 1} has a control character`);
     }
   });
@@ -85,6 +86,28 @@ for (const file of files) {
   } catch (err) {
     problems.push(`ical.js could not parse it: ${err.message}`);
   }
+  // ── the serializer contract (serializer-cases.mjs): every title must read back EXACTLY and inject nothing ──
+  if (path.basename(file).startsWith('spike-robustness')) {
+    if (events.length !== ROBUSTNESS_CASES.length) {
+      problems.push(
+        `expected ${ROBUSTNESS_CASES.length} events, ical.js read ${events.length}: a title injected or swallowed a component`,
+      );
+    }
+    for (const [id, raw] of ROBUSTNESS_CASES) {
+      const e = events.find((ev) => ev.uid === `spike-robustness-${id}`);
+      if (!e) problems.push(`case ${id}: event not found`);
+      else if (e.summary !== normalizeText(raw))
+        problems.push(`case ${id}: the title did not read back exactly`);
+      else if (
+        e.component
+          .getAllProperties()
+          .some((pr) => ['attendee', 'description', 'organizer'].includes(pr.name))
+      ) {
+        problems.push(`case ${id}: an injected property appeared`);
+      }
+    }
+    say(`serializer contract: ${ROBUSTNESS_CASES.length} cases checked`);
+  }
   const uids = new Set();
   for (const e of events) {
     const c = e.component;
@@ -106,7 +129,9 @@ for (const file of files) {
   say(`events read back by ical.js: ${events.length}`);
   for (const e of events) {
     const kind = e.startDate?.isDate ? 'DATE     ' : 'DATE-TIME';
-    say(`  ${kind} ${String(e.startDate)} -> ${String(e.endDate)}  ${e.uid}  "${e.summary}"`);
+    say(
+      `  ${kind} ${String(e.startDate)} -> ${String(e.endDate)}  ${e.uid}  ${JSON.stringify(e.summary)}`,
+    );
   }
   say(`errors:   ${problems.length === 0 ? 'none' : ''}`);
   for (const p of problems) say(`  - ${p}`);
