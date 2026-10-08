@@ -6,6 +6,9 @@ import { useUpdateActivity, useActivities } from '../activities/useActivities';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { useNow } from '../lib/useNow';
+import { Button } from '../components/ui/Button';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { Card } from '../components/ui/Card';
 import { ActivityFilters } from './activities/ActivityFilters';
 import { ActivityFormDialog } from './activities/ActivityFormDialog';
 import { ActivityList } from './activities/ActivityList';
@@ -17,11 +20,6 @@ import {
   toApiQuery,
   type ActivityFilters as Filters,
 } from './activities/filterParams';
-
-const primaryButton =
-  'min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const secondaryButton =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
 
 /** Activities of the current period: filter (kept in the URL), create, edit, change status, delete. */
 export function ActivitiesPage() {
@@ -79,9 +77,9 @@ export function ActivitiesPage() {
   const canCreate = subjectList.length > 0;
 
   const add = canCreate ? (
-    <button type="button" onClick={() => setEditing('new')} className={primaryButton}>
+    <Button variant="primary" onClick={() => setEditing('new')}>
       Agregar actividad
-    </button>
+    </Button>
   ) : null;
 
   function changeStatus(activity: Activity, status: ActivityStatus) {
@@ -96,8 +94,8 @@ export function ActivitiesPage() {
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Actividades</h1>
-          <p className="text-sm text-slate-600 break-words">{period.name}</p>
+          <h1 className="text-page-title">Actividades</h1>
+          <p className="text-sm text-muted-foreground break-words">{period.name}</p>
         </div>
         {list.length > 0 && add}
       </header>
@@ -116,15 +114,15 @@ export function ActivitiesPage() {
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && !canCreate && (
-        <section className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
+        <Card as="section" variant="dashed" className="p-6 text-center">
           <p className="mb-1 text-lg font-medium">Primero agrega una asignatura.</p>
           <p className="mb-4 text-slate-600">
             Cada actividad pertenece a una asignatura de este semestre.
           </p>
-          <Link to="/subjects" className={`${primaryButton} inline-flex items-center`}>
+          <Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>
             Ir a Asignaturas
           </Link>
-        </section>
+        </Card>
       )}
 
       {canCreate && (
@@ -136,24 +134,24 @@ export function ActivitiesPage() {
           <QueryError query={activities} title="No se pudieron cargar tus actividades" />
 
           {activities.isSuccess && list.length === 0 && !filtered && (
-            <section className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
+            <Card as="section" variant="dashed" className="p-6 text-center">
               <p className="mb-1 text-lg font-medium">Aún no tienes actividades.</p>
               <p className="mb-4 text-slate-600">
                 Agrega tareas, parciales y entregas para tener todo en un solo lugar.
               </p>
               {add}
-            </section>
+            </Card>
           )}
 
           {activities.isSuccess && list.length === 0 && filtered && (
-            <section className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
+            <Card as="section" variant="dashed" className="p-6 text-center">
               <p className="mb-3 text-lg font-medium">
                 No hay actividades que coincidan con los filtros.
               </p>
-              <button type="button" onClick={() => setFilters({})} className={secondaryButton}>
+              <Button size="sm" onClick={() => setFilters({})}>
                 Limpiar filtros
-              </button>
-            </section>
+              </Button>
+            </Card>
           )}
 
           {list.length > 0 && (

@@ -58,9 +58,9 @@ export function Modal({
       }}
       onInput={() => setDirty(true)}
       onChange={() => setDirty(true)}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-slate-300 bg-white p-5 text-slate-900 backdrop:bg-black/40"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-surface border border-border bg-surface-elevated p-5 text-foreground shadow-floating backdrop:bg-black/40"
     >
-      <h2 id={titleId} className="mb-4 text-lg font-semibold break-words">
+      <h2 id={titleId} className="mb-4 text-section-title break-words">
         {title}
       </h2>
       {asking && (

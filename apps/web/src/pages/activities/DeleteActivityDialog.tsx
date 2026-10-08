@@ -1,6 +1,7 @@
 import type { Activity } from '@planner/core';
 import { useDeleteActivity } from '../../activities/useActivities';
 import { Modal } from '../../components/Modal';
+import { Button } from '../../components/ui/Button';
 
 interface Props {
   activity: Activity;
@@ -21,24 +22,18 @@ export function DeleteActivityDialog({ activity, onClose, onDeleted }: Props) {
         </p>
       )}
       <div className="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={remove.isPending}
-          className="min-h-11 rounded-md border border-slate-400 px-4 py-2 disabled:opacity-60"
-        >
+        <Button onClick={onClose} disabled={remove.isPending}>
           Cancelar
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger"
           disabled={remove.isPending}
           onClick={() =>
             remove.mutate(activity.id, { onSuccess: () => onDeleted('Actividad eliminada.') })
           }
-          className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white disabled:opacity-60"
         >
           {remove.isPending ? 'Eliminando…' : 'Eliminar'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

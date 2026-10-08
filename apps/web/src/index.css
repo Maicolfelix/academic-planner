@@ -1,5 +1,131 @@
 @import 'tailwindcss';
 
+/*
+ * Design tokens (UX1-0). Semantic ROLES, not colors: components say `bg-primary` or `text-muted-foreground`, never
+ * `bg-slate-900`. The values below are on purpose the app's CURRENT identity (ink on white, slate borders): the
+ * foundation changes nothing by itself. A different palette, or a dark theme, is a change of these values only:
+ * `@theme inline` makes every utility read the variable at run time, so a future `[data-theme='dark']` block that
+ * redefines them is enough, with no component edits.
+ *
+ * Subject colors (the fixed 10-color palette in packages/core) are NOT part of this system: they identify a
+ * subject, never a role.
+ */
+:root {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --foreground: #0f172a;
+  --muted-foreground: #475569;
+  --border: #cbd5e1;
+  --border-strong: #94a3b8;
+  --primary: #0f172a;
+  --primary-hover: #1e293b;
+  --primary-foreground: #ffffff;
+  /* A quiet fill: the hover of outlined and ghost controls. */
+  --secondary: #f1f5f9;
+  /* Reserved for emphasis: UX1-1 decides the hue together with the shell. Nothing uses it yet. */
+  --accent: #4f46e5;
+  /* Semantic states. Each has the solid color, a soft background, a line and the ink to read on the soft one;
+     they reproduce the red / amber / green / blue badges the app already had. */
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-line: #fca5a5;
+  --danger-ink: #7f1d1d;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --warning-line: #fcd34d;
+  --warning-ink: #78350f;
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  --success-line: #86efac;
+  --success-ink: #14532d;
+  --info: #1d4ed8;
+  --info-soft: #eff6ff;
+  --info-line: #93c5fd;
+  --info-ink: #1e3a8a;
+  /* The focus ring is the foreground color: the same one the 34 explicit rings already use. */
+  --ring: var(--foreground);
+  /* Motion: two durations and one easing. prefers-reduced-motion is handled at the bottom of this file. */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-danger-ink: var(--danger-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+  --color-warning-ink: var(--warning-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-success-ink: var(--success-ink);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-info-ink: var(--info-ink);
+}
+
+@theme {
+  /* Radius: controls (buttons, fields) and surfaces (cards, dialogs). Pills stay `rounded-full`. */
+  --radius-control: 0.375rem;
+  --radius-surface: 0.5rem;
+
+  /* Two elevations only: a card at rest and something floating over the page. */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --shadow-floating: 0 8px 24px -6px rgb(15 23 42 / 0.18);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Type roles. Body is the default size and "meta" is Tailwind's `text-sm`: no tokens for those. */
+  --text-page-title: 1.5rem;
+  --text-page-title--line-height: 2rem;
+  --text-page-title--font-weight: 600;
+  --text-section-title: 1.125rem;
+  --text-section-title--line-height: 1.75rem;
+  --text-section-title--font-weight: 600;
+  --text-card-title: 1rem;
+  --text-card-title--line-height: 1.5rem;
+  --text-card-title--font-weight: 600;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  /* One visible focus ring for everything that can take focus. Zero specificity (:where) and inside the base
+     layer: any `focus-visible:` utility already on an element still wins, so nothing existing changes. */
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
 /* Notch / home-indicator insets when installed (0 in ordinary browsers). */
 body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)

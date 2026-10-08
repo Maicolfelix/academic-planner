@@ -8,8 +8,8 @@ Las pruebas son la segunda fuente de verdad después del código: si un document
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Núcleo (`packages/core`) | Vitest                                            | 869 en 17 archivos                                                                                                        |
 | API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 845 en 33 archivos (incluye 159 de seguridad y 28 del seed demo)                                                          |
-| Interfaz (`apps/web`)    | Vitest                                            | 54 en 8 archivos                                                                                                          |
-| **Total Vitest**         |                                                   | **1768**                                                                                                                  |
+| Interfaz (`apps/web`)    | Vitest                                            | 78 en 9 archivos                                                                                                          |
+| **Total Vitest**         |                                                   | **1792**                                                                                                                  |
 | Navegador                | Playwright (360 px y 1366 px)                     | 296 registrados por pasada: 292 pasan y 4 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
 | Seguridad en navegador   | Playwright (puerto 4300, topología de producción) | 9 (configuración aparte)                                                                                                  |
 
