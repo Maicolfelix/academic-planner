@@ -8,7 +8,7 @@ import { useMe } from '../auth/useAuth';
 import { useNow } from '../lib/useNow';
 import { Button } from '../components/ui/Button';
 import { buttonStyles } from '../components/ui/buttonStyles';
-import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
 import { ActivityFormDialog } from './activities/ActivityFormDialog';
@@ -109,15 +109,16 @@ export function ActivitiesPage() {
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && !canCreate && (
-        <Card as="section" variant="dashed" className="p-6 text-center">
-          <p className="mb-1 text-lg font-medium">Primero agrega una asignatura.</p>
-          <p className="mb-4 text-slate-600">
-            Cada actividad pertenece a una asignatura de este semestre.
-          </p>
-          <Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>
-            Ir a Asignaturas
-          </Link>
-        </Card>
+        <EmptyState
+          title="Primero agrega una asignatura."
+          action={
+            <Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>
+              Ir a Asignaturas
+            </Link>
+          }
+        >
+          Cada actividad pertenece a una asignatura de este semestre.
+        </EmptyState>
       )}
 
       {canCreate && (
@@ -129,24 +130,20 @@ export function ActivitiesPage() {
           <QueryError query={activities} title="No se pudieron cargar tus actividades" />
 
           {activities.isSuccess && list.length === 0 && !filtered && (
-            <Card as="section" variant="dashed" className="p-6 text-center">
-              <p className="mb-1 text-lg font-medium">Aún no tienes actividades.</p>
-              <p className="mb-4 text-slate-600">
-                Agrega tareas, parciales y entregas para tener todo en un solo lugar.
-              </p>
-              {add}
-            </Card>
+            <EmptyState title="Aún no tienes actividades." action={add}>
+              Agrega tareas, parciales y entregas para tener todo en un solo lugar.
+            </EmptyState>
           )}
 
           {activities.isSuccess && list.length === 0 && filtered && (
-            <Card as="section" variant="dashed" className="p-6 text-center">
-              <p className="mb-3 text-lg font-medium">
-                No hay actividades que coincidan con los filtros.
-              </p>
-              <Button size="sm" onClick={() => setFilters({})}>
-                Limpiar filtros
-              </Button>
-            </Card>
+            <EmptyState
+              title="No hay actividades que coincidan con los filtros."
+              action={
+                <Button size="sm" onClick={() => setFilters({})}>
+                  Limpiar filtros
+                </Button>
+              }
+            />
           )}
 
           {list.length > 0 && (

@@ -170,11 +170,21 @@ describe('motion (index.css)', () => {
 
   it('defines the entrance and the fill with the shared duration and easing tokens', () => {
     expect(css).toMatch(
-      /--animate-rise:\s*rise var\(--duration-normal\) var\(--ease-standard\) both/,
+      /--animate-rise:\s*rise var\(--duration-normal\) var\(--ease-enter\) backwards/,
     );
     expect(css).toMatch(
-      /--animate-fill:\s*fill var\(--duration-slow\) var\(--ease-standard\) both/,
+      /--animate-fill:\s*fill var\(--duration-slow\) var\(--ease-enter\) backwards/,
     );
+    expect(css).toMatch(
+      /--animate-pop:\s*pop var\(--duration-normal\) var\(--ease-spring\) backwards/,
+    );
+  });
+
+  it('a finished animation never pins a hover or press transform: fill mode is backwards (the glint excepted)', () => {
+    for (const name of ['rise', 'pop', 'fill', 'beacon', 'complete']) {
+      expect(css, name).toMatch(new RegExp(`--animate-${name}:[^;]*backwards;`));
+    }
+    expect(css).toMatch(/--animate-glint:[^;]*both;/);
   });
 
   it('with reduced motion nothing waits and nothing moves: delays and durations collapse', () => {
@@ -184,13 +194,31 @@ describe('motion (index.css)', () => {
     expect(block).toContain('animation-delay: 0s !important');
   });
 
-  it('only moves transform and opacity (no layout property is animated)', () => {
-    const rise = css.slice(css.indexOf('@keyframes rise'), css.indexOf('@keyframes fill'));
-    const fill = css.slice(css.indexOf('@keyframes fill'), css.indexOf('@layer base'));
-    expect(rise).toContain('opacity');
-    expect(rise).toContain('transform');
-    expect(fill).toContain('scaleX');
-    for (const body of [rise, fill])
-      expect(body).not.toMatch(/\b(width|height|top|left|margin)\s*:/);
+  /** The properties a keyframes block animates. */
+  const animated = (name: string) => {
+    const start = css.indexOf(`@keyframes ${name} {`);
+    const next = css.indexOf('@keyframes', start + 1);
+    const end = next === -1 ? css.indexOf('@layer base', start) : next;
+    return new Set([...css.slice(start, end).matchAll(/([a-z-]+):/g)].map((m) => m[1]));
+  };
+
+  it('the entrance, pop, glint and fill move only transform and opacity (no layout property)', () => {
+    for (const name of ['rise', 'pop', 'glint', 'fill']) {
+      const props = animated(name);
+      expect(
+        [...props].filter((p) => p !== 'opacity' && p !== 'transform'),
+        name,
+      ).toEqual([]);
+      expect(props.size, name).toBeGreaterThan(0);
+    }
+    expect(animated('fill').has('transform')).toBe(true);
+  });
+
+  it('the only looping animation is the loading placeholder, and reduced motion stops loops', () => {
+    expect([...css.matchAll(/--animate-([a-z]+):[^;]*infinite;/g)].map((m) => m[1])).toEqual([
+      'breathe',
+    ]);
+    const block = /@media \(prefers-reduced-motion: reduce\)\s*{([\s\S]*?)\n}/.exec(css)?.[1] ?? '';
+    expect(block).toContain('animation-iteration-count: 1 !important');
   });
 });

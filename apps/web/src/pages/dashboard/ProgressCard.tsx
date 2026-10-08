@@ -4,8 +4,9 @@ import { Card } from '../../components/ui/Card';
 
 /**
  * Progress of the activities registered in this period (finished / total). It is not performance,
- * grades or knowledge, and the card says so. CSS only: no chart library. The bar fills to its value once, when
- * the card appears (`animate-fill`; with reduced motion it simply is at its value).
+ * grades or knowledge, and the card says so. CSS only: no chart library. When the card appears the number pops in,
+ * the bar fills to its value once and one glint crosses it; with reduced motion it simply is at its value, with no
+ * delay. A screen reader gets the exact value at once (the progressbar's own attributes).
  */
 export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) {
   const { percent, completed, total } = progress;
@@ -20,7 +21,9 @@ export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) 
         Progreso de actividades
       </h2>
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <p className="text-4xl leading-none font-semibold text-primary">{percent}%</p>
+        <p className="animate-pop text-4xl leading-none font-semibold text-primary [animation-delay:120ms]">
+          {percent}%
+        </p>
         <p>{text}</p>
       </div>
       <div
@@ -34,8 +37,16 @@ export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) 
       >
         <div
           style={{ width: `${percent}%` }}
-          className="h-full origin-left animate-fill rounded-full bg-accent"
-        />
+          className="relative h-full origin-left animate-fill overflow-hidden rounded-full bg-accent"
+        >
+          {/* The glint: a soft light that crosses the fill once, after it has grown. Decoration. */}
+          {percent > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 w-1/4 animate-glint bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.55),transparent)]"
+            />
+          )}
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4">
         <p className="text-xs text-muted-foreground">

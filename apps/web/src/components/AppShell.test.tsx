@@ -114,3 +114,51 @@ describe('shell structure', () => {
     expect(shell('/calendar')).toContain('max-w-6xl');
   });
 });
+
+describe('sliding indicator of the phone bar', () => {
+  const indicator = (path: string) => {
+    const out = shell(path);
+    const tag = /<span aria-hidden="true" data-nav-indicator="(-?\d+)"[^>]*>/.exec(out);
+    return {
+      tag: tag?.[0] ?? '',
+      index: tag ? Number(tag[1]) : Number.NaN,
+      translate: /translateX\((\d+)%\)/.exec(tag?.[0] ?? '')?.[1],
+      opacity: /opacity:\s*(\d)/.exec(tag?.[0] ?? '')?.[1],
+    };
+  };
+
+  it.each([
+    ['/dashboard', 0],
+    ['/activities', 1],
+    ['/calendar', 2],
+    ['/calendar/import', 2],
+    ['/subjects', 3],
+  ])('at %s it sits under destination %i (the same rule as aria-current)', (path, index) => {
+    const i = indicator(path);
+    expect(i.index).toBe(index);
+    expect(i.translate).toBe(String(index * 100));
+    expect(i.opacity).toBe('1');
+  });
+
+  it('hides on screens that are not one of the four, and is never what tells the place', () => {
+    const i = indicator('/radar');
+    expect(i.index).toBe(-1);
+    expect(i.opacity).toBe('0');
+    // it is decoration: aria-hidden, no focus, no taps, only on phone and tablet
+    expect(i.tag).toContain('aria-hidden="true"');
+    expect(i.tag).toContain('pointer-events-none');
+    expect(i.tag).toContain('lg:hidden');
+    // the real signal is still on the link
+    expect(links(shell('/radar')).filter((l) => l.current)).toEqual([]);
+  });
+
+  it('moves with transform and opacity only', () => {
+    expect(indicator('/activities').tag).toContain('transition-[transform,opacity]');
+  });
+
+  it('the icon capsule exists for every destination and lifts only for the current one', () => {
+    const out = nav(shell('/activities'));
+    expect(out.match(/rounded-full px-4 py-0.5/g)).toHaveLength(4);
+    expect(out.match(/-translate-y-0.5 bg-accent-soft/g)).toHaveLength(1);
+  });
+});

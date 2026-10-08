@@ -53,6 +53,8 @@
   --duration-fast: 120ms;
   --duration-normal: 220ms;
   --duration-slow: 600ms;
+  /* The hero surface: deep indigo drifting a little toward violet. The ONLY large gradient of the app. */
+  --gradient-hero: linear-gradient(135deg, #1f2670 0%, #2a2a86 58%, #3a2f95 100%);
 }
 
 @theme inline {
@@ -111,12 +113,17 @@
   --radius-surface: 0.875rem;
   --radius-hero: 1.25rem;
 
-  /* Elevation: a card at rest, the hero, something floating over the page. All soft and tinted, never gray-black. */
+  /* Elevation, four levels at most: 0 the page, 1 a card (shadow-card), 2 an interactive card lifted by hover or focus
+     (shadow-lift), 3 something floating (shadow-floating); the hero has its own tinted glow. Never gray-black. */
   --shadow-card: 0 1px 2px 0 rgb(20 26 60 / 0.04), 0 6px 16px -10px rgb(20 26 60 / 0.12);
+  --shadow-lift: 0 2px 4px 0 rgb(20 26 60 / 0.05), 0 12px 24px -12px rgb(20 26 60 / 0.2);
   --shadow-hero: 0 14px 28px -14px rgb(31 38 112 / 0.5);
   --shadow-floating: 0 12px 32px -8px rgb(20 26 60 / 0.22);
 
+  /* Easings: standard for state changes, enter for things arriving, spring for a little overshoot on release. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Type roles. Body is the default size and "meta" is Tailwind's `text-sm`: no tokens for those. */
   --text-display: 1.875rem;
@@ -132,9 +139,18 @@
   --text-card-title--line-height: 1.5rem;
   --text-card-title--font-weight: 600;
 
-  /* Motion with a purpose: a section settling into place once, and a progress bar filling to its value. */
-  --animate-rise: rise var(--duration-normal) var(--ease-standard) both;
-  --animate-fill: fill var(--duration-slow) var(--ease-standard) both;
+  /* Fill mode is `backwards` on purpose: the element returns to its own styles when the animation ends, so a hover or
+     press transform (or its resting shadow) is never pinned by a finished animation. The glint is the exception: it
+     must end off-screen.
+     Motion with a purpose, all of it one-shot: a section settling into place, a number or mark popping in, a bar
+     filling with one glint, a beacon on the one thing that needs attention, a card confirming a completion. */
+  --animate-rise: rise var(--duration-normal) var(--ease-enter) backwards;
+  --animate-pop: pop var(--duration-normal) var(--ease-spring) backwards;
+  --animate-fill: fill var(--duration-slow) var(--ease-enter) backwards;
+  --animate-glint: glint 900ms var(--ease-standard) 500ms both;
+  --animate-beacon: beacon 1100ms var(--ease-standard) 400ms 1 backwards;
+  --animate-complete: complete 1100ms var(--ease-standard) 1 backwards;
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
 
   @keyframes rise {
     from {
@@ -144,6 +160,57 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes glint {
+    from {
+      transform: translateX(-120%);
+    }
+    to {
+      transform: translateX(420%);
+    }
+  }
+
+  @keyframes beacon {
+    0% {
+      box-shadow: 0 0 0 0 rgb(253 162 155 / 0.7);
+    }
+    100% {
+      box-shadow: 0 0 0 10px rgb(253 162 155 / 0);
+    }
+  }
+
+  @keyframes complete {
+    0% {
+      background-color: var(--success-soft);
+      box-shadow: 0 0 0 3px var(--success-line);
+    }
+    100% {
+      background-color: var(--surface);
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+
+  /* The only looping animation: placeholder blocks while data loads. It stops the moment the data arrives. */
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
     }
   }
 
@@ -200,5 +267,6 @@ body:has(dialog[open]) {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
   }
 }

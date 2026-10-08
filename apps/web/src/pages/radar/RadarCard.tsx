@@ -2,6 +2,7 @@ import { QueryError } from '../../components/QueryError';
 import { RADAR_GROUP_LABELS, RADAR_KEYS, RADAR_STATUSES, type Radar } from '@planner/core';
 import { Link } from 'react-router';
 import { useRadar } from '../../radar/useRadar';
+import { INTERACTIVE_TILE } from '../../components/ui/interactive';
 import { RadarDot } from './RadarDot';
 
 /**
@@ -39,7 +40,7 @@ function RadarGlance({ summary }: { summary: Radar['summary'] }) {
         <li key={status} className={`${i < 3 ? 'col-span-2' : 'col-span-3'} sm:col-span-1`}>
           <Link
             to={`/activities?radar=${status}`}
-            className="flex min-h-16 flex-col justify-between gap-1 rounded-surface border border-border bg-surface px-3 py-2 shadow-card transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-secondary active:scale-[0.98]"
+            className={`group flex min-h-16 flex-col justify-between gap-1 rounded-surface border border-border bg-surface px-3 py-2 shadow-card ${INTERACTIVE_TILE}`}
           >
             <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <RadarDot status={status} />

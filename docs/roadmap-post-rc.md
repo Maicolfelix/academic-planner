@@ -56,13 +56,14 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → piloto controlado → A2 → asistencia y semana cargada → A6 → …**; lo social (cursos compartidos por invitación) queda condicionado al piloto y a un despliegue con HTTPS.
 
-| Id    | Objetivo                                                                                                                                                                                                  |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX1-0 | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0))          |
-| UX1-1 | Shell y navegación (**implementado y validado en un iPhone real**: barra inferior en teléfono y tableta, superior desde 1024 px, iconos SVG en línea, `PageHeader`; sin rediseñar Home ni campana/avatar) |
-| UX1-2 | Home + identidad visual + movimiento (**implementado en su PR**; ver [dirección visual](#dirección-visual-para-ux1-2) y [la guía aplicada](ux-accessibility.md#identidad-visual-y-movimiento-ux1-2))      |
-| UX1-3 | **Siguiente:** Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                   |
-| UX2a  | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                            |
+| Id      | Objetivo                                                                                                                                                                                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX1-0   | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0))          |
+| UX1-1   | Shell y navegación (**implementado y validado en un iPhone real**: barra inferior en teléfono y tableta, superior desde 1024 px, iconos SVG en línea, `PageHeader`; sin rediseñar Home ni campana/avatar) |
+| UX1-2   | Home + identidad visual + movimiento (**implementado en su PR**; ver [dirección visual](#dirección-visual-para-ux1-2) y [la guía aplicada](ux-accessibility.md#identidad-visual-y-movimiento-ux1-2))      |
+| UX1-2.5 | Pasada de movimiento y personalidad (**implementada en el PR de UX1-2**; sin dependencias nuevas; ver [la guía](ux-accessibility.md#movimiento-y-personalidad-ux1-25))                                    |
+| UX1-3   | **Siguiente:** Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                   |
+| UX2a    | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                            |
 
 #### Dirección visual para UX1-2
 

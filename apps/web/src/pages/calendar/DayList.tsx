@@ -40,10 +40,10 @@ export function DayList({ days, selected, today, occurrences, timeZone, onSelect
                 day === today ? ' (hoy)' : ''
               }${count ? `, ${count} ${count === 1 ? 'bloque' : 'bloques'}` : ''}`}
               onClick={() => onSelect(day)}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-md border px-0.5 py-1 text-xs ${
+              className={`flex min-h-14 flex-col items-center justify-center rounded-control border px-0.5 py-1 text-xs transition-[transform,background-color,color,box-shadow] duration-(--duration-normal) ease-spring active:scale-95 ${
                 day === selected
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100'
+                  ? 'z-10 scale-105 border-primary bg-primary text-primary-foreground shadow-lift'
+                  : 'border-border bg-surface text-foreground hover:bg-secondary'
               }`}
             >
               <span>{WEEKDAY_SHORT_LABELS[weekdayOf(day)]}</span>

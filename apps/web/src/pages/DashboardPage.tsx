@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
 import { ClassesToday } from './dashboard/ClassesToday';
+import { HomeSkeleton } from './dashboard/HomeSkeleton';
 import { NoActivities, NoSubjects } from './dashboard/EmptyStates';
 import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
@@ -32,7 +33,7 @@ export function DashboardPage() {
   const dashboard = useDashboard();
   const now = useNow();
 
-  if (dashboard.isPending) return <p role="status">Cargando tu panel…</p>;
+  if (dashboard.isPending) return <HomeSkeleton />;
   if (!dashboard.data) {
     return <QueryError query={dashboard} title="No se pudo cargar tu panel" />;
   }

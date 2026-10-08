@@ -10,6 +10,7 @@ import {
 } from '@planner/core';
 import { SelectField } from '../../components/SelectField';
 import { useMediaQuery } from '../../lib/useMediaQuery';
+import { useSlidingIndicator } from '../../lib/useSlidingIndicator';
 import { hasActiveFilters, type ActivityFilters as Filters } from './filterParams';
 
 type View = 'all' | ActivityStatus | 'overdue';
@@ -33,6 +34,9 @@ interface Props {
 /** Quick state chips plus three selectors. Everything is a native control: keyboard works for free. */
 export function ActivityFilters({ filters, subjects, onChange }: Props) {
   const view = currentView(filters);
+  const { setContainer, setItem, box, ready } = useSlidingIndicator(
+    VIEWS.findIndex((v) => v.value === view),
+  );
   const wide = useMediaQuery('(min-width: 640px)');
   const extra = [filters.subject, filters.priority, filters.type, filters.radar].filter(
     Boolean,
@@ -47,17 +51,40 @@ export function ActivityFilters({ filters, subjects, onChange }: Props) {
 
   return (
     <section aria-label="Filtros" className="flex flex-col gap-3">
-      <div role="group" aria-label="Estado" className="flex flex-wrap gap-2">
-        {VIEWS.map((v) => (
+      {/* A segmented control: one soft track and a white highlight that SLIDES to the chosen state (it follows the
+          button onto a second row when the track wraps). Still plain buttons with aria-pressed: the highlight is
+          decoration. */}
+      <div
+        role="group"
+        aria-label="Estado"
+        ref={setContainer}
+        className="relative flex flex-wrap gap-1 rounded-3xl bg-secondary p-1"
+      >
+        {box && (
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute top-0 left-0 rounded-full bg-surface shadow-card ${
+              ready
+                ? 'transition-[transform,width,height] duration-(--duration-normal) ease-enter'
+                : ''
+            }`}
+            style={{
+              transform: `translate(${box.x}px, ${box.y}px)`,
+              width: box.width,
+              height: box.height,
+            }}
+          />
+        )}
+        {VIEWS.map((v, i) => (
           <button
             key={v.value}
+            ref={setItem}
+            data-index={i}
             type="button"
             aria-pressed={view === v.value}
             onClick={() => setView(v.value)}
-            className={`min-h-11 rounded-full border px-4 py-2 text-sm font-medium ${
-              view === v.value
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'
+            className={`relative z-10 min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-(--duration-fast) ease-standard active:scale-[0.97] ${
+              view === v.value ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {v.label}
