@@ -19,7 +19,7 @@ Principio de la fase: **pulir, no reinventar**. No hubo reglas de negocio nuevas
 - **`PageHeader`** (`components/ui/PageHeader.tsx`): título (el `h1`), línea opcional y acción principal; reemplaza un bloque repetido en Actividades, Asignaturas (y quedan por migrar Agenda, Importar horario, Home, Progreso y Radar). No hay `IconButton` todavía: no existe ninguna acción solo con icono.
 - **Los enlaces de navegación no son una lista** (`ul`/`li`): varias pantallas y pruebas cuentan sus propios elementos de lista (tarjetas) y la navegación ya es un landmark.
 - **Reflow**: pantallas verificadas sin desbordamiento horizontal a **320**, 360, 768 y 1366 px (UX1-1 añadió una comprobación a 1024 px: la barra superior cabe en una fila, y a 768 px se usa la barra inferior).
-- **Ancho de página**: una columna de lectura (`max-w-3xl`) en todas las pantallas; solo la Agenda semanal usa `max-w-6xl` porque necesita siete columnas legibles.
+- **Ancho de página**: una columna de lectura (`max-w-3xl`) en la mayoría de las pantallas; la Agenda semanal (siete columnas legibles) y, desde UX1-2.75, el Home (dos columnas desde 1024 px) usan `max-w-6xl`.
 - **Landmarks**: `banner` (cabecera), `nav`, `main#contenido`. Enlace **«Saltar al contenido»** como primera parada del teclado.
 - **Un solo `h1` por pantalla** y un **título de documento** distinto por pantalla («Agenda · Academic Planner»).
 - **Nombre del producto**: «Academic Planner» en todas partes (antes había «Planificador Académico» en el login).
@@ -71,7 +71,7 @@ Segunda pasada sobre UX1-2, en el mismo PR: darle vida a lo que ya existe sin a�
 - **Finalizar una actividad:** `useJustCompleted` marca la tarjeta durante un instante (`data-just-completed`, tinte y pequeño _pop_ de la insignia) solo cuando el estado cambia a «Finalizada» en esa pantalla; el texto «Finalizada» es lo que lo dice.
 - **`EmptyState`:** un estado vacío reutilizable (ilustración decorativa, título, línea y siguiente paso) usado en Home, Actividades y Asignaturas. **`HomeSkeleton`:** marcador de carga con la forma del Home (una región `status` con el texto «Cargando tu panel…»; los bloques, `aria-hidden`).
 - **Movimiento reducido:** además de duraciones de 0,01 ms y sin retraso, `animation-iteration-count: 1` para que un bucle no parpadee. Las marcas (barra, filtro) saltan en vez de deslizarse. Probado en e2e.
-- **Safari:** sin `backdrop-filter`, sin desenfoques pesados, sin APIs experimentales; solo propiedades compuestas en la GPU. **Pendiente: QA real en iPhone** antes de fusionar.
+- **Safari:** sin `backdrop-filter`, sin desenfoques pesados, sin APIs experimentales; solo propiedades compuestas en la GPU. **Validado en un iPhone real (ver la sección siguiente); PWA y HTTPS sin probar.**
 
 ## Experiencia ambiental inteligente (UX1-2.75)
 
@@ -98,7 +98,23 @@ Segunda pasada sobre UX1-2, en el mismo PR: darle vida a lo que ya existe sin a�
 | **B — interacción**      | Rápida y visible, responde a un gesto | 120–220 ms; transform/color/sombra; con movimiento reducido es instantánea                                                                                        | pulsar (`active:scale`), elevar al pasar, resalte deslizante de la navegación y del filtro, rebote del día                                  |
 | **C — cambio de estado** | Clara y breve, una vez                | `rise`, `pop`, `fill`, `ring`, `beacon`, `complete`; relleno `backwards`; con movimiento reducido llega a su valor sin retraso                                    | entrada del héroe, relleno del progreso, confirmación al finalizar                                                                          |
 
-Además, `breathe` (carga) es el único bucle que no es ambiental. **Movimiento reducido:** las de categoría A no existen (`motion-safe`); el resto colapsa a 0,01 ms sin retraso y con `animation-iteration-count: 1`. Una prueba unitaria exige que todo uso de un bucle ambiental sea `motion-safe:` y otra fija la lista de bucles permitidos. **Rendimiento:** sin `backdrop-filter`, desenfoques ni `mask-image` sobre contenido animado ; sin `scale` en la deriva. **Medido:** mover las tres órbitas del fondo duplicaba el tiempo de una misma tanda de pruebas de navegador (≈ 4,0 min frente a 2,8 min con el fondo quieto y 2,1 min con movimiento reducido) y provocó timeouts, así que el fondo no se anima; quitar además la órbita del héroe no cambió el tiempo, y se conserva; los bucles son transform/opacity en pocos elementos (tres órbitas, un puñado de anillos); `stroke-dasharray` solo en un SVG pequeño y una vez. **Safari:** máscaras con prefijo `-webkit-`, sin `:has()`, sin API experimental. **Pendiente: QA real en iPhone.**
+Además, `breathe` (carga) es el único bucle que no es ambiental. **Movimiento reducido:** las de categoría A no existen (`motion-safe`); el resto colapsa a 0,01 ms sin retraso y con `animation-iteration-count: 1`. Una prueba unitaria exige que todo uso de un bucle ambiental sea `motion-safe:` y otra fija la lista de bucles permitidos. **Rendimiento:** sin `backdrop-filter`, desenfoques ni `mask-image` sobre contenido animado ; sin `scale` en la deriva. **Medido:** mover las tres órbitas del fondo duplicaba el tiempo de una misma tanda de pruebas de navegador (≈ 4,0 min frente a 2,8 min con el fondo quieto y 2,1 min con movimiento reducido) y provocó timeouts, así que el fondo no se anima; quitar además la órbita del héroe no cambió el tiempo, y se conserva; los bucles son transform/opacity en pocos elementos (tres órbitas, un puñado de anillos); `stroke-dasharray` solo en un SVG pequeño y una vez. **Safari:** máscaras con prefijo `-webkit-`, sin `:has()`, sin API experimental. Validación en iPhone real: ver [más abajo](#validación-en-dispositivo-real-ux1-2--ux1-25--ux1-275).
+
+### Validación en dispositivo real (UX1-2 / UX1-2.5 / UX1-2.75)
+
+**Plataforma:** iPhone real con Safari, la app servida por IP local, HTTP, misma red (**no** PWA instalada, **no** HTTPS), sobre la rama del PR #24 (`9e14910`). No se registraron modelo, versión de iOS ni mediciones de fluidez.
+
+**Observado por el mantenedor:**
+
+- la identidad visual («Pulso Ambiental») fue aprobada;
+- la experiencia ambiental fue aceptada;
+- la navegación fue utilizable;
+- el Home fue aceptado visualmente;
+- no se reportó ningún bloqueante.
+
+**Decisión del mantenedor (textual):** «Me gustó como quedó, ya podemos continuar» y «Lo mejoraremos más adelante igualmente». Queda **aprobado para la fase actual**; no es un veredicto de acabado final. No se probó: PWA instalada, HTTPS, Android, otros iPhone ni tabletas.
+
+**Deuda visual que se conserva (esperada, no bloqueante):** la identidad está aceptada pero el refinamiento continuará. Siguen «administrativas» las tarjetas de actividad, los formularios y los diálogos; la Agenda sigue relativamente plana; Asignaturas aún necesita su tratamiento (UX1-3). El pulido visual puede continuar mientras avanza el roadmap funcional.
 
 ## Dashboard
 
