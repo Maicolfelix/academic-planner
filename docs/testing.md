@@ -6,14 +6,14 @@ Las pruebas son la segunda fuente de verdad después del código: si un document
 
 | Capa                     | Herramienta                                       | Pruebas                                                                                                                   |
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Núcleo (`packages/core`) | Vitest                                            | 829 en 16 archivos                                                                                                        |
-| API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 833 en 32 archivos (incluye 157 de seguridad y 28 del seed demo)                                                          |
-| Interfaz (`apps/web`)    | Vitest                                            | 51 en 8 archivos                                                                                                          |
-| **Total Vitest**         |                                                   | **1713**                                                                                                                  |
-| Navegador                | Playwright (360 px y 1366 px)                     | 284 registrados por pasada: 280 pasan y 4 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
+| Núcleo (`packages/core`) | Vitest                                            | 869 en 17 archivos                                                                                                        |
+| API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 845 en 33 archivos (incluye 159 de seguridad y 28 del seed demo)                                                          |
+| Interfaz (`apps/web`)    | Vitest                                            | 54 en 8 archivos                                                                                                          |
+| **Total Vitest**         |                                                   | **1768**                                                                                                                  |
+| Navegador                | Playwright (360 px y 1366 px)                     | 296 registrados por pasada: 292 pasan y 4 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
 | Seguridad en navegador   | Playwright (puerto 4300, topología de producción) | 9 (configuración aparte)                                                                                                  |
 
-Las cifras de Playwright cuentan **ejecuciones** (cada prueba corre en dos proyectos: móvil y escritorio). Nada se cuenta dos veces: las pruebas de seguridad de la API están dentro de las 833, y las de seguridad en navegador son un conjunto distinto de las 258.
+Las cifras de Playwright cuentan **ejecuciones** (cada prueba corre en dos proyectos: móvil y escritorio). Nada se cuenta dos veces: las pruebas de seguridad de la API están dentro de las 845, y las de seguridad en navegador son un conjunto distinto de las 258.
 
 ## Capas
 
@@ -31,7 +31,8 @@ Recorridos reales con `watch(page, …)`, que falla ante cualquier error de cons
 
 ### Seguridad
 
-- **API** (`apps/api/src/security/`, 155 pruebas): autenticación y sesiones, cabeceras/CSRF/CORS/estáticos, **matriz IDOR** (todo recurso con id: el ajeno responde el mismo 404 y la base no cambia), robustez ante entradas hostiles, restricciones de base de datos.
+- **API** (`apps/api/src/security/`, 159 pruebas): autenticación y sesiones, cabeceras/CSRF/CORS/estáticos, **matriz IDOR** (todo recurso con id: el ajeno responde el mismo 404 y la base no cambia), robustez ante entradas hostiles, restricciones de base de datos.
+- **Exportación a calendario (A4.1):** `calendarExport.test.ts` (API), `icalendar.test.ts` (core, con casos de inyección de CRLF, plegado a 75 octetos, Unicode y determinismo; los _mutation checks_ del serializador están descritos en [calendar-export.md](calendar-export.md)) y `e2e/calendar-export.spec.ts` (descarga real, 401, error con reintento, axe a 360 y 1366 px). Playwright no abre ninguna aplicación de calendario externa.
 - **Navegador** (`e2e/security.spec.ts`, 9): cookie invisible para scripts, XSS almacenado mostrado como texto, CSRF desde otro origen, archivos servidos, subida inválida, todo con la CSP real.
 - **Escaneo** (`npm run security:scan`): sin red; busca secretos y construcciones peligrosas en los archivos versionados.
 - Una prueba de inventario falla si aparece una ruta no-GET sin registrar en la matriz de seguridad.

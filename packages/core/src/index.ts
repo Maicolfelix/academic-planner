@@ -8,6 +8,7 @@ export * from './calendar.js';
 export * from './schedule.js';
 export * from './dashboard.js';
 export * from './health.js';
+export * from './icalendar.js';
 export * from './insights.js';
 export * from './quickCapture.js';
 export * from './radar.js';

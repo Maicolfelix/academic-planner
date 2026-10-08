@@ -1,4 +1,5 @@
 import {
+  CALENDAR_EXPORT_FILENAME,
   activityListResponseSchema,
   activityResponseSchema,
   type Activity,
@@ -9,7 +10,8 @@ import {
   type RadarStatus,
   type UpdateActivityRequest,
 } from '@planner/core';
-import { apiFetch } from './client';
+import { apiDownload, apiFetch } from './client';
+import { saveFile } from '../lib/saveFile';
 
 export interface ActivityQuery {
   periodId?: string;
@@ -57,3 +59,8 @@ export async function updateActivityRequest(
 
 export const deleteActivityRequest = (id: string): Promise<void> =>
   apiFetch(`/api/activities/${id}`, { method: 'DELETE' });
+
+/** "Añadir al calendario": downloads the .ics of one activity (the browser/OS decides which app opens it). */
+export async function downloadActivityCalendar(id: string): Promise<void> {
+  saveFile(await apiDownload(`/api/activities/${id}/calendar.ics`), CALENDAR_EXPORT_FILENAME);
+}

@@ -78,6 +78,10 @@ cada consulta lleva `userId`; una actividad o asignatura ajena responde `404 NOT
 `from` y `to` (días locales del usuario, `YYYY-MM-DD`, ambos inclusivos). Valores inválidos → `400 VALIDATION_ERROR`.
 Límites: título 1–150, descripción ≤ 2000.
 
+## Añadir al calendario
+
+`GET /api/activities/:id/calendar.ics` (sesión; ajena o inexistente = el mismo 404) descarga la actividad como `.ics` para abrirla con la aplicación de calendario del estudiante; es una instantánea de solo lectura, también para actividades completadas. Detalle, representación del tiempo y límites: [calendar-export.md](calendar-export.md).
+
 ## Borrar una asignatura
 
 `DELETE /api/subjects/:id` con actividades → `409 SUBJECT_NOT_EMPTY` ("La asignatura tiene actividades o bloques de agenda asociados.", desde la Fase 6: también cuentan los bloques de la agenda).

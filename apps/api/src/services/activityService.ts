@@ -1,4 +1,5 @@
 import {
+  activityToIcs,
   dueFromLocal,
   localDayBounds,
   resolveCompletedAt,
@@ -60,6 +61,29 @@ export function createActivityService(
       const activity = await activities.findOwned(actor.id, id);
       if (!activity) throw activityNotFound();
       return toActivityDto(activity);
+    },
+
+    /**
+     * The `.ics` of one activity ("Añadir al calendario"): the same ownership rule as `get` (foreign and absent are
+     * the same 404). Read-only: nothing is stored, and the output depends only on the stored data, not on the clock.
+     */
+    async calendarExport(actor: Actor, id: string) {
+      const activity = await activities.findOwned(actor.id, id);
+      if (!activity) throw activityNotFound();
+      const subject = await subjects.findOwned(actor.id, activity.subjectId);
+      return activityToIcs({
+        activity: {
+          id: activity.id,
+          title: activity.title,
+          dueAt: activity.dueAt.toISOString(),
+          hasTime: activity.hasTime,
+          updatedAt: activity.updatedAt.toISOString(),
+        },
+        subject: subject
+          ? { name: subject.name, updatedAt: subject.updatedAt.toISOString() }
+          : null,
+        timeZone: actor.timezone,
+      });
     },
 
     /**

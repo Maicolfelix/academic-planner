@@ -82,6 +82,7 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
     ['PATCH /subjects/:id', (a, id) => a.patch(`/api/subjects/${id}`).send({ name: 'Hackeada' })],
     ['DELETE /subjects/:id', (a, id) => a.delete(`/api/subjects/${id}`)],
     ['GET /activities/:id', (a, id) => a.get(`/api/activities/${id}`)],
+    ['GET /activities/:id/calendar.ics', (a, id) => a.get(`/api/activities/${id}/calendar.ics`)],
     [
       'PATCH /activities/:id',
       (a, id) => a.patch(`/api/activities/${id}`).send({ title: 'Hackeada' }),
@@ -439,6 +440,7 @@ describe('every protected route refuses an anonymous caller', () => {
     ['get', '/api/activities'],
     ['post', '/api/activities'],
     ['get', `/api/activities/${randomUUID()}`],
+    ['get', `/api/activities/${randomUUID()}/calendar.ics`],
     ['patch', `/api/activities/${randomUUID()}`],
     ['delete', `/api/activities/${randomUUID()}`],
     ['get', '/api/schedule'],

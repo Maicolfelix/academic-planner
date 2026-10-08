@@ -31,6 +31,7 @@
 | [auth.md](auth.md)                                   | Autenticación, sesiones, cookie, CSRF |
 | [academic.md](academic.md)                           | Periodos académicos y asignaturas     |
 | [activities.md](activities.md)                       | Actividades                           |
+| [calendar-export.md](calendar-export.md)             | Añadir al calendario (`.ics`)         |
 | [dashboard.md](dashboard.md)                         | Pantalla de inicio                    |
 | [schedule.md](schedule.md)                           | Agenda, recurrencia y solapes         |
 | [reminders.md](reminders.md)                         | Recordatorios internos                |
