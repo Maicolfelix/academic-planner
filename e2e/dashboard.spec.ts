@@ -117,7 +117,7 @@ test('dashboard flow: empty states, next due, overdue, progress, live updates, p
   await expect(section(page, 'Vencidas')).toContainText('Taller atrasado');
 
   // 14-15. Logout / login: the data is all still there.
-  await nav(page).getByRole('button', { name: 'Cerrar sesión' }).click();
+  await page.getByRole('banner').getByRole('button', { name: 'Cerrar sesión' }).click();
   await login(page, email);
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(section(page, 'Progreso de actividades')).toContainText(

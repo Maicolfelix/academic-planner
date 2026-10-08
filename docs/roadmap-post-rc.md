@@ -56,13 +56,23 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → piloto controlado → A2 → asistencia y semana cargada → A6 → …**; lo social (cursos compartidos por invitación) queda condicionado al piloto y a un despliegue con HTTPS.
 
-| Id    | Objetivo                                                                                                                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| UX1-0 | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0)) |
-| UX1-1 | Shell y navegación (con espacio para campana y avatar) y decisión de iconografía                                                                                                                 |
-| UX1-2 | Home                                                                                                                                                                                             |
-| UX1-3 | Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                         |
-| UX2a  | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                   |
+| Id    | Objetivo                                                                                                                                                                                                  |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX1-0 | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0))          |
+| UX1-1 | Shell y navegación (**implementado y validado en un iPhone real**: barra inferior en teléfono y tableta, superior desde 1024 px, iconos SVG en línea, `PageHeader`; sin rediseñar Home ni campana/avatar) |
+| UX1-2 | **Siguiente:** Home + identidad visual + movimiento (ver [dirección visual](#dirección-visual-para-ux1-2))                                                                                                |
+| UX1-3 | Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                                  |
+| UX2a  | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                            |
+
+#### Dirección visual para UX1-2
+
+Entrada del mantenedor tras probar UX1-1 en un iPhone real: la mejora es clara y va en buena dirección, pero **queda mucho margen visual**. Se busca una sensación **moderna, universitaria, suave («smooth») y con personalidad**, con la calidad percibida de las apps y páginas de Apple **como principios, no como copia**: más aire, superficies, menos bordes duros, sombras muy sutiles, radios coherentes, transiciones cortas, respuesta visual al toque, color con intención e identidad propia. Todo respetando `prefers-reduced-motion`.
+
+**Premium no significa más decoración:** mejor jerarquía, menos ruido, menos bordes, color y movimiento con propósito. Sin glassmorphism excesivo, degradados por toda la app, neón, animaciones permanentes, desenfoque pesado ni estética de videojuego.
+
+Problemas observados que UX1-2 y UX1-3 deben atender (UX1-1 no los toca): exceso de blanco plano; paleta aún slate, gris y negra, sin color de acento (`accent` está definido y sin uso); tarjetas rectangulares y con bordes visibles, todavía administrativas; Home largo y apilado, más informativo que visual; filtros de Actividades que parecen controles web; indicadores del Radar básicos; falta de profundidad y de movimiento perceptible; «¿Qué hago ahora?» (el mayor valor funcional) parece una tarjeta más; estado activo de la barra inferior y barra superior mejorables en identidad.
+
+UX1-2 explorará: nueva paleta y acento, hero de Home, jerarquía de superficies, menos bordes, sombras sutiles, movimiento y respuesta al toque, animación del progreso, resumen visual del Radar y compactación de Home.
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 

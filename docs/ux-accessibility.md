@@ -10,10 +10,15 @@ Principio de la fase: **pulir, no reinventar**. No hubo reglas de negocio nuevas
 
 ## Navegación y estructura
 
-- **Navegación principal** (`nav "Principal"`): Inicio, Asignaturas, Actividades, Agenda, más «Cerrar sesión». Radar, Progreso, Bandeja y Importar horario se alcanzan desde el Dashboard y la Agenda: no se llenó la barra.
-- **Sección activa**: fondo + subrayado (no solo color) y `aria-current="page"`.
-- **Móvil (360 px)**: dos filas — marca y «Cerrar sesión» arriba, las cuatro secciones repartidas por igual debajo (`grid auto-fit`, se parte en más filas si el texto crece). Sin menú hamburguesa.
-- **Reflow**: pantallas verificadas sin desbordamiento horizontal a **320**, 360, 768 y 1366 px.
+- **Navegación principal** (UX1-1; `nav "Principal"`, **un solo** landmark): **Inicio, Actividades, Agenda, Asignaturas**, cada una con icono y texto. Es la jerarquía **primaria**; la **secundaria** se alcanza desde la pantalla donde tiene sentido (Radar, Progreso y Bandeja desde Inicio; Importar horario desde la Agenda) y no entra en la barra. Si el piloto muestra que cuesta encontrarlas, el siguiente paso sería una entrada «Más», no ampliar la barra.
+- **Barra superior** (`banner`): marca («Academic Planner» con su icono, texto, no enlace) y «**Cerrar sesión**» al extremo, **fuera** del landmark de navegación. El final de la barra queda libre para el avatar y la campana, que llegarán con sus funciones; hoy no se muestra ningún control falso.
+- **Teléfono y tableta (< 1024 px)**: la navegación es una **barra fija abajo** (alcance del pulgar), con icono sobre el texto, 56 px de alto y relleno por `env(safe-area-inset-bottom)` para no chocar con el indicador de inicio del iPhone (`viewport-fit=cover` ya estaba). El contenido deja `pb-24` para que lo último no quede tapado; los diálogos nativos (`showModal`) quedan por encima de la barra. **Escritorio (≥ 1024 px)**: la misma navegación se coloca en la barra superior (solo cambia el CSS), con el icono al lado del texto; a 768 px la fila no cabía (marca + 4 destinos + cerrar sesión), por eso el corte es `lg` y no `md`.
+- **Sección activa**: `aria-current="page"` (lo pone `NavLink`), texto más grueso y, además del color, una **barra superior** en el teléfono o **fondo + subrayado** en escritorio. Agenda queda activa también en «Importar horario» (cuelga de ella).
+- **Insignia de recordatorios**: «🔔 N» dentro del enlace Inicio, solo cuando hay recordatorios vencidos.
+- **Iconos**: SVG en línea (`components/ui/icons.tsx`), siempre `aria-hidden` junto a un texto. Se descartó `lucide-react` por ahora: son cinco formas, una dependencia más no se justifica; cuando el conjunto pase de una docena (notificaciones, perfil…) conviene reevaluarlo.
+- **`PageHeader`** (`components/ui/PageHeader.tsx`): título (el `h1`), línea opcional y acción principal; reemplaza un bloque repetido en Actividades, Asignaturas (y quedan por migrar Agenda, Importar horario, Home, Progreso y Radar). No hay `IconButton` todavía: no existe ninguna acción solo con icono.
+- **Los enlaces de navegación no son una lista** (`ul`/`li`): varias pantallas y pruebas cuentan sus propios elementos de lista (tarjetas) y la navegación ya es un landmark.
+- **Reflow**: pantallas verificadas sin desbordamiento horizontal a **320**, 360, 768 y 1366 px (UX1-1 añadió una comprobación a 1024 px: la barra superior cabe en una fila, y a 768 px se usa la barra inferior).
 - **Ancho de página**: una columna de lectura (`max-w-3xl`) en todas las pantallas; solo la Agenda semanal usa `max-w-6xl` porque necesita siete columnas legibles.
 - **Landmarks**: `banner` (cabecera), `nav`, `main#contenido`. Enlace **«Saltar al contenido»** como primera parada del teclado.
 - **Un solo `h1` por pantalla** y un **título de documento** distinto por pantalla («Agenda · Academic Planner»).
@@ -21,9 +26,24 @@ Principio de la fase: **pulir, no reinventar**. No hubo reglas de negocio nuevas
 - **Ruta inexistente**: página «No encontramos esa página» con «Volver al inicio» (antes redirigía en silencio).
 - **Error inesperado de renderizado**: `ErrorBoundary` global con mensaje amable (el error se registra en consola, no se oculta).
 
+### Validación en dispositivo real (UX1-1)
+
+QA del mantenedor en un **iPhone real con Safari**, con la app servida por HTTP en la red local (**no** PWA instalada, **no** HTTPS). Resultados observados:
+
+| Qué                                                         | Resultado                                                                                                                                                       |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barra inferior (4 destinos, fija, ruta activa distinguible) | **PASS**: sin desbordes ni controles cortados                                                                                                                   |
+| Área segura de iOS                                          | **PASS observado en iPhone real**: indicador de inicio visible, barra por encima, sin solapamiento grave. No se midió el valor de `env(safe-area-inset-bottom)` |
+| Contenido largo (Inicio desplazado hacia abajo)             | **PASS**: la barra fija no impide leer ni se solapa con las tarjetas                                                                                            |
+| Actividades                                                 | **PASS**: título, filtros, tarjetas, acciones y estado activo; nada bloqueado por la barra                                                                      |
+| Agenda                                                      | **PASS**: encabezado, botones, selector de días, estados vacíos y estado activo                                                                                 |
+| PWA instalada, HTTPS                                        | **NOT TESTED**                                                                                                                                                  |
+
+La observación respalda la implementación actual (`viewport-fit=cover`, relleno inferior de la barra y `pb-24` del contenido); no se ajustó ningún número. Android, otros iPhone y tabletas siguen sin probarse.
+
 ## Breakpoints
 
-Solo tres, los de Tailwind: **640 px** (`sm`: filtros en una fila), **768 px** (`md`: navegación en una fila) y **1024 px** (cuadrícula semanal de la Agenda; por debajo se usa la lista diaria — a 768 px las clases que se cruzan quedaban ilegibles).
+Solo tres, los de Tailwind: **640 px** (`sm`: filtros en una fila), **768 px** (`md`) y **1024 px** (`lg`: la navegación pasa de la barra inferior a la superior, y la cuadrícula semanal de la Agenda; por debajo se usa la lista diaria — a 768 px las clases que se cruzan quedaban ilegibles).
 
 ## Dashboard
 

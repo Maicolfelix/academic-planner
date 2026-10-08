@@ -9,6 +9,7 @@ import { useNow } from '../lib/useNow';
 import { Button } from '../components/ui/Button';
 import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
 import { ActivityFormDialog } from './activities/ActivityFormDialog';
 import { ActivityList } from './activities/ActivityList';
@@ -92,13 +93,7 @@ export function ActivitiesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-page-title">Actividades</h1>
-          <p className="text-sm text-muted-foreground break-words">{period.name}</p>
-        </div>
-        {list.length > 0 && add}
-      </header>
+      <PageHeader title="Actividades" description={period.name} actions={list.length > 0 && add} />
 
       {notice && (
         <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
