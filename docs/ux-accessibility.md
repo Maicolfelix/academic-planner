@@ -26,6 +26,21 @@ Principio de la fase: **pulir, no reinventar**. No hubo reglas de negocio nuevas
 - **Ruta inexistente**: página «No encontramos esa página» con «Volver al inicio» (antes redirigía en silencio).
 - **Error inesperado de renderizado**: `ErrorBoundary` global con mensaje amable (el error se registra en consola, no se oculta).
 
+### Validación en dispositivo real (UX1-1)
+
+QA del mantenedor en un **iPhone real con Safari**, con la app servida por HTTP en la red local (**no** PWA instalada, **no** HTTPS). Resultados observados:
+
+| Qué                                                         | Resultado                                                                                                                                                       |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barra inferior (4 destinos, fija, ruta activa distinguible) | **PASS**: sin desbordes ni controles cortados                                                                                                                   |
+| Área segura de iOS                                          | **PASS observado en iPhone real**: indicador de inicio visible, barra por encima, sin solapamiento grave. No se midió el valor de `env(safe-area-inset-bottom)` |
+| Contenido largo (Inicio desplazado hacia abajo)             | **PASS**: la barra fija no impide leer ni se solapa con las tarjetas                                                                                            |
+| Actividades                                                 | **PASS**: título, filtros, tarjetas, acciones y estado activo; nada bloqueado por la barra                                                                      |
+| Agenda                                                      | **PASS**: encabezado, botones, selector de días, estados vacíos y estado activo                                                                                 |
+| PWA instalada, HTTPS                                        | **NOT TESTED**                                                                                                                                                  |
+
+La observación respalda la implementación actual (`viewport-fit=cover`, relleno inferior de la barra y `pb-24` del contenido); no se ajustó ningún número. Android, otros iPhone y tabletas siguen sin probarse.
+
 ## Breakpoints
 
 Solo tres, los de Tailwind: **640 px** (`sm`: filtros en una fila), **768 px** (`md`) y **1024 px** (`lg`: la navegación pasa de la barra inferior a la superior, y la cuadrícula semanal de la Agenda; por debajo se usa la lista diaria — a 768 px las clases que se cruzan quedaban ilegibles).
