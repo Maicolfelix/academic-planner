@@ -160,7 +160,7 @@ Métricas a observar (sin afirmar que ya se cumplen): tiempo de registro a «mi 
 
 Tres investigaciones de bajo costo, antes de construir producto:
 
-1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0 y A4-0b; Google/Apple/Outlook sin probar en clientes reales): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md). Lo implementado (A4.1): [calendar-export.md](calendar-export.md).
+1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0 y A4-0b; Apple Calendar en iPhone probado con QA real; Google, Outlook y Android sin probar): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md). Lo implementado (A4.1): [calendar-export.md](calendar-export.md).
 2. **Datos reales.** Recolectar, anonimizados, ~10 horarios, ~10 syllabus y ~5 archivos `.ics` como línea base. **No se agregan al repositorio sin anonimización explícita.**
 3. **Notas.** Probar «¿cuánto necesito sacar?» con 3 estudiantes en una hoja de cálculo o prototipo; preguntar escala, cortes, pesos y reglas de redondeo.
 

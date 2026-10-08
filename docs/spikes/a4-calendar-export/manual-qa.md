@@ -1,6 +1,24 @@
 # A4.1: QA manual del flujo «Añadir al calendario»
 
-> **Estado: preparado, NO ejecutado en dispositivos reales.** Esta sesión no tiene teléfonos, cuentas de calendario ni acceso a una app de calendario. Todo lo que no está en la tabla de [lo probado](#qué-está-probado-y-qué-no) está **NOT TESTED**: no se inventó ningún resultado. Función: [calendar-export.md](../../calendar-export.md). PR: [#21](https://github.com/Maicolfelix/academic-planner/pull/21).
+> **Estado: probado en un dispositivo real (iPhone + Safari + Apple Calendar); el resto de las plataformas sigue NOT TESTED.** El agente que preparó esta guía no tiene teléfonos ni cuentas de calendario: el resultado de iPhone lo aportó el mantenedor y se registra tal como lo describió. Lo que no está en [Resultados reales](#resultados-reales-registrados) ni en la tabla de [lo probado](#qué-está-probado-y-qué-no) está **NOT TESTED**: no se inventó ningún resultado. Función: [calendar-export.md](../../calendar-export.md). PR: [#21](https://github.com/Maicolfelix/academic-planner/pull/21).
+
+# Resultados reales registrados
+
+## iPhone + Safari + Apple Calendar (probado por el mantenedor)
+
+**Condiciones:** iPhone real, **Safari normal** (no PWA instalada), Academic Planner abierto por `http://<IP-DEL-PC>:5173` desde la misma red local, sin HTTPS, cuenta de prueba. Versión de iOS y modelo: **no registrados**.
+
+| Caso                                              | Resultado  | Lo observado                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Sin hora («Taller de bioestadística»)          | **PASS**   | Al pulsar «Añadir al calendario», Safari/iOS abrió **directamente** la interfaz de Calendario, sin buscar el archivo en Descargas/Archivos. Mostró título, asignatura («Base de datos SQL - NOSQL»), fecha y evento de **día completo**; con «Add To Calendar» el evento apareció en Apple Calendar. |
+| 2. Misma actividad por segunda vez                | **PASS**   | iOS **no permitió crear visualmente otro evento igual**: reconoció el evento existente y mostró opciones del evento ya guardado (p. ej. eliminar). **No se observó un segundo evento.**                                                                                                              |
+| 3. Con hora («Entrega proyecto», 11:59 p. m.)     | **PASS**   | iOS mostró **11:44 p. m. → 11:59 p. m.** el mismo día, sin cruzar a la fecha siguiente; título y asignatura correctos.                                                                                                                                                                               |
+| 4. Parcial («Parcial de redes», 8:30 a. m.)       | **PASS**   | iOS mostró **8:15 a. m. → 8:30 a. m.**, igual que la semántica técnica actual (bloque de 15 minutos que termina en `dueAt`). El mantenedor lo considera **aceptable para A4.1**; no se cambia el modelo.                                                                                             |
+| 5. Texto del botón                                | **PASS**   | El botón llevó directamente al calendario, sin obligar a abrir Descargas ni Archivos: **«Añadir al calendario» describe la experiencia en esta plataforma.** No se cambia el copy.                                                                                                                   |
+| Actividad modificada (caso 5 de la guía completa) | NOT TESTED | No se probó.                                                                                                                                                                                                                                                                                         |
+| PWA instalada                                     | NOT TESTED | **NOT TESTED — PWA REQUIRES HTTPS** (no hay HTTPS real). No bloquea el cierre de A4.1.                                                                                                                                                                                                               |
+
+**Alcance de la evidencia.** Confirmado solo para **iPhone + Safari + Apple Calendar**: día completo, actividad con hora, segunda importación sin duplicado observado, texto comprensible y flujo directo al calendario. Que el `UID` estable ayude a reconocer la misma actividad **se observó únicamente en Apple Calendar**; no se generaliza a Google Calendar, Outlook ni a otros navegadores. **No confirmado:** Android, Chrome móvil, Windows con interfaz real, macOS, Google Calendar, Outlook y PWA instalada. En esta prueba no se anotó de forma explícita que la descripción privada no apareciera; la pantalla mostró título, asignatura y fecha.
 
 # QUICK QA — 10 MINUTOS
 
@@ -47,10 +65,10 @@ Valores: `PASS` / `FAIL` / `NOT TESTED`, con una observación breve.
 | ------------- | ------------- | ------------------------------- | ----------------- | -------------------- | ------------- | ---------- |
 | Windows       | Edge o Chrome | NOT TESTED                      | NOT TESTED        | NOT TESTED           | NOT TESTED    | NOT TESTED |
 | Android       | Chrome        | NOT TESTED                      | NOT TESTED        | NOT TESTED           | NOT TESTED    | NOT TESTED |
-| iPhone        | Safari        | NOT TESTED                      | NOT TESTED        | NOT TESTED           | NOT TESTED    | NOT TESTED |
+| iPhone        | Safari        | PASS                            | PASS              | PASS                 | PASS          | PASS       |
 | PWA instalada | (la que haya) | NOT TESTED — PWA REQUIRES HTTPS | NOT TESTED        | NOT TESTED           | NOT TESTED    | NOT TESTED |
 
-«Duplicado al repetir»: escribir `PASS` si reemplaza o pregunta, `FAIL` si duplica de forma que estorbe, y la descripción en observaciones.
+iPhone + Safari: el sistema abre el calendario directamente; la segunda importación reconoció el evento existente (no se observó duplicado), válido solo para Apple Calendar. Las demás filas siguen sin probarse. «Duplicado al repetir»: escribir `PASS` si reemplaza o pregunta, `FAIL` si duplica de forma que estorbe, y la descripción en observaciones.
 
 ## Qué enviar de vuelta
 
@@ -97,16 +115,18 @@ El archivo `.ics` ya está validado (ical.js, iCalendar Validator v1.22, 1768 pr
 
 ## Qué está probado y qué no
 
-| Qué                                                                                     | Estado     | Evidencia                                                                                                                                       |
-| --------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| El `.ics` se genera y es válido (día completo, con hora, 23:59, hostil, Unicode)        | TESTED     | ical.js 2.2.1 + iCalendar Validator v1.22; pruebas de core y API                                                                                |
-| El botón descarga con el nombre `academic-planner-activity.ics` y el contenido esperado | TESTED     | Playwright con Edge (Chromium): evento `download` real en escritorio 1366 px y en emulación de Pixel 5 a 360 px (**emulación, no un teléfono**) |
-| Estado de error con reintento; axe; sin desborde a 360 y 1366 px                        | TESTED     | `e2e/calendar-export.spec.ts`                                                                                                                   |
-| La descarga en Windows + Chrome/Edge **con interfaz real** y su aviso                   | NOT TESTED | Las pruebas son automáticas (sin ventana de descargas)                                                                                          |
-| Apertura/importación en la app de calendario (cualquier plataforma)                     | NOT TESTED | Sin cuentas ni dispositivos en la sesión                                                                                                        |
-| Android + Chrome, iPhone + Safari, macOS + Safari                                       | NOT TESTED | Sin dispositivos                                                                                                                                |
-| PWA instalada                                                                           | NOT TESTED | Sin dispositivos                                                                                                                                |
-| Importar dos veces lo mismo / lo modificado                                             | NOT TESTED | Sin calendarios. **No se asume que el `UID` fuerce una actualización.**                                                                         |
+| Qué                                                                                                       | Estado                       | Evidencia                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| El `.ics` se genera y es válido (día completo, con hora, 23:59, hostil, Unicode)                          | TESTED                       | ical.js 2.2.1 + iCalendar Validator v1.22; pruebas de core y API                                                                                |
+| El botón descarga con el nombre `academic-planner-activity.ics` y el contenido esperado                   | TESTED                       | Playwright con Edge (Chromium): evento `download` real en escritorio 1366 px y en emulación de Pixel 5 a 360 px (**emulación, no un teléfono**) |
+| Estado de error con reintento; axe; sin desborde a 360 y 1366 px                                          | TESTED                       | `e2e/calendar-export.spec.ts`                                                                                                                   |
+| La descarga en Windows + Chrome/Edge **con interfaz real** y su aviso                                     | NOT TESTED                   | Las pruebas son automáticas (sin ventana de descargas)                                                                                          |
+| iPhone + Safari + Apple Calendar: descarga, apertura directa, día completo, con hora, segunda importación | TESTED                       | QA real del mantenedor (ver [Resultados reales](#resultados-reales-registrados)); no es PWA y no hay HTTPS                                      |
+| Apertura/importación en cualquier otra app de calendario                                                  | NOT TESTED                   | Sin cuentas ni dispositivos en la sesión                                                                                                        |
+| Android + Chrome, macOS + Safari                                                                          | NOT TESTED                   | Sin dispositivos                                                                                                                                |
+| PWA instalada                                                                                             | NOT TESTED                   | **NOT TESTED — PWA REQUIRES HTTPS**                                                                                                             |
+| Importar dos veces lo mismo                                                                               | TESTED (solo Apple Calendar) | Sin duplicado observado en iPhone. **No se generaliza a otros clientes.**                                                                       |
+| Importar una actividad modificada                                                                         | NOT TESTED                   | Sin probar en ninguna plataforma.                                                                                                               |
 
 ## Preparación (para quien prueba)
 
@@ -174,25 +194,25 @@ Anotar: reemplaza el anterior / duplica / pregunta / otra cosa.
 
 Una fila por plataforma y navegador (y una más para la PWA instalada si aplica). Escribir `NOT TESTED` en lo que no se pruebe.
 
-| Plataforma                    | Navegador           | Acción al pulsar | Archivo descargado | Opción de abrir calendario | Evento importado | Segunda importación | Observaciones |
-| ----------------------------- | ------------------- | ---------------- | ------------------ | -------------------------- | ---------------- | ------------------- | ------------- |
-| Windows (versión: …)          | Chrome (versión: …) | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
-| Windows (versión: …)          | Edge (versión: …)   | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
-| Android (versión y modelo: …) | Chrome (versión: …) | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
-| iOS (versión y modelo: …)     | Safari              | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
-| macOS (versión: …)            | Safari              | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
-| iOS / Android                 | PWA instalada       | NOT TESTED       | NOT TESTED         | NOT TESTED                 | NOT TESTED       | NOT TESTED          |               |
+| Plataforma                             | Navegador           | Acción al pulsar                                   | Archivo descargado                          | Opción de abrir calendario        | Evento importado           | Segunda importación                                    | Observaciones                            |
+| -------------------------------------- | ------------------- | -------------------------------------------------- | ------------------------------------------- | --------------------------------- | -------------------------- | ------------------------------------------------------ | ---------------------------------------- |
+| Windows (versión: …)                   | Chrome (versión: …) | NOT TESTED                                         | NOT TESTED                                  | NOT TESTED                        | NOT TESTED                 | NOT TESTED                                             |                                          |
+| Windows (versión: …)                   | Edge (versión: …)   | NOT TESTED                                         | NOT TESTED                                  | NOT TESTED                        | NOT TESTED                 | NOT TESTED                                             |                                          |
+| Android (versión y modelo: …)          | Chrome (versión: …) | NOT TESTED                                         | NOT TESTED                                  | NOT TESTED                        | NOT TESTED                 | NOT TESTED                                             |                                          |
+| iOS (versión y modelo: no registrados) | Safari              | Safari abre directamente la interfaz de Calendario | Sin buscar el archivo en Descargas/Archivos | Sí, inmediata («Add To Calendar») | Correcto en Apple Calendar | Reconoció el evento existente; sin duplicado observado | Safari normal, HTTP en red local; no PWA |
+| macOS (versión: …)                     | Safari              | NOT TESTED                                         | NOT TESTED                                  | NOT TESTED                        | NOT TESTED                 | NOT TESTED                                             |                                          |
+| iOS / Android                          | PWA instalada       | NOT TESTED                                         | NOT TESTED                                  | NOT TESTED                        | NOT TESTED                 | NOT TESTED                                             |                                          |
 
 Resultados por caso (rellenar con lo observado; `OK` / `FALLA` / `NOT TESTED` + una frase):
 
-| Caso                                 | Windows    | Android    | iOS        | macOS      |
-| ------------------------------------ | ---------- | ---------- | ---------- | ---------- |
-| 1. Sin hora: día completo correcto   | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| 1. Sin descripción ni datos privados | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| 2. 23:44–23:59 en un solo día        | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| 3. Parcial 8:15–8:30                 | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| 4. Misma actividad dos veces         | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| 5. Actividad modificada              | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
+| Caso                                 | Windows    | Android    | iOS                                                                                    | macOS      |
+| ------------------------------------ | ---------- | ---------- | -------------------------------------------------------------------------------------- | ---------- |
+| 1. Sin hora: día completo correcto   | NOT TESTED | NOT TESTED | OK (iPhone + Safari)                                                                   | NOT TESTED |
+| 1. Sin descripción ni datos privados | NOT TESTED | NOT TESTED | NOT TESTED (la pantalla mostró título, asignatura y fecha; no se anotó la descripción) | NOT TESTED |
+| 2. 23:44–23:59 en un solo día        | NOT TESTED | NOT TESTED | OK (iPhone + Safari)                                                                   | NOT TESTED |
+| 3. Parcial 8:15–8:30                 | NOT TESTED | NOT TESTED | OK (iPhone + Safari); aceptable según el mantenedor                                    | NOT TESTED |
+| 4. Misma actividad dos veces         | NOT TESTED | NOT TESTED | OK: sin duplicado observado (Apple Calendar)                                           | NOT TESTED |
+| 5. Actividad modificada              | NOT TESTED | NOT TESTED | NOT TESTED                                                                             | NOT TESTED |
 
 ## Mini prueba de producto (por persona, no es un estudio)
 
@@ -234,12 +254,13 @@ Sin _user-agent sniffing_ salvo evidencia extrema. Cualquier cambio del mecanism
 
 El PR #21 puede considerarse **candidato a fusión** si se cumplen **todos** estos puntos:
 
-| Gate | Condición                                                                                     | Estado                                                                                   |
-| ---- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| A    | La generación y la descarga funcionan                                                         | **CONFIRMADO** (descarga automática en Chromium/Edge; falta la prueba con interfaz real) |
-| B    | Al menos una plataforma real permite llegar al calendario de forma comprensible               | **PENDIENTE** (NOT TESTED)                                                               |
-| C    | Se prueba al menos un móvil real                                                              | **PENDIENTE** (NOT TESTED)                                                               |
-| D    | La segunda importación tiene un comportamiento conocido (reemplaza, duplica, pregunta u otro) | **PENDIENTE** (NOT TESTED)                                                               |
-| E    | No aparece un problema grave de privacidad o de UX                                            | **PENDIENTE** (NOT TESTED)                                                               |
+| Gate | Condición                                                                                     | Estado                                                                     |
+| ---- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| A    | La generación y la descarga funcionan                                                         | **PASS** (automático en Chromium/Edge y real en iPhone + Safari)           |
+| B    | Al menos una plataforma real permite llegar al calendario de forma comprensible               | **PASS** (iPhone + Safari + Apple Calendar: abre directo el calendario)    |
+| C    | Se prueba al menos un móvil real                                                              | **PASS** (iPhone real)                                                     |
+| D    | La segunda importación tiene un comportamiento conocido (reemplaza, duplica, pregunta u otro) | **PASS** (Apple Calendar: sin duplicado observado; solo en esa plataforma) |
+| E    | No aparece un problema grave de privacidad o de UX                                            | **PASS** (sin problema grave reportado)                                    |
+| PWA  | PWA instalada                                                                                 | **NOT TESTED — PWA REQUIRES HTTPS** (no bloquea)                           |
 
-No se exige que Google, Apple y Outlook se comporten igual, ni que la segunda importación sea «buena»: basta con que se **conozca** y que no invalide el MVP. Esta guía **no promete compatibilidad** con ninguna aplicación de calendario. **No fusionar hasta cerrar B, C, D y E con resultados reales.** La fusión la decide el mantenedor.
+No se exige que Google, Apple y Outlook se comporten igual, ni que la segunda importación sea «buena»: basta con que se **conozca** y que no invalide el MVP. Esta guía **no promete compatibilidad** con ninguna aplicación de calendario. Los gates A a E quedaron cerrados con la prueba real de iPhone. Lo no probado (Android, Google Calendar, Outlook, Windows con interfaz real, macOS, PWA) **no bloquea** A4.1, pero **tampoco** queda confirmado.

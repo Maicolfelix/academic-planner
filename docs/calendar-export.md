@@ -36,9 +36,18 @@ Se mantiene el modelo actual: `Activity.dueAt` + `hasTime`. No se reinterpreta p
 - **Pruebas:** core (40, con _mutation checks_ sobre CR, escapes, plegado, controles, sustituto, sello, día completo, bloque, `UID` y `METHOD`: 12 de 12 detectados), API (10 en `calendarExport.test.ts` más las matrices de propiedad y de sesión anónima), web (`apiDownload`) y navegador (`e2e/calendar-export.spec.ts`: día completo, con hora, título hostil, error con reintento, axe, 360 y 1366 px).
 - **Independiente (2026-10-07):** cinco archivos generados con el código real (día completo, con hora, 23:59, título hostil y Unicode largo) se leyeron de vuelta con **ical.js 2.2.1** (instalado fuera del repositorio; no es una dependencia) y se pasaron por **iCalendar Validator v1.22 (icalendar.org)**: sin errores en los cinco. El validador cuenta 2 bytes menos que el archivo (el CRLF final); no afecta al resultado. Datos sintéticos.
 
+## Validación en dispositivo real
+
+QA manual del mantenedor (detalle en [manual-qa.md](spikes/a4-calendar-export/manual-qa.md)): **iPhone real, Safari, Apple Calendar**, abriendo la app por HTTP en red local (no PWA instalada).
+
+- Al pulsar «Añadir al calendario», iOS abrió directamente la interfaz de Calendario; no hubo que buscar el archivo en Descargas ni Archivos.
+- Sin hora: evento de día completo con título, asignatura y fecha correctos. Con hora (23:59): 11:44–11:59 p. m. el mismo día. Parcial a las 8:30: 8:15–8:30 a. m., como indica la semántica actual, y el mantenedor lo considera aceptable.
+- Segunda importación de la misma actividad: iOS reconoció el evento existente y no se observó un segundo evento. **Solo se observó en Apple Calendar**; no se generaliza a otros clientes.
+- **No probado:** Android, Chrome móvil, Windows con interfaz real, macOS, Google Calendar, Outlook, una actividad modificada y la PWA instalada (**NOT TESTED — PWA REQUIRES HTTPS**).
+
 ## Qué NO se afirma
 
-- **No se probó en Google Calendar, Apple Calendar ni Outlook, ni en dispositivos reales.** Qué app abre el archivo, si lo ofrece añadir o solo lo guarda, y si volver a descargar la misma actividad **reemplaza** el evento por su `UID` o lo **duplica** dependen del navegador, del sistema operativo y del cliente. Pendiente de pruebas con clientes y estudiantes reales.
+- **No se probó en Google Calendar ni Outlook, ni en Android, Windows con interfaz real o macOS** (Apple Calendar en iPhone sí, ver arriba). Qué app abre el archivo, si lo ofrece añadir o solo lo guarda, y si volver a descargar la misma actividad **reemplaza** el evento por su `UID` o lo **duplica** dependen del navegador, del sistema operativo y del cliente. Pendiente de pruebas con clientes y estudiantes reales.
 - Que el archivo sea válido para un validador no garantiza cómo lo pinta cada cliente.
 - Es una instantánea: si la actividad cambia después, el calendario **no** se entera. Descargarla de nuevo es la forma de actualizarla.
 
