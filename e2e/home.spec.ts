@@ -17,7 +17,6 @@ import {
 /** UX1-2: the redesigned Home. What to do now, then how am I doing, then what comes next. */
 
 const region = (page: Page, name: string) => page.getByRole('region', { name });
-const top = async (page: Page, name: string) => (await region(page, name).boundingBox())!.y;
 
 async function newUser(page: Page) {
   await register(page, uniqueEmail());
@@ -26,7 +25,9 @@ async function newUser(page: Page) {
   return (await apiSubjects(page))[0]!;
 }
 
-test('the hero comes first, then how am I doing, then what comes next', async ({ page }) => {
+test('the hero comes first, then how am I doing, then what comes next (two columns on a wide screen)', async ({
+  page,
+}) => {
   const assertClean = watch(page);
   const redes = await newUser(page);
   const bio = await apiCreateSubject(page, 'Bioestadística');
@@ -41,17 +42,55 @@ test('the hero comes first, then how am I doing, then what comes next', async ({
   await page.goto('/dashboard');
   await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toBeVisible();
 
-  const order = [
-    await top(page, '¿Qué hago ahora?'),
-    await top(page, 'Resumen del periodo'),
-    await top(page, 'Progreso de actividades'),
-    await top(page, 'Captura rápida'),
-    await top(page, 'Radar académico'),
-    await top(page, 'Esta semana'),
+  const names = [
+    '¿Qué hago ahora?',
+    'Resumen del periodo',
+    'Progreso de actividades',
+    'Captura rápida',
+    'Radar académico',
+    'Esta semana',
   ];
-  expect(order, 'hero > counters > progress > capture > Radar > week').toEqual(
-    [...order].sort((a, b) => a - b),
+  const top = async (name: string) => (await region(page, name).boundingBox())!.y;
+  const left = async (name: string) => (await region(page, name).boundingBox())!.x;
+
+  // The DOM (and so the keyboard and the screen reader) always reads: hero > counters > progress > capture > Radar > week.
+  const handles = await Promise.all(names.map((n) => region(page, n).elementHandle()));
+  const inDomOrder = await page.evaluate(
+    (els) =>
+      els.every(
+        (el, i) =>
+          i === 0 ||
+          (els[i - 1]!.compareDocumentPosition(el!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      ),
+    handles,
   );
+  expect(inDomOrder, 'reading order').toBe(true);
+
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    // phone and tablet: one column, in that same order
+    const order = await Promise.all(names.map(top));
+    expect(order, 'hero > counters > progress > capture > Radar > week').toEqual(
+      [...order].sort((a, b) => a - b),
+    );
+  } else {
+    // desktop: two columns. Left: what to do now, then what is next. Right: how am I doing, the capture and the Radar.
+    const [heroX, heroW] = [
+      await left(names[0]!),
+      (await region(page, names[0]!).boundingBox())!.width,
+    ];
+    for (const n of names.slice(1, 5))
+      expect(await left(n), `${n} sits beside the hero`).toBeGreaterThan(heroX + heroW);
+    expect(await left(names[5]!), 'the week stays under the hero').toBeCloseTo(heroX, 0);
+    const right = await Promise.all(names.slice(1, 5).map(top));
+    expect(right, 'counters > progress > capture > Radar, one under the other').toEqual(
+      [...right].sort((a, b) => a - b),
+    );
+    expect(await top(names[5]!), 'the week comes after the hero').toBeGreaterThan(
+      await top(names[0]!),
+    );
+    // the desktop uses the width: the content is wider than the old 768 px reading column
+    expect((await page.locator('main').boundingBox())!.width).toBeGreaterThan(900);
+  }
   // exactly one h1, every section title an h2
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
   const levels = await page

@@ -11,6 +11,7 @@ import { useCurrentPeriod, useSubjects } from '../../academic/useAcademic';
 import { useCreateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
 import { Button } from '../../components/ui/Button';
+import { SparkIcon } from '../../components/ui/icons';
 import { useParseQuickCapture } from '../../quickCapture/useQuickCapture';
 import { QuickCapturePreview, type QuickCaptureDraft } from './QuickCapturePreview';
 
@@ -121,7 +122,10 @@ export function QuickCapture() {
 
   return (
     <section aria-labelledby="quick-capture-title" className="flex flex-col gap-2">
-      <h2 id="quick-capture-title" className="text-lg font-semibold">
+      <h2 id="quick-capture-title" className="flex items-center gap-2 text-lg font-semibold">
+        <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-accent-ink">
+          <SparkIcon className="size-4" />
+        </span>
         Captura rápida
       </h2>
 

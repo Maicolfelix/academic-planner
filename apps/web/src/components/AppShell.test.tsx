@@ -159,6 +159,32 @@ describe('sliding indicator of the phone bar', () => {
   it('the icon capsule exists for every destination and lifts only for the current one', () => {
     const out = nav(shell('/activities'));
     expect(out.match(/rounded-full px-4 py-0.5/g)).toHaveLength(4);
-    expect(out.match(/-translate-y-0.5 bg-accent-soft/g)).toHaveLength(1);
+    expect(out.match(/-translate-y-1 bg-\[linear-gradient/g)).toHaveLength(1);
+  });
+
+  it('the desktop highlight is decoration that slides behind the links, and only the phone rail has data-nav-indicator', () => {
+    // Static render: the highlight is measured in the browser (no pill yet), so only the rail is in the markup.
+    const out = nav(shell('/calendar'));
+    expect(out.match(/data-nav-indicator/g)).toHaveLength(1);
+    expect(out).not.toContain('data-nav-pill');
+    // links keep their order and are the only links of the navigation
+    expect(out.match(/<a /g)).toHaveLength(4);
+  });
+});
+
+describe('ambient light', () => {
+  const html = shell('/activities');
+
+  it('sits behind every screen, is hidden from assistive tech and cannot catch a tap', () => {
+    const layer = /<div aria-hidden="true" class="([^"]*)"/.exec(html)?.[1] ?? '';
+    expect(layer).toContain('pointer-events-none');
+    expect(layer).toContain('-z-10');
+    expect(layer).toContain('overflow-hidden'); // the orbs hang off the edges: they must never widen the page
+  });
+
+  it('is still: moving viewport-sized layers on every frame is the costliest thing a page can do', () => {
+    const orbs = [...html.matchAll(/class="(ambient-orb [^"]*)"/g)].map((m) => m[1]!);
+    expect(orbs).toHaveLength(3);
+    for (const orb of orbs) expect(orb).not.toContain('animate-');
   });
 });

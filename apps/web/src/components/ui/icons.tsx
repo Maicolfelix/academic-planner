@@ -53,6 +53,13 @@ export const BookIcon = () => (
   </Icon>
 );
 
+/** Two sparks: "write it in a sentence and I will organize it" (Quick Capture). */
+export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (
+  <Icon className={className}>
+    <path d="M9 3v4M7 5h4M17 12v6M14 15h6M10 12l-3 3M19 4l-2 2" />
+  </Icon>
+);
+
 /** The product mark: a rounded square with a check, the same idea as the favicon. */
 export const BrandMark = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7 text-primary">

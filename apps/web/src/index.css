@@ -55,6 +55,31 @@
   --duration-slow: 600ms;
   /* The hero surface: deep indigo drifting a little toward violet. The ONLY large gradient of the app. */
   --gradient-hero: linear-gradient(135deg, #1f2670 0%, #2a2a86 58%, #3a2f95 100%);
+  /* The same hero when nothing presses (planning / under control): the indigo drifts toward a deep teal. */
+  --gradient-hero-calm: linear-gradient(135deg, #1f2670 0%, #17478a 52%, #0a5f66 100%);
+  /* Ambient light (UX1-2.75): three large, faint halos behind the page. Their hue follows the state of the semester
+     (see the `data-ambient` rules below, set on <body> by the Home); they are decoration and never carry information. */
+  --amb-a: rgb(99 102 241 / 0.2);
+  --amb-b: rgb(13 148 136 / 0.16);
+  --amb-c: rgb(139 92 246 / 0.12);
+}
+
+/* The state of the semester tints the light: urgent (overdue or immediate), calm (under control), done (100 %).
+   The Home sets `data-ambient` on <body> while it is on screen; every other screen keeps the neutral light. */
+body[data-ambient='urgent'] {
+  --amb-a: rgb(244 63 94 / 0.17);
+  --amb-b: rgb(249 115 22 / 0.13);
+  --amb-c: rgb(99 102 241 / 0.14);
+}
+body[data-ambient='calm'] {
+  --amb-a: rgb(13 148 136 / 0.19);
+  --amb-b: rgb(56 189 248 / 0.15);
+  --amb-c: rgb(99 102 241 / 0.12);
+}
+body[data-ambient='done'] {
+  --amb-a: rgb(22 163 74 / 0.18);
+  --amb-b: rgb(13 148 136 / 0.17);
+  --amb-c: rgb(99 102 241 / 0.1);
 }
 
 @theme inline {
@@ -151,6 +176,16 @@
   --animate-beacon: beacon 1100ms var(--ease-standard) 400ms 1 backwards;
   --animate-complete: complete 1100ms var(--ease-standard) 1 backwards;
   --animate-breathe: breathe 1.6s ease-in-out infinite;
+  --animate-ring: ring var(--duration-slow) var(--ease-enter) 120ms backwards;
+
+  /* AMBIENT (category A): slow, discreet and never in sync. Always used as `motion-safe:animate-*`, so with reduced
+     motion they never start. They move only `transform` and `opacity`. */
+  --animate-drift: drift 20s ease-in-out infinite alternate;
+  --animate-drift-slow: drift 28s ease-in-out -9s infinite alternate-reverse;
+  --animate-halo: halo 6s ease-out infinite;
+  --animate-scan: scan 9s ease-in-out infinite;
+  --animate-node: node 7s ease-in-out infinite;
+  --animate-orbit: orbit 48s linear infinite;
 
   @keyframes rise {
     from {
@@ -214,6 +249,71 @@
     }
   }
 
+  /* A big soft light that wanders a little, the way ambient light does. */
+  @keyframes drift {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(8vw, 3rem, 0);
+    }
+  }
+
+  /* A ring that leaves a Radar mark once in a while: most of the cycle it is not there at all. */
+  @keyframes halo {
+    0%,
+    62%,
+    100% {
+      opacity: 0;
+      transform: scale(1);
+    }
+    70% {
+      opacity: 0.6;
+    }
+    94% {
+      opacity: 0;
+      transform: scale(3);
+    }
+  }
+
+  /* A faint light that passes over the Radar strip, then rests. */
+  @keyframes scan {
+    0%,
+    55% {
+      transform: translateX(-130%);
+    }
+    100% {
+      transform: translateX(520%);
+    }
+  }
+
+  /* Three small nodes circling a center, very slowly (the empty-state picture). */
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* The current node of the hero rail breathes in and out, slowly. */
+  @keyframes node {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.35);
+    }
+  }
+
+  /* The progress ring draws itself once (the end value is the element's own). Paint only, on one small SVG. */
+  @keyframes ring {
+    from {
+      stroke-dasharray: 0 100;
+    }
+  }
+
   @keyframes fill {
     from {
       transform: scaleX(0);
@@ -255,6 +355,34 @@ body {
 /* A modal dialog is open: the page behind must not scroll under the student's finger. */
 body:has(dialog[open]) {
   overflow: hidden;
+}
+
+/* The light behind the page (AppShell). Plain radial gradients, no blur and no image, and STILL (no animation, no
+   will-change): each orb fades to transparent by itself and ends inside its box, so there is never a visible edge. */
+.ambient-orb {
+  position: absolute;
+  border-radius: 9999px;
+}
+.ambient-orb-a {
+  top: -14rem;
+  left: -8rem;
+  width: 44rem;
+  height: 44rem;
+  background: radial-gradient(closest-side, var(--amb-a), transparent);
+}
+.ambient-orb-b {
+  top: -6rem;
+  right: -12rem;
+  width: 40rem;
+  height: 40rem;
+  background: radial-gradient(closest-side, var(--amb-b), transparent);
+}
+.ambient-orb-c {
+  top: 6rem;
+  left: 30%;
+  width: 30rem;
+  height: 30rem;
+  background: radial-gradient(closest-side, var(--amb-c), transparent);
 }
 
 /* Respect the system setting: no smooth scrolling, transitions or animations for people who ask for less motion.

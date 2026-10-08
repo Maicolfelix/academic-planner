@@ -214,11 +214,36 @@ describe('motion (index.css)', () => {
     expect(animated('fill').has('transform')).toBe(true);
   });
 
-  it('the only looping animation is the loading placeholder, and reduced motion stops loops', () => {
-    expect([...css.matchAll(/--animate-([a-z]+):[^;]*infinite;/g)].map((m) => m[1])).toEqual([
+  it('loops are either the loading placeholder or AMBIENT (slow, discreet), and reduced motion stops loops', () => {
+    const loops = [...css.matchAll(/--animate-([a-z-]+):[^;]*infinite[^;]*;/g)].map((m) => m[1]);
+    // `breathe` is the loading placeholder; the rest are the ambient category (documented in ux-accessibility.md)
+    expect(loops.sort()).toEqual([
       'breathe',
+      'drift',
+      'drift-slow',
+      'halo',
+      'node',
+      'orbit',
+      'scan',
     ]);
     const block = /@media \(prefers-reduced-motion: reduce\)\s*{([\s\S]*?)\n}/.exec(css)?.[1] ?? '';
     expect(block).toContain('animation-iteration-count: 1 !important');
+  });
+
+  it('every ambient loop is only ever used as motion-safe (it never starts under reduced motion)', () => {
+    const sources = [
+      'pages/attention/AttentionCard.tsx',
+      'pages/radar/RadarDot.tsx',
+      'pages/radar/RadarCard.tsx',
+      'components/ui/EmptyState.tsx',
+    ];
+    for (const file of sources) {
+      const code = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+      const used = [
+        ...code.matchAll(/(motion-safe:)?animate-(drift-slow|drift|halo|scan|node|orbit)\b/g),
+      ];
+      expect(used.length, file).toBeGreaterThan(0);
+      for (const [match, safe] of used) expect(safe, `${file}: ${match}`).toBe('motion-safe:');
+    }
   });
 });

@@ -1,5 +1,11 @@
 import { QueryError } from '../../components/QueryError';
-import { RADAR_LABELS, formatDue, radarExplanation, type RadarStatus } from '@planner/core';
+import {
+  RADAR_LABELS,
+  RADAR_STATUSES,
+  formatDue,
+  radarExplanation,
+  type RadarStatus,
+} from '@planner/core';
 import { Link } from 'react-router';
 import { useAttention } from '../../attention/useAttention';
 import { Card } from '../../components/ui/Card';
@@ -26,6 +32,52 @@ const HALO: Record<RadarStatus, string> = {
 
 /** Only the two states that ask for action get the one-time ripple on their mark. */
 const NEEDS_ACTION: RadarStatus[] = ['OVERDUE', 'IMMEDIATE'];
+
+/** The hero reflects the state: pressing ones keep the deep indigo, planning and under-control ones drift toward teal. */
+const SURFACE = (status: RadarStatus) =>
+  NEEDS_ACTION.includes(status) || status === 'UPCOMING'
+    ? 'bg-(image:--gradient-hero)'
+    : 'bg-(image:--gradient-hero-calm)';
+
+/**
+ * A tiny timeline: the five Radar states as nodes on a line, and the current one lit and breathing. It repeats, in
+ * miniature, the spectrum of the Radar card: the same idea of "where this sits in your load". Decoration only: the
+ * state is already written as a word at the top of the hero.
+ */
+function Rail({ status }: { status: RadarStatus }) {
+  const current = RADAR_STATUSES.indexOf(status);
+  return (
+    <svg
+      viewBox="0 0 96 22"
+      aria-hidden="true"
+      focusable="false"
+      className="pointer-events-none hidden h-5 w-24 shrink-0 min-[380px]:block"
+    >
+      <line x1="6" y1="11" x2="90" y2="11" stroke="white" strokeOpacity="0.28" strokeWidth="1.5" />
+      {RADAR_STATUSES.map((s, i) => (
+        <g key={s}>
+          {i === current && (
+            <circle
+              cx={6 + i * 21}
+              cy="11"
+              r="8"
+              fill="white"
+              fillOpacity="0.16"
+              className="origin-center [transform-box:fill-box] motion-safe:animate-node"
+            />
+          )}
+          <circle
+            cx={6 + i * 21}
+            cy="11"
+            r={i === current ? 4 : 2.5}
+            fill="white"
+            fillOpacity={i === current ? 1 : i < current ? 0.25 : 0.5}
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
 
 // Entrance: the card settles, then its parts follow a few milliseconds apart. One-shot; nothing loops.
 const STAGE = [
@@ -80,12 +132,20 @@ export function Suggestion({
   return (
     <article
       aria-labelledby="attention-activity"
-      className={`${HALO[radarStatus]} relative isolate flex animate-rise flex-col gap-4 overflow-hidden rounded-hero bg-(image:--gradient-hero) p-5 text-primary-foreground shadow-hero ring-1 ring-white/10 ring-inset`}
+      className={`${HALO[radarStatus]} ${SURFACE(radarStatus)} relative isolate flex animate-rise flex-col gap-4 overflow-hidden rounded-hero p-5 text-primary-foreground shadow-hero ring-1 ring-white/10 ring-inset lg:p-7`}
     >
-      {/* Decoration: a glow of the state's hue and a thin ring. Hidden from assistive tech, never catches a tap. */}
+      {/* Decoration, all of it hidden from assistive tech and unable to catch a tap, behind the text: an orb of the
+          state's own light that drifts very slowly, a soft grid that fades away from it, and a thin ring. The orb is
+          stronger when the state asks for action and calmer when it does not. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -top-20 -right-16 -z-10 size-60 rounded-full bg-[radial-gradient(closest-side,var(--halo),transparent)]"
+        className={`pointer-events-none absolute -top-24 -right-20 -z-10 size-72 rounded-full bg-[radial-gradient(closest-side,var(--halo),transparent)] motion-safe:animate-drift ${
+          NEEDS_ACTION.includes(radarStatus) ? '' : 'opacity-70'
+        }`}
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.09] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px] [-webkit-mask-image:radial-gradient(70%_90%_at_88%_12%,black,transparent)] [mask-image:radial-gradient(70%_90%_at_88%_12%,black,transparent)]"
       />
       <span
         aria-hidden="true"
@@ -95,7 +155,7 @@ export function Suggestion({
       <div className={`flex animate-rise flex-wrap items-center gap-1.5 ${STAGE[0]}`}>
         {/* The state is a word with a mark, never a color on its own. */}
         <span className="mr-1 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-sm font-medium">
-          <RadarDot status={radarStatus} beacon={NEEDS_ACTION.includes(radarStatus)} />
+          <RadarDot status={radarStatus} beacon={NEEDS_ACTION.includes(radarStatus)} ambient={0} />
           {RADAR_LABELS[radarStatus]}
         </span>
         <PriorityBadge priority={activity.priority} />
@@ -131,20 +191,24 @@ export function Suggestion({
         </div>
       </div>
 
-      {/* A white button on the deep surface; its focus ring is white too, the page's dark ring would vanish here. */}
-      <Link
-        to={`/activities?edit=${activity.id}`}
-        aria-label={`Ver actividad: ${activity.title}`}
-        className={`group inline-flex min-h-11 animate-rise items-center gap-2 self-start rounded-control bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lift transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-accent-soft focus-visible:outline-white active:scale-[0.97] ${STAGE[4]}`}
-      >
-        Ver actividad
-        <span
-          aria-hidden="true"
-          className="transition-transform duration-(--duration-fast) ease-spring group-hover:translate-x-0.5 group-active:translate-x-1"
+      {/* A white button on the deep surface; its focus ring is white too, the page's dark ring would vanish here. The
+          rail sits beside it, in the flow, so it can never overlap the text or the button. */}
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          to={`/activities?edit=${activity.id}`}
+          aria-label={`Ver actividad: ${activity.title}`}
+          className={`group inline-flex min-h-11 animate-rise items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lift transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-accent-soft focus-visible:outline-white active:scale-[0.97] ${STAGE[4]}`}
         >
-          →
-        </span>
-      </Link>
+          Ver actividad
+          <span
+            aria-hidden="true"
+            className="transition-transform duration-(--duration-fast) ease-spring group-hover:translate-x-0.5 group-active:translate-x-1"
+          >
+            →
+          </span>
+        </Link>
+        <Rail status={radarStatus} />
+      </div>
     </article>
   );
 }

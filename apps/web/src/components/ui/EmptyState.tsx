@@ -1,31 +1,66 @@
 import type { ReactNode } from 'react';
 import { Card } from './Card';
 
-/** A small abstract picture (a tilted check over soft shapes). Decoration: hidden from assistive technology. */
+/**
+ * A small constellation: three nodes circling the thing that is still to come (a checked square), with a ring that
+ * leaves it now and then. The orbit and the ring are ambient motion (never with reduced motion). Decoration: hidden
+ * from assistive technology.
+ */
 function Illustration() {
   return (
     <svg
       viewBox="0 0 120 80"
       aria-hidden="true"
       focusable="false"
-      className="mx-auto mb-3 h-16 w-24 animate-pop"
+      className="mx-auto mb-3 h-20 w-32 animate-pop"
     >
-      <circle cx="60" cy="42" r="30" className="fill-accent-soft" />
-      <circle cx="98" cy="18" r="6" className="fill-accent/40" />
-      <circle cx="20" cy="62" r="4" className="fill-primary/20" />
-      <circle cx="104" cy="64" r="3" className="fill-primary/15" />
+      <circle cx="60" cy="40" r="32" className="fill-accent-soft" />
+      <ellipse
+        cx="60"
+        cy="40"
+        rx="46"
+        ry="17"
+        transform="rotate(-18 60 40)"
+        fill="none"
+        strokeWidth="1"
+        className="stroke-primary/20"
+      />
+      <ellipse
+        cx="60"
+        cy="40"
+        rx="40"
+        ry="14"
+        transform="rotate(26 60 40)"
+        fill="none"
+        strokeWidth="1"
+        strokeDasharray="2 4"
+        className="stroke-accent/40"
+      />
+      <g className="[transform-origin:60px_40px] motion-safe:animate-orbit">
+        <circle cx="96" cy="40" r="3.5" className="fill-accent" />
+        <circle cx="42" cy="68" r="2.5" className="fill-primary/40" />
+        <circle cx="30" cy="20" r="3" className="fill-primary/25" />
+      </g>
+      <circle
+        cx="60"
+        cy="40"
+        r="20"
+        fill="none"
+        strokeWidth="2"
+        className="origin-center stroke-accent opacity-0 [transform-box:fill-box] motion-safe:animate-halo"
+      />
       <rect
-        x="38"
+        x="40"
         y="22"
-        width="44"
-        height="40"
+        width="40"
+        height="36"
         rx="10"
-        transform="rotate(-6 60 42)"
+        transform="rotate(-6 60 40)"
         className="fill-primary"
       />
       <path
-        d="m50 43 7 7 14-15"
-        transform="rotate(-6 60 42)"
+        d="m51 41 6 6 13-13"
+        transform="rotate(-6 60 40)"
         fill="none"
         strokeWidth="4"
         strokeLinecap="round"

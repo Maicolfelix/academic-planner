@@ -25,22 +25,22 @@ async function seeded(page: Page) {
   await addSubjectViaUi(page, 'Redes');
   const [redes] = await apiSubjects(page);
   const bio = await apiCreateSubject(page, 'Bioestadística');
-  await apiCreateActivity(page, {
-    subjectId: redes!.id,
-    title: 'Entrega atrasada',
-    dueDate: daysFromNow(-2),
-  });
-  await apiCreateActivity(page, { subjectId: bio.id, title: 'Taller', dueDate: daysFromNow(3) });
-  await apiCreateActivity(page, { subjectId: bio.id, title: 'Lectura', dueDate: daysFromNow(6) });
   const soon = inBogota(12 * 3600e3);
-  await apiCreateActivity(page, {
-    subjectId: redes!.id,
-    title: 'Parcial',
-    type: 'EXAM',
-    dueDate: soon.dueDate,
-    dueTime: soon.dueTime,
-  });
-  return { redes: redes!, bio };
+  const ids: string[] = [];
+  for (const a of [
+    { subjectId: redes!.id, title: 'Entrega atrasada', dueDate: daysFromNow(-2) },
+    { subjectId: bio.id, title: 'Taller', dueDate: daysFromNow(3) },
+    { subjectId: bio.id, title: 'Lectura', dueDate: daysFromNow(6) },
+    {
+      subjectId: redes!.id,
+      title: 'Parcial',
+      type: 'EXAM' as const,
+      dueDate: soon.dueDate,
+      dueTime: soon.dueTime,
+    },
+  ])
+    ids.push((await apiCreateActivity(page, a)).id);
+  return { redes: redes!, bio, ids };
 }
 
 const centerX = async (locator: Locator) => {
@@ -72,7 +72,8 @@ test('the bottom bar mark slides to the destination you open and stays under its
     // once the slide ends, the mark is centered under the link it belongs to (poll the state, not the clock)
     await expect
       .poll(
-        async () => Math.abs((await centerX(indicator.locator('span'))) - (await centerX(link))),
+        async () =>
+          Math.abs((await centerX(indicator.locator('span').last())) - (await centerX(link))),
         {
           timeout: 3000,
         },
@@ -168,15 +169,12 @@ test('with reduced motion nothing slides, springs or waits, and everything is st
   await expect(hero).toBeVisible();
   const heroMotion = await hero.evaluate((el) => {
     const cs = getComputedStyle(el);
-    return {
-      duration: parseFloat(cs.animationDuration),
-      delay: parseFloat(cs.animationDelay),
-      opacity: cs.opacity,
-    };
+    return { duration: parseFloat(cs.animationDuration), delay: parseFloat(cs.animationDelay) };
   });
   expect(heroMotion.duration).toBeLessThan(0.001);
   expect(heroMotion.delay).toBe(0);
-  expect(heroMotion.opacity).toBe('1');
+  // …and it is fully there as soon as the first frame has run (wait for that frame: a 0.01 ms animation still needs one)
+  await expect(hero).toHaveCSS('opacity', '1');
 
   // the phone bar: the mark has no transition and is already under the current place
   if (PHONE(page)) {
@@ -203,6 +201,7 @@ test('with reduced motion nothing slides, springs or waits, and everything is st
 test('Home, Activities and Agenda fit the screen and pass axe with all the new visuals', async ({
   page,
 }) => {
+  test.setTimeout(90_000); // seeds a semester, then three screens with axe: more than the default 30 s under load
   await seeded(page);
   for (const url of ['/dashboard', '/activities', '/calendar']) {
     await page.goto(url);
@@ -215,4 +214,99 @@ test('Home, Activities and Agenda fit the screen and pass axe with all the new v
       url,
     ).toEqual([]);
   }
+});
+
+/** UX1-2.75: intelligent ambient experience. Ambient motion exists, is never in step, and disappears with reduced motion. */
+
+const animationOf = (locator: Locator) =>
+  locator.evaluate((el) => getComputedStyle(el).animationName);
+
+test('the ambient light and the Radar rings are alive, and with reduced motion they never start', async ({
+  page,
+}) => {
+  await seeded(page);
+  await page.goto('/dashboard');
+  const orbs = page.locator('.ambient-orb');
+  await expect(orbs).toHaveCount(3);
+  await expect(orbs.first()).toHaveCSS('animation-name', 'none'); // the background light is still on purpose (cost)
+  const heroOrb = page
+    .getByRole('region', { name: '¿Qué hago ahora?' })
+    .locator('[class*="animate-drift"]');
+  await expect(heroOrb).toHaveCSS('animation-name', 'drift'); // the hero's own light does drift
+  const rings = page
+    .getByRole('region', { name: 'Radar académico' })
+    .locator('[class*="animate-halo"]');
+  await expect(rings.first()).toBeAttached(); // the Radar loads after the Home
+  expect(
+    await rings.count(),
+    'a ring for every category that has something to show',
+  ).toBeGreaterThan(0);
+  // out of step: the rings of different categories do not share a delay
+  const delays = await rings.evaluateAll((els) =>
+    els.map(
+      (el) => getComputedStyle(el).animationDelay + '/' + getComputedStyle(el).animationDuration,
+    ),
+  );
+  expect(new Set(delays).size, 'not synchronised').toBeGreaterThan(1);
+  expect(await animationOf(rings.first())).toBe('halo');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/dashboard');
+  await expect(page.getByRole('region', { name: '¿Qué hago ahora?' })).toBeVisible();
+  await expect(rings.first()).toBeAttached();
+  for (const loop of [heroOrb, rings.first(), page.locator('[class*="animate-scan"]').first()])
+    expect(await animationOf(loop)).toBe('none');
+});
+
+test('the ambient light follows the state of the semester, from data the Home already has', async ({
+  page,
+}) => {
+  const { ids } = await seeded(page);
+  await page.goto('/dashboard');
+  await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'urgent'); // overdue + immediate
+
+  // finish everything: the light turns to "done" (and the progress card takes its done tint)
+  for (const id of ids)
+    await page.request.patch(`/api/activities/${id}`, { data: { status: 'COMPLETED' } });
+  await page.goto('/dashboard');
+  await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'done');
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+});
+
+test('on a wide screen the navigation highlight slides to the current destination', async ({
+  page,
+}) => {
+  test.skip(PHONE(page), 'desktop navigation');
+  await seeded(page);
+  await page.goto('/dashboard');
+  const nav = mainNav(page);
+  const pill = nav.locator('[data-nav-pill]');
+  for (const name of ['Actividades', 'Agenda', 'Asignaturas', 'Inicio']) {
+    const link = nav.getByRole('link', { name, exact: true });
+    await link.click();
+    await expect(link).toHaveAttribute('aria-current', 'page');
+    await expect
+      .poll(
+        async () => {
+          const [p, l] = [(await pill.boundingBox())!, (await link.boundingBox())!];
+          return Math.max(Math.abs(p.x - l.x), Math.abs(p.width - l.width), Math.abs(p.y - l.y));
+        },
+        { timeout: 3000 },
+      )
+      .toBeLessThan(2);
+  }
+});
+
+test('the top of the page breathes on a wide screen: the greeting is not stuck to the bar', async ({
+  page,
+}) => {
+  test.skip(PHONE(page), 'desktop spacing');
+  await seeded(page);
+  await page.goto('/dashboard');
+  const bar = (await page.getByRole('banner').boundingBox())!;
+  const title = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+  expect(
+    title.y - (bar.y + bar.height),
+    'air between the bar and the greeting',
+  ).toBeGreaterThanOrEqual(32);
 });
