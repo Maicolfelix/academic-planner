@@ -10,6 +10,8 @@ import { Link } from 'react-router';
 import { useCurrentPeriod, useSubjects } from '../../academic/useAcademic';
 import { useCreateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
+import { Button } from '../../components/ui/Button';
+import { SparkIcon } from '../../components/ui/icons';
 import { useParseQuickCapture } from '../../quickCapture/useQuickCapture';
 import { QuickCapturePreview, type QuickCaptureDraft } from './QuickCapturePreview';
 
@@ -120,7 +122,10 @@ export function QuickCapture() {
 
   return (
     <section aria-labelledby="quick-capture-title" className="flex flex-col gap-2">
-      <h2 id="quick-capture-title" className="text-lg font-semibold">
+      <h2 id="quick-capture-title" className="flex items-center gap-2 text-lg font-semibold">
+        <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-accent-ink">
+          <SparkIcon className="size-4" />
+        </span>
         Captura rápida
       </h2>
 
@@ -149,17 +154,13 @@ export function QuickCapture() {
               autoComplete="off"
               aria-invalid={inputError ? true : undefined}
               aria-describedby={inputError ? 'quick-capture-error' : undefined}
-              className={`min-h-11 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-slate-900 ${
+              className={`min-h-11 w-full min-w-0 rounded-control border bg-surface px-3 py-2 text-base transition-[border-color,box-shadow] duration-(--duration-fast) ease-standard placeholder:text-slate-500 focus:border-accent focus:shadow-lift focus:outline-2 focus:outline-offset-1 focus:outline-accent ${
                 inputError ? 'border-red-600' : 'border-slate-400'
               }`}
             />
-            <button
-              type="submit"
-              disabled={parse.isPending}
-              className="min-h-11 shrink-0 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-            >
+            <Button type="submit" variant="primary" disabled={parse.isPending} className="shrink-0">
               {parse.isPending ? 'Interpretando…' : 'Interpretar'}
-            </button>
+            </Button>
           </div>
           {inputError && (
             <p id="quick-capture-error" role="alert" className="text-sm text-red-700">
@@ -171,7 +172,7 @@ export function QuickCapture() {
               )}
             </p>
           )}
-          <p className="text-sm text-slate-600">
+          <p className="text-xs text-muted-foreground">
             Se interpreta aquí mismo, sin enviar el texto a ningún servicio externo. Nada se guarda
             hasta que confirmes.
           </p>

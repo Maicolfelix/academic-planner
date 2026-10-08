@@ -182,14 +182,23 @@ test('times use one 12-hour style (a. m./p. m.) for classes and deadlines alike'
   }
 });
 
-test('the Dashboard leads with what to do now, then capture, then context', async ({ page }) => {
+test('the Dashboard leads with what to do now, then how am I doing, then capture and context', async ({
+  page,
+}) => {
   await richUser(page);
   await page.goto('/dashboard');
   await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
   await expect(page.getByRole('region', { name: /Radar/ })).toBeVisible();
-  const h2 = await page.getByRole('heading', { level: 2 }).allInnerTexts();
-  expect(h2.slice(0, 2)).toEqual(['¿Qué hago ahora?', 'Captura rápida']);
-  expect(h2).toContain('Radar académico');
+  // innerText follows the CSS: some section titles are small caps in uppercase, so compare in lower case.
+  const h2 = (await page.getByRole('heading', { level: 2 }).allInnerTexts()).map((t) =>
+    t.toLowerCase(),
+  );
+  const at = (title: string) => h2.indexOf(title.toLowerCase());
+  // UX1-2: the hero is first (it used to be followed at once by capture, which now sits below the counters and progress).
+  expect(h2[0]).toBe('¿qué hago ahora?');
+  expect(at('Progreso de actividades')).toBeGreaterThan(0);
+  expect(at('Captura rápida')).toBeGreaterThan(at('Progreso de actividades'));
+  expect(at('Radar académico')).toBeGreaterThan(at('Captura rápida'));
 });
 
 // ───────────────────────── Keyboard and focus ─────────────────────────

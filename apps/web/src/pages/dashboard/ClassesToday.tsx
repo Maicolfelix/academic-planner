@@ -1,5 +1,6 @@
 import type { ScheduleOccurrence } from '@planner/core';
 import { Link } from 'react-router';
+import { Card } from '../../components/ui/Card';
 import { timeRange } from '../calendar/format';
 
 interface Props {
@@ -11,15 +12,12 @@ interface Props {
 export function ClassesToday({ classes, timeZone }: Props) {
   return (
     <section aria-labelledby="classes-today-title" className="flex flex-col gap-2">
-      <h2 id="classes-today-title" className="text-lg font-semibold">
+      <h2 id="classes-today-title" className="text-section-title">
         Clases de hoy
       </h2>
       <ul className="flex flex-col gap-2">
         {classes.map((c) => (
-          <li
-            key={`${c.blockId}-${c.startAt}`}
-            className="flex min-w-0 overflow-hidden rounded-lg border border-slate-300 bg-white"
-          >
+          <Card as="li" key={`${c.blockId}-${c.startAt}`} className="flex min-w-0 overflow-hidden">
             <span
               aria-hidden="true"
               style={{ backgroundColor: c.subject?.color ?? '#64748B' }}
@@ -32,11 +30,11 @@ export function ClassesToday({ classes, timeZone }: Props) {
                 <span className="text-sm font-semibold text-red-800">⚠ Choque de horario</span>
               )}
             </div>
-          </li>
+          </Card>
         ))}
       </ul>
       <p className="text-sm">
-        <Link to="/calendar" className="font-medium underline">
+        <Link to="/calendar" className="font-medium text-accent-ink underline underline-offset-4">
           Ver la agenda de la semana
         </Link>
       </p>

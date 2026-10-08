@@ -114,3 +114,77 @@ describe('shell structure', () => {
     expect(shell('/calendar')).toContain('max-w-6xl');
   });
 });
+
+describe('sliding indicator of the phone bar', () => {
+  const indicator = (path: string) => {
+    const out = shell(path);
+    const tag = /<span aria-hidden="true" data-nav-indicator="(-?\d+)"[^>]*>/.exec(out);
+    return {
+      tag: tag?.[0] ?? '',
+      index: tag ? Number(tag[1]) : Number.NaN,
+      translate: /translateX\((\d+)%\)/.exec(tag?.[0] ?? '')?.[1],
+      opacity: /opacity:\s*(\d)/.exec(tag?.[0] ?? '')?.[1],
+    };
+  };
+
+  it.each([
+    ['/dashboard', 0],
+    ['/activities', 1],
+    ['/calendar', 2],
+    ['/calendar/import', 2],
+    ['/subjects', 3],
+  ])('at %s it sits under destination %i (the same rule as aria-current)', (path, index) => {
+    const i = indicator(path);
+    expect(i.index).toBe(index);
+    expect(i.translate).toBe(String(index * 100));
+    expect(i.opacity).toBe('1');
+  });
+
+  it('hides on screens that are not one of the four, and is never what tells the place', () => {
+    const i = indicator('/radar');
+    expect(i.index).toBe(-1);
+    expect(i.opacity).toBe('0');
+    // it is decoration: aria-hidden, no focus, no taps, only on phone and tablet
+    expect(i.tag).toContain('aria-hidden="true"');
+    expect(i.tag).toContain('pointer-events-none');
+    expect(i.tag).toContain('lg:hidden');
+    // the real signal is still on the link
+    expect(links(shell('/radar')).filter((l) => l.current)).toEqual([]);
+  });
+
+  it('moves with transform and opacity only', () => {
+    expect(indicator('/activities').tag).toContain('transition-[transform,opacity]');
+  });
+
+  it('the icon capsule exists for every destination and lifts only for the current one', () => {
+    const out = nav(shell('/activities'));
+    expect(out.match(/rounded-full px-4 py-0.5/g)).toHaveLength(4);
+    expect(out.match(/-translate-y-1 bg-\[linear-gradient/g)).toHaveLength(1);
+  });
+
+  it('the desktop highlight is decoration that slides behind the links, and only the phone rail has data-nav-indicator', () => {
+    // Static render: the highlight is measured in the browser (no pill yet), so only the rail is in the markup.
+    const out = nav(shell('/calendar'));
+    expect(out.match(/data-nav-indicator/g)).toHaveLength(1);
+    expect(out).not.toContain('data-nav-pill');
+    // links keep their order and are the only links of the navigation
+    expect(out.match(/<a /g)).toHaveLength(4);
+  });
+});
+
+describe('ambient light', () => {
+  const html = shell('/activities');
+
+  it('sits behind every screen, is hidden from assistive tech and cannot catch a tap', () => {
+    const layer = /<div aria-hidden="true" class="([^"]*)"/.exec(html)?.[1] ?? '';
+    expect(layer).toContain('pointer-events-none');
+    expect(layer).toContain('-z-10');
+    expect(layer).toContain('overflow-hidden'); // the orbs hang off the edges: they must never widen the page
+  });
+
+  it('is still: moving viewport-sized layers on every frame is the costliest thing a page can do', () => {
+    const orbs = [...html.matchAll(/class="(ambient-orb [^"]*)"/g)].map((m) => m[1]!);
+    expect(orbs).toHaveLength(3);
+    for (const orb of orbs) expect(orb).not.toContain('animate-');
+  });
+});

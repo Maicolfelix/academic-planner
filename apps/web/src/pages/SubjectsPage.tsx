@@ -7,6 +7,7 @@ import { DeleteSubjectDialog } from './subjects/DeleteSubjectDialog';
 import { SubjectFormDialog } from './subjects/SubjectFormDialog';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 
 /** The current period's subjects: list, create, edit, delete. */
@@ -56,13 +57,9 @@ export function SubjectsPage() {
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && list.length === 0 && (
-        <Card as="section" variant="dashed" className="p-6 text-center">
-          <p className="mb-1 text-lg font-medium">Aún no tienes asignaturas.</p>
-          <p className="mb-4 text-slate-600">
-            Agrega las materias de este semestre para comenzar a organizar tus actividades.
-          </p>
-          {add}
-        </Card>
+        <EmptyState title="Aún no tienes asignaturas." action={add}>
+          Agrega las materias de este semestre para comenzar a organizar tus actividades.
+        </EmptyState>
       )}
 
       {list.length > 0 && (

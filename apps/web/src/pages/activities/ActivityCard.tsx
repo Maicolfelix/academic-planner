@@ -10,6 +10,7 @@ import {
 } from '@planner/core';
 import { useMutation } from '@tanstack/react-query';
 import { downloadActivityCalendar } from '../../api/activities';
+import { useJustCompleted } from '../../lib/useJustCompleted';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { RadarBadge } from '../radar/RadarBadge';
@@ -40,11 +41,17 @@ export function ActivityCard({
   // Derived from the clock on every render (see core/radar.ts): null for a finished activity.
   const radar = calculateRadarStatus(activity, now);
   const done = activity.status === 'COMPLETED';
+  // A brief confirmation (a soft success tint and a popping badge) the moment it becomes completed.
+  const justCompleted = useJustCompleted(activity.status);
   // Read-only: nothing to invalidate. The browser/OS decides what opens the downloaded file.
   const addToCalendar = useMutation({ mutationFn: () => downloadActivityCalendar(activity.id) });
 
   return (
-    <Card as="li" className="flex min-w-0 overflow-hidden">
+    <Card
+      as="li"
+      data-just-completed={justCompleted || undefined}
+      className={`flex min-w-0 overflow-hidden ${justCompleted ? 'animate-complete' : ''}`}
+    >
       <span
         aria-hidden="true"
         style={{ backgroundColor: subject?.color ?? '#64748B' }}
@@ -76,7 +83,9 @@ export function ActivityCard({
 
         <div className="flex flex-wrap items-center gap-1.5">
           {radar && <RadarBadge status={radar} />}
-          <StatusBadge status={activity.status} />
+          <span className={justCompleted ? 'animate-pop' : undefined}>
+            <StatusBadge status={activity.status} />
+          </span>
           <PriorityBadge priority={activity.priority} />
           <TypeBadge type={activity.type} />
         </div>

@@ -174,6 +174,7 @@ test('every destination is a 44 px target with a visible focus ring, reachable b
   }
 
   await page.goto('/dashboard');
+  await expect(mainNav(page)).toBeVisible(); // the shell is there: Tab must start from the page, not from the loading screen
   await page.keyboard.press('Tab'); // skip link
   let focused = '';
   for (let i = 0; i < 6 && focused !== 'Inicio'; i++) {
@@ -216,7 +217,8 @@ test('at 1024 px the top bar fits on one row, and at 768 px the bottom bar is us
     banner.boundingBox(),
     banner.getByRole('button', { name: 'Cerrar sesión' }).boundingBox(),
   ]);
-  expect(bar!.height, 'one row (a wrapped bar would be ~2x taller)').toBeLessThanOrEqual(72);
+  // UX1-2.75 gave the bar more air (the nav sits in a pill track); a wrapped bar would still be ~2x taller (> 110)
+  expect(bar!.height, 'one row (a wrapped bar would be ~2x taller)').toBeLessThanOrEqual(90);
   expect(logout!.x + logout!.width).toBeLessThanOrEqual(1024);
 
   await page.setViewportSize({ width: 768, height: 1024 });

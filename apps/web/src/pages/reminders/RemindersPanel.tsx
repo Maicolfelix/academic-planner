@@ -18,10 +18,10 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
   return (
     <section
       aria-labelledby="reminders-panel-heading"
-      className="flex flex-col gap-3 rounded-lg border border-amber-500 bg-amber-50 p-4"
+      className="flex flex-col gap-3 rounded-surface border border-warning-line bg-warning-soft p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="reminders-panel-heading" className="text-lg font-semibold">
+        <h2 id="reminders-panel-heading" className="text-section-title">
           Recordatorios
         </h2>
         <p className="text-sm font-medium">

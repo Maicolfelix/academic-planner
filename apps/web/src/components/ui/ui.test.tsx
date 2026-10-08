@@ -140,6 +140,12 @@ describe('design tokens (index.css)', () => {
     ['success-ink', 'success-soft', 7],
     ['info-ink', 'info-soft', 7],
     ['foreground', 'surface-elevated', 7],
+    ['muted-foreground', 'surface', 7],
+    ['border-strong', 'surface', 3], // the outline of a field or an outlined button (WCAG 1.4.11)
+    ['accent', 'surface', 3], // the progress fill and the current-place mark
+    ['accent', 'secondary', 3], // …and the fill against its own track
+    ['accent-ink', 'accent-soft', 4.5],
+    ['accent-ink', 'surface', 7],
   ])('%s on %s has contrast of at least %s:1', (fg, bg, min) => {
     const [a, b] = [value(fg), value(bg)];
     expect(a, fg).toBeDefined();

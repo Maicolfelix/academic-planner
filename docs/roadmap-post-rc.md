@@ -56,13 +56,23 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → piloto controlado → A2 → asistencia y semana cargada → A6 → …**; lo social (cursos compartidos por invitación) queda condicionado al piloto y a un despliegue con HTTPS.
 
-| Id    | Objetivo                                                                                                                                                                                                  |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX1-0 | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0))          |
-| UX1-1 | Shell y navegación (**implementado y validado en un iPhone real**: barra inferior en teléfono y tableta, superior desde 1024 px, iconos SVG en línea, `PageHeader`; sin rediseñar Home ni campana/avatar) |
-| UX1-2 | **Siguiente:** Home + identidad visual + movimiento (ver [dirección visual](#dirección-visual-para-ux1-2))                                                                                                |
-| UX1-3 | Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                                  |
-| UX2a  | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                            |
+| Id       | Objetivo                                                                                                                                                                                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX1-0    | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0))                                                                                                                                |
+| UX1-1    | Shell y navegación (**implementado y validado en un iPhone real**: barra inferior en teléfono y tableta, superior desde 1024 px, iconos SVG en línea, `PageHeader`; sin rediseñar Home ni campana/avatar)                                                                                                                       |
+| UX1-2    | Home + identidad visual + movimiento (**fusionado, PR #24; aprobado en un iPhone real**; ver [dirección visual](#dirección-visual-para-ux1-2) y [la guía aplicada](ux-accessibility.md#identidad-visual-y-movimiento-ux1-2))                                                                                                    |
+| UX1-2.5  | Pasada de movimiento y personalidad (**fusionada con UX1-2, PR #24**; sin dependencias nuevas; ver [la guía](ux-accessibility.md#movimiento-y-personalidad-ux1-25))                                                                                                                                                             |
+| UX1-2.75 | Experiencia ambiental inteligente, «Pulso Ambiental»: luz ambiental con tono por estado, escritorio en dos columnas, Radar vivo, superficies con sistema (**fusionada con UX1-2, PR #24; aprobada en un iPhone real**, con deuda visual esperada; ver [la guía](ux-accessibility.md#experiencia-ambiental-inteligente-ux1-275)) |
+| UX1-3    | **LISTO (no iniciado):** Actividades + Asignaturas, ver [UX1-3](#ux1-3-actividades--asignaturas-listo-no-iniciado)                                                                                                                                                                                                              |
+| UX2a     | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                                                                                                                                                  |
+
+#### UX1-3: Actividades + Asignaturas (LISTO, no iniciado)
+
+Objetivos preliminares, **sin implementar** y sin autorización hasta que el mantenedor apruebe esta etapa: una `ActivityCard` menos administrativa (una acción primaria clara y las secundarias más discretas); filtros más refinados; menos `select` y botones apilados donde sea razonable; `RadarBadge` sin emojis; tarjetas de asignatura más visuales; eliminar la deuda de `slate-*` restante; mantener «Pulso Ambiental» y su movimiento (con `prefers-reduced-motion`); **sin tocar lógica**.
+
+#### Deuda de fiabilidad de pruebas: TEST-REL-1 (futura, no iniciada)
+
+La prueba `MASTER` de `e2e/system-validation.spec.ts` depende de la hora: corrida un jueves antes de las 8:00 (Bogotá), el «Quiz» que la Bandeja crea para «el jueves a las 8 a. m.» supera a «Taller express» y la aserción de «¿Qué hago ahora?» falla. Está **reproducida en `d23f8b6`** (previa a UX1-2.5/2.75) y **no está arreglada**: pasa o falla según la hora de ejecución. Es deuda de pruebas (**KNOWN PRE-EXISTING / TEST RELIABILITY DEBT**), no un defecto del producto; se corregirá, si el mantenedor lo aprueba, en una fase propia (fijar el reloj o el fixture), nunca de pasada.
 
 #### Dirección visual para UX1-2
 
