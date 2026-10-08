@@ -5,11 +5,8 @@ import { useSearchParams } from 'react-router';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { DeleteSubjectDialog } from './subjects/DeleteSubjectDialog';
 import { SubjectFormDialog } from './subjects/SubjectFormDialog';
-
-const primaryButton =
-  'min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const secondaryButton =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 
 /** The current period's subjects: list, create, edit, delete. */
 export function SubjectsPage() {
@@ -34,17 +31,17 @@ export function SubjectsPage() {
 
   const list = subjects.data ?? [];
   const add = (
-    <button type="button" onClick={() => setEditing('new')} className={primaryButton}>
+    <Button variant="primary" onClick={() => setEditing('new')}>
       Agregar asignatura
-    </button>
+    </Button>
   );
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Mis asignaturas</h1>
-          <p className="text-sm text-slate-600 break-words">
+          <h1 className="text-page-title">Mis asignaturas</h1>
+          <p className="text-sm text-muted-foreground break-words">
             {period.name} · {formatDateOnly(period.startDate)} – {formatDateOnly(period.endDate)}
           </p>
         </div>
@@ -62,22 +59,19 @@ export function SubjectsPage() {
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && list.length === 0 && (
-        <section className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
+        <Card as="section" variant="dashed" className="p-6 text-center">
           <p className="mb-1 text-lg font-medium">Aún no tienes asignaturas.</p>
           <p className="mb-4 text-slate-600">
             Agrega las materias de este semestre para comenzar a organizar tus actividades.
           </p>
           {add}
-        </section>
+        </Card>
       )}
 
       {list.length > 0 && (
         <ul className="grid gap-3 sm:grid-cols-2">
           {list.map((subject) => (
-            <li
-              key={subject.id}
-              className="flex min-w-0 overflow-hidden rounded-lg border border-slate-300"
-            >
+            <Card as="li" key={subject.id} className="flex min-w-0 overflow-hidden">
               <span
                 aria-hidden="true"
                 style={{ backgroundColor: subject.color }}
@@ -98,25 +92,24 @@ export function SubjectsPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
                     aria-label={`Editar ${subject.name}`}
                     onClick={() => setEditing(subject)}
-                    className={secondaryButton}
                   >
                     Editar
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
                     aria-label={`Eliminar ${subject.name}`}
                     onClick={() => setDeleting(subject)}
-                    className={`${secondaryButton} text-red-800`}
+                    className="text-danger"
                   >
                     Eliminar
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </li>
+            </Card>
           ))}
         </ul>
       )}

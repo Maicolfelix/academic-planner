@@ -10,6 +10,8 @@ import {
 } from '@planner/core';
 import { useMutation } from '@tanstack/react-query';
 import { downloadActivityCalendar } from '../../api/activities';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
 import { RadarBadge } from '../radar/RadarBadge';
 import { PriorityBadge, StatusBadge, TypeBadge } from './badges';
 
@@ -23,8 +25,6 @@ interface Props {
   onEdit: () => void;
   onDelete: () => void;
 }
-
-const button = 'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
 
 /** One activity: what it is, when it is due, and its state — plus the quick actions. */
 export function ActivityCard({
@@ -44,7 +44,7 @@ export function ActivityCard({
   const addToCalendar = useMutation({ mutationFn: () => downloadActivityCalendar(activity.id) });
 
   return (
-    <li className="flex min-w-0 overflow-hidden rounded-lg border border-slate-300">
+    <Card as="li" className="flex min-w-0 overflow-hidden">
       <span
         aria-hidden="true"
         style={{ backgroundColor: subject?.color ?? '#64748B' }}
@@ -52,7 +52,9 @@ export function ActivityCard({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <div className="min-w-0">
-          <h2 className={`font-semibold break-words ${done ? 'text-slate-600 line-through' : ''}`}>
+          <h2
+            className={`text-card-title break-words ${done ? 'text-muted-foreground line-through' : ''}`}
+          >
             {activity.title}
           </h2>
           {subject && <p className="text-sm text-slate-700 break-words">{subject.name}</p>}
@@ -93,31 +95,25 @@ export function ActivityCard({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            aria-label={`Editar ${activity.title}`}
-            onClick={onEdit}
-            className={button}
-          >
+          <Button size="sm" aria-label={`Editar ${activity.title}`} onClick={onEdit}>
             Editar
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             aria-label={`Añadir al calendario: ${activity.title}`}
             disabled={addToCalendar.isPending}
             onClick={() => addToCalendar.mutate()}
-            className={button}
           >
             Añadir al calendario
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             aria-label={`Eliminar ${activity.title}`}
             onClick={onDelete}
-            className={`${button} text-red-800`}
+            className="text-danger"
           >
             Eliminar
-          </button>
+          </Button>
         </div>
         {addToCalendar.isError && (
           <p role="alert" className="text-sm text-red-800 break-words">
@@ -125,6 +121,6 @@ export function ActivityCard({
           </p>
         )}
       </div>
-    </li>
+    </Card>
   );
 }

@@ -52,6 +52,18 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 | A2  | Importación de un archivo `.ics`                                                                                                                                                   |
 | A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))                                                                                          |
 
+### Etapa UX — Base visual y ajustes (orden aprobado en la revisión del roadmap)
+
+Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → piloto controlado → A2 → asistencia y semana cargada → A6 → …**; lo social (cursos compartidos por invitación) queda condicionado al piloto y a un despliegue con HTTPS.
+
+| Id    | Objetivo                                                                                                                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| UX1-0 | Base visual: tokens de diseño y primitivas `Button`, `Card`, `Badge` (**implementado en su PR**; sin rediseño de pantallas, ver [ux-accessibility.md](ux-accessibility.md#sistema-visual-ux1-0)) |
+| UX1-1 | Shell y navegación (con espacio para campana y avatar) y decisión de iconografía                                                                                                                 |
+| UX1-2 | Home                                                                                                                                                                                             |
+| UX1-3 | Actividades y Asignaturas (migración del resto de pantallas al tocarlas)                                                                                                                         |
+| UX2a  | Ajustes mínimos: editar periodo, nombre y contraseña, conservar el destino tras el login (la zona horaria queda fuera hasta definir su efecto)                                                   |
+
 ### Etapa B — Contexto universitario (`1.2.x`)
 
 | Id    | Objetivo                                                                    |
