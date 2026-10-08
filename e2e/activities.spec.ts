@@ -11,6 +11,7 @@ import {
   uniqueEmail,
   watch,
   login,
+  openActivityMenu,
 } from './helpers';
 
 async function newUserWithSubject(page: Page, subjectName = 'Redes') {
@@ -122,7 +123,8 @@ test('activity flow: create, edit, status, persistence, subject guard, delete, e
 
   // 17. Delete the activity (with confirmation).
   await nav(page).getByRole('link', { name: 'Actividades' }).click();
-  await page.getByRole('button', { name: 'Eliminar Parcial 1' }).click();
+  await openActivityMenu(page, 'Parcial 1');
+  await page.getByRole('menuitem', { name: 'Eliminar Parcial 1' }).click();
   const confirm = page.getByRole('dialog', { name: '¿Eliminar Parcial 1?' });
   await expect(confirm.getByText('Esta acción eliminará la actividad.')).toBeVisible();
   await confirm.getByRole('button', { name: 'Eliminar', exact: true }).click();
@@ -376,7 +378,8 @@ test('activity form: validation, keyboard, focus and responsive layout with long
   const editBox = (await edit.boundingBox())!;
   expect(editBox.x + editBox.width).toBeLessThanOrEqual(viewport.width);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: new RegExp(`^Eliminar Proyecto x`) }).click();
+  await openActivityMenu(page, /Proyecto x/);
+  await page.getByRole('menuitem', { name: /^Eliminar Proyecto x/ }).click();
   const confirm = page.getByRole('dialog', { name: /^¿Eliminar Proyecto x/ });
   await expectNoHorizontalOverflow(page);
   await expect(confirm.getByRole('button', { name: 'Cancelar' })).toBeFocused();

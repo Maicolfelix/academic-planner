@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { DeleteSubjectDialog } from './subjects/DeleteSubjectDialog';
+import { SubjectCard } from './subjects/SubjectCard';
 import { SubjectFormDialog } from './subjects/SubjectFormDialog';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 
@@ -47,7 +47,7 @@ export function SubjectsPage() {
       />
 
       {notice && (
-        <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+        <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success-ink">
           {notice}
         </p>
       )}
@@ -63,47 +63,14 @@ export function SubjectsPage() {
       )}
 
       {list.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((subject) => (
-            <Card as="li" key={subject.id} className="flex min-w-0 overflow-hidden">
-              <span
-                aria-hidden="true"
-                style={{ backgroundColor: subject.color }}
-                className="w-2 shrink-0"
-              />
-              <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
-                <div className="min-w-0">
-                  <h2 className="font-semibold break-words">{subject.name}</h2>
-                  {subject.professor && (
-                    <p className="text-sm text-slate-700 break-words">
-                      Profesor: {subject.professor}
-                    </p>
-                  )}
-                  {subject.description && (
-                    <p className="mt-1 line-clamp-3 text-sm text-slate-600 break-words">
-                      {subject.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    aria-label={`Editar ${subject.name}`}
-                    onClick={() => setEditing(subject)}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    aria-label={`Eliminar ${subject.name}`}
-                    onClick={() => setDeleting(subject)}
-                    className="text-danger"
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              </div>
-            </Card>
+            <SubjectCard
+              key={subject.id}
+              subject={subject}
+              onEdit={() => setEditing(subject)}
+              onDelete={() => setDeleting(subject)}
+            />
           ))}
         </ul>
       )}

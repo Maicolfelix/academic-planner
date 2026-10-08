@@ -18,6 +18,7 @@ import { useState, type FormEvent } from 'react';
 import { useCreateActivity, useUpdateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
+import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/Modal';
 import { SelectField } from '../../components/SelectField';
 import { ReminderSection } from '../reminders/ReminderSection';
@@ -167,7 +168,7 @@ export function ActivityFormDialog({
 
         <details
           open={advancedInUse || undefined}
-          className="rounded-md border border-slate-300 p-3"
+          className="rounded-surface border border-border p-3"
         >
           <summary className="min-h-6 cursor-pointer text-sm font-medium">Más opciones</summary>
           <div className="mt-3 flex flex-col gap-4">
@@ -181,7 +182,7 @@ export function ActivityFormDialog({
               hint="Sin hora, vence al terminar el día."
             />
             {!activity && (
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-muted-foreground">
                 Los recordatorios se crean solos según el tipo; podrás ajustarlos al editar.
               </p>
             )}
@@ -216,21 +217,12 @@ export function ActivityFormDialog({
         </details>
 
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="min-h-11 rounded-md border border-slate-400 px-4 py-2 disabled:opacity-60"
-          >
+          <Button onClick={onClose} disabled={pending}>
             Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
-          >
+          </Button>
+          <Button type="submit" variant="primary" disabled={pending}>
             {pending ? 'Guardando…' : activity ? 'Guardar cambios' : 'Agregar'}
-          </button>
+          </Button>
         </div>
       </form>
       {activity && <ReminderSection activity={activity} timeZone={timeZone} />}

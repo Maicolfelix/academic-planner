@@ -27,20 +27,23 @@ export const AMBIENT_PERIOD: Record<RadarStatus, number> = {
  * Inside a `group` it grows a little under a pointer; `beacon` sends one ripple, once (the single thing that needs
  * attention). `ambient` (a position in a row) makes it breathe a ring now and then, out of step with its neighbours:
  * the Radar is "watching". With reduced motion the ring never starts, and nothing depends on it: the state is a word.
+ * `compact` shrinks the halo (3 px) for a mark that sits inside a small pill, where a 5 px halo would spill over its edge.
  */
 export function RadarDot({
   status,
   beacon = false,
   ambient,
+  compact = false,
 }: {
   status: RadarStatus;
   beacon?: boolean;
   ambient?: number;
+  compact?: boolean;
 }) {
   return (
     <span
       aria-hidden="true"
-      className={`relative inline-block size-2.5 shrink-0 rounded-full ring-2 ring-white shadow-[0_0_0_5px_var(--halo)] transition-transform duration-(--duration-fast) ease-spring group-hover:scale-125 ${DOT[status]} ${beacon ? 'animate-beacon' : ''}`}
+      className={`relative inline-block size-2.5 shrink-0 rounded-full ring-2 ring-white ${compact ? 'shadow-[0_0_0_3px_var(--halo)]' : 'shadow-[0_0_0_5px_var(--halo)]'} transition-transform duration-(--duration-fast) ease-spring group-hover:scale-125 ${DOT[status]} ${beacon ? 'animate-beacon' : ''}`}
     >
       {ambient !== undefined && (
         <span

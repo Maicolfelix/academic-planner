@@ -147,7 +147,8 @@ test('on a wide screen the navigation sits in the top bar and the page keeps its
 }) => {
   test.skip(PHONE(page), 'desktop layout');
   await signedIn(page);
-  await page.goto('/activities');
+  // Radar is a reading column; Home, Agenda, Activities and Subjects compose columns and are wide on purpose.
+  await page.goto('/radar');
 
   const nav = page.getByRole('banner').getByRole('navigation', { name: 'Principal' });
   await expect(nav).toBeVisible();

@@ -11,6 +11,7 @@ import { useState, type FormEvent } from 'react';
 import { useCreateSubject, useUpdateSubject } from '../../academic/useAcademic';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
+import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/Modal';
 
 interface Props {
@@ -85,7 +86,7 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
         />
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium text-slate-800">Color</legend>
+          <legend className="text-sm font-medium text-foreground">Color</legend>
           <div className="flex flex-wrap gap-2">
             {SUBJECT_COLOR_VALUES.map((value) => (
               <label key={value} className="relative">
@@ -100,7 +101,7 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
                 <span
                   aria-hidden="true"
                   style={{ backgroundColor: value }}
-                  className="grid size-9 cursor-pointer place-items-center rounded-full border-2 border-white text-white outline-offset-2 peer-checked:outline-2 peer-checked:outline-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-slate-900"
+                  className="grid size-9 cursor-pointer place-items-center rounded-full border-2 border-white text-white outline-offset-2 peer-checked:outline-2 peer-checked:outline-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-foreground"
                 >
                   {color === value && '✓'}
                 </span>
@@ -108,12 +109,12 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
               </label>
             ))}
           </div>
-          {fieldErrors.color && <p className="text-sm text-red-700">{fieldErrors.color[0]}</p>}
+          {fieldErrors.color && <p className="text-sm text-danger-ink">{fieldErrors.color[0]}</p>}
         </fieldset>
 
         <details
           open={Boolean(subject?.professor || subject?.description) || undefined}
-          className="rounded-md border border-slate-300 p-3"
+          className="rounded-surface border border-border p-3"
         >
           <summary className="min-h-6 cursor-pointer text-sm font-medium">
             Más opciones (profesor y descripción)
@@ -138,21 +139,12 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
         </details>
 
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="min-h-11 rounded-md border border-slate-400 px-4 py-2 disabled:opacity-60"
-          >
+          <Button onClick={onClose} disabled={pending}>
             Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
-          >
+          </Button>
+          <Button type="submit" variant="primary" disabled={pending}>
             {pending ? 'Guardando…' : subject ? 'Guardar cambios' : 'Agregar'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

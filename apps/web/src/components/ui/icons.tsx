@@ -60,6 +60,67 @@ export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (
   </Icon>
 );
 
+/*
+ * UX1-3 added the action icons (check, pencil, calendar+, trash, more, chevron, user, sliders): 13 small shapes in all.
+ * Still cheaper to keep as eight lines of path each than a dependency (see docs/ux-accessibility.md, "Iconos").
+ */
+type IconProps = { className?: string };
+
+export const CheckIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </Icon>
+);
+
+export const PencilIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+    <path d="m13.5 6.5 4 4" />
+  </Icon>
+);
+
+export const CalendarPlusIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <rect x="3" y="5" width="18" height="16" rx="3" />
+    <path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5" />
+  </Icon>
+);
+
+export const TrashIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+  </Icon>
+);
+
+export const MoreIcon = ({ className = 'size-5' }: IconProps) => (
+  <Icon className={className}>
+    <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+  </Icon>
+);
+
+export const ChevronDownIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+);
+
+export const UserIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
+  </Icon>
+);
+
+export const SlidersIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </Icon>
+);
+
 /** The product mark: a rounded square with a check, the same idea as the favicon. */
 export const BrandMark = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7 text-primary">

@@ -9,6 +9,7 @@ import {
   register,
   uniqueEmail,
   watch,
+  openActivityMenu,
 } from './helpers';
 
 /** "Añadir al calendario" (A4.1): one click on an activity downloads an .ics. No external app is opened here. */
@@ -21,15 +22,16 @@ async function userWithSubject(page: Page) {
 }
 
 const card = (page: Page, title: string) => page.getByRole('listitem').filter({ hasText: title });
+// Since UX1-3 the action lives in the card's "Más acciones" menu: open it, then use the item.
 const addButton = (page: Page, title: string) =>
-  page.getByRole('button', { name: `Añadir al calendario: ${title}`, exact: true });
+  page.getByRole('menuitem', { name: `Añadir al calendario: ${title}`, exact: true });
 
 /** Clicks the button and returns the downloaded file's name and text, after the API answered 200. */
 async function download(page: Page, title: string) {
   const [response, file] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/calendar.ics')),
     page.waitForEvent('download'),
-    addButton(page, title).click(),
+    openActivityMenu(page, title).then(() => addButton(page, title).click()),
   ]);
   expect(response.status()).toBe(200);
   expect(response.headers()['content-type']).toBe('text/calendar; charset=utf-8');
@@ -54,13 +56,19 @@ test('an activity without a time downloads an all-day event', async ({ page }) =
 
   await page.goto('/activities');
   await expect(card(page, 'Taller de Bioestadística')).toBeVisible();
+  await openActivityMenu(page, 'Taller de Bioestadística');
   const button = addButton(page, 'Taller de Bioestadística');
   await expect(button).toBeVisible();
   await expect(button).toHaveText('Añadir al calendario');
-  const box = await button.boundingBox();
-  expect(box!.height, 'touch target').toBeGreaterThanOrEqual(44);
+  // The LAYOUT height (not the bounding box): the menu is still entering with a transform, and a transformed box can
+  // come back as 43.99997 px for a 44 px target.
+  expect(
+    await button.evaluate((el) => (el as HTMLElement).offsetHeight),
+    'touch target',
+  ).toBeGreaterThanOrEqual(44);
   await expectNoHorizontalOverflow(page);
 
+  await page.keyboard.press('Escape'); // close the menu again: download() opens it itself
   const { name, text } = await download(page, 'Taller de Bioestadística');
 
   expect(name).toBe('academic-planner-activity.ics');
@@ -109,7 +117,8 @@ test('a hostile title cannot add properties or components to the file', async ({
 
   await page.goto('/activities');
   // The accessible name keeps the title as the user typed it (line breaks collapse in the accessibility tree).
-  const hostileButton = page.getByRole('button', { name: /^Añadir al calendario: Parcial/ });
+  await openActivityMenu(page, /Parcial/);
+  const hostileButton = page.getByRole('menuitem', { name: /^Añadir al calendario: Parcial/ });
   const [file] = await Promise.all([page.waitForEvent('download'), hostileButton.click()]);
   const stream = await file.createReadStream();
   const chunks: Buffer[] = [];
@@ -148,8 +157,10 @@ test.describe('failure', () => {
         : route.continue(),
     );
 
+    await openActivityMenu(page, 'Taller de Bioestadística');
     await addButton(page, 'Taller de Bioestadística').click();
     await expect(page.getByRole('alert')).toContainText('No se pudo descargar el archivo');
+    await openActivityMenu(page, 'Taller de Bioestadística');
     await expect(addButton(page, 'Taller de Bioestadística')).toBeEnabled();
 
     fail = false;
@@ -172,7 +183,8 @@ test('the activities page with the new button passes axe and stays within the sc
     dueDate: '2099-03-13',
   });
   await page.goto('/activities');
-  await expect(page.getByRole('button', { name: /^Añadir al calendario/ })).toBeVisible();
+  await openActivityMenu(page, /Entrega final/);
+  await expect(page.getByRole('menuitem', { name: /^Añadir al calendario/ })).toBeVisible();
 
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([]);

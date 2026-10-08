@@ -35,8 +35,7 @@ async function addSubject(
 }
 
 const card = (page: Page, name: string) => page.getByRole('listitem').filter({ hasText: name });
-const swatchColor = (page: Page, name: string) =>
-  card(page, name).locator('span[aria-hidden="true"]').first();
+const swatchColor = (page: Page, name: string) => card(page, name).locator('[data-subject-swatch]');
 
 test('academic flow: onboarding, create, edit, color, persistence, delete, logout/login', async ({
   page,

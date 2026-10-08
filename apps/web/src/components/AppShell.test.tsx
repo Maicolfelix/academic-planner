@@ -109,9 +109,12 @@ describe('shell structure', () => {
     expect(nav(html)).toContain('lg:min-h-11');
   });
 
-  it('is a reading column everywhere except the weekly grid', () => {
-    expect(shell('/activities')).toContain('max-w-3xl');
-    expect(shell('/calendar')).toContain('max-w-6xl');
+  it('is a reading column except where the content composes columns (Home, Agenda, Activities, Subjects)', () => {
+    const main = (path: string) => /<main[^>]*class="([^"]*)"/.exec(shell(path))?.[1] ?? '';
+    for (const path of ['/radar', '/progress', '/inbox'])
+      expect(main(path), path).toContain('max-w-3xl');
+    for (const path of ['/dashboard', '/calendar', '/activities', '/subjects'])
+      expect(main(path), path).toContain('max-w-6xl');
   });
 });
 
