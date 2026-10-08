@@ -3,7 +3,7 @@ export type ButtonSize = 'md' | 'sm';
 
 // min-h-11 = 44 px: the touch target the whole app already honors. The focus ring comes from the base layer, and the transition leaves outline-color out so the ring never fades in from the text color.
 const BASE =
-  'inline-flex min-h-11 items-center justify-center rounded-control font-medium transition-[color,background-color,border-color] duration-(--duration-fast) ease-standard disabled:opacity-60';
+  'inline-flex min-h-11 items-center justify-center rounded-control font-medium transition-[color,background-color,border-color,transform] duration-(--duration-fast) ease-standard active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100';
 
 const SIZE: Record<ButtonSize, string> = {
   md: 'px-4 py-2',

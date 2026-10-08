@@ -45,9 +45,21 @@ La observación respalda la implementación actual (`viewport-fit=cover`, rellen
 
 Solo tres, los de Tailwind: **640 px** (`sm`: filtros en una fila), **768 px** (`md`) y **1024 px** (`lg`: la navegación pasa de la barra inferior a la superior, y la cuadrícula semanal de la Agenda; por debajo se usa la lista diaria — a 768 px las clases que se cruzan quedaban ilegibles).
 
+## Identidad visual y movimiento (UX1-2)
+
+Principios **premium/smooth** (no una copia de ninguna interfaz): más aire, capas en vez de cajas con bordes duros, sombras suaves, radios coherentes, color con intención, movimiento corto. Una guía mínima, aplicable a Actividades, Asignaturas y Agenda en UX1-3/UX1-4:
+
+- **Paleta** (valores en `:root`, sin dark mode todavía pero tokenizada): fondo frío y suave `#F3F4FA` con superficies blancas encima; **primario** índigo profundo `#1F2670` (tinta del texto y de los botones, y superficie del único héroe de una pantalla); **acento** teal vivo `#0D9488` solo para relleno y marcas (progreso, lugar actual en la navegación), con `accent-ink` `#0F5651` para texto; tonos semánticos suaves (peligro, aviso, éxito, información) siempre con texto. Los colores de **asignatura** no cambian y no son parte del sistema. El contraste de cada par está en `ui.test.tsx` (texto ≥ 4,5:1 o 7:1, bordes de campo y acento ≥ 3:1).
+- **Superficies:** fondo → superficie (tarjeta blanca con sombra suave) → héroe (primario). Los bordes son tenues (`--border`); la separación viene del espacio y del tono. **Radios:** controles 8 px, superficies 14 px, héroe 20 px, píldoras redondas. **Sombras:** `shadow-card` (reposo), `shadow-hero`, `shadow-floating` (diálogos).
+- **Acento con mesura:** relleno del progreso, raya del lugar actual en la barra inferior y enlaces secundarios (`accent-ink`). No va en botones ni fondos.
+- **Escala neutra transitoria:** `slate-*` (que las pantallas aún usan literalmente) se re-tiñó al mismo índigo frío en `@theme` para que lo migrado y lo no migrado compartan identidad. `slate-900` es el primario. Se elimina al migrar el último literal.
+- **Estado del Radar** en el Home: un punto redondo diseñado (`RadarDot`) **más** el nombre en texto, no emojis; en el héroe, una pastilla con punto y palabra.
+- **Movimiento** (solo CSS, sin librerías): `animate-rise` (aparecer subiendo 8 px, una vez, 220 ms) en el saludo y el héroe; `animate-fill` (el relleno del progreso crece una vez, 600 ms, con `transform`); respuesta al toque `active:scale-[0.98]` en botones, contadores y fichas del Radar; transiciones de color y fondo de 120 ms. Nada permanente, rebotando ni dependiente del scroll; no hay `backdrop-filter` ni API experimentales (Safari).
+- **`prefers-reduced-motion: reduce`:** transiciones y animaciones duran 0,01 ms y **sin retraso**: la barra de progreso aparece en su valor y el contenido, en su sitio. Probado en e2e.
+
 ## Dashboard
 
-Jerarquía: saludo → recordatorios (cuando hay) → **¿Qué hago ahora?** → **Captura rápida** (+ acceso a la Bandeja) → resumen → Radar → próxima entrega → clases de hoy → entregas → semana → progreso. «Próxima entrega» pasó a una tarjeta de borde fino para no competir con la recomendación. A 360 px la página mide ≈ 3180 px; no se eliminó información.
+Jerarquía (UX1-2), en el orden en que el estudiante pregunta: **¿qué hago ahora?** → **¿cómo voy?** → **¿qué viene?**. Saludo y periodo → recordatorios (cuando hay) → **¿Qué hago ahora?** (el héroe) → clases de hoy → vencidas → para hoy → contadores → progreso → **Captura rápida** (+ acceso a la Bandeja) → Radar → próxima entrega → próximas entregas → semana → accesos rápidos. Captura bajó de la segunda posición: quien entra a saber qué hacer ve primero eso. Cuando el héroe ya muestra la próxima entrega, «Próxima entrega» es una sola línea tenue y no una segunda tarjeta (la región sigue existiendo).
 
 ## Formularios y diálogos
 

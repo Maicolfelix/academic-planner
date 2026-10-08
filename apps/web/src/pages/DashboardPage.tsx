@@ -1,7 +1,10 @@
-import { DEFAULT_TIMEZONE, formatDateOnly } from '@planner/core';
+import { DEFAULT_TIMEZONE, formatDateOnly, type DashboardActivity } from '@planner/core';
 import { Link } from 'react-router';
+import { useAttention } from '../attention/useAttention';
 import { useMe } from '../auth/useAuth';
 import { QueryError } from '../components/QueryError';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { Card } from '../components/ui/Card';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
 import { ClassesToday } from './dashboard/ClassesToday';
@@ -17,10 +20,13 @@ import { InstallPrompt } from '../pwa/InstallPrompt';
 import { QuickCapture } from './quickCapture/QuickCapture';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
-const quickLink =
-  'inline-flex min-h-11 items-center rounded-md border border-slate-400 px-4 py-2 text-sm font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-
-/** Home. Everything shown is derived by GET /api/dashboard for the current period; nothing is stored here. */
+/**
+ * Home. Everything shown is derived by GET /api/dashboard for the current period; nothing is stored here.
+ *
+ * Hierarchy, in the order a student asks: "what do I do NOW?" (the hero, then today), "how am I doing?" (counters,
+ * progress, capturing something new) and "what comes next?" (Radar, next deliveries, the week). Secondary
+ * destinations stay at the bottom with low weight.
+ */
 export function DashboardPage() {
   const user = useMe().data;
   const dashboard = useDashboard();
@@ -41,13 +47,13 @@ export function DashboardPage() {
   const upcoming = d.upcoming.filter((a) => a.id !== nextId);
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold break-words">
+    <div className="flex flex-col gap-5">
+      <header className="animate-rise">
+        <h1 className="text-display break-words">
           {d.greeting}, {user?.name}
         </h1>
         {d.period && (
-          <p className="text-sm text-slate-600 break-words">
+          <p className="mt-0.5 text-sm text-muted-foreground break-words">
             {d.period.name} · {formatDateOnly(d.period.startDate)} –{' '}
             {formatDateOnly(d.period.endDate)}
           </p>
@@ -58,37 +64,16 @@ export function DashboardPage() {
 
       <RemindersPanel timeZone={timeZone} now={now} />
 
-      {/* Hierarchy: what to do now comes first; capturing is one step below; the rest is context. */}
+      {/* NOW */}
       {hasData && <AttentionCard timeZone={timeZone} now={now} />}
 
-      {d.subjectCount > 0 && (
-        <div className="flex flex-col gap-3">
-          <QuickCapture />
-          <p className="text-sm text-slate-700">
-            ¿Tienes un mensaje del profesor? Pégalo aquí.{' '}
-            <Link to="/inbox" className="font-medium underline">
-              Interpretar mensaje
-            </Link>
-          </p>
-        </div>
-      )}
-
-      {d.classesToday.length > 0 && !hasData && (
-        <ClassesToday classes={d.classesToday} timeZone={timeZone} />
-      )}
+      {d.classesToday.length > 0 && <ClassesToday classes={d.classesToday} timeZone={timeZone} />}
 
       {d.subjectCount === 0 && <NoSubjects />}
       {d.subjectCount > 0 && d.summary.total === 0 && <NoActivities />}
 
       {hasData && (
         <>
-          <SummaryTiles summary={d.summary} />
-          <RadarCard />
-          <NextDueCard activity={d.nextDue} timeZone={timeZone} now={now} />
-          {d.classesToday.length > 0 && (
-            <ClassesToday classes={d.classesToday} timeZone={timeZone} />
-          )}
-
           {d.overdue.length > 0 && (
             <DueSection
               title="Vencidas"
@@ -100,7 +85,10 @@ export function DashboardPage() {
                 d.summary.overdue > d.overdue.length && (
                   <p className="text-sm">
                     Mostrando {d.overdue.length} de {d.summary.overdue}.{' '}
-                    <Link to="/activities?overdue=true" className="font-medium underline">
+                    <Link
+                      to="/activities?overdue=true"
+                      className="font-medium text-accent-ink underline underline-offset-4"
+                    >
                       Ver todas las vencidas
                     </Link>
                   </p>
@@ -111,18 +99,40 @@ export function DashboardPage() {
           {today.length > 0 && (
             <DueSection title="Para hoy" items={today} timeZone={timeZone} now={now} />
           )}
+
+          {/* HOW AM I DOING */}
+          <SummaryTiles summary={d.summary} />
+          <ProgressCard progress={d.progress} />
+        </>
+      )}
+
+      {d.subjectCount > 0 && (
+        <Card className="flex flex-col gap-3 p-4">
+          <QuickCapture />
+          <p className="text-sm text-muted-foreground">
+            ¿Tienes un mensaje del profesor? Pégalo aquí.{' '}
+            <Link to="/inbox" className="font-medium text-accent-ink underline underline-offset-4">
+              Interpretar mensaje
+            </Link>
+          </p>
+        </Card>
+      )}
+
+      {hasData && (
+        <>
+          {/* WHAT COMES NEXT */}
+          <RadarCard />
+          <NextDue activity={d.nextDue} timeZone={timeZone} now={now} />
           {upcoming.length > 0 && (
             <DueSection title="Próximas entregas" items={upcoming} timeZone={timeZone} now={now} />
           )}
-
           <WeekCard />
-          <ProgressCard progress={d.progress} />
 
           <nav aria-label="Accesos rápidos" className="flex flex-wrap gap-2">
-            <Link to="/activities?action=create" className={quickLink}>
+            <Link to="/activities?action=create" className={buttonStyles({ size: 'sm' })}>
               Nueva actividad
             </Link>
-            <Link to="/subjects?action=create" className={quickLink}>
+            <Link to="/subjects?action=create" className={buttonStyles({ size: 'sm' })}>
               Nueva asignatura
             </Link>
           </nav>
@@ -132,4 +142,19 @@ export function DashboardPage() {
       <InstallPrompt />
     </div>
   );
+}
+
+/** "Próxima entrega": when the hero already shows that very activity it shrinks to one quiet line. */
+function NextDue({
+  activity,
+  timeZone,
+  now,
+}: {
+  activity: DashboardActivity | null;
+  timeZone: string;
+  now: Date;
+}) {
+  const heroId = useAttention().data?.recommendation?.activity.id;
+  const quiet = activity !== null && activity.id === heroId;
+  return <NextDueCard activity={activity} timeZone={timeZone} now={now} quiet={quiet} />;
 }

@@ -1,53 +1,58 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens (UX1-0). Semantic ROLES, not colors: components say `bg-primary` or `text-muted-foreground`, never
- * `bg-slate-900`. The values below are on purpose the app's CURRENT identity (ink on white, slate borders): the
- * foundation changes nothing by itself. A different palette, or a dark theme, is a change of these values only:
- * `@theme inline` makes every utility read the variable at run time, so a future `[data-theme='dark']` block that
- * redefines them is enough, with no component edits.
+ * Design tokens. Semantic ROLES, not colors: components say `bg-primary` or `text-muted-foreground`, never
+ * `bg-slate-900`. Values live in `:root`, and `@theme inline` makes every utility read the variable at run time, so a
+ * future `[data-theme='dark']` block that redefines them is enough, with no component edits.
  *
+ * UX1-2 gave the system its own identity (UX1-0 had only reproduced the old look):
+ *   - a cool, softly tinted BACKGROUND with white SURFACES on top: layers instead of boxes with hard borders;
+ *   - a deep indigo PRIMARY (ink for text and buttons, and the surface of the one hero of a screen);
+ *   - a vivid teal ACCENT, used sparingly for emphasis: progress, the current place in the navigation, small marks;
+ *   - soft semantic tones (danger, warning, success, info) that are always paired with text.
  * Subject colors (the fixed 10-color palette in packages/core) are NOT part of this system: they identify a
  * subject, never a role.
  */
 :root {
-  --background: #ffffff;
+  --background: #f3f4fa;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --foreground: #0f172a;
-  --muted-foreground: #475569;
-  --border: #cbd5e1;
-  --border-strong: #94a3b8;
-  --primary: #0f172a;
-  --primary-hover: #1e293b;
+  --foreground: #141a3c;
+  --muted-foreground: #4c5578;
+  --border: #dfe2ef;
+  --border-strong: #8791b2;
+  --primary: #1f2670;
+  --primary-hover: #181e5a;
   --primary-foreground: #ffffff;
-  /* A quiet fill: the hover of outlined and ghost controls. */
-  --secondary: #f1f5f9;
-  /* Reserved for emphasis: UX1-1 decides the hue together with the shell. Nothing uses it yet. */
-  --accent: #4f46e5;
-  /* Semantic states. Each has the solid color, a soft background, a line and the ink to read on the soft one;
-     they reproduce the red / amber / green / blue badges the app already had. */
-  --danger: #b91c1c;
-  --danger-soft: #fef2f2;
-  --danger-line: #fca5a5;
-  --danger-ink: #7f1d1d;
-  --warning: #b45309;
-  --warning-soft: #fffbeb;
-  --warning-line: #fcd34d;
-  --warning-ink: #78350f;
-  --success: #15803d;
-  --success-soft: #f0fdf4;
-  --success-line: #86efac;
-  --success-ink: #14532d;
-  --info: #1d4ed8;
-  --info-soft: #eff6ff;
-  --info-line: #93c5fd;
-  --info-ink: #1e3a8a;
-  /* The focus ring is the foreground color: the same one the 34 explicit rings already use. */
+  /* A quiet fill: the hover of outlined and ghost controls, the track of a progress bar. */
+  --secondary: #eceef8;
+  --accent: #0d9488;
+  --accent-soft: #e6f6f4;
+  /* The ink to read accent-colored TEXT: the accent itself is for fills, rules and marks, never for small text. */
+  --accent-ink: #0f5651;
+  /* Semantic states. Each has the solid color, a soft background, a line and the ink to read on the soft one. */
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --danger-line: #fda29b;
+  --danger-ink: #7a271a;
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+  --warning-line: #fec84b;
+  --warning-ink: #7a2e0e;
+  --success: #067647;
+  --success-soft: #ecfdf3;
+  --success-line: #75e0a7;
+  --success-ink: #054f31;
+  --info: #175cd3;
+  --info-soft: #eff8ff;
+  --info-line: #84caff;
+  --info-ink: #194185;
+  /* The focus ring is the foreground color. On a dark surface (the hero) a control sets its own white ring. */
   --ring: var(--foreground);
-  /* Motion: two durations and one easing. prefers-reduced-motion is handled at the bottom of this file. */
+  /* Motion: three durations and one easing. prefers-reduced-motion is handled at the bottom of this file. */
   --duration-fast: 120ms;
-  --duration-normal: 200ms;
+  --duration-normal: 220ms;
+  --duration-slow: 600ms;
 }
 
 @theme inline {
@@ -63,6 +68,8 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-danger-line: var(--danger-line);
@@ -82,17 +89,39 @@
 }
 
 @theme {
-  /* Radius: controls (buttons, fields) and surfaces (cards, dialogs). Pills stay `rounded-full`. */
-  --radius-control: 0.375rem;
-  --radius-surface: 0.5rem;
+  /*
+   * TRANSITIONAL: the neutral scale (`slate-*`) that most screens still use literally is re-tinted to the same cool
+   * indigo ink as the tokens above, so migrated and not-yet-migrated screens share one identity. slate-900 IS the
+   * primary. UX1-3 onwards migrate those literals to the semantic roles, and this block goes away with the last one.
+   */
+  --color-slate-50: #f6f7fb;
+  --color-slate-100: #edeff7;
+  --color-slate-200: #dee2ef;
+  --color-slate-300: #cdd3e5;
+  --color-slate-400: #8791b2;
+  --color-slate-500: #656f94;
+  --color-slate-600: #4c5578;
+  --color-slate-700: #3a4264;
+  --color-slate-800: #272e50;
+  --color-slate-900: #1f2670;
+  --color-slate-950: #121735;
 
-  /* Two elevations only: a card at rest and something floating over the page. */
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow-floating: 0 8px 24px -6px rgb(15 23 42 / 0.18);
+  /* Radius: controls (buttons, fields), surfaces (cards, dialogs) and the hero. Pills stay `rounded-full`. */
+  --radius-control: 0.5rem;
+  --radius-surface: 0.875rem;
+  --radius-hero: 1.25rem;
+
+  /* Elevation: a card at rest, the hero, something floating over the page. All soft and tinted, never gray-black. */
+  --shadow-card: 0 1px 2px 0 rgb(20 26 60 / 0.04), 0 6px 16px -10px rgb(20 26 60 / 0.12);
+  --shadow-hero: 0 14px 28px -14px rgb(31 38 112 / 0.5);
+  --shadow-floating: 0 12px 32px -8px rgb(20 26 60 / 0.22);
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Type roles. Body is the default size and "meta" is Tailwind's `text-sm`: no tokens for those. */
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.25rem;
+  --text-display--font-weight: 600;
   --text-page-title: 1.5rem;
   --text-page-title--line-height: 2rem;
   --text-page-title--font-weight: 600;
@@ -102,6 +131,30 @@
   --text-card-title: 1rem;
   --text-card-title--line-height: 1.5rem;
   --text-card-title--font-weight: 600;
+
+  /* Motion with a purpose: a section settling into place once, and a progress bar filling to its value. */
+  --animate-rise: rise var(--duration-normal) var(--ease-standard) both;
+  --animate-fill: fill var(--duration-slow) var(--ease-standard) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
 }
 
 @layer base {
@@ -137,7 +190,8 @@ body:has(dialog[open]) {
   overflow: hidden;
 }
 
-/* Respect the system setting: no smooth scrolling or transitions for people who ask for less motion. */
+/* Respect the system setting: no smooth scrolling, transitions or animations for people who ask for less motion.
+   The entrance and the progress fill end in their final state at once, with no delay. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -145,5 +199,6 @@ body:has(dialog[open]) {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
   }
 }

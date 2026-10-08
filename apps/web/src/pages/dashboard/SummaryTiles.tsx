@@ -10,6 +10,9 @@ const TILES: { key: keyof Omit<Summary, 'total'>; label: string; symbol: string;
   { key: 'overdue', label: 'Vencidas', symbol: '⚠', to: '/activities?overdue=true' },
 ];
 
+const TILE =
+  'flex min-h-11 items-center gap-3 rounded-surface border px-3 py-2 shadow-card transition-[transform,background-color] duration-(--duration-fast) ease-standard active:scale-[0.98]';
+
 /** Four compact counters. Each is a link to the matching filtered list; the label is always text. */
 export function SummaryTiles({ summary }: { summary: Summary }) {
   return (
@@ -24,11 +27,13 @@ export function SummaryTiles({ summary }: { summary: Summary }) {
             <li key={key}>
               <Link
                 to={to}
-                className={`flex min-h-11 flex-col rounded-lg border px-3 py-2 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
-                  alert ? 'border-red-700 text-red-900' : 'border-slate-300'
+                className={`${TILE} ${
+                  alert
+                    ? 'border-danger-line bg-danger-soft text-danger-ink'
+                    : 'border-border bg-surface hover:bg-secondary'
                 }`}
               >
-                <span className="text-2xl leading-tight font-semibold">{summary[key]}</span>
+                <span className="text-2xl leading-none font-semibold">{summary[key]}</span>
                 <span className="text-sm">
                   <span aria-hidden="true">{symbol} </span>
                   {label}

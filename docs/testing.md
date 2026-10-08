@@ -8,9 +8,9 @@ Las pruebas son la segunda fuente de verdad después del código: si un document
 | ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Núcleo (`packages/core`) | Vitest                                            | 869 en 17 archivos                                                                                                        |
 | API (`apps/api`)         | Vitest + Supertest, PostgreSQL real               | 845 en 33 archivos (incluye 159 de seguridad y 28 del seed demo)                                                          |
-| Interfaz (`apps/web`)    | Vitest                                            | 95 en 11 archivos                                                                                                         |
-| **Total Vitest**         |                                                   | **1809**                                                                                                                  |
-| Navegador                | Playwright (360 px y 1366 px)                     | 312 registrados por pasada: 304 pasan y 8 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
+| Interfaz (`apps/web`)    | Vitest                                            | 121 en 12 archivos                                                                                                        |
+| **Total Vitest**         |                                                   | **1835**                                                                                                                  |
+| Navegador                | Playwright (360 px y 1366 px)                     | 328 registrados por pasada: 320 pasan y 8 se omiten a propósito (teclado solo en escritorio, tamaño táctil solo en móvil) |
 | Seguridad en navegador   | Playwright (puerto 4300, topología de producción) | 9 (configuración aparte)                                                                                                  |
 
 Las cifras de Playwright cuentan **ejecuciones** (cada prueba corre en dos proyectos: móvil y escritorio). Nada se cuenta dos veces: las pruebas de seguridad de la API están dentro de las 845, y las de seguridad en navegador son un conjunto distinto de las 258.

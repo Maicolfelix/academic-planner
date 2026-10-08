@@ -26,7 +26,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
     'transition-[color,background-color] duration-(--duration-fast) ease-standard',
     'active:bg-secondary lg:min-h-11 lg:flex-row lg:gap-2 lg:px-2.5 lg:text-sm',
     isActive
-      ? 'font-semibold text-foreground before:absolute before:inset-x-4 before:top-0 before:h-0.5 before:rounded-full before:bg-primary lg:bg-secondary lg:underline lg:underline-offset-4 lg:before:hidden'
+      ? 'font-semibold text-primary before:absolute before:inset-x-4 before:top-0 before:h-0.5 before:rounded-full before:bg-accent lg:bg-secondary lg:underline lg:underline-offset-4 lg:before:hidden'
       : 'font-medium text-muted-foreground hover:bg-secondary hover:text-foreground',
   ].join(' ');
 
@@ -73,7 +73,7 @@ export function AppShell() {
 
           <nav
             aria-label="Principal"
-            className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:static lg:mr-auto lg:ml-4 lg:border-t-0 lg:bg-transparent lg:pb-0"
+            className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-14px_rgb(20_26_60/0.25)] lg:static lg:mr-auto lg:ml-4 lg:border-t-0 lg:bg-transparent lg:pb-0 lg:shadow-none"
           >
             {/* Plain links, not a list: the screens count their own list items (cards) and a navigation is a landmark. */}
             <div className="mx-auto grid max-w-md grid-cols-4 lg:flex lg:max-w-none lg:gap-1">
