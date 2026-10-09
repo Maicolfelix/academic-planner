@@ -210,3 +210,16 @@ export async function openActivityMenu(page: Page, title: string | RegExp) {
       : page.getByRole('button', { name: new RegExp(`^Más acciones: ${title.source}`) });
   await trigger.click();
 }
+
+/**
+ * Waits until every animation that CAN finish has finished (the entrances: a card rising, a fill growing). Ambient loops are
+ * infinite and ignored. Needed before axe: it reads the colors the page has at that instant, and text that is still fading
+ * in is semi-transparent (a white button caught at 70 % reads 4.17:1 and is flagged for nothing).
+ */
+export async function entrancesDone(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
+  );
+}

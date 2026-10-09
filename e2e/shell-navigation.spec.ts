@@ -11,6 +11,7 @@ import {
   register,
   uniqueEmail,
   watch,
+  entrancesDone,
 } from './helpers';
 
 /** UX1-1: the app shell. One main navigation: a bottom bar on a phone or tablet, part of the top bar from 1024 px up. */
@@ -197,6 +198,7 @@ test('the shell passes axe on the home and activities screens', async ({ page })
   for (const url of ['/dashboard', '/activities', '/calendar', '/subjects']) {
     await page.goto(url);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await entrancesDone(page); // axe must read the final colors, not a fade (flagged 2 of 20 runs on main without this)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(
       violations.map((v) => `${v.id}: ${v.nodes.length}`),
