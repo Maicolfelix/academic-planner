@@ -10,7 +10,7 @@ Requisitos: Node.js ≥ 22.18 (probado con 24.19; `.nvmrc`), npm ≥ 10 y Docker
 npm ci                      # instala todo; el postinstall compila @planner/core y genera el cliente Prisma
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 npm run db:up               # PostgreSQL 17 en Docker (host :5433); espera a que esté sano
-npm run db:deploy           # aplica las migraciones a la base de desarrollo
+npm run db:deploy           # aplica las migraciones a la base de desarrollo (tras actualizar `main` con F1-0 hay una migración nueva: hace falta)
 npm run dev                 # core (watch) + API :3000 + web :5173
 ```
 
