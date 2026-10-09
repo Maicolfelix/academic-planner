@@ -177,6 +177,8 @@ body[data-ambient='done'] {
   --animate-complete: complete 1100ms var(--ease-standard) 1 backwards;
   --animate-breathe: breathe 1.6s ease-in-out infinite;
   --animate-ring: ring var(--duration-slow) var(--ease-enter) 120ms backwards;
+  /* A dialog opens with a fade and a small rise (interaction, 220 ms); it closes at once because it is unmounted. */
+  --animate-dialog: dialog var(--duration-normal) var(--ease-enter) backwards;
 
   /* AMBIENT (category A): slow, discreet and never in sync. Always used as `motion-safe:animate-*`, so with reduced
      motion they never start. They move only `transform` and `opacity`. */
@@ -314,6 +316,13 @@ body[data-ambient='done'] {
     }
   }
 
+  @keyframes dialog {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+  }
+
   @keyframes fill {
     from {
       transform: scaleX(0);
@@ -355,6 +364,16 @@ body {
 /* A modal dialog is open: the page behind must not scroll under the student's finger. */
 body:has(dialog[open]) {
   overflow: hidden;
+}
+
+/* The veil behind a modal dialog fades in with it (opacity only; no blur). */
+@keyframes dialog-backdrop {
+  from {
+    opacity: 0;
+  }
+}
+dialog::backdrop {
+  animation: dialog-backdrop var(--duration-normal) var(--ease-standard) backwards;
 }
 
 /* The light behind the page (AppShell). Plain radial gradients, no blur and no image, and STILL (no animation, no

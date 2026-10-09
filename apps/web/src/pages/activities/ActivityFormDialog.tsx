@@ -19,6 +19,7 @@ import { useCreateActivity, useUpdateActivity } from '../../activities/useActivi
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
 import { Button } from '../../components/ui/Button';
+import { Disclosure, FormActions, FormError } from '../../components/ui/form';
 import { Modal } from '../../components/Modal';
 import { SelectField } from '../../components/SelectField';
 import { ReminderSection } from '../reminders/ReminderSection';
@@ -126,11 +127,7 @@ export function ActivityFormDialog({
   return (
     <Modal title={activity ? 'Editar actividad' : 'Agregar actividad'} onClose={onClose}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-            {formError}
-          </p>
-        )}
+        {formError && <FormError>{formError}</FormError>}
         <FormField
           id="activity-title"
           label="Título"
@@ -147,45 +144,47 @@ export function ActivityFormDialog({
           options={subjects.map((s) => ({ value: s.id, label: s.name }))}
           error={fieldErrors.subjectId?.[0]}
         />
-        <FormField
-          id="activity-date"
-          label="Fecha"
-          type="date"
-          value={dueDate}
-          onChange={setDueDate}
-          error={fieldErrors.dueDate?.[0]}
-        />
-        {activity && (
-          <SelectField
-            id="activity-status"
-            label="Estado"
-            value={status}
-            onChange={setStatus}
-            options={ACTIVITY_STATUSES.map((s) => ({ value: s, label: ACTIVITY_STATUS_LABELS[s] }))}
-            error={fieldErrors.status?.[0]}
+        {/* When it is edited, the state sits beside the date (two short controls on one row from 640 px). */}
+        <div className={activity ? 'grid gap-4 sm:grid-cols-2' : undefined}>
+          <FormField
+            id="activity-date"
+            label="Fecha"
+            type="date"
+            value={dueDate}
+            onChange={setDueDate}
+            error={fieldErrors.dueDate?.[0]}
           />
-        )}
-
-        <details
-          open={advancedInUse || undefined}
-          className="rounded-surface border border-border p-3"
-        >
-          <summary className="min-h-6 cursor-pointer text-sm font-medium">Más opciones</summary>
-          <div className="mt-3 flex flex-col gap-4">
-            <FormField
-              id="activity-time"
-              label="Hora (opcional)"
-              type="time"
-              value={dueTime}
-              onChange={setDueTime}
-              error={fieldErrors.dueTime?.[0]}
-              hint="Sin hora, vence al terminar el día."
+          {activity && (
+            <SelectField
+              id="activity-status"
+              label="Estado"
+              value={status}
+              onChange={setStatus}
+              options={ACTIVITY_STATUSES.map((s) => ({
+                value: s,
+                label: ACTIVITY_STATUS_LABELS[s],
+              }))}
+              error={fieldErrors.status?.[0]}
             />
-            {!activity && (
-              <p className="text-sm text-muted-foreground">
-                Los recordatorios se crean solos según el tipo; podrás ajustarlos al editar.
-              </p>
-            )}
+          )}
+        </div>
+
+        <Disclosure summary="Más opciones" open={advancedInUse}>
+          <FormField
+            id="activity-time"
+            label="Hora (opcional)"
+            type="time"
+            value={dueTime}
+            onChange={setDueTime}
+            error={fieldErrors.dueTime?.[0]}
+            hint="Sin hora, vence al terminar el día."
+          />
+          {!activity && (
+            <p className="text-sm text-muted-foreground">
+              Los recordatorios se crean solos según el tipo; podrás ajustarlos al editar.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               id="activity-type"
               label="Tipo"
@@ -205,25 +204,25 @@ export function ActivityFormDialog({
               }))}
               error={fieldErrors.priority?.[0]}
             />
-            <FormField
-              id="activity-description"
-              label="Descripción"
-              multiline
-              value={description}
-              onChange={setDescription}
-              error={fieldErrors.description?.[0]}
-            />
           </div>
-        </details>
+          <FormField
+            id="activity-description"
+            label="Descripción"
+            multiline
+            value={description}
+            onChange={setDescription}
+            error={fieldErrors.description?.[0]}
+          />
+        </Disclosure>
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <FormActions>
           <Button onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? 'Guardando…' : activity ? 'Guardar cambios' : 'Agregar'}
           </Button>
-        </div>
+        </FormActions>
       </form>
       {activity && <ReminderSection activity={activity} timeZone={timeZone} />}
     </Modal>

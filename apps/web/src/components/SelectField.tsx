@@ -1,3 +1,7 @@
+import { fieldControl, FIELD_LABEL } from './ui/fieldStyles';
+import { FieldError } from './ui/form';
+import { ChevronDownIcon } from './ui/icons';
+
 interface SelectFieldProps {
   id: string;
   label: string;
@@ -9,8 +13,15 @@ interface SelectFieldProps {
   error?: string;
   /** Extra classes for the wrapper (e.g. grid spans). */
   className?: string;
+  required?: boolean;
+  disabled?: boolean;
 }
 
+/**
+ * A labelled NATIVE `<select>` (the best picker on every phone: Safari on iPhone still opens its own wheel). Only its dress
+ * changes: the browser's arrow is replaced by a chevron of ours (decoration, it never catches a tap), an unchosen
+ * placeholder reads as such, and the error is said in words with an icon.
+ */
 export function SelectField({
   id,
   label,
@@ -20,35 +31,39 @@ export function SelectField({
   placeholder,
   error,
   className = '',
+  required,
+  disabled,
 }: SelectFieldProps) {
+  const unchosen = placeholder !== undefined && value === '';
   return (
-    <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
-      <label htmlFor={id} className="text-sm font-medium text-foreground">
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <label htmlFor={id} className={FIELD_LABEL}>
         {label}
       </label>
-      <select
-        id={id}
-        name={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={`min-h-11 w-full rounded-control border bg-surface px-3 py-2 text-base ${
-          error ? 'border-danger' : 'border-border-strong'
-        }`}
-      >
-        {placeholder !== undefined && <option value="">{placeholder}</option>}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-danger-ink">
-          {error}
-        </p>
-      )}
+      <span className="relative block">
+        <select
+          id={id}
+          name={id}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-required={required ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={`${fieldControl(Boolean(error))} cursor-pointer appearance-none pr-10 ${
+            unchosen ? 'text-muted-foreground' : ''
+          }`}
+        >
+          {placeholder !== undefined && <option value="">{placeholder}</option>}
+          {options.map((o) => (
+            <option key={o.value} value={o.value} className="text-foreground">
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      </span>
+      {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
     </div>
   );
 }

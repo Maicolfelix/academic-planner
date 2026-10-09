@@ -1,5 +1,7 @@
 import { SCHEDULE_BLOCK_TYPE_LABELS, type ScheduleBlock } from '@planner/core';
 import { Modal } from '../../components/Modal';
+import { Button } from '../../components/ui/Button';
+import { FormActions, FormError } from '../../components/ui/form';
 import { useDeleteScheduleBlock } from '../../schedule/useSchedule';
 
 interface Props {
@@ -15,27 +17,22 @@ export function DeleteBlockDialog({ block, onClose, onDeleted }: Props) {
 
   return (
     <Modal title={`¿Eliminar ${block.title}?`} onClose={onClose}>
-      <p className="mb-4">
+      <p className="mb-5 text-foreground">
         {block.recurrence
           ? `${what} se repite semanalmente. Se eliminarán todas las apariciones de la agenda.`
           : `Esta acción eliminará el bloque de la agenda (${SCHEDULE_BLOCK_TYPE_LABELS[block.type].toLowerCase()}).`}
       </p>
       {remove.isError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-800">
-          {remove.error.message}
-        </p>
+        <div className="mb-4">
+          <FormError>{remove.error.message}</FormError>
+        </div>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={remove.isPending}
-          className="min-h-11 rounded-md border border-slate-400 px-4 py-2 disabled:opacity-60"
-        >
+      <FormActions>
+        <Button onClick={onClose} disabled={remove.isPending}>
           Cancelar
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger"
           disabled={remove.isPending}
           onClick={() =>
             remove.mutate(block.id, {
@@ -43,11 +40,10 @@ export function DeleteBlockDialog({ block, onClose, onDeleted }: Props) {
                 onDeleted(block.recurrence ? 'Serie eliminada de la agenda.' : 'Bloque eliminado.'),
             })
           }
-          className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white disabled:opacity-60"
         >
           {remove.isPending ? 'Eliminando…' : 'Eliminar'}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </Modal>
   );
 }

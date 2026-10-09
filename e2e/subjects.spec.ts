@@ -8,6 +8,7 @@ import {
   register,
   uniqueEmail,
   watch,
+  entrancesDone,
 } from './helpers';
 
 async function newUserWithPeriod(page: Page) {
@@ -25,6 +26,7 @@ async function addSubject(
   await page.getByRole('button', { name: 'Agregar asignatura' }).click();
   const dialog = page.getByRole('dialog', { name: 'Agregar asignatura' });
   await dialog.getByLabel('Nombre').fill(name);
+  await entrancesDone(page); // a forced click does not wait for the dialog to stop rising
   if (extra.color) await dialog.getByLabel(extra.color).check({ force: true });
   if (extra.professor) {
     await dialog.getByText('Más opciones').click();
@@ -79,6 +81,7 @@ test('academic flow: onboarding, create, edit, color, persistence, delete, logou
   await expect(edit.getByLabel('Nombre')).toHaveValue('Redes');
   await expect(edit.getByLabel('Profesor')).toHaveValue('Carlos Pérez'); // disclosure opens when filled
   await edit.getByLabel('Nombre').fill('Redes y Comunicaciones');
+  await entrancesDone(page); // a forced click does not wait for the dialog to stop rising
   await edit.getByLabel('Rojo').check({ force: true });
   await edit.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(edit).toBeHidden();

@@ -1,3 +1,6 @@
+import { fieldControl, FIELD_LABEL } from './ui/fieldStyles';
+import { FieldError } from './ui/form';
+
 interface FormFieldProps {
   id: string;
   label: string;
@@ -9,8 +12,16 @@ interface FormFieldProps {
   onChange: (value: string) => void;
   error?: string;
   hint?: string;
+  /** Announces the field as required to assistive technology (the form validates; nothing is drawn). */
+  required?: boolean;
+  disabled?: boolean;
 }
 
+/**
+ * A labelled NATIVE input (or textarea, date or time picker): label above, the control, then a hint or an error. The
+ * error is linked with `aria-describedby`, marks the field `aria-invalid` and says it in words with an icon. A hint is
+ * only linked while it is shown (it gives way to an error).
+ */
 export function FormField({
   id,
   label,
@@ -21,21 +32,24 @@ export function FormField({
   onChange,
   error,
   hint,
+  required,
+  disabled,
 }: FormFieldProps) {
-  const describedBy = [error && `${id}-error`, hint && `${id}-hint`].filter(Boolean).join(' ');
+  const showHint = Boolean(hint) && !error;
+  const describedBy = [error && `${id}-error`, showHint && `${id}-hint`].filter(Boolean).join(' ');
   const shared = {
     id,
     name: id,
     value,
+    disabled,
     'aria-invalid': error ? true : undefined,
+    'aria-required': required ? true : undefined,
     'aria-describedby': describedBy || undefined,
-    className: `min-h-11 w-full rounded-md border px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-slate-900 ${
-      error ? 'border-red-600' : 'border-slate-400'
-    }`,
+    className: fieldControl(Boolean(error)),
   };
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-slate-800">
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className={FIELD_LABEL}>
         {label}
       </label>
       {multiline ? (
@@ -48,16 +62,12 @@ export function FormField({
           onChange={(e) => onChange(e.target.value)}
         />
       )}
-      {hint && !error && (
-        <p id={`${id}-hint`} className="text-sm text-slate-600">
+      {showHint && (
+        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
           {hint}
         </p>
       )}
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
     </div>
   );
 }

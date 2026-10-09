@@ -176,7 +176,43 @@ Lleva «Pulso Ambiental» a las dos pantallas que seguían sintiéndose administ
 
 Jerarquía (UX1-2), en el orden en que el estudiante pregunta: **¿qué hago ahora?** → **¿cómo voy?** → **¿qué viene?**. Saludo y periodo → recordatorios (cuando hay) → **¿Qué hago ahora?** (el héroe) → clases de hoy → vencidas → para hoy → contadores → progreso → **Captura rápida** (+ acceso a la Bandeja) → Radar → próxima entrega → próximas entregas → semana → accesos rápidos. Captura bajó de la segunda posición: quien entra a saber qué hacer ve primero eso. Cuando el héroe ya muestra la próxima entrega, «Próxima entrega» es una sola línea tenue y no una segunda tarjeta (la región sigue existiendo).
 
-## Formularios y diálogos
+## Formularios y diálogos (UX1-4)
+
+Cierra la deuda visual que quedaba tras UX1-3. **Solo presentación:** mismas reglas de validación y esquemas, mismos endpoints, mismos campos y mismos nombres accesibles. Estado: **implementado en su PR, pendiente de QA real en iPhone** (no está DONE hasta entonces).
+
+**Inventario.** _A, modales:_ Agregar/Editar actividad, Agregar/Editar asignatura, Agregar/Editar bloque de la agenda (con su aviso de choques), los tres diálogos de eliminar y la pregunta «¿descartar cambios?» del `Modal`. _B, página completa:_ Inicio de sesión, Registro, Onboarding, Bandeja e Importar horario (heredan el nuevo aspecto de los campos porque usan `FormField`/`SelectField`; **no se rediseñaron**; solo se miró una captura a 390 px del Registro con errores y de la Bandeja). _C, en línea:_ el editor de recordatorios (dentro de Editar actividad), Captura rápida y las propuestas de la Bandeja y de la importación.
+
+**Lo que se sentía «CRUD»:** campos con borde `slate` duro y contorno negro, un `<details>` «Más opciones» como una caja sin identidad, errores sin icono, los recordatorios como un bloque pegado con botones crudos, botones de cada pie escritos a mano (con el orden y los colores a criterio de cada formulario) y un `Modal` sin entrada, con `amber/slate` literales.
+
+**Lenguaje de campo** (`components/ui/fieldStyles.ts`). Controles **nativos** (input, textarea, select, selector de fecha y de hora) con otro aspecto: relleno tonal suave, borde que sigue leyéndose a 3:1, foco con contorno de acento y un resplandor tenue (nunca una raya negra fina), error con borde y fondo de peligro **más** un icono y la frase junto al campo (`aria-invalid` y `aria-describedby` como antes), pista que solo se enlaza mientras se ve (cede ante el error), y estados `required` (anunciado a la tecnología asistiva; no se dibuja nada) y `disabled`. `SelectField` sigue siendo un `<select>` nativo (Safari del iPhone abre su selector de siempre): solo cambia la flecha, que ahora es un chevron propio (decoración, no captura toques), y un placeholder sin elegir se lee como tal.
+
+**Primitivas nuevas** (`components/ui/form.tsx`, cuatro y pequeñas; ninguna sabe de campos ni de validación): `FieldError` (la frase con su icono, en `FormField`, `SelectField` y la paleta de color), `FormError` (el error de todo el formulario, `role="alert"`, en los formularios, las confirmaciones y los recordatorios), `Disclosure` (el «Más opciones» de Actividad y de Asignatura) y `FormActions` (el pie, siete usos). **No** se creó `FormSection`, `FieldGroup`, un motor de formularios ni nada dirigido por esquemas: cada formulario agrupa distinto y no había repetición real.
+
+**«Más opciones».** Sigue siendo un `<details>` y un `<summary>` nativos (teclado, lector de pantalla y búsqueda en la página gratis), ahora una fila de 44 px sobre una superficie suave, con un chevron que gira y un contenido que entra subiendo una vez (no se pinta mientras está cerrado, así que la animación ocurre al abrir). `open` solo fija el estado inicial: se abre solo si el estudiante ya tiene algo dentro.
+
+**Modal.** Superficie blanca con una raya de acento fina arriba (decoración), velo índigo sin desenfoque, entrada de 220 ms (aparece y sube 12 px con una escala de 0,98) y cierre inmediato (se desmonta); en reducido todo es instantáneo. Ancho de hasta 31 rem; si el formulario es más alto que la pantalla, se desplaza **dentro**. **En el teléfono se conserva centrado con margen por los cuatro lados.** Se evaluó una hoja pegada al borde inferior y se descartó: el contrato de las pruebas exige un hueco bajo el diálogo (nunca a ras del indicador de inicio) y no se podía comprobar el teclado real de iOS en esta sesión. La pregunta de descartar usa ahora tokens y `Button`.
+
+**Acciones.** Un pie común: «Cancelar» **antes** de la acción primaria, ambos a la derecha; un atajo destructivo («Eliminar» en el editor de bloques) a la izquierda y aparte; en el teléfono los dos botones comparten fila como objetivos anchos. **Pie fijo (sticky) en el teléfono: no se adoptó.** Habría que verificar que no tapa campos con el teclado virtual de iOS, algo que esta sesión no podía hacer; los formularios, ya agrupados, son cortos y el pie queda a un desplazamiento.
+
+**Validación.** Sin cambios de reglas ni de esquemas. No se añadió un resumen de errores: los formularios son cortos y cada error está junto a su campo, con icono y texto.
+
+**Actividad.** Título, asignatura y fecha (y, al editar, el estado junto a la fecha) a la vista; hora, tipo, prioridad y descripción en «Más opciones» (tipo y prioridad en una fila desde 640 px). Los **recordatorios** son una sección de la misma superficie (suave), con su título a la izquierda y «+ Agregar recordatorio» a la derecha, filas compactas y el editor que entra subiendo; mismas opciones, misma lógica y mismos endpoints.
+
+**Asignatura.** Una **vista previa viva** junto al nombre: el mosaico de la tarjeta (color elegido e iniciales del nombre; decoración). La paleta cerrada sigue siendo un grupo de botones de radio reales (las flechas mueven la elección) con el **nombre** de cada color para un lector de pantalla, ahora de 40 px, con anillo y check en el elegido y foco visible.
+
+**Bloque de la agenda.** Tipo y asignatura en una fila, «Repetir semanalmente» como una fila tonal completamente tocable (el checkbox es real), día/fecha, horas y «Hasta», y los avisos (aviso de edición semanal y choques) con tokens. No se tocó la recurrencia, las ocurrencias ni la zona horaria.
+
+**Eliminar.** Los tres diálogos (actividad, asignatura, bloque) preguntan igual: «Cancelar» primero y con el foco, después «Eliminar» en peligro.
+
+**Movimiento y rendimiento.** Solo interacción (foco, desplegar, abrir): ningún bucle, ningún desenfoque. **Teclado:** Escape, Tab dentro del diálogo, devolución del foco y la pregunta de descartar siguen como antes y tienen pruebas.
+
+**Deuda `slate-*`.** En el alcance (campos, `Modal`, formularios de actividad, asignatura y bloque, recordatorios y los tres diálogos de eliminar): **20 → 0** literales `slate-*` y **45 → 0** de cualquier paleta cruda (red, amber, green…). En todo `apps/web/src`: 126 → 108 líneas. Iconos: 14 (se añade el triángulo de alerta).
+
+**Lo que atrapó una prueba:** añadir `relative` al `<dialog>` anuló su `position: fixed` nativo (lo que lo centra) y un diálogo más alto que la pantalla se salía por arriba (hasta −177 px); el diálogo modal ya está posicionado, así que se quitó y una prueba lo vigila.
+
+**Sigue sintiéndose de sistema:** Inicio de sesión, Registro, Onboarding, Bandeja e Importar horario (sus tarjetas y botones propios), las vistas previas de Captura rápida y la Agenda semanal. **No probado:** el teclado virtual real de iOS (solo se comprobó el comportamiento con viewports estrechos), PWA instalada y HTTPS.
+
+## Formularios y diálogos (reglas generales)
 
 - Todo campo tiene `label` asociado; los errores van junto al campo (`aria-describedby`, `aria-invalid`); los opcionales dicen «(opcional)».
 - Alto mínimo de 44 px en botones, `select`, `input` y `summary` (probado en el viewport móvil en todas las pantallas).

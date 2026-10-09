@@ -61,7 +61,8 @@ export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (
 );
 
 /*
- * UX1-3 added the action icons (check, pencil, calendar+, trash, more, chevron, user, sliders): 13 small shapes in all.
+ * UX1-3 added the action icons (check, pencil, calendar+, trash, more, chevron, user, sliders) and UX1-4 the alert
+ * triangle of the form errors: 14 small shapes in all.
  * Still cheaper to keep as eight lines of path each than a dependency (see docs/ux-accessibility.md, "Iconos").
  */
 type IconProps = { className?: string };
@@ -118,6 +119,13 @@ export const SlidersIcon = ({ className = 'size-4' }: IconProps) => (
     <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
     <circle cx="15" cy="7" r="2" />
     <circle cx="9" cy="17" r="2" />
+  </Icon>
+);
+
+export const AlertIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 4 3 20h18z" />
+    <path d="M12 10v4M12 17.2v.1" />
   </Icon>
 );
 

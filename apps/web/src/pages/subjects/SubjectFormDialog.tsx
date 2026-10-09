@@ -12,6 +12,11 @@ import { useCreateSubject, useUpdateSubject } from '../../academic/useAcademic';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
 import { Button } from '../../components/ui/Button';
+import { FIELD_LABEL } from '../../components/ui/fieldStyles';
+import { Disclosure, FieldError, FormActions, FormError } from '../../components/ui/form';
+import { CheckIcon } from '../../components/ui/icons';
+import { readableInk } from '../../lib/readableInk';
+import { initialsOf } from './SubjectCard';
 import { Modal } from '../../components/Modal';
 
 interface Props {
@@ -72,22 +77,33 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
   return (
     <Modal title={subject ? 'Editar asignatura' : 'Agregar asignatura'} onClose={onClose}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-            {formError}
-          </p>
-        )}
-        <FormField
-          id="subject-name"
-          label="Nombre"
-          value={name}
-          onChange={setName}
-          error={fieldErrors.name?.[0]}
-        />
+        {formError && <FormError>{formError}</FormError>}
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium text-foreground">Color</legend>
-          <div className="flex flex-wrap gap-2">
+        {/* The tile of the card, live: the chosen color and the letters of the name (decoration, hidden from assistive tech). */}
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden="true"
+            data-subject-preview
+            style={{ backgroundColor: color, color: readableInk(color) }}
+            className="mt-7 grid size-12 shrink-0 place-items-center rounded-2xl text-xl font-bold shadow-card transition-colors duration-(--duration-fast) ease-standard"
+          >
+            {initialsOf(name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <FormField
+              id="subject-name"
+              label="Nombre"
+              value={name}
+              onChange={setName}
+              error={fieldErrors.name?.[0]}
+            />
+          </div>
+        </div>
+
+        {/* A closed palette: real radio buttons (arrows move between them), each with its color's NAME for a screen reader. */}
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className={FIELD_LABEL}>Color</legend>
+          <div className="flex flex-wrap gap-2.5 p-1">
             {SUBJECT_COLOR_VALUES.map((value) => (
               <label key={value} className="relative">
                 <input
@@ -100,52 +116,49 @@ export function SubjectFormDialog({ periodId, subject, onClose, onSaved }: Props
                 />
                 <span
                   aria-hidden="true"
-                  style={{ backgroundColor: value }}
-                  className="grid size-9 cursor-pointer place-items-center rounded-full border-2 border-white text-white outline-offset-2 peer-checked:outline-2 peer-checked:outline-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-foreground"
+                  style={{ backgroundColor: value, color: readableInk(value) }}
+                  className="grid size-10 cursor-pointer place-items-center rounded-full ring-offset-2 ring-offset-surface-elevated transition-transform duration-(--duration-fast) ease-spring hover:scale-110 peer-checked:scale-105 peer-checked:ring-2 peer-checked:ring-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent"
                 >
-                  {color === value && '✓'}
+                  {color === value && <CheckIcon className="size-5" />}
                 </span>
                 <span className="sr-only">{SUBJECT_COLOR_NAMES[value]}</span>
               </label>
             ))}
           </div>
-          {fieldErrors.color && <p className="text-sm text-danger-ink">{fieldErrors.color[0]}</p>}
+          {fieldErrors.color && (
+            <FieldError id="subject-color-error">{fieldErrors.color[0]}</FieldError>
+          )}
         </fieldset>
 
-        <details
-          open={Boolean(subject?.professor || subject?.description) || undefined}
-          className="rounded-surface border border-border p-3"
+        <Disclosure
+          summary="Más opciones (profesor y descripción)"
+          open={Boolean(subject?.professor || subject?.description)}
         >
-          <summary className="min-h-6 cursor-pointer text-sm font-medium">
-            Más opciones (profesor y descripción)
-          </summary>
-          <div className="mt-3 flex flex-col gap-4">
-            <FormField
-              id="subject-professor"
-              label="Profesor"
-              value={professor}
-              onChange={setProfessor}
-              error={fieldErrors.professor?.[0]}
-            />
-            <FormField
-              id="subject-description"
-              label="Descripción"
-              multiline
-              value={description}
-              onChange={setDescription}
-              error={fieldErrors.description?.[0]}
-            />
-          </div>
-        </details>
+          <FormField
+            id="subject-professor"
+            label="Profesor"
+            value={professor}
+            onChange={setProfessor}
+            error={fieldErrors.professor?.[0]}
+          />
+          <FormField
+            id="subject-description"
+            label="Descripción"
+            multiline
+            value={description}
+            onChange={setDescription}
+            error={fieldErrors.description?.[0]}
+          />
+        </Disclosure>
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <FormActions>
           <Button onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? 'Guardando…' : subject ? 'Guardar cambios' : 'Agregar'}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Modal>
   );
