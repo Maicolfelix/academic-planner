@@ -45,6 +45,12 @@ async function world() {
       dueTime: '10:00',
     })
   ).body.activity as { id: string };
+  // F1: a general activity (no subject) of B. It has no subject to be reached through, only its period and its id.
+  const generalActivity = (
+    await b.agent
+      .post('/api/activities')
+      .send({ title: 'Trámite secreto de B', dueDate: '2026-10-14', type: 'EXAM' })
+  ).body.activity as { id: string };
   const reminder = (
     await b.agent
       .post('/api/reminders')
@@ -61,7 +67,7 @@ async function world() {
       recurrence: { frequency: 'WEEKLY', until: '2026-11-28' },
     })
   ).body.block as { id: string };
-  return { a, b, secondSubject, activity, reminder, block };
+  return { a, b, secondSubject, activity, generalActivity, reminder, block };
 }
 
 const snapshot = async () => ({
@@ -92,6 +98,16 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
       (a, id) => a.patch(`/api/activities/${id}`).send({ status: 'COMPLETED' }),
     ],
     ['DELETE /activities/:id', (a, id) => a.delete(`/api/activities/${id}`)],
+    ['GET /activities/:id (general)', (a, id) => a.get(`/api/activities/${id}`)],
+    [
+      'GET /activities/:id/calendar.ics (general)',
+      (a, id) => a.get(`/api/activities/${id}/calendar.ics`),
+    ],
+    [
+      'PATCH /activities/:id (general)',
+      (a, id) => a.patch(`/api/activities/${id}`).send({ title: 'Hackeada', subjectId: null }),
+    ],
+    ['DELETE /activities/:id (general)', (a, id) => a.delete(`/api/activities/${id}`)],
     ['GET /schedule/:id', (a, id) => a.get(`/api/schedule/${id}`)],
     ['PATCH /schedule/:id', (a, id) => a.patch(`/api/schedule/${id}`).send({ title: 'Hackeada' })],
     [
@@ -112,13 +128,15 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
   const target = (label: string, w: Awaited<ReturnType<typeof world>>) =>
     label.includes('/subjects')
       ? w.b.subject.id
-      : label.includes('/activities')
-        ? w.activity.id
-        : label.includes('/schedule')
-          ? w.block.id
-          : label.includes('/reminders')
-            ? w.reminder.id
-            : w.b.period.id;
+      : label.includes('(general)')
+        ? w.generalActivity.id
+        : label.includes('/activities')
+          ? w.activity.id
+          : label.includes('/schedule')
+            ? w.block.id
+            : label.includes('/reminders')
+              ? w.reminder.id
+              : w.b.period.id;
 
   it.each(byId.map(([label, call]) => [label, call] as const))(
     '%s: B’s id gets the exact answer of a random id, and nothing changes',
@@ -373,6 +391,7 @@ describe('strict bodies: no mass assignment', () => {
       w.a.agent
         .post('/api/activities')
         .send({ subjectId: w.a.subject.id, title: 'Z', dueDate: '2026-12-01', [key]: value }),
+      w.a.agent.post('/api/activities').send({ title: 'Z', dueDate: '2026-12-01', [key]: value }),
       w.a.agent.patch(`/api/activities/${mine.id}`).send({ title: 'Z', [key]: value }),
       w.a.agent.post('/api/schedule').send({
         type: 'STUDY',

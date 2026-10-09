@@ -36,6 +36,7 @@ async function base() {
 
 const activity = (b: Awaited<ReturnType<typeof base>>, over: object = {}) => ({
   userId: b.user.id,
+  periodId: b.period.id,
   subjectId: b.subject.id,
   title: 'T',
   type: 'TASK' as const,
@@ -157,6 +158,80 @@ describe('the database refuses inconsistent data on its own', () => {
     await expect(
       prisma.reminder.create({ data: reminder({ kind: 'AUTO', offsetMinutes: -1440 }) }),
     ).rejects.toThrow();
+  });
+
+  describe('an activity always has a period, and its subject (when it has one) is from that same period (F1)', () => {
+    async function twoPeriods() {
+      const b = await base();
+      const other = await prisma.academicPeriod.create({
+        data: {
+          userId: b.user.id,
+          name: 'Q',
+          startDate: new Date('2027-02-01'),
+          endDate: new Date('2027-06-01'),
+        },
+      });
+      return { ...b, other };
+    }
+
+    it('A) no subject + a valid period: ACCEPTED (a general activity)', async () => {
+      const b = await base();
+      await expect(
+        prisma.activity.create({ data: activity(b, { subjectId: null }) }),
+      ).resolves.toMatchObject({ subjectId: null, periodId: b.period.id });
+    });
+
+    it('B) a subject + the subject’s own period: ACCEPTED', async () => {
+      const b = await base();
+      await expect(prisma.activity.create({ data: activity(b) })).resolves.toMatchObject({
+        subjectId: b.subject.id,
+        periodId: b.period.id,
+      });
+    });
+
+    it('C) a subject + a DIFFERENT period: REJECTED by the database itself (composite foreign key)', async () => {
+      const b = await twoPeriods();
+      await expect(
+        prisma.activity.create({ data: activity(b, { periodId: b.other.id }) }),
+      ).rejects.toThrow(/Activity_subjectId_periodId_fkey/);
+      // Same through raw SQL: nothing but the constraint stands in the way.
+      await expect(
+        prisma.$executeRaw`INSERT INTO "Activity" ("id","userId","periodId","subjectId","title","dueAt","updatedAt")
+          VALUES (gen_random_uuid(), ${b.user.id}::uuid, ${b.other.id}::uuid, ${b.subject.id}::uuid, 'X', now(), now())`,
+      ).rejects.toThrow();
+      expect(await prisma.activity.count()).toBe(0);
+    });
+
+    it('an existing activity can not be moved to another period while it keeps its subject, but may lose the subject first', async () => {
+      const b = await twoPeriods();
+      const a = await prisma.activity.create({ data: activity(b) });
+      await expect(
+        prisma.activity.update({ where: { id: a.id }, data: { periodId: b.other.id } }),
+      ).rejects.toThrow();
+      await expect(
+        prisma.activity.update({ where: { id: a.id }, data: { subjectId: null } }),
+      ).resolves.toMatchObject({ subjectId: null, periodId: b.period.id });
+    });
+
+    it('a period is mandatory: no activity without one, and it must exist', async () => {
+      const b = await base();
+      await expect(
+        prisma.$executeRaw`INSERT INTO "Activity" ("id","userId","subjectId","title","dueAt","updatedAt")
+          VALUES (gen_random_uuid(), ${b.user.id}::uuid, ${b.subject.id}::uuid, 'X', now(), now())`,
+      ).rejects.toThrow(/periodId/);
+      await expect(
+        prisma.activity.create({
+          data: activity(b, { subjectId: null, periodId: '00000000-0000-4000-8000-000000000000' }),
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('a period holding only general activities can not be deleted from under them (no silent cascade)', async () => {
+      const b = await base();
+      await prisma.activity.create({ data: activity(b, { subjectId: null }) });
+      await prisma.subject.delete({ where: { id: b.subject.id } });
+      await expect(prisma.academicPeriod.delete({ where: { id: b.period.id } })).rejects.toThrow();
+    });
   });
 
   it('a subject or period with dependants can not be deleted from under them (no silent cascade)', async () => {

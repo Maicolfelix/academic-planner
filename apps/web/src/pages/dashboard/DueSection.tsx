@@ -37,14 +37,18 @@ export function DueSection({
           <Card as="li" key={a.id} className="flex min-w-0 overflow-hidden">
             <span
               aria-hidden="true"
-              style={{ backgroundColor: a.subject.color }}
+              style={{ backgroundColor: a.subject?.color ?? '#64748B' }}
               className="w-1.5 shrink-0"
             />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2.5">
               <p className="font-medium break-words">{a.title}</p>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                <span className="break-words">{a.subject.name}</span>
-                <span aria-hidden="true">·</span>
+                {a.subject && (
+                  <>
+                    <span className="break-words">{a.subject.name}</span>
+                    <span aria-hidden="true">·</span>
+                  </>
+                )}
                 <span>{formatDue(a, timeZone)}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-medium text-foreground">{describe(a)}</span>

@@ -72,7 +72,7 @@ export const toDueReminderDto = (
       type: ActivityRow['type'];
       dueAt: Date;
       hasTime: boolean;
-      subject: { id: string; name: string; color: string };
+      subject: { id: string; name: string; color: string } | null;
     };
   },
 ): DueReminder => ({
@@ -150,7 +150,7 @@ export const toOccurrenceDto = (
 
 /** An activity row joined with the few subject fields the Dashboard shows (same query, no N+1). */
 export const toDashboardActivityDto = (
-  a: ActivityRow & { subject: { id: string; name: string; color: string } },
+  a: ActivityRow & { subject: { id: string; name: string; color: string } | null },
 ): DashboardActivity => ({ ...toActivityDto(a), subject: a.subject });
 
 /** Deliberately omits userId and nameKey: internal details the client has no use for. */

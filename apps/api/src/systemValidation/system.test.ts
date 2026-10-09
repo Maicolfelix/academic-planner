@@ -385,7 +385,7 @@ describe('the data is internally consistent after a full story', () => {
       });
       expect(activities.length).toBeGreaterThan(0);
       for (const act of activities) {
-        expect(act.subject.userId).toBe(uid); // an activity only uses its owner's subject
+        expect(act.subject?.userId).toBe(uid); // an activity only uses its owner's subject
         expect((act.status === 'COMPLETED') === (act.completedAt !== null)).toBe(true); // completion is coherent
       }
       const blocks = await prisma.scheduleBlock.findMany({

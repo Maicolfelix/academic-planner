@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   createActivitySchema,
   isOverdue,
+  activitySchema,
   listActivitiesQuerySchema,
+  NO_SUBJECT_FILTER,
   resolveCompletedAt,
   updateActivitySchema,
   type ActivityStatus,
@@ -148,6 +150,21 @@ describe('createActivitySchema', () => {
     expect(res.error?.issues.some((i) => i.path[0] === field)).toBe(true);
   });
 
+  it('a general activity: the subject may be omitted or null (and then stays that way)', () => {
+    const withoutSubject = { title: valid.title, dueDate: valid.dueDate };
+    expect(createActivitySchema.parse(withoutSubject).subjectId).toBeUndefined();
+    expect(createActivitySchema.parse({ ...valid, subjectId: null }).subjectId).toBeNull();
+    expect(createActivitySchema.parse(valid).subjectId).toBe(subjectId);
+  });
+
+  it('a subject, when present, must still be a uuid ("" and "none" are not valid ways to say "no subject")', () => {
+    for (const bad of ['', 'none', 'nope', 0])
+      expect(
+        createActivitySchema.safeParse({ ...valid, subjectId: bad }).success,
+        String(bad),
+      ).toBe(false);
+  });
+
   it('rejects userId, status and any other unknown key', () => {
     for (const extra of [
       { userId: subjectId },
@@ -161,6 +178,19 @@ describe('createActivitySchema', () => {
 });
 
 describe('updateActivitySchema', () => {
+  it('subjectId: absent leaves it alone, null detaches it, a uuid assigns it (three different things)', () => {
+    const absent = updateActivitySchema.parse({ title: 'X' });
+    expect('subjectId' in absent).toBe(false);
+    expect(updateActivitySchema.parse({ subjectId: null })).toEqual({ subjectId: null });
+    expect(updateActivitySchema.parse({ subjectId })).toEqual({ subjectId });
+    expect(updateActivitySchema.safeParse({ subjectId: 'nope' }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ subjectId: '' }).success).toBe(false);
+  });
+
+  it('never accepts a period (it is immutable after creation)', () => {
+    expect(updateActivitySchema.safeParse({ periodId: subjectId }).success).toBe(false);
+  });
+
   it('distinguishes omitted from cleared fields', () => {
     expect(updateActivitySchema.parse({ title: 'X' })).toEqual({ title: 'X' });
     expect(updateActivitySchema.parse({ dueTime: null })).toEqual({ dueTime: null });
@@ -195,6 +225,14 @@ describe('listActivitiesQuerySchema', () => {
     expect(listActivitiesQuerySchema.parse({})).toEqual({});
   });
 
+  it('subjectId is a uuid or exactly "none" (the general activities); nothing else is a sentinel', () => {
+    expect(NO_SUBJECT_FILTER).toBe('none');
+    expect(listActivitiesQuerySchema.parse({ subjectId: 'none' })).toEqual({ subjectId: 'none' });
+    expect(listActivitiesQuerySchema.parse({ subjectId })).toEqual({ subjectId });
+    for (const bad of ['None', 'NONE', 'null', 'all', ''])
+      expect(listActivitiesQuerySchema.safeParse({ subjectId: bad }).success, bad).toBe(false);
+  });
+
   it.each([
     [{ status: 'DONE' }],
     [{ priority: 'URGENT' }],
@@ -205,5 +243,32 @@ describe('listActivitiesQuerySchema', () => {
     [{ from: '2026-10-10', to: '2026-10-01' }],
   ])('rejects %j', (query) => {
     expect(listActivitiesQuerySchema.safeParse(query).success).toBe(false);
+  });
+});
+
+describe('activitySchema (the DTO)', () => {
+  const dto = {
+    id: subjectId,
+    subjectId,
+    title: 'T',
+    description: null,
+    type: 'TASK',
+    priority: 'MEDIUM',
+    status: 'PENDING',
+    dueAt: '2026-10-10T19:00:00.000Z',
+    hasTime: true,
+    completedAt: null,
+    createdAt: '2026-10-01T10:00:00.000Z',
+    updatedAt: '2026-10-01T10:00:00.000Z',
+  };
+
+  it('subjectId is a uuid or null (a general activity)', () => {
+    expect(activitySchema.safeParse(dto).success).toBe(true);
+    expect(activitySchema.safeParse({ ...dto, subjectId: null }).success).toBe(true);
+    expect(activitySchema.safeParse({ ...dto, subjectId: 'x' }).success).toBe(false);
+  });
+
+  it('does not expose the period: it is not part of the public contract', () => {
+    expect(Object.keys(activitySchema.shape)).not.toContain('periodId');
   });
 });

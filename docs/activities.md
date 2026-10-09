@@ -3,10 +3,11 @@
 ## Modelo
 
 ```
-User 1──* Activity *──1 Subject *──1 AcademicPeriod
+User 1──* Activity *──1 AcademicPeriod
+                  *──0..1 Subject   (la asignatura es opcional; si existe, es del mismo periodo)
 ```
 
-`Activity`: `id` (UUID v4), `userId`, `subjectId`, `title`, `description?`, `type`, `priority`, `status`, `dueAt` (`timestamptz`, UTC),
+`Activity`: `id` (UUID v4), `userId`, `periodId`, `subjectId?`, `title`, `description?`, `type`, `priority`, `status`, `dueAt` (`timestamptz`, UTC),
 `hasTime`, `completedAt?`, `createdAt`, `updatedAt`.
 
 | Enum       | Valores (UI en español)                                                                                                             | Por defecto                |
@@ -15,14 +16,33 @@ User 1──* Activity *──1 Subject *──1 AcademicPeriod
 | `priority` | LOW Baja · MEDIUM Media · HIGH Alta                                                                                                 | MEDIUM                     |
 | `status`   | PENDING Pendiente · IN_PROGRESS En proceso · COMPLETED Finalizada                                                                   | PENDING (siempre al crear) |
 
-Reglas en la BD: `Activity.subjectId` con `ON DELETE NO ACTION`; `ON DELETE CASCADE` desde `User`;
+Reglas en la BD: `Activity.periodId` y `Activity.subjectId` con `ON DELETE NO ACTION` (la clave de la asignatura es compuesta, ver abajo); `ON DELETE CASCADE` desde `User`;
 `CHECK ((status = 'COMPLETED') = ("completedAt" IS NOT NULL))`.
 
-## `periodId` NO se guarda en `Activity`
+## El periodo SÍ se guarda en `Activity`; la asignatura es opcional (F1)
 
-El periodo se **deriva** de `subject.periodId`. Guardarlo también permitiría que ambos discrepen (una actividad "del periodo A" cuya asignatura es del B).
-Hoy las asignaturas no cambian de periodo, y filtrar por periodo es un join con índice (`Subject(userId, periodId)`), suficiente para el volumen de un estudiante.
-`GET /api/activities?periodId=` filtra a través de la asignatura. Se reconsiderará solo si una consulta futura (p. ej. la carga semanal) demuestra con medidas que hace falta.
+Una actividad **siempre** pertenece a un periodo académico (`periodId NOT NULL`) y puede no tener asignatura (`subjectId` nulo): una **actividad general**, p. ej. un trámite, una cita con el tutor, pagar la matrícula. «Sin asignatura» **no** significa «sin periodo»: la actividad general cuenta en el Radar, el Dashboard, el Progreso (general), la Carga semanal, los recordatorios y el calendario como cualquier otra.
+(Antes de F1 el periodo se deducía de `subject.periodId` y no se guardaba; esa frase ya no es verdad.)
+
+**Invariantes**
+
+1. `periodId` siempre existe.
+2. Si `subjectId` no es nulo, `subject.periodId = activity.periodId`. **Lo garantiza la base de datos**: clave foránea compuesta `Activity(subjectId, periodId) → Subject(id, periodId)` (`MATCH SIMPLE`: no se comprueba mientras `subjectId` es nulo). Requiere un índice único `Subject(id, periodId)`, redundante como clave pero necesario como destino de la FK.
+3. El periodo **no cambia nunca** después de crear la actividad: no hay endpoint, ni campo en el DTO, ni efecto oculto al editar. Cambiar de asignatura dentro del mismo periodo, o quitarla, no mueve el periodo.
+4. El cliente **nunca envía** `periodId` (el esquema `strict` lo rechaza con 400) y la API **no lo expone** (nadie lo lee; exponerlo sugeriría que se puede editar). Lo deriva el servidor al crear: el periodo de la asignatura si hay una, o el **periodo actual** del usuario si no la hay (sin periodo actual: `400 NO_CURRENT_PERIOD`, el mismo código de la Agenda).
+
+**Quién impide que `Activity.userId = A` apunte a un periodo de B** (revisión de F1):
+
+| Capa          | Qué lo impide                                                                                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cliente       | No puede enviar `periodId` (400). Es la barrera principal: el valor nunca viene de fuera.                                                                                                            |
+| Servicio      | El periodo sale de `subjects.findOwned(actor.id, …)` (asignatura propia) o de `periods.findCurrent(actor.id)` (periodo actual **del actor**). No hay ninguna búsqueda sin `userId`.                  |
+| Repositorio   | Toda consulta lleva `userId`; `update` y `delete` usan `where: { id, userId }`; el filtro `periodId` de la lista es una condición más sobre actividades propias (el de otro usuario da lista vacía). |
+| Base de datos | `periodId` existe y es obligatorio; con asignatura, la FK compuesta fuerza el mismo periodo. **No** hay una FK `(periodId, userId) → AcademicPeriod(id, userId)`.                                    |
+
+Decisión: **no** se añadió esa FK de endurecimiento. Haría falta otro índice único en `AcademicPeriod` y repetir el patrón en `Subject` y `ScheduleBlock` (hoy tampoco la tienen: el dueño se valida en el servicio en todo el esquema); protegería un camino que ningún código tiene (nadie recibe un `periodId` del cliente) y rompería la coherencia entre tablas. Si algún día un endpoint acepta un `periodId` del cliente, se reconsidera (y se aplica a las tres tablas a la vez).
+
+**Fronteras futuras (sin implementar)**: una actividad sin asignatura **no participa** en notas, ponderaciones ni programa de curso (no hay relación con una evaluación); **no** entra en la asistencia (que se relaciona con asignaturas y bloques de agenda); y sigue siendo **privada** del usuario: no se asocia a grupos de estudio ni a asignaturas compartidas salvo una función futura explícita.
 
 ## Fecha límite y zona horaria
 
@@ -66,15 +86,27 @@ cada consulta lleva `userId`; una actividad o asignatura ajena responde `404 NOT
 
 ## Endpoints (todos requieren sesión)
 
-| Método y ruta                | Notas                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `GET /api/activities`        | filtros abajo; orden `dueAt` ascendente → `{ activities }`                      |
-| `POST /api/activities`       | `{ subjectId, title, dueDate, dueTime?, type?, priority?, description? }` → 201 |
-| `GET /api/activities/:id`    | 404 si no es tuya                                                               |
-| `PATCH /api/activities/:id`  | cualquier campo, incluido `status` y `subjectId` (otra asignatura propia)       |
-| `DELETE /api/activities/:id` | 204                                                                             |
+| Método y ruta                | Notas                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `GET /api/activities`        | filtros abajo; orden `dueAt` ascendente → `{ activities }`                       |
+| `POST /api/activities`       | `{ subjectId?, title, dueDate, dueTime?, type?, priority?, description? }` → 201 |
+| `GET /api/activities/:id`    | 404 si no es tuya                                                                |
+| `PATCH /api/activities/:id`  | cualquier campo, incluido `status` y `subjectId` (ver abajo)                     |
+| `DELETE /api/activities/:id` | 204                                                                              |
 
-**Filtros** (se combinan con AND): `subjectId`, `periodId` (derivado), `status`, `priority`, `type`, `overdue=true|false`,
+**Crear.** `subjectId` ausente o `null` crea una actividad general, anclada al periodo actual. Con `subjectId`, la asignatura debe ser del usuario (ajena e inexistente dan el mismo 404) y la actividad toma **su** periodo. Crear, el cálculo del periodo y los recordatorios AUTO ocurren en una sola transacción.
+
+**Editar `subjectId`** (ausente y `null` son cosas distintas):
+
+| Se envía                                               | Resultado                                                                                                                                                |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nada                                                   | no cambia ni la asignatura ni el periodo                                                                                                                 |
+| `null`                                                 | se desvincula la asignatura; la actividad pasa a ser general y **conserva su periodo** y sus recordatorios                                               |
+| un uuid de una asignatura propia del **mismo periodo** | se asigna (sirve para «sin asignatura → asignatura» y para «A → B»)                                                                                      |
+| un uuid propio de **otro periodo**                     | `400 VALIDATION_ERROR` en `subjectId`: «La asignatura debe pertenecer al mismo periodo.» (el mismo mecanismo que la Agenda); la FK compuesta lo respalda |
+| un uuid ajeno o inexistente                            | `404 NOT_FOUND` idéntico                                                                                                                                 |
+
+**Filtros** (se combinan con AND): `subjectId` (un uuid, o `none` para las actividades generales; cualquier otro valor es 400, sin otros comodines), `periodId` (el periodo guardado en la actividad), `status`, `priority`, `type`, `overdue=true|false`,
 `from` y `to` (días locales del usuario, `YYYY-MM-DD`, ambos inclusivos). Valores inválidos → `400 VALIDATION_ERROR`.
 Límites: título 1–150, descripción ≤ 2000.
 
@@ -82,10 +114,12 @@ Límites: título 1–150, descripción ≤ 2000.
 
 `GET /api/activities/:id/calendar.ics` (sesión; ajena o inexistente = el mismo 404) descarga la actividad como `.ics` para abrirla con la aplicación de calendario del estudiante; es una instantánea de solo lectura, también para actividades completadas. Detalle, representación del tiempo y límites: [calendar-export.md](calendar-export.md).
 
-## Borrar una asignatura
+## Borrar una asignatura o un periodo
 
 `DELETE /api/subjects/:id` con actividades → `409 SUBJECT_NOT_EMPTY` ("La asignatura tiene actividades o bloques de agenda asociados.", desde la Fase 6: también cuentan los bloques de la agenda).
-Se decide en `subjectService.remove`; la FK (`NO ACTION`) lo refuerza ante una carrera. No hay cascadas silenciosas. Para "mover" una actividad: `PATCH { subjectId }`.
+Se decide en `subjectService.remove`; la FK (`NO ACTION`) lo refuerza ante una carrera. No hay cascadas silenciosas **ni desvinculación automática**: con F1 una actividad puede quedar sin asignatura, pero solo si el estudiante la desvincula (`PATCH { subjectId: null }`); entonces la asignatura sí se puede borrar y la actividad sigue en su periodo. Para "mover" una actividad a otra asignatura del mismo periodo: `PATCH { subjectId }`.
+
+`DELETE /api/periods/:id` cuenta asignaturas, bloques **y actividades** del periodo: una actividad general (sin asignatura) también lo impide (`409 PERIOD_NOT_EMPTY`). La FK (`NO ACTION`) es solo la red de seguridad ante una carrera; el 409 sale de la comprobación explícita, nunca de un 500.
 
 ## UX (`/activities`)
 

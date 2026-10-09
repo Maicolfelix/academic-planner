@@ -1,5 +1,6 @@
 import {
   activityToIcs,
+  NO_SUBJECT_FILTER,
   dueFromLocal,
   localDayBounds,
   resolveCompletedAt,
@@ -9,13 +10,14 @@ import {
   type UpdateActivityInput,
 } from '@planner/core';
 import type { RunInTransaction } from '../db/prisma.js';
-import { notFound } from '../errors/AppError.js';
+import { AppError, notFound, validationError } from '../errors/AppError.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { toActivityDto } from '../mappers.js';
 import {
   createActivityRepository,
   type ActivityRepository,
 } from '../repositories/activityRepository.js';
+import type { PeriodLookup } from '../repositories/periodRepository.js';
 import { createReminderRepository } from '../repositories/reminderRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
 import { createRemindersFor, syncRemindersAfterChange } from './reminderSync.js';
@@ -28,6 +30,13 @@ export interface Actor {
 
 const activityNotFound = () => notFound('Actividad no encontrada.');
 const subjectNotFound = () => notFound('Asignatura no encontrada.');
+/** Same code the Agenda uses for the same situation (no current period to anchor the record to). */
+const noCurrentPeriod = () =>
+  new AppError(
+    400,
+    'NO_CURRENT_PERIOD',
+    'Configura tu periodo académico antes de crear actividades.',
+  );
 
 const isPrismaError = (err: unknown, code: string) =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
@@ -35,6 +44,8 @@ const isPrismaError = (err: unknown, code: string) =>
 export function createActivityService(
   activities: ActivityRepository,
   subjects: SubjectRepository,
+  /** Only the current-period lookup: a general activity (no subject) is anchored to the user's current period. */
+  periods: Pick<PeriodLookup, 'findCurrent'>,
   /** Injected so tests (and future jobs) control "now"; production passes the real clock. */
   clock: () => Date,
   /** Writes that also touch reminders run in ONE transaction: both change, or neither does. */
@@ -43,7 +54,8 @@ export function createActivityService(
   return {
     async list(actor: Actor, query: ListActivitiesQuery) {
       const rows = await activities.list(actor.id, {
-        subjectId: query.subjectId,
+        // `none` selects the general activities (no subject); anything else is a subject id.
+        subjectId: query.subjectId === NO_SUBJECT_FILTER ? null : query.subjectId,
         periodId: query.periodId,
         status: query.status,
         priority: query.priority,
@@ -70,7 +82,10 @@ export function createActivityService(
     async calendarExport(actor: Actor, id: string) {
       const activity = await activities.findOwned(actor.id, id);
       if (!activity) throw activityNotFound();
-      const subject = await subjects.findOwned(actor.id, activity.subjectId);
+      // A general activity has no subject to look up: the calendar entry is just its title.
+      const subject = activity.subjectId
+        ? await subjects.findOwned(actor.id, activity.subjectId)
+        : null;
       return activityToIcs({
         activity: {
           id: activity.id,
@@ -87,12 +102,23 @@ export function createActivityService(
     },
 
     /**
-     * The subject must belong to the authenticated user: one that does not exist and one that
-     * belongs to someone else produce the very same 404. A new activity is always PENDING and starts
-     * with the automatic reminders for its type — created in the same transaction as the activity.
+     * The client never sends the period: it is derived here. With a subject the activity takes the subject's period
+     * (which must belong to the authenticated user: one that does not exist and one that belongs to someone else
+     * produce the very same 404); without one it takes the user's CURRENT period. A new activity is always PENDING and
+     * starts with the automatic reminders for its type — created in the same transaction as the activity.
      */
     async create(actor: Actor, input: CreateActivityInput) {
-      if (!(await subjects.findOwned(actor.id, input.subjectId))) throw subjectNotFound();
+      const subjectId = input.subjectId ?? null;
+      let periodId: string;
+      if (subjectId) {
+        const subject = await subjects.findOwned(actor.id, subjectId);
+        if (!subject) throw subjectNotFound();
+        periodId = subject.periodId;
+      } else {
+        const period = await periods.findCurrent(actor.id);
+        if (!period) throw noCurrentPeriod();
+        periodId = period.id;
+      }
       const { dueAt, hasTime } = dueFromLocal(
         { date: input.dueDate, time: input.dueTime },
         actor.timezone,
@@ -101,7 +127,8 @@ export function createActivityService(
         const created = await runInTransaction(async (tx) => {
           const row = await createActivityRepository(tx).create({
             userId: actor.id,
-            subjectId: input.subjectId,
+            periodId,
+            subjectId,
             title: input.title,
             description: input.description ?? null,
             type: input.type,
@@ -114,8 +141,8 @@ export function createActivityService(
         });
         return toActivityDto(created);
       } catch (err) {
-        // The subject was deleted between the check and the insert: the foreign key says no.
-        if (isPrismaError(err, 'P2003')) throw subjectNotFound();
+        // The subject (or the period) was deleted between the check and the insert: the foreign key says no.
+        if (isPrismaError(err, 'P2003')) throw subjectId ? subjectNotFound() : noCurrentPeriod();
         throw err;
       }
     },
@@ -131,9 +158,17 @@ export function createActivityService(
           const existing = await txActivities.findOwned(actor.id, id);
           if (!existing) throw activityNotFound();
 
+          // Absent: untouched. null: detach (the period stays). A uuid: it must be the user's own AND from the
+          // activity's period — an activity never changes period (the composite foreign key backs this up).
           const moving = input.subjectId !== undefined && input.subjectId !== existing.subjectId;
-          if (moving && !(await subjects.findOwned(actor.id, input.subjectId!)))
-            throw subjectNotFound();
+          if (moving && input.subjectId) {
+            const subject = await subjects.findOwned(actor.id, input.subjectId);
+            if (!subject) throw subjectNotFound();
+            if (subject.periodId !== existing.periodId)
+              throw validationError({
+                subjectId: ['La asignatura debe pertenecer al mismo periodo.'],
+              });
+          }
 
           // Sending only the date keeps the stored time (and the other way round); dueTime null drops it.
           let due: { dueAt: Date; hasTime: boolean } | undefined;

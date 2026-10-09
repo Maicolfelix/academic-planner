@@ -91,6 +91,8 @@ export function resolveCompletedAt(
 
 export const ACTIVITY_TITLE_MAX = 150;
 export const ACTIVITY_DESCRIPTION_MAX = 2000;
+/** The `subjectId` filter value that selects the general activities (the ones with no subject). */
+export const NO_SUBJECT_FILTER = 'none';
 
 export const dueTimeSchema = z
   .string()
@@ -128,10 +130,12 @@ const uuid = (message: string) => z.uuid(message);
 
 /**
  * The owner is never part of the input (session only) and neither is the status: a new activity
- * is always PENDING. `strict` rejects any unknown key such as a client-sent userId.
+ * is always PENDING. `strict` rejects any unknown key such as a client-sent userId or periodId: the period is
+ * derived by the server (the subject's period, or the current one for a general activity).
+ * `subjectId` omitted or null creates a general activity (no subject).
  */
 export const createActivitySchema = z.strictObject({
-  subjectId: uuid('Elige una asignatura.'),
+  subjectId: uuid('Elige una asignatura.').nullish(),
   title,
   dueDate: dateOnlySchema,
   dueTime: optionalTime,
@@ -147,7 +151,8 @@ export const createActivitySchema = z.strictObject({
  * the deadline untouched; sending only one keeps the stored value of the other.
  */
 export const updateActivitySchema = z.strictObject({
-  subjectId: uuid('Elige una asignatura.').optional(),
+  /** Omitted: unchanged. `null`: detach the subject (the activity becomes general). A uuid: assign that subject. */
+  subjectId: uuid('Elige una asignatura.').nullable().optional(),
   title: title.optional(),
   dueDate: dateOnlySchema.optional(),
   dueTime: optionalTime,
@@ -166,8 +171,8 @@ const optionalDay = z.string().refine(isRealDateOnly, 'Ingresa una fecha válida
 /** Query string of GET /api/activities. All filters are optional and combine with AND. */
 export const listActivitiesQuerySchema = z
   .object({
-    subjectId: uuid('Asignatura inválida.').optional(),
-    /** Derived through the subject: activities do not store their period. */
+    /** A subject id, or `none` for the general activities (no subject). */
+    subjectId: z.union([z.literal(NO_SUBJECT_FILTER), uuid('Asignatura inválida.')]).optional(),
     periodId: uuid('Periodo inválido.').optional(),
     status: enumField(ACTIVITY_STATUSES, 'Estado inválido.').optional(),
     priority: enumField(ACTIVITY_PRIORITIES, 'Prioridad inválida.').optional(),
@@ -186,9 +191,10 @@ export const listActivitiesQuerySchema = z
 
 // ───────────────────────── Response schemas ─────────────────────────
 
+/** The period is deliberately not part of the public contract: the client never sends it and nothing reads it. */
 export const activitySchema = z.object({
   id: z.uuid(),
-  subjectId: z.uuid(),
+  subjectId: z.uuid().nullable(),
   title: z.string(),
   description: z.string().nullable(),
   type: z.enum(ACTIVITY_TYPES),

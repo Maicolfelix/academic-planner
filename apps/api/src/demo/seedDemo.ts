@@ -138,7 +138,13 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
     subjectRepo,
     clock,
   );
-  const activities = createActivityService(activityRepo, subjectRepo, clock, runInTransaction);
+  const activities = createActivityService(
+    activityRepo,
+    subjectRepo,
+    periodRepo,
+    clock,
+    runInTransaction,
+  );
   const reminders = createReminderService(
     createReminderRepository(prisma),
     activityRepo,

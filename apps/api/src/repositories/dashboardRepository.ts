@@ -1,9 +1,10 @@
 import type { ActivityStatus } from '@planner/core';
 import type { PrismaClient } from '../db/prisma.js';
 
-// Always the same scope: this user's activities whose subject belongs to the given period.
-const inPeriod = (userId: string, periodId: string) => ({ userId, subject: { periodId } });
+// Always the same scope: this user's activities of the given period (stored on the activity: no join with the subject).
+const inPeriod = (userId: string, periodId: string) => ({ userId, periodId });
 const open = { status: { not: 'COMPLETED' } } as const;
+// The subject is optional: a general activity comes back with `subject: null`.
 const withSubject = { subject: { select: { id: true, name: true, color: true } } } as const;
 // Soonest deadline first; createdAt keeps equal deadlines in a stable order.
 const byDeadline = [{ dueAt: 'asc' }, { createdAt: 'asc' }] as const;

@@ -373,10 +373,11 @@ describe('confirming goes through the normal Activity API, so everything downstr
     });
     expect(first.body.activity.dueAt).toBe('2026-10-06T15:00:00.000Z'); // Tuesday 10:00 in Bogotá
 
-    // The incomplete one is refused by the Activity API until it is completed...
-    const rejected = await confirm(agent, workshop);
+    // The Activity API still refuses a proposal that is incomplete (no date)...
+    const rejected = await confirm(agent, workshop, { dueDate: null });
     expect(rejected.status).toBe(400);
-    // ...and created once the student picks the subject.
+    // ...and creates it once complete (here with the subject the student picked; without one it would be a general
+    // activity, which F1-2 exposes in this screen).
     const second = await confirm(agent, workshop, { subjectId: subject.id });
     expect(second.status, JSON.stringify(second.body)).toBe(201);
     expect(second.body.activity).toMatchObject({

@@ -82,6 +82,9 @@ export function createPeriodRepository(prisma: PrismaClient) {
 
     countScheduleBlocks: (periodId: string) => prisma.scheduleBlock.count({ where: { periodId } }),
 
+    /** Every activity of the period, with or without a subject (a general activity has no subject to count it by). */
+    countActivities: (periodId: string) => prisma.activity.count({ where: { periodId } }),
+
     delete: async (userId: string, id: string) =>
       (await prisma.academicPeriod.deleteMany({ where: { id, userId } })).count > 0,
   };

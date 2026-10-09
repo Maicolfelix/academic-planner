@@ -166,7 +166,9 @@ export function Suggestion({
         <p id="attention-activity" className="text-2xl leading-tight font-semibold break-words">
           {activity.title}
         </p>
-        <p className="mt-0.5 text-primary-foreground/80 break-words">{activity.subject.name}</p>
+        {activity.subject && (
+          <p className="mt-0.5 text-primary-foreground/80 break-words">{activity.subject.name}</p>
+        )}
       </div>
 
       <p className={`animate-rise text-lg ${STAGE[2]}`}>

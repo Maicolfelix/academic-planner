@@ -318,6 +318,7 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
       prisma.activity.createMany({
         data: Array.from({ length: n }, (_, i) => ({
           userId: user.id,
+          periodId: period.id,
           subjectId,
           title: `bulk ${i}`,
           type: 'TASK' as const,

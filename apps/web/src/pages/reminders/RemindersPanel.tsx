@@ -39,7 +39,7 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
                 <span aria-hidden="true">🔔 </span>
                 {reminderMessage(r.activity, now, timeZone)}
               </p>
-              <p className="text-sm break-words text-slate-700">{r.subject.name}</p>
+              {r.subject && <p className="text-sm break-words text-slate-700">{r.subject.name}</p>}
             </div>
             <button
               type="button"

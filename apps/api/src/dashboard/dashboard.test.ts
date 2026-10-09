@@ -479,7 +479,7 @@ describe('efficiency: a constant number of queries, no N+1', () => {
   }
 
   it('uses the same number of queries with 3 activities as with 150', async () => {
-    const { agent, subject } = await setupUser(loggedApp, 'perf@example.com');
+    const { agent, subject, period } = await setupUser(loggedApp, 'perf@example.com');
     for (let i = 0; i < 3; i++)
       await mk(agent, subject.id, { title: `s${i}`, dueDate: '2099-01-01' });
     const small = await countQueries(agent);
@@ -492,6 +492,7 @@ describe('efficiency: a constant number of queries, no N+1', () => {
         const status = statuses[i % 3]!;
         return {
           userId: user.id,
+          periodId: period.id,
           subjectId: subject.id,
           title: `bulk ${i}`,
           status,

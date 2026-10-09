@@ -151,7 +151,8 @@ export function radarExplanation(
 const count = z.number().int().nonnegative();
 
 export const radarActivitySchema = activitySchema.extend({
-  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }),
+  /** null for a general activity (no subject). */
+  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }).nullable(),
 });
 
 const perStatus = <T extends z.ZodType>(shape: T) =>

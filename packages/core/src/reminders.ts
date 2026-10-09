@@ -204,7 +204,8 @@ export const dueReminderSchema = reminderSchema.extend({
     dueAt: z.iso.datetime(),
     hasTime: z.boolean(),
   }),
-  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }),
+  /** null for a general activity (no subject). */
+  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }).nullable(),
 });
 
 export const reminderResponseSchema = z.object({ reminder: reminderSchema });

@@ -567,6 +567,7 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
       await prisma.activity.createMany({
         data: Array.from({ length: 25 }, (_, i) => ({
           userId: user.id,
+          periodId: period.id,
           subjectId,
           title: `bulk ${i}`,
           type: 'TASK' as const,
@@ -605,11 +606,12 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
   });
 
   it('the number of queries does not depend on the data (empty vs full week)', async () => {
-    const { agent, user, subject } = await setupUser(loggedApp, 'perf2@example.com');
+    const { agent, user, subject, period } = await setupUser(loggedApp, 'perf2@example.com');
     const empty = await measure(agent);
     await prisma.activity.createMany({
       data: Array.from({ length: 200 }, (_, i) => ({
         userId: user.id,
+        periodId: period.id,
         subjectId: subject.id,
         title: `x${i}`,
         type: 'TASK' as const,

@@ -103,6 +103,44 @@ describe('buildProgress', () => {
     });
   });
 
+  describe('general activities (no subject)', () => {
+    const general = (c: ReturnType<typeof counts>, overdue = 0) => ({ counts: c, overdue });
+
+    it('weigh in the general progress exactly once, and in no subject row', () => {
+      const subjectsIn = [
+        subject('b', 'Bases de Datos', counts(5, 0, 1), 2), // 6 activities
+        subject('r', 'Redes', counts(1, 0, 3), 0), // 4 activities
+      ];
+      const { general: total, subjects } = buildProgress(subjectsIn, general(counts(2, 1, 3), 1));
+      // 10 with a subject + 6 general
+      expect(total).toMatchObject({
+        total: 16,
+        pending: 8,
+        inProgress: 1,
+        completed: 7,
+        overdue: 3,
+        percentage: 44,
+      });
+      // Only the real subjects have a row, and their rows do not include the general ones.
+      expect(subjects.map((s) => [s.name, s.total])).toEqual([
+        ['Bases de Datos', 6],
+        ['Redes', 4],
+      ]);
+      expect(subjects.reduce((n, s) => n + s.total, 0)).toBeLessThan(total.total);
+    });
+
+    it('with no subjects at all the general progress is still the general activities', () => {
+      const { general: total, subjects } = buildProgress([], general(counts(1, 0, 1)));
+      expect(subjects).toEqual([]);
+      expect(total).toMatchObject({ total: 2, completed: 1, percentage: 50 });
+    });
+
+    it('without general activities (the default) nothing changes', () => {
+      const input = [subject('r', 'Redes', counts(1, 0, 3), 1)];
+      expect(buildProgress(input, general(counts(0, 0, 0)))).toEqual(buildProgress(input));
+    });
+  });
+
   it('keeps a subject without activities in the list, with total 0', () => {
     const { subjects } = buildProgress([subject('a', 'Sin nada', counts(0, 0, 0))]);
     expect(subjects).toHaveLength(1);

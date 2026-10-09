@@ -151,7 +151,10 @@ describe('the dataset', () => {
     expect(subjects.every((s) => s.periodId === period.id)).toBe(true);
     const ids = new Set(subjects.map((s) => s.id));
     const activities = await prisma.activity.findMany({ where: { userId: user.id } });
-    expect(activities.every((a) => ids.has(a.subjectId))).toBe(true);
+    // The demo has no general activities yet (F1-2): every one has a subject, and the period stored on the
+    // activity is the subject's (the database also guarantees it).
+    expect(activities.every((a) => a.subjectId !== null && ids.has(a.subjectId))).toBe(true);
+    expect(activities.every((a) => a.periodId === period.id)).toBe(true);
     const blocks = await prisma.scheduleBlock.findMany({ where: { userId: user.id } });
     expect(
       blocks.every((b) => b.periodId === period.id && b.subjectId && ids.has(b.subjectId)),

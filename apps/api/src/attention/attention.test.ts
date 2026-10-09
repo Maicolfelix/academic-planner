@@ -376,9 +376,11 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
 
   async function seedMany(userId: string, subjectId: string, n: number) {
     const priorities = ['LOW', 'MEDIUM', 'HIGH'] as const;
+    const { periodId } = await prisma.subject.findUniqueOrThrow({ where: { id: subjectId } });
     await prisma.activity.createMany({
       data: Array.from({ length: n }, (_, i) => ({
         userId,
+        periodId,
         subjectId,
         title: `bulk ${i}`,
         type: 'TASK' as const,
