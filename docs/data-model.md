@@ -14,24 +14,26 @@ erDiagram
   User ||--o{ Reminder : posee
   AcademicPeriod ||--o{ Subject : contiene
   AcademicPeriod ||--o{ ScheduleBlock : contiene
-  Subject ||--o{ Activity : agrupa
+  AcademicPeriod ||--o{ Activity : contiene
+  Subject |o--o{ Activity : "agrupa (opcional)"
   Subject |o--o{ ScheduleBlock : "clase de"
   Activity ||--o{ Reminder : genera
 ```
 
 ## Relaciones
 
-| Relación                                                                      | Cardinalidad | Borrado                                                                                      |
-| ----------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| `User` → `Session`                                                            | 1:N          | En cascada con el usuario                                                                    |
-| `User` → `AcademicPeriod`, `Subject`, `Activity`, `ScheduleBlock`, `Reminder` | 1:N          | En cascada con el usuario (borrar un usuario elimina todo lo suyo)                           |
-| `AcademicPeriod` → `Subject`                                                  | 1:N          | **No en cascada** (`NO ACTION`): un periodo con asignaturas no se puede borrar (409)         |
-| `AcademicPeriod` → `ScheduleBlock`                                            | 1:N          | **No en cascada**: un periodo con bloques no se puede borrar                                 |
-| `Subject` → `Activity`                                                        | 1:N          | **No en cascada**: una asignatura con actividades o bloques no se puede borrar (409)         |
-| `Subject` → `ScheduleBlock`                                                   | 1:N opcional | **No en cascada**; `subjectId` es opcional (una sesión de estudio puede no tener asignatura) |
-| `Activity` → `Reminder`                                                       | 1:N          | **En cascada**: borrar una actividad borra sus recordatorios                                 |
+| Relación                                                                      | Cardinalidad | Borrado                                                                                                       |
+| ----------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `User` → `Session`                                                            | 1:N          | En cascada con el usuario                                                                                     |
+| `User` → `AcademicPeriod`, `Subject`, `Activity`, `ScheduleBlock`, `Reminder` | 1:N          | En cascada con el usuario (borrar un usuario elimina todo lo suyo)                                            |
+| `AcademicPeriod` → `Subject`                                                  | 1:N          | **No en cascada** (`NO ACTION`): un periodo con asignaturas no se puede borrar (409)                          |
+| `AcademicPeriod` → `ScheduleBlock`                                            | 1:N          | **No en cascada**: un periodo con bloques no se puede borrar                                                  |
+| `AcademicPeriod` → `Activity`                                                 | 1:N          | **No en cascada**: un periodo con actividades (también generales) no se puede borrar (409)                    |
+| `Subject` → `Activity`                                                        | 1:N opcional | **No en cascada**: una asignatura con actividades o bloques no se puede borrar (409); `subjectId` es opcional |
+| `Subject` → `ScheduleBlock`                                                   | 1:N opcional | **No en cascada**; `subjectId` es opcional (una sesión de estudio puede no tener asignatura)                  |
+| `Activity` → `Reminder`                                                       | 1:N          | **En cascada**: borrar una actividad borra sus recordatorios                                                  |
 
-Una `Activity` **no guarda su periodo**: se deduce por `subject.periodId`, para que ambos nunca puedan discrepar.
+Una `Activity` **guarda su periodo** (`periodId`, obligatorio, inmutable) y su asignatura es **opcional** (F1). Si hay asignatura, la clave foránea compuesta `(subjectId, periodId) → Subject(id, periodId)` hace que la **propia base de datos** rechace una asignatura de otro periodo. Detalle y decisiones: [activities.md](activities.md#el-periodo-sí-se-guarda-en-activity-la-asignatura-es-opcional-f1).
 
 ## Entidades
 
@@ -55,6 +57,8 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 | Campo         | Significado                                                                                                                                                                                     |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `periodId`    | Periodo al que pertenece. **Obligatorio e inmutable**; lo deriva el servidor (el de la asignatura, o el periodo actual si no hay asignatura). No forma parte del DTO público                    |
+| `subjectId`   | Asignatura **opcional**. Nulo = actividad general (sin asignatura). Con valor, su periodo es el mismo `periodId` (clave foránea compuesta)                                                      |
 | `type`        | `TASK`, `EXAM`, `QUIZ`, `PROJECT`, `PRESENTATION`, `WORKSHOP`, `READING`, `OTHER` (por defecto `TASK`)                                                                                          |
 | `priority`    | `LOW`, `MEDIUM`, `HIGH` (por defecto `MEDIUM`)                                                                                                                                                  |
 | `status`      | `PENDING`, `IN_PROGRESS`, `COMPLETED` (por defecto `PENDING`)                                                                                                                                   |

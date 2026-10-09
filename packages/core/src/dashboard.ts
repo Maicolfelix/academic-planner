@@ -71,7 +71,8 @@ export function dueRelativeLabel(
 // ───────────────────────── Response ─────────────────────────
 
 export const dashboardActivitySchema = activitySchema.extend({
-  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }),
+  /** null for a general activity (no subject). */
+  subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }).nullable(),
 });
 
 const count = z.number().int().nonnegative();

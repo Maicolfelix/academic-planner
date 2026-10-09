@@ -114,7 +114,8 @@ async function integrity(email: string) {
     });
     const periods = await prisma.academicPeriod.findMany({ where: { userId: user.id } });
     return {
-      foreignSubject: activities.filter((a) => a.subject.userId !== user.id).length,
+      foreignSubject: activities.filter((a) => a.subject !== null && a.subject.userId !== user.id)
+        .length,
       incoherentCompletion: activities.filter(
         (a) => (a.status === 'COMPLETED') !== (a.completedAt !== null),
       ).length,

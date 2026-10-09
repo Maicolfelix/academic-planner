@@ -660,6 +660,14 @@ describe('possible duplicates', () => {
     expect(marked.warnings[0]!.message).toBe('Ya existe una actividad similar.');
   });
 
+  it('a general activity (no subject) is never taken for a duplicate: a duplicate is judged by subject', () => {
+    expect(mark(proposal(), existing({ subjectId: null })).duplicateOf).toBeNull();
+    // ...and a proposal with no subject is not compared against anything.
+    expect(
+      mark(proposal({ subjectId: null }), existing({ subjectId: null })).duplicateOf,
+    ).toBeNull();
+  });
+
   it('only warns: the proposal keeps everything else', () => {
     const marked = mark(proposal(), existing());
     expect({ ...marked, duplicateOf: null, warnings: [] }).toEqual(proposal());

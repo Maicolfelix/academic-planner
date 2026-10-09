@@ -406,7 +406,8 @@ describe('status and completedAt (rule decided by the backend)', () => {
     const columns = await prisma.$queryRaw<{ column_name: string }[]>`
       SELECT column_name FROM information_schema.columns WHERE table_name = 'Activity'`;
     expect(columns.map((c) => c.column_name)).not.toContain('isOverdue');
-    expect(columns.map((c) => c.column_name)).not.toContain('periodId');
+    // The period, on the contrary, IS stored (F1): an activity always belongs to one, with or without a subject.
+    expect(columns.map((c) => c.column_name)).toContain('periodId');
   });
 });
 

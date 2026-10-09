@@ -12,7 +12,8 @@ const STATUS_KEY = {
 } as const;
 
 /**
- * Registered-activity progress of the authenticated user's CURRENT period, in general and per subject.
+ * Registered-activity progress of the authenticated user's CURRENT period, in general (every activity, with or without a
+ * subject) and per subject (only the ones that have one).
  * 4 queries (current period, then subjects + counts by status + overdue counts in parallel), whatever the data.
  * The arithmetic is core's `buildProgress`; nothing is stored.
  */
@@ -36,13 +37,23 @@ export function createProgressService(
         insights.overdueCounts(actor.id, period.id, now),
       ]);
 
+      // The general activities (no subject) have no row of their own: they only weigh in the general progress.
       const counts = new Map<string, StatusCounts>();
+      const general = { counts: empty(), overdue: 0 };
       for (const row of statusRows) {
+        if (row.subjectId === null) {
+          general.counts[STATUS_KEY[row.status]] += row._count._all;
+          continue;
+        }
         const c = counts.get(row.subjectId) ?? empty();
         c[STATUS_KEY[row.status]] += row._count._all;
         counts.set(row.subjectId, c);
       }
-      const overdue = new Map(overdueRows.map((r) => [r.subjectId, r._count._all]));
+      const overdue = new Map<string, number>();
+      for (const row of overdueRows) {
+        if (row.subjectId === null) general.overdue += row._count._all;
+        else overdue.set(row.subjectId, row._count._all);
+      }
 
       return {
         generatedAt,
@@ -53,6 +64,7 @@ export function createProgressService(
             counts: counts.get(s.id) ?? empty(),
             overdue: overdue.get(s.id) ?? 0,
           })),
+          general,
         ),
       };
     },

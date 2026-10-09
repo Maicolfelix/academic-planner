@@ -39,7 +39,7 @@ export function ActivityList({
         <ActivityCard
           key={activity.id}
           activity={activity}
-          subject={subjectById.get(activity.subjectId)}
+          subject={activity.subjectId ? subjectById.get(activity.subjectId) : undefined}
           timeZone={timeZone}
           now={now}
           statusPending={pendingStatusId === activity.id}

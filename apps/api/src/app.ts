@@ -105,7 +105,13 @@ export function createApp(deps: AppDeps): Express {
   const periodRepository = createPeriodRepository(prisma);
   const activityRepository = createActivityRepository(prisma);
   const activityController = createActivityController(
-    createActivityService(activityRepository, subjectRepository, clock, runInTransaction),
+    createActivityService(
+      activityRepository,
+      subjectRepository,
+      periodRepository,
+      clock,
+      runInTransaction,
+    ),
   );
   const reminderController = createReminderController(
     createReminderService(

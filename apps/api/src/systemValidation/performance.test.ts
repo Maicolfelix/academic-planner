@@ -54,6 +54,7 @@ describe('a heavy account', () => {
         const status = statuses[i % 3]!;
         return {
           userId: u.user.id,
+          periodId: u.period.id,
           subjectId: subjects[i % subjects.length]!,
           title: 'Actividad ' + i,
           type: (['TASK', 'EXAM', 'QUIZ', 'PROJECT', 'WORKSHOP'] as const)[i % 5]!,

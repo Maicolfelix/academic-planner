@@ -61,4 +61,4 @@ Las reglas son auditables, reproducibles y sin costo ni envío de datos; el estu
 - Solo español; fraseos muy libres pueden no reconocerse (se verá "No encontramos actividades claras").
 - Fechas sin año se resuelven con la próxima ocurrencia y avisan si caen fuera del periodo.
 - Una asignatura mencionada en una oración no se hereda a la siguiente.
-- Los duplicados no se detectan para propuestas sin asignatura o sin fecha.
+- Los duplicados no se detectan para propuestas sin asignatura o sin fecha, ni se compara contra actividades generales (sin asignatura): un duplicado se juzga por asignatura.

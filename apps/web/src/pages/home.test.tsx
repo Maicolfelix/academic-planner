@@ -5,6 +5,7 @@ import { StaticRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { RADAR_LABELS, RADAR_STATUSES } from '@planner/core';
 import { Suggestion } from './attention/AttentionCard';
+import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
@@ -77,6 +78,59 @@ describe('the hero: "¿Qué hago ahora?"', () => {
 
   it('its link has a white focus ring: the page ring would vanish on the deep surface', () => {
     expect(hero('IMMEDIATE')).toContain('focus-visible:outline-white');
+  });
+});
+
+describe('a general activity (F1: no subject) does not break what the Home shows', () => {
+  const general = () => activity({ subjectId: null, subject: null });
+
+  it('the hero keeps title, deadline and reasons, and simply has no subject line', () => {
+    const out = html(
+      <Suggestion
+        item={{
+          activity: general(),
+          radarStatus: 'IMMEDIATE',
+          reasons: ['Vence en menos de 24 horas.'],
+        }}
+        timeZone={TZ}
+        now={NOW}
+      />,
+    );
+    expect(out).toContain('Parcial de Redes');
+    expect(out).toContain('<li>Vence en menos de 24 horas.</li>');
+    expect(out).not.toContain('Redes de Computadores');
+    expect(out).not.toContain('null');
+    expect(out).not.toContain('undefined');
+  });
+
+  it('the next delivery (card and quiet line) reads without a hole where the subject was', () => {
+    for (const quiet of [false, true]) {
+      const out = html(
+        <NextDueCard activity={general() as never} timeZone={TZ} now={NOW} quiet={quiet} />,
+      );
+      expect(out).toContain('Parcial de Redes');
+      expect(out).toMatch(/Vence/);
+      expect(out).not.toMatch(/·\s*·/);
+      expect(out).not.toContain('null');
+    }
+  });
+
+  it('a due list row has a neutral mark and no subject name, and keeps the deadline', () => {
+    const out = html(
+      <DueSection title="Hoy" items={[general() as never]} timeZone={TZ} now={NOW} />,
+    );
+    expect(out).toContain('Parcial de Redes');
+    expect(out).toContain('background-color:#64748B');
+    expect(out).toMatch(/Vence/);
+    expect(out).not.toContain('null');
+  });
+
+  it('with a subject nothing changed: name and its color are still there', () => {
+    const out = html(
+      <DueSection title="Hoy" items={[activity() as never]} timeZone={TZ} now={NOW} />,
+    );
+    expect(out).toContain('Redes de Computadores');
+    expect(out).toContain('background-color:#3B82F6');
   });
 });
 

@@ -128,7 +128,7 @@ const dueWhere = (userId: string, periodId: string, now: Date) =>
     status: 'PENDING',
     remindAt: { lte: now },
     // A finished activity never shows reminders, even if an inconsistent row existed.
-    activity: { status: { not: 'COMPLETED' }, subject: { periodId } },
+    activity: { status: { not: 'COMPLETED' }, periodId },
   }) as const;
 
 export type ReminderRepository = ReturnType<typeof createReminderRepository>;

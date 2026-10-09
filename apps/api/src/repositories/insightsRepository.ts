@@ -1,7 +1,7 @@
 import type { Db } from '../db/prisma.js';
 
-// Always the same scope: this user's activities whose subject belongs to the given period.
-const inPeriod = (userId: string, periodId: string) => ({ userId, subject: { periodId } });
+// Always the same scope: this user's activities of the given period (stored on the activity: no join with the subject).
+const inPeriod = (userId: string, periodId: string) => ({ userId, periodId });
 
 /**
  * Read-only queries behind Progress and Weekly workload. Each is one round trip and none depends on how many
@@ -15,7 +15,7 @@ export function createInsightsRepository(prisma: Db) {
         select: { id: true, name: true, color: true },
       }),
 
-    /** One GROUP BY (subject, status) instead of one COUNT per subject and status. */
+    /** One GROUP BY (subject, status) instead of one COUNT per subject and status. `subjectId: null` is the general activities. */
     statusCounts: (userId: string, periodId: string) =>
       prisma.activity.groupBy({
         by: ['subjectId', 'status'],

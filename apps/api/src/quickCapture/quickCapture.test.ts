@@ -313,11 +313,11 @@ describe('confirming goes through the normal Activity API, so everything downstr
     expect(capture.subjectId).not.toBe(bases.id);
   });
 
-  it('the Activity API still decides: an incomplete proposal cannot be created', async () => {
+  it('the Activity API still decides: a proposal without a date cannot be created', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     const { capture } = await parse(agent, 'parcial mañana');
     expect(capture.subjectId).toBeNull();
-    const rejected = await confirm(agent, capture);
+    const rejected = await confirm(agent, { ...capture, dueDate: null });
     expect(rejected.status).toBe(400);
     expect(await prisma.activity.count()).toBe(0);
   });

@@ -22,9 +22,11 @@ Reglas heredadas: sin actividades es 0 %; nunca exagera (100 % solo si **todo** 
 
 El progreso general de `/api/progress` y el del Dashboard coinciden (un test lo comprueba).
 
+**Actividades generales (F1, sin asignatura).** Cuentan en el progreso **general** (total, completadas, vencidas…) **exactamente una vez**, y **no** crean una fila de asignatura: no existe una fila artificial «Sin asignatura». Por eso la suma de las filas por asignatura puede ser **menor** que el total general. Es intencional: una actividad general no pertenece a ninguna asignatura (y no participará en notas). `buildProgress(subjects, withoutSubject)` recibe sus cuentas aparte.
+
 ### Por asignatura
 
-Para cada asignatura del periodo actual: `total`, `completed`, `pending`, `inProgress`, `overdue` y `percentage`, con la misma fórmula.
+Para cada asignatura del periodo actual (solo las actividades que tienen esa asignatura): `total`, `completed`, `pending`, `inProgress`, `overdue` y `percentage`, con la misma fórmula.
 
 - **No ponderado:** una actividad completada cuenta como una, sin importar prioridad, tipo, dificultad, nota o créditos.
 - **Asignatura sin actividades:** la API devuelve `total = 0` y `percentage = 0`, pero la pantalla muestra **"Sin actividades registradas"** (sin barra), para no presentar "0 %" como mal progreso. Es distinto de "0 de 5 completadas · 0 %".
@@ -41,11 +43,11 @@ Cantidad y distribución de **compromisos académicos registrados** durante una 
 
 ### Qué cuenta
 
-| Cuenta                                                                                                                                                                   | No cuenta                                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Una `Activity` con `dueAt` en la semana, en **cualquier estado** (una completada de esa semana sigue siendo un compromiso de esa semana; el desglose muestra su estado). | Una actividad **vencida de otra semana** solo por estar aún pendiente: la carga describe compromisos cuya fecha pertenece a la semana. |
-| Cada **ocurrencia** de la agenda en la semana. Una serie semanal da **exactamente** la ocurrencia de esa semana (no la serie completa).                                  | Un bloque o una ocurrencia fuera de la semana.                                                                                         |
-| Bloques solapados: **todos** cuentan; no se fusionan ni se restan.                                                                                                       | Actividades u horarios de **otro periodo** u otro usuario.                                                                             |
+| Cuenta                                                                                                                                                                                             | No cuenta                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Una `Activity` con `dueAt` en la semana, **con o sin asignatura**, en **cualquier estado** (una completada de esa semana sigue siendo un compromiso de esa semana; el desglose muestra su estado). | Una actividad **vencida de otra semana** solo por estar aún pendiente: la carga describe compromisos cuya fecha pertenece a la semana. |
+| Cada **ocurrencia** de la agenda en la semana. Una serie semanal da **exactamente** la ocurrencia de esa semana (no la serie completa).                                                            | Un bloque o una ocurrencia fuera de la semana.                                                                                         |
+| Bloques solapados: **todos** cuentan; no se fusionan ni se restan.                                                                                                                                 | Actividades u horarios de **otro periodo** u otro usuario.                                                                             |
 
 Se reutiliza la expansión de recurrencia de la agenda (`expandBlock` / `occurrencesInRange`): no se duplica ni se guarda en la BD.
 

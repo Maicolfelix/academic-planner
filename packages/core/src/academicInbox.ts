@@ -510,7 +510,8 @@ export interface ExistingActivity {
   id: string;
   title: string;
   type: ActivityType;
-  subjectId: string;
+  /** null for a general activity: it never matches a proposal (a duplicate is judged by subject). */
+  subjectId: string | null;
   dueAt: Date | string;
 }
 

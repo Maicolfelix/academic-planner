@@ -58,16 +58,32 @@ export interface SubjectProgressInput {
 
 export type SubjectProgress = ProgressSummary & { id: string; name: string; color: string };
 
+/** The counts of the general activities (no subject): they weigh in the general progress, in no subject's row. */
+export interface GeneralActivitiesInput {
+  counts: StatusCounts;
+  overdue: number;
+}
+
+const NO_GENERAL_ACTIVITIES: GeneralActivitiesInput = {
+  counts: { pending: 0, inProgress: 0, completed: 0 },
+  overdue: 0,
+};
+
 /**
- * General progress (all the period's activities) and progress per subject, sorted alphabetically: a stable,
- * neutral order that does not rank subjects by how well they are going.
+ * General progress (all the period's activities, with or without a subject) and progress per subject, sorted
+ * alphabetically: a stable, neutral order that does not rank subjects by how well they are going.
+ * The general activities count exactly once, in the general progress and in no subject's row, so the subjects'
+ * rows may add up to LESS than the general total. That is intentional: there is no artificial "no subject" row.
  */
-export function buildProgress(subjects: readonly SubjectProgressInput[]): {
+export function buildProgress(
+  subjects: readonly SubjectProgressInput[],
+  withoutSubject: GeneralActivitiesInput = NO_GENERAL_ACTIVITIES,
+): {
   general: ProgressSummary;
   subjects: SubjectProgress[];
 } {
-  const sum = (pick: (s: SubjectProgressInput) => number) =>
-    subjects.reduce((acc, s) => acc + pick(s), 0);
+  const sum = (pick: (s: { counts: StatusCounts; overdue: number }) => number) =>
+    subjects.reduce((acc, s) => acc + pick(s), pick(withoutSubject));
   const general = calculateSubjectProgress(
     {
       pending: sum((s) => s.counts.pending),

@@ -9,8 +9,8 @@ import type { Db } from '../db/prisma.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 export interface ActivityFilters {
-  subjectId?: string;
-  /** Derived through the subject: activities do not store their period. */
+  /** A subject id, or null for the general activities (no subject). */
+  subjectId?: string | null;
   periodId?: string;
   status?: ActivityStatus;
   priority?: ActivityPriority;
@@ -26,7 +26,9 @@ export interface ActivityFilters {
 
 export interface ActivityCreateData {
   userId: string;
-  subjectId: string;
+  /** Derived by the service (the subject's period, or the current one); never taken from the client. */
+  periodId: string;
+  subjectId: string | null;
   title: string;
   description: string | null;
   type: ActivityType;
@@ -35,8 +37,9 @@ export interface ActivityCreateData {
   hasTime: boolean;
 }
 
+/** `periodId` is deliberately absent: an activity never changes period. */
 export interface ActivityUpdateData {
-  subjectId?: string;
+  subjectId?: string | null;
   title?: string;
   description?: string | null;
   type?: ActivityType;
@@ -71,8 +74,8 @@ export function createActivityRepository(prisma: Db) {
       return prisma.activity.findMany({
         where: {
           userId,
-          ...(f.subjectId && { subjectId: f.subjectId }),
-          ...(f.periodId && { subject: { periodId: f.periodId } }),
+          ...(f.subjectId !== undefined && { subjectId: f.subjectId }),
+          ...(f.periodId && { periodId: f.periodId }),
           ...(f.status && { status: f.status }),
           ...(f.priority && { priority: f.priority }),
           ...(f.type && { type: f.type }),

@@ -40,6 +40,7 @@ model AcademicPeriod {
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects       Subject[]
   scheduleBlocks ScheduleBlock[]
+  activities     Activity[]
   // Also in the migration SQL (Prisma cannot express them):
   //  - partial unique index: at most one isCurrent = true per user
   //  - CHECK ("endDate" > "startDate")
@@ -69,6 +70,9 @@ model Subject {
   scheduleBlocks ScheduleBlock[]
 
   @@unique([periodId, nameKey])
+  // Redundant as a key (id is already unique) but required: it is the target of Activity's composite foreign key,
+  // which is what makes the database reject an activity whose subject belongs to another period.
+  @@unique([id, periodId])
   @@index([userId, periodId])
 }
 
@@ -95,12 +99,15 @@ enum ActivityStatus {
   COMPLETED
 }
 
-// The period is NOT stored here: it is derived through `subject.periodId`, so the two can never
-// disagree. "Overdue" is NOT stored either: it is derived (dueAt < now AND status != COMPLETED).
+// An activity ALWAYS belongs to a period; a subject is optional (a general activity: a paperwork errand, an advisor
+// meeting). The period is stored here and the composite foreign key (subjectId, periodId) -> Subject(id, periodId)
+// makes the database itself reject a subject from another period (MATCH SIMPLE: it is not checked while subjectId is
+// NULL). The period never changes after creation. "Overdue" is NOT stored: it is derived (dueAt < now AND status != COMPLETED).
 model Activity {
   id          String           @id @default(uuid()) @db.Uuid
   userId      String           @db.Uuid
-  subjectId   String           @db.Uuid
+  periodId    String           @db.Uuid
+  subjectId   String?          @db.Uuid
   title       String
   description String?
   type        ActivityType     @default(TASK)
@@ -114,14 +121,15 @@ model Activity {
   createdAt   DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // NoAction: a subject with activities cannot be deleted silently, yet deleting a whole user cascades.
-  // Phase 7 will hang Reminders off Activity with their own cascade.
-  subject     Subject          @relation(fields: [subjectId], references: [id], onDelete: NoAction)
+  // NoAction: a period or subject with activities cannot be deleted silently, yet deleting a whole user cascades.
+  period      AcademicPeriod   @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  subject     Subject?         @relation(fields: [subjectId, periodId], references: [id, periodId], onDelete: NoAction)
 
   reminders Reminder[]
 
   @@index([userId, dueAt])
   @@index([userId, status])
+  @@index([userId, periodId, dueAt])
   @@index([subjectId])
 }
 

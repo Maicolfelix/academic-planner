@@ -18,7 +18,7 @@ const notEmpty = () =>
   new AppError(
     409,
     'PERIOD_NOT_EMPTY',
-    'Este periodo todavía tiene asignaturas o bloques de agenda. Elimínalos primero para poder borrarlo.',
+    'Este periodo todavía tiene asignaturas, actividades o bloques de agenda. Elimínalos primero para poder borrarlo.',
   );
 
 export function createPeriodService(periods: PeriodRepository) {
@@ -73,19 +73,21 @@ export function createPeriodService(periods: PeriodRepository) {
       }
     },
 
-    /** Never cascades: a period with subjects must be emptied by the user first. */
+    /** Never cascades: a period with subjects, activities or schedule blocks must be emptied by the user first. */
     async remove(userId: string, id: string) {
       if (!(await periods.findOwned(userId, id))) throw periodNotFound();
-      // Subjects AND standalone schedule blocks (a study session has no subject but has a period).
-      const [subjectCount, blockCount] = await Promise.all([
+      // Subjects, standalone schedule blocks (a study session has no subject but has a period) AND activities: a
+      // general activity has no subject, so counting subjects would not see it.
+      const [subjectCount, blockCount, activityCount] = await Promise.all([
         periods.countSubjects(id),
         periods.countScheduleBlocks(id),
+        periods.countActivities(id),
       ]);
-      if (subjectCount > 0 || blockCount > 0) throw notEmpty();
+      if (subjectCount > 0 || blockCount > 0 || activityCount > 0) throw notEmpty();
       try {
         if (!(await periods.delete(userId, id))) throw periodNotFound();
       } catch (err) {
-        // A subject was added between the check and the delete: the foreign key still says no.
+        // A subject, block or activity was added between the check and the delete: the foreign key still says no.
         if (isPrismaError(err, 'P2003')) throw notEmpty();
         throw err;
       }
