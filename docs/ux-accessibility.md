@@ -118,7 +118,7 @@ Además, `breathe` (carga) es el único bucle que no es ambiental. **Movimiento 
 
 ## Actividades y Asignaturas (UX1-3)
 
-Lleva «Pulso Ambiental» a las dos pantallas que seguían sintiéndose administrativas. **Solo presentación:** mismos datos, mismas rutas, misma API, mismos estados y mismas reglas; el endpoint, la descarga y el texto de «Añadir al calendario» no cambiaron. Estado: **implementado en su PR, pendiente de QA real en iPhone** (no está DONE hasta entonces).
+Lleva «Pulso Ambiental» a las dos pantallas que seguían sintiéndose administrativas. **Solo presentación:** mismos datos, mismas rutas, misma API, mismos estados y mismas reglas; el endpoint, la descarga y el texto de «Añadir al calendario» no cambiaron. Estado: **DONE**, aprobado en un iPhone real (ver [la validación](#validación-en-dispositivo-real-ux1-3)).
 
 **Antes (lo que generaba sensación de sistema).** _Actividades:_ cada tarjeta era una barra de color de 8 px y cuatro píldoras (Radar con **emoji**, estado, prioridad y tipo) más un `select` de estado y tres botones (Editar, Añadir al calendario, Eliminar) en dos filas de controles; los filtros eran un control segmentado que se partía en dos líneas y un `<details>` «Más filtros» con aspecto de HTML; una sola columna de 768 px aunque hubiera ancho. _Asignaturas:_ una fila CRUD (barra de color, nombre, profesor, descripción y dos botones) en una rejilla de dos columnas de ancho estrecho.
 
@@ -148,6 +148,29 @@ Lleva «Pulso Ambiental» a las dos pantallas que seguían sintiéndose administ
 **Lo que atrapó una prueba:** llevar el estado elegido a la vista con `scrollIntoView` movía el punto de partida de Tab del navegador, y la primera parada del teclado dejaba de ser «Saltar al contenido». Ahora se desplaza solo la fila (`scrollTo`).
 
 **Sigue sintiéndose administrativo:** los formularios y diálogos (Agregar/Editar actividad y asignatura, con sus `<details>` «Más opciones»), la Agenda semanal y el panel de recordatorios del diálogo de edición.
+
+### Validación en dispositivo real (UX1-3)
+
+**Plataforma:** iPhone real con Safari, la app servida por HTTP en la red local (**no** PWA instalada, **no** HTTPS), sobre la rama del PR #25 (`88b5b60`) y con el dataset demo del proyecto (6 asignaturas, 15 actividades en los tres estados). No se registraron modelo, versión de iOS ni mediciones de fluidez.
+
+**Observado por el mantenedor:**
+
+- el rediseño visual de Actividades fue aprobado;
+- el rediseño visual de Asignaturas fue aprobado;
+- «Pulso Ambiental» sigue coherente entre pantallas;
+- no se reportó ningún bloqueante visual;
+- el mantenedor aprobó continuar.
+
+**Decisión del mantenedor (textual):** «me gusta cómo se ve a nivel visual». Queda **aprobado para la fase actual**, no como veredicto de acabado final. El comentario fue visual: no se registró un recorrido detallado de cada control en el dispositivo (la verificación funcional es la de las pruebas automáticas). No se probó: PWA instalada, HTTPS, Android, Chrome móvil, otros iPhone ni un lector de pantalla real.
+
+**Límites que se conservan (no bloqueantes):**
+
+- «Añadir al calendario» ahora está dentro de «Más acciones»; **su descubribilidad queda como deuda de uso real**, no se movió de nuevo;
+- los formularios y diálogos siguen más «de sistema»;
+- la Agenda sigue necesitando trabajo visual;
+- los `select` nativos se conservan a propósito (el mejor control en el teléfono y el accesible);
+- las tarjetas de asignatura son más altas en el teléfono (102 → 142 px);
+- PWA instalada, HTTPS y Android siguen sin probarse.
 
 ## Dashboard
 

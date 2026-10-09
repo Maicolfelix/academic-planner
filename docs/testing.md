@@ -39,7 +39,7 @@ Recorridos reales con `watch(page, …)`, que falla ante cualquier error de cons
 
 ### Accesibilidad
 
-`@axe-core/playwright` (etiquetas WCAG 2.0/2.1 A y AA) sobre cada pantalla con una cuenta cargada y sobre las pantallas con datos del escenario MASTER, más recorridos solo con teclado, foco en diálogos, tamaño táctil y desbordes. Es una evaluación orientada a WCAG, **no una certificación**. Ver [ux-accessibility.md](ux-accessibility.md).
+`@axe-core/playwright` (etiquetas WCAG 2.0/2.1 A y AA) sobre cada pantalla con una cuenta cargada y sobre las pantallas con datos del escenario MASTER, más recorridos solo con teclado, foco en diálogos, tamaño táctil y desbordes. Es una evaluación orientada a WCAG, **no una certificación**. Antes de axe, las pruebas esperan a que terminen las animaciones de entrada (`entrancesDone(page)` en `e2e/helpers.ts`; los bucles ambientales, infinitos, se ignoran): un texto a medio aparecer se lee semitransparente y axe lo marcaba (un botón blanco al 70 % da 4,17:1). La prueba de `shell-navigation` que no esperaba daba esa falsa alarma en 2 de 20 ejecuciones **también en `main`**; ya espera (30 de 30 después). Ver [ux-accessibility.md](ux-accessibility.md).
 
 ### OCR e importación de horario
 
