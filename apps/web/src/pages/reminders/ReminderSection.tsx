@@ -11,15 +11,14 @@ import {
 import { useState, type FormEvent } from 'react';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
+import { Button } from '../../components/ui/Button';
+import { FormActions, FormError } from '../../components/ui/form';
 import {
   useActivityReminders,
   useCreateReminder,
   useDeleteReminder,
   useUpdateReminder,
 } from '../../reminders/useReminders';
-
-const smallButton =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-60';
 
 const when = (r: Reminder, timeZone: string) =>
   formatDue({ dueAt: r.remindAt, hasTime: true }, timeZone);
@@ -51,7 +50,7 @@ function ReminderEditor({ initial, submitLabel, pending, error, onSubmit, onCanc
     <form
       onSubmit={submit}
       noValidate
-      className="flex flex-col gap-3 rounded-md border border-slate-300 p-3"
+      className="flex animate-rise flex-col gap-3 rounded-control border border-border bg-surface p-3"
     >
       <FormField
         id="reminder-date"
@@ -69,18 +68,14 @@ function ReminderEditor({ initial, submitLabel, pending, error, onSubmit, onCanc
         onChange={setTime}
         error={fieldErrors.remindTime?.[0] ?? error}
       />
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" onClick={onCancel} disabled={pending} className={smallButton}>
+      <FormActions>
+        <Button size="sm" onClick={onCancel} disabled={pending}>
           Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60"
-        >
+        </Button>
+        <Button size="sm" type="submit" variant="primary" disabled={pending}>
           {pending ? 'Guardando…' : submitLabel}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }
@@ -107,20 +102,38 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
       : err.message;
 
   return (
-    <section aria-labelledby="reminders-heading" className="mt-5 flex flex-col gap-3 border-t pt-4">
-      <h3 id="reminders-heading" className="text-base font-semibold">
-        Recordatorios
-      </h3>
+    <section
+      aria-labelledby="reminders-heading"
+      className="mt-5 flex flex-col gap-3 rounded-surface border border-border bg-secondary/40 p-3"
+    >
+      {/* The section is part of the form's surface: its title on the left and the way to add one on the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="reminders-heading" className="text-base font-semibold">
+          Recordatorios
+        </h3>
+        {!finished && !adding && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="font-semibold text-accent-ink"
+            onClick={() => {
+              setError(undefined);
+              setEditingId(undefined);
+              setAdding(true);
+            }}
+          >
+            + Agregar recordatorio
+          </Button>
+        )}
+      </div>
 
       {list.isPending && <p role="status">Cargando recordatorios…</p>}
       {list.isError && (
-        <p role="alert" className="text-sm text-red-800">
-          No se pudieron cargar los recordatorios: {list.error.message}
-        </p>
+        <FormError>No se pudieron cargar los recordatorios: {list.error.message}</FormError>
       )}
 
       {list.data && list.data.length === 0 && (
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-muted-foreground">
           Esta actividad no tiene recordatorios{finished ? '.' : ' pendientes.'}
         </p>
       )}
@@ -130,17 +143,20 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
           {list.data.map((r) => {
             const local = toLocalParts(r.remindAt, timeZone);
             return (
-              <li key={r.id} className="flex flex-col gap-2 rounded-md border border-slate-300 p-3">
+              <li
+                key={r.id}
+                className="flex flex-col gap-2 rounded-control border border-border bg-surface p-3"
+              >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span className="font-medium">{when(r, timeZone)}</span>
+                  <span className="font-semibold">{when(r, timeZone)}</span>
                   <span aria-hidden="true">·</span>
-                  <span>
+                  <span className="text-muted-foreground">
                     {r.kind === 'AUTO' && r.offsetMinutes !== null
                       ? `Automático, ${formatReminderOffset(r.offsetMinutes)}`
                       : 'Manual'}
                   </span>
                   <span aria-hidden="true">·</span>
-                  <span>{REMINDER_STATUS_LABELS[r.status]}</span>
+                  <span className="text-muted-foreground">{REMINDER_STATUS_LABELS[r.status]}</span>
                 </div>
                 {editingId === r.id ? (
                   <ReminderEditor
@@ -162,10 +178,10 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
                   />
                 ) : (
                   !finished && (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className={smallButton}
+                    <div className="-mb-1 flex flex-wrap gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         aria-label={`Editar recordatorio del ${when(r, timeZone)}`}
                         onClick={() => {
                           setError(undefined);
@@ -174,16 +190,17 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
                         }}
                       >
                         Editar
-                      </button>
-                      <button
-                        type="button"
-                        className={smallButton}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-danger"
                         disabled={remove.isPending}
                         aria-label={`Eliminar recordatorio del ${when(r, timeZone)}`}
                         onClick={() => remove.mutate(r.id)}
                       >
                         Eliminar
-                      </button>
+                      </Button>
                     </div>
                   )
                 )}
@@ -192,14 +209,10 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
           })}
         </ul>
       )}
-      {remove.isError && (
-        <p role="alert" className="text-sm text-red-800">
-          {remove.error.message}
-        </p>
-      )}
+      {remove.isError && <FormError>{remove.error.message}</FormError>}
 
       {finished ? (
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-muted-foreground">
           La actividad está finalizada: no admite recordatorios nuevos. Si la reabres, se vuelven a
           generar los automáticos que aún estén en el futuro.
         </p>
@@ -220,19 +233,7 @@ export function ReminderSection({ activity, timeZone }: { activity: Activity; ti
             );
           }}
         />
-      ) : (
-        <button
-          type="button"
-          className={`${smallButton} self-start`}
-          onClick={() => {
-            setError(undefined);
-            setEditingId(undefined);
-            setAdding(true);
-          }}
-        >
-          + Agregar recordatorio
-        </button>
-      )}
+      ) : null}
     </section>
   );
 }

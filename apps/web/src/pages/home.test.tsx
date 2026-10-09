@@ -198,7 +198,10 @@ describe('motion (index.css)', () => {
   const animated = (name: string) => {
     const start = css.indexOf(`@keyframes ${name} {`);
     const next = css.indexOf('@keyframes', start + 1);
-    const end = next === -1 ? css.indexOf('@layer base', start) : next;
+    const layer = css.indexOf('@layer base', start);
+    // up to whichever comes first: the next keyframes block or the end of the theme (a later plain @keyframes must not
+    // drag the whole base layer into the slice)
+    const end = Math.min(...[next, layer].filter((i) => i !== -1));
     return new Set([...css.slice(start, end).matchAll(/([a-z-]+):/g)].map((m) => m[1]));
   };
 

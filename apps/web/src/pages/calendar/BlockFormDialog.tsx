@@ -23,6 +23,8 @@ import { useSubjects } from '../../academic/useAcademic';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
 import { Modal } from '../../components/Modal';
+import { Button } from '../../components/ui/Button';
+import { FormActions, FormError } from '../../components/ui/form';
 import { SelectField } from '../../components/SelectField';
 import { useSaveScheduleBlock } from '../../schedule/useSchedule';
 
@@ -191,32 +193,30 @@ export function BlockFormDialog({
   return (
     <Modal title={block ? 'Editar bloque' : 'Agregar bloque'} onClose={onClose}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-            {formError}
-          </p>
-        )}
+        {formError && <FormError>{formError}</FormError>}
 
-        <SelectField
-          id="block-type"
-          label="Tipo"
-          value={type}
-          onChange={(v) => changeType(v as ScheduleBlockType)}
-          options={SCHEDULE_BLOCK_TYPES.map((t) => ({
-            value: t,
-            label: SCHEDULE_BLOCK_TYPE_LABELS[t],
-          }))}
-          error={fieldErrors.type?.[0]}
-        />
-        <SelectField
-          id="block-subject"
-          label="Asignatura"
-          placeholder={type === 'CLASS' ? 'Elige una asignatura' : 'Sin asignatura'}
-          value={subjectId}
-          onChange={changeSubject}
-          options={subjects.map((s) => ({ value: s.id, label: s.name }))}
-          error={fieldErrors.subjectId?.[0]}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            id="block-type"
+            label="Tipo"
+            value={type}
+            onChange={(v) => changeType(v as ScheduleBlockType)}
+            options={SCHEDULE_BLOCK_TYPES.map((t) => ({
+              value: t,
+              label: SCHEDULE_BLOCK_TYPE_LABELS[t],
+            }))}
+            error={fieldErrors.type?.[0]}
+          />
+          <SelectField
+            id="block-subject"
+            label="Asignatura"
+            placeholder={type === 'CLASS' ? 'Elige una asignatura' : 'Sin asignatura'}
+            value={subjectId}
+            onChange={changeSubject}
+            options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+            error={fieldErrors.subjectId?.[0]}
+          />
+        </div>
         <FormField
           id="block-title"
           label="Título"
@@ -229,7 +229,8 @@ export function BlockFormDialog({
           error={fieldErrors.title?.[0]}
         />
 
-        <label className="flex min-h-11 items-center gap-2">
+        {/* WHEN: the repetition (a real checkbox, in a tonal row that is all tappable), then the day, the hours and the end. */}
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-control border border-border bg-secondary/40 px-3 transition-colors duration-(--duration-fast) ease-standard hover:bg-secondary/70">
           <input
             type="checkbox"
             checked={repeat}
@@ -237,7 +238,7 @@ export function BlockFormDialog({
               setRepeat(e.target.checked);
               setRepeatTouched(true);
             }}
-            className="size-5"
+            className="size-5 accent-accent"
           />
           <span className="text-sm font-medium">Repetir semanalmente</span>
         </label>
@@ -294,14 +295,16 @@ export function BlockFormDialog({
         )}
 
         {block && repeat && (
-          <p className="rounded-md bg-slate-100 p-3 text-sm">{WEEKLY_EDIT_NOTICE}</p>
+          <p className="rounded-control border border-info-line bg-info-soft p-3 text-sm text-info-ink">
+            {WEEKLY_EDIT_NOTICE}
+          </p>
         )}
 
         {showWarning && (
           <section
             ref={warningRef}
             role="alert"
-            className="rounded-md border border-amber-600 bg-amber-50 p-3 text-sm"
+            className="rounded-control border border-warning-line bg-warning-soft p-3 text-sm text-warning-ink"
           >
             <p className="font-semibold">⚠ {pending.warnings[0]!.message}</p>
             <ul className="mt-1 list-disc pl-5">
@@ -310,59 +313,43 @@ export function BlockFormDialog({
               ))}
             </ul>
             <p className="mt-2">Puedes guardar de todas formas o revisar el horario.</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="primary"
                 disabled={save.isPending}
                 onClick={() => commit(pending.input)}
-                className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
               >
                 Guardar de todas formas
-              </button>
-              <button
-                type="button"
-                onClick={() => setPending(undefined)}
-                className="min-h-11 rounded-md border border-slate-400 bg-white px-4 py-2"
-              >
+              </Button>
+              <Button className="bg-surface" onClick={() => setPending(undefined)}>
                 Revisar horario
-              </button>
+              </Button>
             </div>
           </section>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            {onDelete && (
-              <button
-                type="button"
+        <FormActions
+          start={
+            onDelete && (
+              <Button
                 onClick={onDelete}
                 disabled={save.isPending}
-                className="min-h-11 rounded-md border border-red-700 px-4 py-2 text-red-800 disabled:opacity-60"
+                className="border-danger text-danger-ink hover:bg-danger-soft"
               >
                 Eliminar
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={save.isPending}
-              className="min-h-11 rounded-md border border-slate-400 px-4 py-2 disabled:opacity-60"
-            >
-              Cancelar
-            </button>
-            {!showWarning && (
-              <button
-                type="submit"
-                disabled={save.isPending}
-                className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
-              >
-                {save.isPending ? 'Guardando…' : block ? 'Guardar cambios' : 'Guardar'}
-              </button>
-            )}
-          </div>
-        </div>
+              </Button>
+            )
+          }
+        >
+          <Button onClick={onClose} disabled={save.isPending}>
+            Cancelar
+          </Button>
+          {!showWarning && (
+            <Button type="submit" variant="primary" disabled={save.isPending}>
+              {save.isPending ? 'Guardando…' : block ? 'Guardar cambios' : 'Guardar'}
+            </Button>
+          )}
+        </FormActions>
       </form>
     </Modal>
   );

@@ -2,6 +2,7 @@ import type { Activity } from '@planner/core';
 import { useDeleteActivity } from '../../activities/useActivities';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/ui/Button';
+import { FormActions, FormError } from '../../components/ui/form';
 
 interface Props {
   activity: Activity;
@@ -15,13 +16,13 @@ export function DeleteActivityDialog({ activity, onClose, onDeleted }: Props) {
 
   return (
     <Modal title={`¿Eliminar ${activity.title}?`} onClose={onClose}>
-      <p className="mb-4">Esta acción eliminará la actividad.</p>
+      <p className="mb-5 text-foreground">Esta acción eliminará la actividad.</p>
       {remove.isError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-800">
-          {remove.error.message}
-        </p>
+        <div className="mb-4">
+          <FormError>{remove.error.message}</FormError>
+        </div>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <FormActions>
         <Button onClick={onClose} disabled={remove.isPending}>
           Cancelar
         </Button>
@@ -34,7 +35,7 @@ export function DeleteActivityDialog({ activity, onClose, onDeleted }: Props) {
         >
           {remove.isPending ? 'Eliminando…' : 'Eliminar'}
         </Button>
-      </div>
+      </FormActions>
     </Modal>
   );
 }

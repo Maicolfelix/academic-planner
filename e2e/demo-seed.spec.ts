@@ -4,7 +4,7 @@ import { createPrisma } from '../apps/api/src/db/prisma';
 import { DEMO_PASSWORD } from '../apps/api/src/demo/demoPlan';
 import { deleteDemoUser, seedDemo } from '../apps/api/src/demo/seedDemo';
 import { getTestDatabaseUrl } from '../apps/api/test/testDb';
-import { expectNoHorizontalOverflow, login, watch } from './helpers';
+import { expectNoHorizontalOverflow, login, watch, entrancesDone } from './helpers';
 
 /**
  * Phase 18: the demo, as the person presenting it would use it. The seed is run against the TEST database with the
@@ -60,6 +60,9 @@ test('the demo seed gives a populated, coherent product: sign in, Dashboard, Rad
     expect(thisWeek).toMatch(/\d+ compromisos/);
     expect(thisWeek).toContain('Día con más compromisos');
     await expectNoHorizontalOverflow(page);
+    // axe reads the colors the page has at that instant: let the entrances (the Radar tiles rise in one after another) end,
+    // or a tile caught at 60 % reads 1.4:1 (it did, on main too)
+    await entrancesDone(page);
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(axe.violations.map((v) => v.id)).toEqual([]);
 

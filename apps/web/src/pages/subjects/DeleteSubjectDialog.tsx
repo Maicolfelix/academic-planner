@@ -2,6 +2,7 @@ import type { Subject } from '@planner/core';
 import { useDeleteSubject } from '../../academic/useAcademic';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/ui/Button';
+import { FormActions, FormError } from '../../components/ui/form';
 
 interface Props {
   subject: Subject;
@@ -15,13 +16,13 @@ export function DeleteSubjectDialog({ subject, onClose, onDeleted }: Props) {
 
   return (
     <Modal title={`¿Eliminar ${subject.name}?`} onClose={onClose}>
-      <p className="mb-4">Esta acción eliminará la asignatura.</p>
+      <p className="mb-5 text-foreground">Esta acción eliminará la asignatura.</p>
       {remove.isError && (
-        <p role="alert" className="mb-4 rounded-control bg-danger-soft p-3 text-sm text-danger-ink">
-          {remove.error.message}
-        </p>
+        <div className="mb-4">
+          <FormError>{remove.error.message}</FormError>
+        </div>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <FormActions>
         <Button onClick={onClose} disabled={remove.isPending}>
           Cancelar
         </Button>
@@ -34,7 +35,7 @@ export function DeleteSubjectDialog({ subject, onClose, onDeleted }: Props) {
         >
           {remove.isPending ? 'Eliminando…' : 'Eliminar'}
         </Button>
-      </div>
+      </FormActions>
     </Modal>
   );
 }
