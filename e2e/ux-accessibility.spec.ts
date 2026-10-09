@@ -14,6 +14,7 @@ import {
   seedRichData,
   uniqueEmail,
   watch,
+  openActivityMenu,
 } from './helpers';
 
 /**
@@ -96,8 +97,9 @@ test('axe: dialogs, filters, validation errors and the unsaved-changes question'
   await axe(page, 'unsaved-changes question');
   await dialog.getByRole('button', { name: 'Descartar cambios' }).click();
 
+  await openActivityMenu(page, new RegExp(LONG_TITLE.slice(0, 20)));
   await page
-    .getByRole('button', { name: new RegExp(`^Eliminar ${LONG_TITLE.slice(0, 20)}`) })
+    .getByRole('menuitem', { name: new RegExp(`^Eliminar ${LONG_TITLE.slice(0, 20)}`) })
     .click();
   await axe(page, 'delete dialog');
 });

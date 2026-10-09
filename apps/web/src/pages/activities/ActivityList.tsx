@@ -13,7 +13,10 @@ interface Props {
   onDelete: (activity: Activity) => void;
 }
 
-/** Open activities first (soonest deadline first, as the API returns them), finished ones after. */
+/**
+ * Open activities first (soonest deadline first, as the API returns them), finished ones after. One column on a phone and
+ * a tablet; two from 1024 px, where a single column of full-width cards would leave the screen mostly empty.
+ */
 export function ActivityList({
   activities,
   subjects,
@@ -31,7 +34,7 @@ export function ActivityList({
   ];
 
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="grid gap-3 lg:grid-cols-2">
       {ordered.map((activity) => (
         <ActivityCard
           key={activity.id}

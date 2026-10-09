@@ -96,12 +96,12 @@ export function ActivitiesPage() {
       <PageHeader title="Actividades" description={period.name} actions={list.length > 0 && add} />
 
       {notice && (
-        <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+        <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success-ink">
           {notice}
         </p>
       )}
       {statusError && (
-        <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink">
           No se pudo cambiar el estado: {statusError}
         </p>
       )}

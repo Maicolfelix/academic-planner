@@ -45,5 +45,5 @@ export function useSlidingIndicator(selectedIndex: number) {
     };
   }, [selectedIndex, container]);
 
-  return { setContainer, setItem, box, ready };
+  return { setContainer, container, setItem, box, ready };
 }

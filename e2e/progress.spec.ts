@@ -11,6 +11,7 @@ import {
   register,
   uniqueEmail,
   watch,
+  openActivityMenu,
 } from './helpers';
 
 // A period that always contains "today" and the weeks around it (the system clock decides what today is).
@@ -202,7 +203,8 @@ test('progress and weekly workload: from the Dashboard to the detail, and live u
 
   // 21-22. Delete the deadline: one commitment less, still no reload.
   await nav(page).getByRole('link', { name: 'Actividades' }).click();
-  await page.getByRole('button', { name: 'Eliminar Entrega de la semana' }).click();
+  await openActivityMenu(page, 'Entrega de la semana');
+  await page.getByRole('menuitem', { name: 'Eliminar Entrega de la semana' }).click();
   await page
     .getByRole('dialog', { name: '¿Eliminar Entrega de la semana?' })
     .getByRole('button', { name: 'Eliminar' })

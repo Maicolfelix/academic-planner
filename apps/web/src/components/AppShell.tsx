@@ -58,9 +58,9 @@ const TITLES: [prefix: string, title: string][] = [
  */
 export function AppShell() {
   const { pathname } = useLocation();
-  // The weekly grid needs seven readable columns, and the Home composes two columns from 1024 px: both are wide.
-  // Every other screen is a comfortable reading column.
-  const wide = pathname === '/calendar' || pathname === '/dashboard';
+  // The weekly grid needs seven readable columns, and the Home, Activities and Subjects compose two or three columns from
+  // 1024 px: all of them are wide. Every other screen is a comfortable reading column.
+  const wide = ['/calendar', '/dashboard', '/activities', '/subjects'].includes(pathname);
   const width = wide ? 'max-w-6xl' : 'max-w-3xl';
   const dueCount = useDueReminders().data?.total ?? 0;
   useDocumentTitle(TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1]);

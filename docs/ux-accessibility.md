@@ -116,6 +116,62 @@ Además, `breathe` (carga) es el único bucle que no es ambiental. **Movimiento 
 
 **Deuda visual que se conserva (esperada, no bloqueante):** la identidad está aceptada pero el refinamiento continuará. Siguen «administrativas» las tarjetas de actividad, los formularios y los diálogos; la Agenda sigue relativamente plana; Asignaturas aún necesita su tratamiento (UX1-3). El pulido visual puede continuar mientras avanza el roadmap funcional.
 
+## Actividades y Asignaturas (UX1-3)
+
+Lleva «Pulso Ambiental» a las dos pantallas que seguían sintiéndose administrativas. **Solo presentación:** mismos datos, mismas rutas, misma API, mismos estados y mismas reglas; el endpoint, la descarga y el texto de «Añadir al calendario» no cambiaron. Estado: **DONE**, aprobado en un iPhone real (ver [la validación](#validación-en-dispositivo-real-ux1-3)).
+
+**Antes (lo que generaba sensación de sistema).** _Actividades:_ cada tarjeta era una barra de color de 8 px y cuatro píldoras (Radar con **emoji**, estado, prioridad y tipo) más un `select` de estado y tres botones (Editar, Añadir al calendario, Eliminar) en dos filas de controles; los filtros eran un control segmentado que se partía en dos líneas y un `<details>` «Más filtros» con aspecto de HTML; una sola columna de 768 px aunque hubiera ancho. _Asignaturas:_ una fila CRUD (barra de color, nombre, profesor, descripción y dos botones) en una rejilla de dos columnas de ancho estrecho.
+
+**Tarjeta de actividad (`ActivityCard`).** Se lee en el orden en que se piensa: **qué** (título, con su estado a la derecha), **cuándo** (asignatura con su color y plazo, con el tiempo restante en negrita), **qué tan urgente** (marca del Radar y prioridad; el tipo pasa a metadato en texto discreto) y **qué hacer**.
+
+- **Una acción primaria: «Completar».** Hace exactamente lo mismo que elegir «Finalizada» en el control de estado (`onStatusChange('COMPLETED')`): no es un flujo nuevo. Se eligió sobre «Editar» porque marcar algo como hecho es lo que el estudiante más repite y porque ya tenía su confirmación (`useJustCompleted`). Es un botón **tonal** (acento suave), no un bloque oscuro: una lista de doce botones sólidos serían doce cosas gritando. Una actividad finalizada no tiene acción primaria y descansa sobre una superficie más quieta (`soft`).
+- **Secundarias:** «Editar» queda a la vista (ghost, con icono); «Añadir al calendario» y «Eliminar» viven en un menú **«Más acciones: _título_»**. Eliminar sigue pidiendo la confirmación de siempre (con «Cancelar» como foco inicial) y en el menú se distingue por color, icono y palabra.
+- **Control de estado:** sigue siendo un `<select>` nativo (el mejor selector en cualquier teléfono y el accesible), con el mismo nombre («Cambiar estado de _título_») y los mismos tres estados, pero vestido como el propio estado: píldora con símbolo (○ ◐ ✓), palabra y tono. Se descartaron los chips/segmentado por tarjeta: tres botones por tarjeta repetirían el problema.
+- **Confirmación al completar:** se conserva `useJustCompleted` y se mejora: un check que aparece junto al título, la píldora de estado que «salta» y el tinte de éxito breve; sin confeti y sin retrasar la actualización real.
+- **Radar sin emojis:** `RadarBadge` ahora es un `RadarDot` compacto (halo de 3 px) más el nombre, con el mismo tono que las fichas del Home; «Vencidas» conserva el rojo sólido. **Estático**: una lista puede tener decenas.
+- **Color de asignatura:** una raya fina e inset (no una losa), un punto junto al nombre y un lavado muy tenue en la esquina. Las tarjetas **urgentes** (vencida o inmediata) tienen un borde rojo suave; las demás no varían.
+
+**Menú de acciones (`ActionMenu`, sin librería).** Botón real con `aria-haspopup="menu"` y `aria-expanded`; Enter, Espacio y ↓ lo abren y llevan el foco al primer elemento (↑ al último); dentro, flechas, Inicio y Fin; Escape lo cierra y devuelve el foco al botón; Tab lo cierra; un clic fuera lo cierra; al elegir un elemento el foco vuelve primero al botón (así el diálogo que se abre lo recupera al cerrarse). Se abre hacia arriba si abajo no cabe (la barra del teléfono). Los elementos miden 44 px y conservan su nombre accesible («Eliminar _título_», «Añadir al calendario: _título_»).
+
+**Filtros.** El control segmentado de UX1-2.5 queda como diseño definitivo: **una sola fila** que en el teléfono se desplaza horizontalmente (y lleva el estado elegido a la vista; ver abajo) y desde 640 px se ajusta a su contenido; sigue siendo `aria-pressed` con el resalte que se desliza. «Más filtros» deja de ser `<details>`: es un botón-píldora con `aria-expanded`/`aria-controls`, el icono de filtros, cuántos hay activos y un panel `soft` con los `select` nativos agrupados (en pantallas anchas el panel está siempre visible). Se abre solo si llegas con filtros aplicados.
+
+**Escritorio.** Actividades y Asignaturas pasan a ancho 6xl: las tarjetas de actividad en **dos columnas** desde 1024 px y las asignaturas en **tres**; ya no es una columna móvil centrada.
+
+**Asignaturas (`SubjectCard`).** Un espacio, no una fila: un monograma (iniciales) sobre el color de la asignatura, un lavado del color en la esquina y una órbita tenue, el profesor (con icono) y la descripción si existen, y dos acciones compactas. Solo datos que la asignatura ya tiene (sin conteos ni consultas nuevas). Color en dosis moderada: el texto del monograma es **blanco** si alcanza 3:1 (es texto grande en negrita) y tinta oscura en los colores claros (amarillo, naranja). Movimiento solo B (respuesta al puntero): sin ningún bucle.
+
+**Rendimiento (medido, Edge sin GPU, 12 actividades).** Ningún movimiento ambiental dentro de las tarjetas. Altura de la página de Actividades, antes → después: 390 px 3843 → 3125 (−19 %), 320 px 4255 → 3249 (−24 %), 430 px 3815 → 3125, 768 px 3013 → 3127 (+4 %: ahí sigue siendo una columna), 1024–1440 px 2999 → 1769 (−41 %, dos columnas). Desplazamiento de 12 tarjetas a 390 px: fotogramas de 6,9 ms de media y 8,5 ms como máximo (antes, 10,5 ms): no se degrada. Las tarjetas de **Asignaturas son más altas** en el teléfono (102 → 142 px): es el precio de que tengan identidad.
+
+**Iconos.** UX1-3 añade ocho (check, lápiz, calendario+, papelera, más, chevron, usuario, filtros): **13 en total**. Se reevaluó `lucide-react` y **no se añadió**: son 13 formas de una a tres líneas cada una, sin versión que mantener ni dependencia que auditar; se vuelve a decidir al pasar de unos 20 o si hace falta un icono complejo.
+
+**Deuda `slate-*`.** En el área tocada (Actividades, Asignaturas, sus diálogos y `SelectField`): **21 → 0** literales, migrados a tokens (los botones de los diálogos ahora usan `Button`). En todo `apps/web/src`: **146 → 126** líneas.
+
+**Lo que atrapó una prueba:** llevar el estado elegido a la vista con `scrollIntoView` movía el punto de partida de Tab del navegador, y la primera parada del teclado dejaba de ser «Saltar al contenido». Ahora se desplaza solo la fila (`scrollTo`).
+
+**Sigue sintiéndose administrativo:** los formularios y diálogos (Agregar/Editar actividad y asignatura, con sus `<details>` «Más opciones»), la Agenda semanal y el panel de recordatorios del diálogo de edición.
+
+### Validación en dispositivo real (UX1-3)
+
+**Plataforma:** iPhone real con Safari, la app servida por HTTP en la red local (**no** PWA instalada, **no** HTTPS), sobre la rama del PR #25 (`88b5b60`) y con el dataset demo del proyecto (6 asignaturas, 15 actividades en los tres estados). No se registraron modelo, versión de iOS ni mediciones de fluidez.
+
+**Observado por el mantenedor:**
+
+- el rediseño visual de Actividades fue aprobado;
+- el rediseño visual de Asignaturas fue aprobado;
+- «Pulso Ambiental» sigue coherente entre pantallas;
+- no se reportó ningún bloqueante visual;
+- el mantenedor aprobó continuar.
+
+**Decisión del mantenedor (textual):** «me gusta cómo se ve a nivel visual». Queda **aprobado para la fase actual**, no como veredicto de acabado final. El comentario fue visual: no se registró un recorrido detallado de cada control en el dispositivo (la verificación funcional es la de las pruebas automáticas). No se probó: PWA instalada, HTTPS, Android, Chrome móvil, otros iPhone ni un lector de pantalla real.
+
+**Límites que se conservan (no bloqueantes):**
+
+- «Añadir al calendario» ahora está dentro de «Más acciones»; **su descubribilidad queda como deuda de uso real**, no se movió de nuevo;
+- los formularios y diálogos siguen más «de sistema»;
+- la Agenda sigue necesitando trabajo visual;
+- los `select` nativos se conservan a propósito (el mejor control en el teléfono y el accesible);
+- las tarjetas de asignatura son más altas en el teléfono (102 → 142 px);
+- PWA instalada, HTTPS y Android siguen sin probarse.
+
 ## Dashboard
 
 Jerarquía (UX1-2), en el orden en que el estudiante pregunta: **¿qué hago ahora?** → **¿cómo voy?** → **¿qué viene?**. Saludo y periodo → recordatorios (cuando hay) → **¿Qué hago ahora?** (el héroe) → clases de hoy → vencidas → para hoy → contadores → progreso → **Captura rápida** (+ acceso a la Bandeja) → Radar → próxima entrega → próximas entregas → semana → accesos rápidos. Captura bajó de la segunda posición: quien entra a saber qué hacer ve primero eso. Cuando el héroe ya muestra la próxima entrega, «Próxima entrega» es una sola línea tenue y no una segunda tarjeta (la región sigue existiendo).

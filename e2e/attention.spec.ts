@@ -9,6 +9,7 @@ import {
   register,
   uniqueEmail,
   watch,
+  openActivityMenu,
 } from './helpers';
 
 const HOUR = 3_600_000;
@@ -128,7 +129,8 @@ test('¿Qué hago ahora?: recommendation, reasons, live changes without reloadin
 
   // 16-17. Delete the suggested one: the next one is suggested.
   await goActivities(page);
-  await page.getByRole('button', { name: 'Eliminar Quiz' }).click();
+  await openActivityMenu(page, 'Quiz');
+  await page.getByRole('menuitem', { name: 'Eliminar Quiz' }).click();
   await page
     .getByRole('dialog', { name: '¿Eliminar Quiz?' })
     .getByRole('button', { name: 'Eliminar' })

@@ -23,7 +23,7 @@ export function SelectField({
 }: SelectFieldProps) {
   return (
     <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
-      <label htmlFor={id} className="text-sm font-medium text-slate-800">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
         {label}
       </label>
       <select
@@ -33,8 +33,8 @@ export function SelectField({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`min-h-11 w-full rounded-md border bg-white px-3 py-2 text-base focus:outline-2 focus:outline-offset-1 focus:outline-slate-900 ${
-          error ? 'border-red-600' : 'border-slate-400'
+        className={`min-h-11 w-full rounded-control border bg-surface px-3 py-2 text-base ${
+          error ? 'border-danger' : 'border-border-strong'
         }`}
       >
         {placeholder !== undefined && <option value="">{placeholder}</option>}
@@ -45,7 +45,7 @@ export function SelectField({
         ))}
       </select>
       {error && (
-        <p id={`${id}-error`} className="text-sm text-red-700">
+        <p id={`${id}-error`} className="text-sm text-danger-ink">
           {error}
         </p>
       )}
