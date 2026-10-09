@@ -1,6 +1,7 @@
 import { dueRelativeLabel, formatDue, type DashboardActivity } from '@planner/core';
 import { useId, type ReactNode } from 'react';
 import { Card } from '../../components/ui/Card';
+import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { OverdueBadge } from '../activities/badges';
 
 interface Props {
@@ -37,18 +38,14 @@ export function DueSection({
           <Card as="li" key={a.id} className="flex min-w-0 overflow-hidden">
             <span
               aria-hidden="true"
-              style={{ backgroundColor: a.subject?.color ?? '#64748B' }}
+              style={{ backgroundColor: a.subject?.color ?? NO_SUBJECT_COLOR }}
               className="w-1.5 shrink-0"
             />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2.5">
               <p className="font-medium break-words">{a.title}</p>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                {a.subject && (
-                  <>
-                    <span className="break-words">{a.subject.name}</span>
-                    <span aria-hidden="true">·</span>
-                  </>
-                )}
+                <span className="break-words">{a.subject?.name ?? 'Sin asignatura'}</span>
+                <span aria-hidden="true">·</span>
                 <span>{formatDue(a, timeZone)}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-medium text-foreground">{describe(a)}</span>

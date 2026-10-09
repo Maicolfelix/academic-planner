@@ -1,3 +1,6 @@
+/** The neutral color of something that has no subject (a general activity, a block with no class): never a subject's own. */
+export const NO_SUBJECT_COLOR = '#64748B';
+
 /** Relative luminance of a `#RRGGBB` color (WCAG 2.x), or null when the text is not one. */
 function luminance(hex: string): number | null {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);

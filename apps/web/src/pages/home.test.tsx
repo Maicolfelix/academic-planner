@@ -81,10 +81,10 @@ describe('the hero: "¿Qué hago ahora?"', () => {
   });
 });
 
-describe('a general activity (F1: no subject) does not break what the Home shows', () => {
+describe('a general activity (F1: no subject) says "Sin asignatura" where the subject would be', () => {
   const general = () => activity({ subjectId: null, subject: null });
 
-  it('the hero keeps title, deadline and reasons, and simply has no subject line', () => {
+  it('the hero keeps title, deadline and reasons, and names the missing subject', () => {
     const out = html(
       <Suggestion
         item={{
@@ -98,39 +98,42 @@ describe('a general activity (F1: no subject) does not break what the Home shows
     );
     expect(out).toContain('Parcial de Redes');
     expect(out).toContain('<li>Vence en menos de 24 horas.</li>');
+    expect(out).toContain('Sin asignatura');
     expect(out).not.toContain('Redes de Computadores');
     expect(out).not.toContain('null');
     expect(out).not.toContain('undefined');
   });
 
-  it('the next delivery (card and quiet line) reads without a hole where the subject was', () => {
+  it('the next delivery (card and quiet line) says it too', () => {
     for (const quiet of [false, true]) {
       const out = html(
         <NextDueCard activity={general() as never} timeZone={TZ} now={NOW} quiet={quiet} />,
       );
       expect(out).toContain('Parcial de Redes');
+      expect(out).toContain('Sin asignatura');
       expect(out).toMatch(/Vence/);
-      expect(out).not.toMatch(/·\s*·/);
       expect(out).not.toContain('null');
     }
   });
 
-  it('a due list row has a neutral mark and no subject name, and keeps the deadline', () => {
+  it('a due list row has a neutral mark and the same words, and keeps the deadline', () => {
     const out = html(
       <DueSection title="Hoy" items={[general() as never]} timeZone={TZ} now={NOW} />,
     );
     expect(out).toContain('Parcial de Redes');
+    expect(out).toContain('Sin asignatura');
     expect(out).toContain('background-color:#64748B');
     expect(out).toMatch(/Vence/);
     expect(out).not.toContain('null');
   });
 
-  it('with a subject nothing changed: name and its color are still there', () => {
+  it('with a subject nothing changed: name and its color are still there, and no "Sin asignatura"', () => {
     const out = html(
       <DueSection title="Hoy" items={[activity() as never]} timeZone={TZ} now={NOW} />,
     );
     expect(out).toContain('Redes de Computadores');
     expect(out).toContain('background-color:#3B82F6');
+    expect(out).not.toContain('Sin asignatura');
   });
 });
 

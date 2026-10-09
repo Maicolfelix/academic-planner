@@ -14,7 +14,7 @@ import {
   type Activity,
   type Subject,
 } from '@planner/core';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useCreateActivity, useUpdateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
@@ -22,6 +22,8 @@ import { Button } from '../../components/ui/Button';
 import { Disclosure, FormActions, FormError } from '../../components/ui/form';
 import { Modal } from '../../components/Modal';
 import { SelectField } from '../../components/SelectField';
+import { FIELD_LABEL } from '../../components/ui/fieldStyles';
+import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { ReminderSection } from '../reminders/ReminderSection';
 
 interface Props {
@@ -38,6 +40,11 @@ interface Props {
 /**
  * Quick path: title, subject, date. Time, type, priority and description sit behind "Más opciones".
  * Status is only editable on an existing activity (a new one always starts Pendiente).
+ *
+ * The subject is optional (F1): "Omitir asignatura" turns the selector into the state "Sin asignatura" (a general
+ * activity, e.g. an errand or a meeting) and "Elegir asignatura" brings the selector back. It is never the default when
+ * there are subjects: it takes one explicit tap. The last subject chosen is kept while the form is open, so going
+ * back and forth does not lose it. Saving in the "Sin asignatura" state sends `subjectId: null`.
  */
 export function ActivityFormDialog({
   subjects,
@@ -68,8 +75,40 @@ export function ActivityFormDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string>();
 
+  // A general activity opens as such; so does a new one when there is no subject to choose from. Otherwise the subject
+  // is chosen (the usual flow) and omitting it is the student's decision.
+  const [subjectless, setSubjectless] = useState(
+    activity ? activity.subjectId === null : subjects.length === 0,
+  );
+  // The swap between the selector and the state animates only once the student asks for it (not when the form opens).
+  const [swapped, setSwapped] = useState(false);
+  const focusAfterSwap = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusAfterSwap.current) return;
+    document.getElementById(focusAfterSwap.current)?.focus();
+    focusAfterSwap.current = null;
+  }, [subjectless]);
+
+  // The control that was pressed disappears: keep the focus on the one that takes its place.
+  function omitSubject() {
+    focusAfterSwap.current = 'activity-subject-choose';
+    setFieldErrors((e) => {
+      const rest = { ...e };
+      delete rest.subjectId;
+      return rest;
+    });
+    setSwapped(true);
+    setSubjectless(true);
+  }
+  function chooseSubject() {
+    focusAfterSwap.current = 'activity-subject';
+    setSwapped(true);
+    setSubjectless(false);
+  }
+
   // With a single subject there is nothing to choose.
   const effectiveSubjectId = subjectId || (subjects.length === 1 ? subjects[0]!.id : '');
+  const subjectToSend = subjectless ? null : effectiveSubjectId;
 
   const advancedInUse = Boolean(
     activity &&
@@ -93,7 +132,7 @@ export function ActivityFormDialog({
 
     if (activity) {
       const parsed = updateActivitySchema.safeParse({
-        subjectId: effectiveSubjectId,
+        subjectId: subjectToSend,
         title,
         dueDate,
         dueTime: dueTime || null,
@@ -110,7 +149,7 @@ export function ActivityFormDialog({
       );
     } else {
       const parsed = createActivitySchema.safeParse({
-        subjectId: effectiveSubjectId,
+        subjectId: subjectToSend,
         title,
         dueDate,
         dueTime: dueTime || undefined,
@@ -135,15 +174,66 @@ export function ActivityFormDialog({
           onChange={setTitle}
           error={fieldErrors.title?.[0]}
         />
-        <SelectField
-          id="activity-subject"
-          label="Asignatura"
-          placeholder={subjects.length === 1 ? undefined : 'Elige una asignatura'}
-          value={effectiveSubjectId}
-          onChange={setSubjectId}
-          options={subjects.map((s) => ({ value: s.id, label: s.name }))}
-          error={fieldErrors.subjectId?.[0]}
-        />
+        {subjectless ? (
+          <div
+            role="group"
+            aria-labelledby="activity-subject-label"
+            className={`flex flex-col gap-1.5 ${swapped ? 'animate-rise' : ''}`}
+          >
+            <span id="activity-subject-label" className={FIELD_LABEL}>
+              Asignatura
+            </span>
+            <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 rounded-control border border-dashed border-border-strong px-3 py-1">
+              <p id="activity-subject-none" className="flex items-center gap-2 text-foreground">
+                <span
+                  aria-hidden="true"
+                  style={{ backgroundColor: NO_SUBJECT_COLOR }}
+                  className="size-2 shrink-0 rounded-full"
+                />
+                Sin asignatura
+              </p>
+              {subjects.length > 0 && (
+                <Button
+                  id="activity-subject-choose"
+                  size="sm"
+                  variant="ghost"
+                  className="-mr-2 text-accent-ink"
+                  onClick={chooseSubject}
+                >
+                  Elegir asignatura
+                </Button>
+              )}
+            </div>
+            {subjects.length === 0 && (
+              <p className="text-sm text-muted-foreground">Aún no tienes asignaturas.</p>
+            )}
+            {fieldErrors.subjectId?.[0] && (
+              <p role="alert" className="text-sm text-danger-ink">
+                {fieldErrors.subjectId[0]}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className={`flex flex-col gap-0.5 ${swapped ? 'animate-rise' : ''}`}>
+            <SelectField
+              id="activity-subject"
+              label="Asignatura"
+              placeholder={subjects.length === 1 ? undefined : 'Elige una asignatura'}
+              value={effectiveSubjectId}
+              onChange={setSubjectId}
+              options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+              error={fieldErrors.subjectId?.[0]}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="self-start text-accent-ink"
+              onClick={omitSubject}
+            >
+              Omitir asignatura
+            </Button>
+          </div>
+        )}
         {/* When it is edited, the state sits beside the date (two short controls on one row from 640 px). */}
         <div className={activity ? 'grid gap-4 sm:grid-cols-2' : undefined}>
           <FormField

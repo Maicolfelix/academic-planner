@@ -15,6 +15,7 @@ export interface ActivityFilters {
   status?: ActivityStatus;
   /** "Vencidas": derived by the backend (deadline passed and not finished). Exclusive with `status`. */
   overdue?: boolean;
+  /** A subject id, or `none` (NO_SUBJECT_FILTER) for the activities with no subject. */
   subject?: string;
   priority?: ActivityPriority;
   type?: ActivityType;

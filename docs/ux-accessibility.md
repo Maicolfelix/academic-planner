@@ -212,6 +212,16 @@ Cierra la deuda visual que quedaba tras UX1-3. **Solo presentación:** mismas re
 
 **Sigue sintiéndose de sistema:** Inicio de sesión, Registro, Onboarding, Bandeja e Importar horario (sus tarjetas y botones propios), las vistas previas de Captura rápida y la Agenda semanal. **No probado:** el teclado virtual real de iOS (solo se comprobó el comportamiento con viewports estrechos), PWA instalada y HTTPS.
 
+## Actividades sin asignatura (F1-1)
+
+**Implementado en su PR; pendiente de QA real en un dispositivo** (no DONE). Los textos aprobados: acción «Omitir asignatura», estado «Sin asignatura», regreso «Elegir asignatura», filtro «Sin asignatura». Reglas de interfaz:
+
+- **Botones reales** (`<button type="button">`, `min-h-11` = 44 px, nombre accesible = su texto visible; el contenido que cambia es texto visible, sin `aria-live`). Orden de tabulación natural: el selector y, justo después, «Omitir asignatura». Al pulsar, el foco pasa al botón «Elegir asignatura» (y al revés, al selector): ningún control desaparece con el foco encima. El estado es un grupo con nombre («Asignatura») cuyo texto dice «Sin asignatura»; el punto neutro es decoración (`aria-hidden`).
+- **Movimiento:** el cambio entre el selector y el estado usa la entrada `animate-rise` existente (corta, categoría C) y **solo cuando el estudiante lo pide**, no al abrir el formulario; con `prefers-reduced-motion` es instantáneo.
+- **Diseño:** sin primitivas nuevas ni literales de paleta nuevos: `FormField`/`SelectField`/`Button`/`FIELD_LABEL` y los tokens existentes (`accent-ink`, `border-border-strong`, `text-muted-foreground`); el gris neutro de «sin asignatura» es la constante `NO_SUBJECT_COLOR` que ya usaban tres sitios. A 320 px la fila del estado envuelve («Elegir asignatura» pasa debajo) sin desbordar.
+- **Medido** (navegador, 320/390/430/768/1024/1366/1440 px): sin desbordes horizontales, botones de 44 px, tarjeta, filtros y Home con el respaldo; axe (WCAG 2 A/AA) limpio en ambos modos del formulario y en Home.
+- **Qué NO hace:** no cambia Captura rápida ni Bandeja (siguen exigiendo asignatura al confirmar: F1-2), ni el seed demo, ni el backend.
+
 ## Formularios y diálogos (reglas generales)
 
 - Todo campo tiene `label` asociado; los errores van junto al campo (`aria-describedby`, `aria-invalid`); los opcionales dicen «(opcional)».

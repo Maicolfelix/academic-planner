@@ -1,13 +1,12 @@
 import { QueryError } from '../components/QueryError';
 import { DEFAULT_TIMEZONE, type Activity, type ActivityStatus } from '@planner/core';
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useUpdateActivity, useActivities } from '../activities/useActivities';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { useNow } from '../lib/useNow';
 import { Button } from '../components/ui/Button';
-import { buttonStyles } from '../components/ui/buttonStyles';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
@@ -75,13 +74,13 @@ export function ActivitiesPage() {
   const subjectList = subjects.data ?? [];
   const list = activities.data ?? [];
   const filtered = hasActiveFilters(filters);
-  const canCreate = subjectList.length > 0;
 
-  const add = canCreate ? (
+  // A subject is optional (F1): having none no longer blocks adding an activity.
+  const add = (
     <Button variant="primary" onClick={() => setEditing('new')}>
       Agregar actividad
     </Button>
-  ) : null;
+  );
 
   function changeStatus(activity: Activity, status: ActivityStatus) {
     setStatusError(undefined);
@@ -108,60 +107,44 @@ export function ActivitiesPage() {
 
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
-      {subjects.isSuccess && !canCreate && (
-        <EmptyState
-          title="Primero agrega una asignatura."
-          action={
-            <Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>
-              Ir a Asignaturas
-            </Link>
-          }
-        >
-          Cada actividad pertenece a una asignatura de este semestre.
+      <ActivityFilters filters={filters} subjects={subjectList} onChange={setFilters} />
+
+      {activities.isPending && <p role="status">Cargando actividades…</p>}
+
+      <QueryError query={activities} title="No se pudieron cargar tus actividades" />
+
+      {activities.isSuccess && list.length === 0 && !filtered && (
+        <EmptyState title="Aún no tienes actividades." action={add}>
+          Agrega tareas, parciales y entregas para tener todo en un solo lugar.
         </EmptyState>
       )}
 
-      {canCreate && (
-        <>
-          <ActivityFilters filters={filters} subjects={subjectList} onChange={setFilters} />
-
-          {activities.isPending && <p role="status">Cargando actividades…</p>}
-
-          <QueryError query={activities} title="No se pudieron cargar tus actividades" />
-
-          {activities.isSuccess && list.length === 0 && !filtered && (
-            <EmptyState title="Aún no tienes actividades." action={add}>
-              Agrega tareas, parciales y entregas para tener todo en un solo lugar.
-            </EmptyState>
-          )}
-
-          {activities.isSuccess && list.length === 0 && filtered && (
-            <EmptyState
-              title="No hay actividades que coincidan con los filtros."
-              action={
-                <Button size="sm" onClick={() => setFilters({})}>
-                  Limpiar filtros
-                </Button>
-              }
-            />
-          )}
-
-          {list.length > 0 && (
-            <ActivityList
-              activities={list}
-              subjects={subjectList}
-              timeZone={timeZone}
-              now={now}
-              pendingStatusId={updateStatus.isPending ? updateStatus.variables?.id : undefined}
-              onStatusChange={changeStatus}
-              onEdit={setEditing}
-              onDelete={setDeleting}
-            />
-          )}
-        </>
+      {activities.isSuccess && list.length === 0 && filtered && (
+        <EmptyState
+          title="No hay actividades que coincidan con los filtros."
+          action={
+            <Button size="sm" onClick={() => setFilters({})}>
+              Limpiar filtros
+            </Button>
+          }
+        />
       )}
 
-      {current && canCreate && (
+      {list.length > 0 && (
+        <ActivityList
+          activities={list}
+          subjects={subjectList}
+          timeZone={timeZone}
+          now={now}
+          pendingStatusId={updateStatus.isPending ? updateStatus.variables?.id : undefined}
+          onStatusChange={changeStatus}
+          onEdit={setEditing}
+          onDelete={setDeleting}
+        />
+      )}
+
+      {/* Wait for the subjects: the form decides its first mode (a subject to choose, or none) from them, once. */}
+      {current && subjects.isSuccess && (
         <ActivityFormDialog
           subjects={subjectList}
           activity={current === 'new' ? undefined : current}

@@ -21,7 +21,7 @@ export function NextDueCard({ activity, timeZone, now, quiet = false }: Props) {
         <span className="break-words">
           {[
             activity.title,
-            activity.subject?.name,
+            activity.subject?.name ?? 'Sin asignatura',
             formatDue(activity, timeZone),
             dueRelativeLabel(activity, now, timeZone),
           ]
@@ -43,9 +43,9 @@ export function NextDueCard({ activity, timeZone, now, quiet = false }: Props) {
       {activity ? (
         <div className="mt-1 min-w-0">
           <p className="text-card-title break-words">{activity.title}</p>
-          {activity.subject && (
-            <p className="text-muted-foreground break-words">{activity.subject.name}</p>
-          )}
+          <p className="text-muted-foreground break-words">
+            {activity.subject?.name ?? 'Sin asignatura'}
+          </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-foreground">
             <span>{formatDue(activity, timeZone)}</span>
             <span aria-hidden="true">·</span>
