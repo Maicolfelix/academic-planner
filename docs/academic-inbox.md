@@ -1,4 +1,4 @@
-> **F1-2b:** el mismo motor de propuestas que usa ahora Captura rápida ([capture-proposals.md](capture-proposals.md), `POST /api/capture/parse` con `mode: 'INBOX'`) ya existe y da las mismas actividades que esta pantalla, más listas de días y horas por posición. **Esta pantalla todavía usa su ruta anterior** (F1-2d).
+> **Vigente (F1-2cdp):** la Bandeja usa el mismo motor, la misma revisión y la misma confirmación en lote que Captura rápida ([capture-proposals.md](capture-proposals.md): `POST /api/capture/parse` con `mode: 'INBOX'` y `POST /api/capture/confirm`). **«Crear N actividades»** crea todo lo marcado **todo o nada** (ya no «una tras otra»), y el mensaje pegado y lo decidido se conservan como borrador ([drafts.md](drafts.md)). Lo que sigue describe la ruta anterior (`POST /api/academic-inbox/parse`), conservada por compatibilidad sin uso en la interfaz; su segmentación sigue siendo la base del motor.
 
 # Bandeja académica (Fase 12)
 

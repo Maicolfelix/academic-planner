@@ -183,6 +183,14 @@ Cabeceras reales: arrancar con `WEB_DIST_DIR=apps/web/dist` y `curl -I http://lo
 
 `npm run db:seed:demo -- --allow-demo` es el único camino que crea datos de demostración. **Desactivado en producción:** rechaza con código 2 si `NODE_ENV` es `production` aunque lleve el flag, y rechaza sin el flag. No se ejecuta con `npm install`, `dev`, `db:deploy` ni al arrancar el servidor. Solo lee y escribe filas del usuario demo (correo fijo `demo@academicplanner.local`), nunca borra otros usuarios ni sus sesiones, no hace `DROP`/`TRUNCATE` y no imprime la URL de la base de datos ni el hash. La contraseña demo es sintética y pública (docs/demo.md): **la cuenta demo no debe existir en un despliegue público**; si por error se hubiera sembrado una base compartida, se elimina con una sola sentencia sobre ese correo. No hay modo demo en el producto ni credenciales en el frontend. Se probó (BD de test) que el flag es obligatorio, que producción lo rechaza, que otros usuarios quedan intactos y que la contraseña sirve solo a través del inicio de sesión normal.
 
+## 22. Captura inteligente: confirmación en lote y borradores (F1-2cdp)
+
+- **`POST /api/capture/confirm`** entra en las matrices: 401 sin sesión, origen, cuerpo **estricto** (en la raíz y en cada ítem y subasignatura: `userId`, `periodId`, `status`, `dueAt`, `reminders`, `subjectId` junto a `subject` se rechazan), `Cache-Control: no-store`, entradas hostiles (cadenas enormes, tipos erróneos, `__proto__`, NUL, sustitutos sueltos, fechas imposibles, más de 10 ítems) → 4xx y nunca 500, y propiedad: la asignatura de otro usuario y una inexistente responden **exactamente igual** y no se filtra su id.
+- **Invariante del periodo:** el cliente nunca lo envía; una asignatura `EXISTING` debe ser del usuario **y del periodo actual**; una `NEW` se crea en el periodo actual con clave, color y periodo del servidor.
+- **Todo o nada** en una transacción, con un bloqueo asesor transaccional por usuario (espera acotada: 429 `CAPTURE_IN_PROGRESS`) y rechazo de copias exactas (409) para que un doble toque o un reintento no dupliquen.
+- **NUL:** un carácter NUL en un nombre o título provocaba un 500 de la base de datos; ahora los esquemas de nombre de asignatura y periodo y de título y descripción de actividad lo rechazan con un mensaje (400).
+- **Borradores:** `localStorage` con la clave del usuario, sin correo, token, CSRF ni nada de la sesión (probado en `e2e/security.spec.ts`), validados con Zod al leer, con caducidad y sin ejecutar nada de lo guardado. El texto que se muestra sigue renderizándose como texto (XSS probado en el navegador con la captura nueva).
+
 ## 21. Añadir al calendario (A4.1)
 
 `GET /api/activities/:id/calendar.ics` descarga un `.ics` de una actividad ([calendar-export.md](calendar-export.md)).

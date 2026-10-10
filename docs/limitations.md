@@ -40,8 +40,10 @@ Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. 
 ## Intérpretes de texto (Captura rápida y Bandeja académica)
 
 - Solo **español** y solo los fraseos que las reglas prevén; no «entienden» lenguaje libre.
-- **Captura rápida admite una actividad a la vez**; la detección de varias en una frase no es perfecta. Hasta 300 caracteres.
-- **Bandeja académica:** hasta 5000 caracteres y **10 propuestas** por mensaje. Puede proponer algo incompleto (queda marcado) y sugiere duplicados, pero no los decide.
+- **Captura rápida** (hasta **1000** caracteres) y **Bandeja académica** (hasta 5000) comparten un motor que lee varias actividades, listas de días y horas, cantidades («dos tareas») y referencias hacia atrás («el parcial es a las 7», «las dos tareas…»); hasta **10 propuestas** por texto, nunca recortado en silencio. No es lenguaje libre: lo que no reconoce queda como una pregunta o un campo vacío, y las referencias solo se resuelven hacia atrás y contra menciones del mismo tipo («cada uno», «los anteriores» y «los otros» fuera de una lista de días no se interpretan). Puede proponer algo incompleto (queda marcado) y sugiere duplicados, pero no los decide.
+- **Borradores:** viven en `localStorage` de **ese navegador** (no se sincronizan entre dispositivos), caducan a los 7 días y se conservan al cerrar sesión (solo los lee esa cuenta); en un equipo compartido conviene «Descartar» antes de salir. No son una cola sin conexión: sin conexión no se interpreta ni se crea nada.
+- Las rutas anteriores `/api/quick-capture/parse` y `/api/academic-inbox/parse` se conservan por compatibilidad sin uso en la interfaz.
+- Un NUL en el título de una clase de la Agenda sigue siendo aceptado por el esquema y rechazado por la base de datos con un 500 genérico (hallazgo de F1-2cdp; los títulos y descripciones de actividad y los nombres de asignatura y periodo ya lo rechazan con un mensaje).
 - Nunca inventan una asignatura: una ambigua o ausente se pregunta.
 - Sin alias propios de asignaturas.
 

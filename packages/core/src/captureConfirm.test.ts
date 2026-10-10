@@ -3,6 +3,7 @@ import { createActivitySchema } from './activity.js';
 import { createSubjectSchema, subjectNameSchema } from './academic.js';
 import { captureConfirmSchema } from './captureConfirm.js';
 
+const UUID = '00000000-0000-4000-8000-000000000001';
 const item = (over: Record<string, unknown> = {}) => ({
   clientId: 'p1',
   title: 'Ensayo',
@@ -18,7 +19,7 @@ describe('the confirmation request', () => {
     const r = parse([
       item(),
       item({ clientId: 'p2', subject: { kind: 'NEW', name: 'Criptografía' }, type: 'EXAM' }),
-      item({ clientId: 'p3', subject: { kind: 'EXISTING', subjectId: crypto.randomUUID() } }),
+      item({ clientId: 'p3', subject: { kind: 'EXISTING', subjectId: UUID } }),
     ]);
     expect(r.success).toBe(true);
     if (r.success) {
@@ -29,18 +30,18 @@ describe('the confirmation request', () => {
 
   it('is strict at every level: nothing the server derives is accepted', () => {
     for (const extra of [
-      { periodId: crypto.randomUUID() },
-      { userId: crypto.randomUUID() },
+      { periodId: UUID },
+      { userId: UUID },
       { status: 'COMPLETED' },
       { dueAt: '2026-10-12T12:30:00.000Z' },
       { reminders: [] },
-      { subjectId: crypto.randomUUID() }, // the subject goes in `subject`
+      { subjectId: UUID }, // the subject goes in `subject`
     ]) {
       expect(parse([item(extra)]).success, JSON.stringify(extra)).toBe(false);
     }
     expect(captureConfirmSchema.safeParse({ items: [item()], count: 1 }).success).toBe(false);
     for (const subject of [
-      { kind: 'NONE', subjectId: crypto.randomUUID() },
+      { kind: 'NONE', subjectId: UUID },
       { kind: 'NEW', name: 'X', color: '#000000' },
       { kind: 'EXISTING' },
       { kind: 'OTHER' },
@@ -89,9 +90,7 @@ describe('free text never carries a NUL character (the database would refuse it 
   it('in a subject name, wherever the name enters', () => {
     expect(subjectNameSchema.safeParse('Redes\u0000').success).toBe(false);
     expect(subjectNameSchema.safeParse('Redes de Computadores').success).toBe(true);
-    expect(
-      createSubjectSchema.safeParse({ periodId: crypto.randomUUID(), name: 'a\u0000' }).success,
-    ).toBe(false);
+    expect(createSubjectSchema.safeParse({ periodId: UUID, name: 'a\u0000' }).success).toBe(false);
     expect(parse([item({ subject: { kind: 'NEW', name: 'a\u0000b' } })]).success).toBe(false);
   });
 });

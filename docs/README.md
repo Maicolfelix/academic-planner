@@ -26,24 +26,25 @@
 
 ## Módulos funcionales
 
-| Documento                                            | Módulo                                 |
-| ---------------------------------------------------- | -------------------------------------- |
-| [auth.md](auth.md)                                   | Autenticación, sesiones, cookie, CSRF  |
-| [academic.md](academic.md)                           | Periodos académicos y asignaturas      |
-| [activities.md](activities.md)                       | Actividades                            |
-| [calendar-export.md](calendar-export.md)             | Añadir al calendario (`.ics`)          |
-| [dashboard.md](dashboard.md)                         | Pantalla de inicio                     |
-| [schedule.md](schedule.md)                           | Agenda, recurrencia y solapes          |
-| [reminders.md](reminders.md)                         | Recordatorios internos                 |
-| [radar.md](radar.md)                                 | Radar académico                        |
-| [attention-engine.md](attention-engine.md)           | «¿Qué hago ahora?»                     |
-| [progress-and-workload.md](progress-and-workload.md) | Progreso y carga semanal               |
-| [quick-capture.md](quick-capture.md)                 | Captura rápida                         |
-| [academic-inbox.md](academic-inbox.md)               | Bandeja académica                      |
-| [capture-proposals.md](capture-proposals.md)         | Motor de propuestas de captura (F1-2b) |
-| [schedule-import.md](schedule-import.md)             | Importación de horario (OCR)           |
-| [pwa.md](pwa.md)                                     | PWA instalable                         |
-| [ux-accessibility.md](ux-accessibility.md)           | UX, accesibilidad y diseño adaptable   |
+| Documento                                            | Módulo                                                                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [auth.md](auth.md)                                   | Autenticación, sesiones, cookie, CSRF                                         |
+| [academic.md](academic.md)                           | Periodos académicos y asignaturas                                             |
+| [activities.md](activities.md)                       | Actividades                                                                   |
+| [calendar-export.md](calendar-export.md)             | Añadir al calendario (`.ics`)                                                 |
+| [dashboard.md](dashboard.md)                         | Pantalla de inicio                                                            |
+| [schedule.md](schedule.md)                           | Agenda, recurrencia y solapes                                                 |
+| [reminders.md](reminders.md)                         | Recordatorios internos                                                        |
+| [radar.md](radar.md)                                 | Radar académico                                                               |
+| [attention-engine.md](attention-engine.md)           | «¿Qué hago ahora?»                                                            |
+| [progress-and-workload.md](progress-and-workload.md) | Progreso y carga semanal                                                      |
+| [quick-capture.md](quick-capture.md)                 | Captura rápida                                                                |
+| [academic-inbox.md](academic-inbox.md)               | Bandeja académica                                                             |
+| [capture-proposals.md](capture-proposals.md)         | Captura inteligente: motor, confirmación en lote y revisión (F1-2b → F1-2cdp) |
+| [drafts.md](drafts.md)                               | Borradores persistentes (captura y formularios de actividad)                  |
+| [schedule-import.md](schedule-import.md)             | Importación de horario (OCR)                                                  |
+| [pwa.md](pwa.md)                                     | PWA instalable                                                                |
+| [ux-accessibility.md](ux-accessibility.md)           | UX, accesibilidad y diseño adaptable                                          |
 
 ## Calidad, seguridad y operación
 

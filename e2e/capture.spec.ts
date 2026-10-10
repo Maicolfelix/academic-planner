@@ -91,7 +91,7 @@ test('1. four days with two hours by position: four cards, nothing to answer, on
   const hours = ['7:30 a. m.', '7:30 a. m.', '5:40 p. m.', '5:40 p. m.'];
   for (const [i, day] of summaries.entries()) {
     const card = cards(page).nth(i);
-    await expect(card.getByRole('heading', { level: 3 })).toContainText('Ensayo');
+    await expect(card.getByRole('heading', { level: 4 })).toContainText('Ensayo');
     await expect(card).toContainText(day);
     await expect(card).toContainText(hours[i]!);
     await expect(card).toContainText('Sin asignatura');
@@ -393,7 +393,7 @@ test('12. a reload keeps the text and the review', async ({ page }) => {
   await page.waitForTimeout(500);
   await page.reload();
   await expect(cards(page)).toHaveCount(1);
-  await expect(cards(page).nth(0).getByRole('heading', { level: 3 })).toContainText(
+  await expect(cards(page).nth(0).getByRole('heading', { level: 4 })).toContainText(
     'Tarea 1 de Redes',
   );
   assertClean();
