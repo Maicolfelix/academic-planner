@@ -116,7 +116,7 @@ describe('parsers do not stall or crash on hostile text', () => {
     }
     // The shared engine, both ways of reading: days, hours, ranges and positions are not a way to make it work hard.
     for (const [mode, size] of [
-      ['QUICK', 300],
+      ['QUICK', 1000],
       ['INBOX', 5000],
     ] as const) {
       const engine = [
@@ -130,6 +130,13 @@ describe('parsers do not stall or crash on hostile text', () => {
         ),
         'reunión '.repeat(size / 8),
         'parcial martes y '.repeat(size / 17),
+        // References, quantities and enumerators: the discourse layer is not a way to make it work hard either.
+        'tengo dos tareas jueves y viernes las dos a las 8 '.repeat(size / 50),
+        'el parcial es a las 7 y el ensayo es '.repeat(size / 36),
+        'una tarea el lunes y otra '.repeat(size / 26),
+        'tarea y otra y otra y otra '.repeat(size / 27),
+        'ambos las dos los tres '.repeat(size / 23),
+        'el parcial de redes el parcial de redes '.repeat(size / 40),
       ];
       for (const text of [...nasty(size), ...engine]) {
         const t0 = Date.now();
@@ -139,6 +146,40 @@ describe('parsers do not stall or crash on hostile text', () => {
       }
     }
     expect(slowest).toBeLessThan(1500);
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('hostile confirmations are answered with 4xx, never a 500, and create nothing', async () => {
+    const app = buildApp();
+    const { agent } = await setupUser(app, 'c@example.com', 'Redes');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const base = { clientId: 'c1', title: 'Z', dueDate: '2026-10-08', subject: { kind: 'NONE' } };
+    const lone = String.fromCharCode(0xd800); // a lone surrogate: not valid text
+    const bodies: unknown[] = [
+      null,
+      [],
+      'items',
+      { items: 'x' },
+      { items: [null] },
+      { items: [[]] },
+      { items: [{ ...base, title: 'x'.repeat(100_000) }] },
+      { items: [{ ...base, clientId: 'x'.repeat(1000) }] },
+      { items: [{ ...base, subject: { kind: 'NEW', name: 'x'.repeat(100_000) } }] },
+      { items: [{ ...base, subject: { kind: 'NEW', name: `\u0000${lone}` } }] },
+      { items: [{ ...base, subject: { kind: '__proto__' } }] },
+      { items: [{ ...base, dueDate: '9999-99-99' }] },
+      { items: [{ ...base, dueTime: '25:61' }] },
+      { items: [{ ...base, type: 'DROP TABLE' }] },
+      { items: Array.from({ length: 11 }, (_, i) => ({ ...base, clientId: `c${i}` })) },
+      { items: [base], constructor: { prototype: { polluted: true } } },
+    ];
+    for (const body of bodies) {
+      const res = await agent.post('/api/capture/confirm').send(body as object);
+      expect(res.status, JSON.stringify(body)?.slice(0, 60)).toBeLessThan(500);
+      expect(res.status, JSON.stringify(body)?.slice(0, 60)).toBeGreaterThanOrEqual(400);
+    }
+    expect(await prisma.activity.count()).toBe(0);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     expect(errors).not.toHaveBeenCalled();
   });
 

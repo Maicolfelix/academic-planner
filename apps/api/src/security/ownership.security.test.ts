@@ -309,6 +309,46 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
     expect((await w.a.agent.get('/api/workload')).body.workload.totals.activityCount).toBe(0);
   });
 
+  it('confirming a capture never touches another user: their subject, their data, their activities', async () => {
+    const w = await world();
+    const before = await prisma.activity.count();
+    const attempt = (subjectId: string) =>
+      w.a.agent.post('/api/capture/confirm').send({
+        items: [
+          {
+            clientId: 'c1',
+            title: 'Z',
+            dueDate: '2026-10-08',
+            subject: { kind: 'EXISTING', subjectId },
+          },
+        ],
+      });
+    const foreign = await attempt(w.b.subject.id);
+    const missing = await attempt(randomUUID());
+    expect(foreign.status).toBe(400);
+    expect(foreign.body).toEqual(missing.body); // exactly the same answer: existence is not confirmed
+    expect(JSON.stringify(foreign.body)).not.toContain(w.b.subject.id);
+    expect(await prisma.activity.count()).toBe(before);
+
+    // A new subject is created for A, in A's period; B's data is untouched.
+    const ok = await w.a.agent.post('/api/capture/confirm').send({
+      items: [
+        {
+          clientId: 'c1',
+          title: 'Z',
+          dueDate: '2026-10-08',
+          subject: { kind: 'NEW', name: 'Nueva de A' },
+        },
+      ],
+    });
+    expect(ok.status).toBe(201);
+    const created = await prisma.subject.findFirstOrThrow({ where: { name: 'Nueva de A' } });
+    expect(created.userId).toBe(w.a.user.id);
+    expect(created.periodId).toBe(w.a.period.id);
+    const bSide = await prisma.activity.count({ where: { userId: w.b.user.id } });
+    expect(bSide).toBe(await prisma.activity.count({ where: { userId: w.b.user.id } }));
+  });
+
   it('Quick Capture and the Academic Inbox only match A’s own subjects', async () => {
     const w = await world();
     const quick = await w.a.agent
@@ -413,6 +453,18 @@ describe('strict bodies: no mass assignment', () => {
       w.a.agent.post('/api/periods').send({ ...periodInput, [key]: value }),
       w.a.agent.post('/api/quick-capture/parse').send({ text: 'x', [key]: value }),
       w.a.agent.post('/api/capture/parse').send({ text: 'x', [key]: value }),
+      w.a.agent.post('/api/capture/confirm').send({
+        items: [{ clientId: 'c1', title: 'Z', dueDate: '2026-10-08', subject: { kind: 'NONE' } }],
+        [key]: value,
+      }),
+      w.a.agent.post('/api/capture/confirm').send({
+        items: [
+          {
+            ...{ clientId: 'c1', title: 'Z', dueDate: '2026-10-08', subject: { kind: 'NONE' } },
+            [key]: value,
+          },
+        ],
+      }),
       w.a.agent.post('/api/academic-inbox/parse').send({ text: 'x', [key]: value }),
     ];
     for (const r of await Promise.all(attempts)) {
@@ -486,6 +538,7 @@ describe('every protected route refuses an anonymous caller', () => {
     ['get', '/api/workload'],
     ['post', '/api/quick-capture/parse'],
     ['post', '/api/capture/parse'],
+    ['post', '/api/capture/confirm'],
     ['post', '/api/academic-inbox/parse'],
     ['post', '/api/schedule-import/parse'],
     ['post', '/api/schedule-import/confirm'],

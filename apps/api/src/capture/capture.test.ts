@@ -56,8 +56,8 @@ describe('POST /api/capture/parse: access and input', () => {
   it('the mode defaults to QUICK; empty and over-limit texts are a clear status, not a 500', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     expect((await parse(agent, '   ')).capture.status).toBe('EMPTY');
-    expect((await parse(agent, 'x'.repeat(301))).capture.status).toBe('TOO_LONG');
-    expect((await parse(agent, 'x'.repeat(301), 'INBOX')).capture.status).toBe('OK');
+    expect((await parse(agent, 'x'.repeat(1001))).capture.status).toBe('TOO_LONG');
+    expect((await parse(agent, 'x'.repeat(1001), 'INBOX')).capture.status).toBe('OK');
     expect((await agent.post('/api/capture/parse').send({ text: 'x'.repeat(20_001) })).status).toBe(
       400,
     );
