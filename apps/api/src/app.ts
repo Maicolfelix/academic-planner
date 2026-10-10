@@ -20,6 +20,7 @@ import {
   createWorkloadController,
 } from './controllers/insightsController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createCaptureController } from './controllers/captureController.js';
 import { createQuickCaptureController } from './controllers/quickCaptureController.js';
 import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
@@ -41,6 +42,7 @@ import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { progressRouter, workloadRouter } from './routes/insights.js';
+import { captureRouter } from './routes/capture.js';
 import { quickCaptureRouter } from './routes/quickCapture.js';
 import { periodsRouter } from './routes/periods.js';
 import { radarRouter } from './routes/radar.js';
@@ -54,6 +56,7 @@ import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProgressService } from './services/progressService.js';
+import { createCaptureService } from './services/captureService.js';
 import { createQuickCaptureService } from './services/quickCaptureService.js';
 import { createRadarService } from './services/radarService.js';
 import { createReminderService } from './services/reminderService.js';
@@ -128,6 +131,9 @@ export function createApp(deps: AppDeps): Express {
   );
   const academicInboxController = createAcademicInboxController(
     createAcademicInboxService(periodRepository, subjectRepository, activityRepository, clock),
+  );
+  const captureController = createCaptureController(
+    createCaptureService(periodRepository, subjectRepository, activityRepository, clock),
   );
   const quickCaptureController = createQuickCaptureController(
     createQuickCaptureService(periodRepository, subjectRepository, clock),
@@ -205,6 +211,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/radar', radarRouter(radarController, requireAuth));
   app.use('/api/academic-inbox', academicInboxRouter(academicInboxController, requireAuth));
   app.use('/api/quick-capture', quickCaptureRouter(quickCaptureController, requireAuth));
+  app.use('/api/capture', captureRouter(captureController, requireAuth));
   app.use('/api/progress', progressRouter(progressController, requireAuth));
   app.use('/api/workload', workloadRouter(workloadController, requireAuth));
   app.use('/api/attention', attentionRouter(attentionController, requireAuth));

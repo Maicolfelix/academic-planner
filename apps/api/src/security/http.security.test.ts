@@ -51,6 +51,7 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ['patch', `/api/reminders/${uuid()}`, { remindDate: '2026-10-08' }],
   ['delete', `/api/reminders/${uuid()}`],
   ['post', '/api/quick-capture/parse', { text: 'parcial' }],
+  ['post', '/api/capture/parse', { text: 'parcial' }],
   ['post', '/api/academic-inbox/parse', { text: 'parcial' }],
   ['post', '/api/schedule-import/parse'],
   [
@@ -296,6 +297,7 @@ describe('private responses are never stored by a browser or proxy', () => {
       await request(app).get('/api/nope'),
       await agent.post('/api/activities').send({}),
       await agent.post('/api/quick-capture/parse').send({ text: 'parcial redes' }),
+      await agent.post('/api/capture/parse').send({ text: 'parcial redes' }),
       await agent.post('/api/academic-inbox/parse').send({ text: 'parcial' }),
     ]) {
       expect(res.headers['cache-control']).toBe('no-store');
