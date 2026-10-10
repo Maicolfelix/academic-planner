@@ -243,10 +243,10 @@ test('the Home keeps working with the bottom navigation and capture in their new
   await page.goto('/dashboard');
 
   const capture = region(page, 'Captura rápida');
-  await expect(capture.getByLabel('Escribe la actividad en una frase')).toBeVisible();
-  await capture.getByLabel('Escribe la actividad en una frase').fill('   ');
+  await expect(capture.getByLabel('Escribe lo que tienes pendiente')).toBeVisible();
+  await capture.getByLabel('Escribe lo que tienes pendiente').fill('   ');
   await capture.getByRole('button', { name: 'Interpretar' }).click();
-  await expect(capture.locator('#quick-capture-error')).toBeVisible();
+  await expect(capture.locator('#capture-error-QUICK')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Interpretar mensaje' })).toBeVisible();
 
   const nav = page.getByRole('navigation', { name: 'Principal' });
