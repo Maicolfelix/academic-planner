@@ -214,7 +214,7 @@ Cierra la deuda visual que quedaba tras UX1-3. **Solo presentación:** mismas re
 
 ## Actividades sin asignatura (F1-1)
 
-**Implementado en su PR; pendiente de QA real en un dispositivo** (no DONE). Los textos aprobados: acción «Omitir asignatura», estado «Sin asignatura», regreso «Elegir asignatura», filtro «Sin asignatura». Reglas de interfaz:
+**Fusionado (PR #28), DONE:** QA real en un iPhone con Safari (HTTP en la red local) **aprobada para la fase actual** por el mantenedor: se validaron visualmente y en la interacción principal (Omitir asignatura → Sin asignatura → Elegir asignatura); **no** consta un recorrido funcional exhaustivo (PWA y HTTPS sin probar). Los textos aprobados: acción «Omitir asignatura», estado «Sin asignatura», regreso «Elegir asignatura», filtro «Sin asignatura». Reglas de interfaz:
 
 - **Botones reales** (`<button type="button">`, `min-h-11` = 44 px, nombre accesible = su texto visible; el contenido que cambia es texto visible, sin `aria-live`). Orden de tabulación natural: el selector y, justo después, «Omitir asignatura». Al pulsar, el foco pasa al botón «Elegir asignatura» (y al revés, al selector): ningún control desaparece con el foco encima. El estado es un grupo con nombre («Asignatura») cuyo texto dice «Sin asignatura»; el punto neutro es decoración (`aria-hidden`).
 - **Movimiento:** el cambio entre el selector y el estado usa la entrada `animate-rise` existente (corta, categoría C) y **solo cuando el estudiante lo pide**, no al abrir el formulario; con `prefers-reduced-motion` es instantáneo.
