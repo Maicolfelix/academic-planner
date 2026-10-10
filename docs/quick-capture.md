@@ -1,5 +1,7 @@
 # Captura rápida (Fase 11)
 
+> **F1-2b:** el motor que interpreta varias actividades y varios días por texto, con propuestas `READY` / `NEEDS_REVIEW` / `INVALID`, ya existe ([capture-proposals.md](capture-proposals.md), `POST /api/capture/parse`). **Esta pantalla todavía no lo usa** (F1-2d): sigue con el parser descrito abajo, que admite una actividad por frase y por eso emite «Captura rápida admite una actividad a la vez.».
+
 ## Objetivo
 
 Que el estudiante registre una actividad escribiendo **una frase corta** ("parcial redes martes 10am") en lugar de abrir el formulario completo. El sistema interpreta la frase y propone una actividad; el estudiante la revisa y la confirma.

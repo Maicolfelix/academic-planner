@@ -316,6 +316,11 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
       .send({ text: 'parcial secreta de B viernes 10am' });
     expect(JSON.stringify(quick.body)).not.toContain(w.secondSubject.id);
     expect(quick.body.capture.subjectId).toBeNull();
+    const capture = await w.a.agent
+      .post('/api/capture/parse')
+      .send({ text: 'parcial de Materia B y de Secreta de B el viernes' });
+    expect(JSON.stringify(capture.body)).not.toContain(w.b.subject.id);
+    expect(JSON.stringify(capture.body)).not.toContain(w.secondSubject.id);
     const inbox = await w.a.agent
       .post('/api/academic-inbox/parse')
       .send({ text: 'El viernes tendremos parcial de Materia B y de Secreta de B.' });
@@ -407,6 +412,7 @@ describe('strict bodies: no mass assignment', () => {
       w.a.agent.patch(`/api/periods/${w.a.period.id}`).send({ name: 'Z', [key]: value }),
       w.a.agent.post('/api/periods').send({ ...periodInput, [key]: value }),
       w.a.agent.post('/api/quick-capture/parse').send({ text: 'x', [key]: value }),
+      w.a.agent.post('/api/capture/parse').send({ text: 'x', [key]: value }),
       w.a.agent.post('/api/academic-inbox/parse').send({ text: 'x', [key]: value }),
     ];
     for (const r of await Promise.all(attempts)) {
@@ -479,6 +485,7 @@ describe('every protected route refuses an anonymous caller', () => {
     ['get', '/api/progress'],
     ['get', '/api/workload'],
     ['post', '/api/quick-capture/parse'],
+    ['post', '/api/capture/parse'],
     ['post', '/api/academic-inbox/parse'],
     ['post', '/api/schedule-import/parse'],
     ['post', '/api/schedule-import/confirm'],

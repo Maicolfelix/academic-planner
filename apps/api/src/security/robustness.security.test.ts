@@ -114,6 +114,30 @@ describe('parsers do not stall or crash on hostile text', () => {
       slowest = Math.max(slowest, Date.now() - t0);
       expect(res.status, JSON.stringify(text.slice(0, 20))).toBeLessThan(500);
     }
+    // The shared engine, both ways of reading: days, hours, ranges and positions are not a way to make it work hard.
+    for (const [mode, size] of [
+      ['QUICK', 300],
+      ['INBOX', 5000],
+    ] as const) {
+      const engine = [
+        'lunes y '.repeat(size / 8),
+        'lunes a '.repeat(size / 8),
+        'a las 8 y '.repeat(size / 10),
+        'los dos primeros a las 7 '.repeat(size / 25),
+        'todos los martes '.repeat(size / 17),
+        'lunes, martes, jueves y viernes los dos primeros días a las 7:30 am y los otros dos días a las 5 pm '.repeat(
+          size / 100,
+        ),
+        'reunión '.repeat(size / 8),
+        'parcial martes y '.repeat(size / 17),
+      ];
+      for (const text of [...nasty(size), ...engine]) {
+        const t0 = Date.now();
+        const res = await agent.post('/api/capture/parse').send({ text, mode });
+        slowest = Math.max(slowest, Date.now() - t0);
+        expect(res.status, JSON.stringify(text.slice(0, 20))).toBeLessThan(500);
+      }
+    }
     expect(slowest).toBeLessThan(1500);
     expect(errors).not.toHaveBeenCalled();
   });

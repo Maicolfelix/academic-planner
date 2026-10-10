@@ -7,6 +7,7 @@ import {
   QUICK_CAPTURE_WARNING_CODES,
   STOPWORDS,
   buildSubjectEntries,
+  findDateExpressions,
   findTypes,
   interpretTokens,
   tokenize,
@@ -186,7 +187,7 @@ const NOUN_SKIPPABLE = new Set([
  * Words that say "this is something that will happen or must be handed in". A type word alone ("el parcial es
  * importante") is not enough to propose an activity: it needs a date, a time, a subject or one of these.
  */
-const CUES = new Set([
+export const ACADEMIC_CUES = new Set([
   'tendremos',
   'tendran',
   'tenemos',
@@ -240,7 +241,24 @@ function exactSubjectRanges(tokens: Token[], entries: SubjectEntry[]): [number, 
   return ranges;
 }
 
-function findAnchors(tokens: Token[], entries: SubjectEntry[]): Anchor[] {
+/**
+ * Activities that are not a school type but are still one ("reunión de semillero", "cita con el tutor", "llevar
+ * documentos"): the noun or the verb is the anchor and the type is read from the wording. Only the multi-activity
+ * capture asks for them (`extendedAnchors`): the inbox keeps its conservative reading of pasted messages.
+ */
+const MEETING_NOUNS = new Set(['reunion', 'reuniones', 'cita', 'citas', 'tramite', 'tramites']);
+const ERRAND_VERBS = new Set([
+  'llevar',
+  'pagar',
+  'renovar',
+  'inscribir',
+  'solicitar',
+  'recoger',
+  'radicar',
+  'matricular',
+]);
+
+function findAnchors(tokens: Token[], entries: SubjectEntry[], extended = false): Anchor[] {
   const subjectRanges = exactSubjectRanges(tokens, entries);
   const anchors: Anchor[] = [];
   for (const hit of findTypes(tokens)) {
@@ -267,6 +285,20 @@ function findAnchors(tokens: Token[], entries: SubjectEntry[]): Anchor[] {
     const noun = tokens[j];
     if (noun && nouns.has(noun.norm) && !anchors.some((a) => a.start >= i && a.start <= j)) {
       anchors.push({ start: i, length: 1, implicitType: kind });
+    }
+  }
+  if (extended) {
+    for (let i = 0; i < tokens.length; i++) {
+      const word = tokens[i]!.norm;
+      const implicitType: ActivityType | null = MEETING_NOUNS.has(word)
+        ? 'OTHER'
+        : ERRAND_VERBS.has(word)
+          ? 'TASK'
+          : null;
+      if (implicitType === null) continue;
+      const inside = anchors.some((a) => i >= a.start && i < a.start + a.length);
+      const inSubjectName = subjectRanges.some(([from, to]) => i >= from && i < to);
+      if (!inside && !inSubjectName) anchors.push({ start: i, length: 1, implicitType });
     }
   }
   return anchors.sort((a, b) => a.start - b.start);
@@ -309,6 +341,7 @@ function clauseStart(tokens: Token[], previous: Anchor, current: Anchor): number
 export function extractAcademicCandidates(
   text: string,
   context: Pick<QuickCaptureContext, 'subjects'>,
+  options: { extendedAnchors?: boolean; splitLeading?: boolean } = {},
 ): { candidates: AcademicCandidate[]; sentences: number } {
   const entries = buildSubjectEntries(context.subjects);
   const sentences = splitSentences(text);
@@ -316,7 +349,7 @@ export function extractAcademicCandidates(
 
   sentences.forEach((sentence, sentenceIndex) => {
     const tokens = tokenize(sentence);
-    const anchors = findAnchors(tokens, entries);
+    const anchors = findAnchors(tokens, entries, options.extendedAnchors === true);
     if (anchors.length === 0) return;
 
     const starts = [0];
@@ -325,6 +358,45 @@ export function extractAcademicCandidates(
     const slice = (from: number, to: number) =>
       from >= to ? '' : sentence.slice(tokens[from]!.start, tokens[to - 1]!.end);
     const sharedText = slice(0, anchors[0]!.start);
+
+    // "Ensayo lunes y reunión martes": the words BEFORE the first activity word are an activity of their own when they
+    // carry their own day and the clause of that activity word has its own too (quick capture only: a pasted message
+    // shares what comes before, "El martes tendremos parcial…").
+    let leadingSplit = false;
+    if (options.splitLeading && anchors[0]!.start > 0) {
+      const lead = tokens.slice(0, anchors[0]!.start);
+      const clauseEnd = anchors.length > 1 ? starts[1]! : tokens.length;
+      const dates = findDateExpressions(lead);
+      const dated = new Set(
+        dates.flatMap((d) => lead.slice(d.match.start, d.match.start + d.match.length)),
+      );
+      const ownWords = lead.filter(
+        (t) =>
+          !dated.has(t) &&
+          !STOPWORDS.has(t.norm) &&
+          !/^\d/.test(t.norm) &&
+          !['am', 'pm', 'las', 'la'].includes(t.norm) &&
+          !CLAUSE_SPLITTERS.has(t.norm),
+      );
+      if (
+        dates.length > 0 &&
+        ownWords.length > 0 &&
+        findDateExpressions(tokens.slice(anchors[0]!.start, clauseEnd)).length > 0
+      ) {
+        let cut = anchors[0]!.start;
+        while (cut > 0 && CLAUSE_SPLITTERS.has(tokens[cut - 1]!.norm)) cut--;
+        const own = slice(0, cut);
+        candidates.push({
+          sentenceIndex,
+          rawSegment: own.trim(),
+          text: own,
+          sharedText: '',
+          implicitType: null,
+        });
+        starts[0] = anchors[0]!.start;
+        leadingSplit = true;
+      }
+    }
 
     anchors.forEach((anchor, k) => {
       const from = starts[k]!;
@@ -347,7 +419,7 @@ export function extractAcademicCandidates(
         sentenceIndex,
         rawSegment: shown.trim(),
         text: own,
-        sharedText: k === 0 ? '' : sharedText,
+        sharedText: k === 0 || leadingSplit ? '' : sharedText,
         implicitType: anchor.implicitType,
       });
     });
@@ -459,7 +531,7 @@ export function parseAcademicInbox(
         (f) => f === 'date' || f === 'time' || f === 'subject',
       ) ||
       interpretation.certainty.subject === 'AMBIGUOUS' ||
-      tokens.some((t) => CUES.has(t.norm));
+      tokens.some((t) => ACADEMIC_CUES.has(t.norm));
     if (!supported) continue;
 
     const key = [
