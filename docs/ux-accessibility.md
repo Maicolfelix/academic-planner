@@ -222,6 +222,10 @@ Cierra la deuda visual que quedaba tras UX1-3. **Solo presentación:** mismas re
 - **Medido** (navegador, 320/390/430/768/1024/1366/1440 px): sin desbordes horizontales, botones de 44 px, tarjeta, filtros y Home con el respaldo; axe (WCAG 2 A/AA) limpio en ambos modos del formulario y en Home.
 - **Qué NO hace:** no cambia Captura rápida ni Bandeja (siguen exigiendo asignatura al confirmar: F1-2), ni el seed demo, ni el backend.
 
+### Crear asignatura inline (F1-2a)
+
+**Implementado en su PR; pendiente de QA real en un dispositivo** (no DONE). Subflujo dentro de `ActivityFormDialog` (`InlineSubjectCreator`): un grupo con nombre «Nueva asignatura», un campo «Nombre» (con su error asociado por `aria-describedby`/`aria-invalid`, dicho con palabras) y dos botones reales de 44 px, «Cancelar» y «Crear y usar». Teclado y foco: al abrir, el foco va al nombre; el orden natural es nombre → Cancelar → Crear y usar; al cancelar vuelve a «Crear asignatura»; al crear va al selector con la nueva ya elegida. Enter en el nombre crea la asignatura y no envía el formulario (el diálogo es **un solo** `<form>`); Enter sobre un botón sigue pulsando ese botón. Escape no se intercepta: sigue siendo el del diálogo (pregunta antes de descartar). Movimiento: la entrada `animate-rise` existente; con `prefers-reduced-motion` es instantáneo (comprobado en navegador con la emulación). Diseño: tokens existentes, sin primitivas ni literales nuevos; a 320 px los botones «Omitir asignatura» y «Crear asignatura» envuelven en dos líneas y «Cancelar» y «Crear y usar» caben en una. Medido (320/390/430/768/1366 px): sin desbordes, el diálogo cabe y se desplaza dentro de sí mismo; axe (WCAG 2 A/AA) limpio con el subflujo abierto.
+
 ## Formularios y diálogos (reglas generales)
 
 - Todo campo tiene `label` asociado; los errores van junto al campo (`aria-describedby`, `aria-invalid`); los opcionales dicen «(opcional)».
