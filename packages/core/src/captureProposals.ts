@@ -68,7 +68,6 @@ const subjectRef = z.object({ id: z.uuid(), name: z.string() });
 
 export const CAPTURE_ISSUE_CODES = [
   'TITLE_MISSING',
-  'SUBJECT_MISSING',
   'SUBJECT_AMBIGUOUS',
   'SUBJECT_UNKNOWN',
   'DATE_MISSING',
@@ -102,19 +101,28 @@ const issue = z.object({
 const warning = z.object({ code: z.enum(CAPTURE_WARNING_CODES), message: z.string() });
 
 /**
- * The subject, as the engine understands it:
+ * The subject, as the engine understands it. "The words do not mention a subject" is NOT "a subject I could not
+ * resolve": an activity may legitimately have none, so saying nothing about it is a decision already made, never a
+ * question.
  *  - EXISTING: one of the student's subjects (EXACT or LIKELY);
- *  - NONE: a general activity, decided because there is no subject to choose from (a student with none);
- *  - UNRESOLVED: nothing usable yet. MISSING (not mentioned), AMBIGUOUS (several fit: `candidates`) or UNKNOWN_NAME
- *    (it names a subject that does not exist: `suggestedName`). The student picks, creates or omits it; the engine
- *    never does.
+ *  - NONE: a general activity. NOT_MENTIONED (the words say nothing about a subject, whether the student has subjects
+ *    or not), NO_SUBJECTS (the student has none at all) or USER (set by the interface when the student omits it). It
+ *    never blocks;
+ *  - UNRESOLVED: the words TRIED to name a subject and it cannot be resolved: AMBIGUOUS (several fit: `candidates`) or
+ *    UNKNOWN_NAME (it names a subject that does not exist: `suggestedName`). The student picks, creates or omits it;
+ *    the engine never does. It blocks.
  */
 export const captureSubjectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('EXISTING'), id: z.uuid(), name: z.string(), certainty, origin }),
-  z.object({ kind: z.literal('NONE'), reason: z.enum(['NO_SUBJECTS', 'USER']), certainty, origin }),
+  z.object({
+    kind: z.literal('NONE'),
+    reason: z.enum(['NOT_MENTIONED', 'NO_SUBJECTS', 'USER']),
+    certainty,
+    origin,
+  }),
   z.object({
     kind: z.literal('UNRESOLVED'),
-    reason: z.enum(['MISSING', 'AMBIGUOUS', 'UNKNOWN_NAME']),
+    reason: z.enum(['AMBIGUOUS', 'UNKNOWN_NAME']),
     candidates: z.array(subjectRef),
     suggestedName: z.string().nullable(),
     certainty,
@@ -190,7 +198,7 @@ export type RecurrenceSuggestion = z.infer<typeof recurrenceSuggestionSchema>;
 /** One decision for several proposals that share the same missing or ambiguous thing. */
 export const captureCorrectionSchema = z.object({
   field: z.enum(['subject', 'time']),
-  /** Same key = same question: "MISSING", "AMBIGUOUS:<ids>", "UNKNOWN:<name key>", or a time group key. */
+  /** Same key = same question: "AMBIGUOUS:<ids>", "UNKNOWN:<name key>", or a time group key. */
   key: z.string(),
   clientIds: z.array(z.string()).min(2),
   candidates: z.array(subjectRef),
@@ -238,7 +246,6 @@ export type CaptureResponse = z.infer<typeof captureResponseSchema>;
 
 const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
   TITLE_MISSING: 'Falta el título.',
-  SUBJECT_MISSING: 'Falta la asignatura.',
   SUBJECT_AMBIGUOUS: QUICK_CAPTURE_MESSAGES.AMBIGUOUS_SUBJECT,
   SUBJECT_UNKNOWN: 'La asignatura no existe todavía.',
   DATE_MISSING: QUICK_CAPTURE_MESSAGES.MISSING_DATE,
@@ -250,7 +257,6 @@ const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
 };
 const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][number]['field']> = {
   TITLE_MISSING: 'title',
-  SUBJECT_MISSING: 'subject',
   SUBJECT_AMBIGUOUS: 'subject',
   SUBJECT_UNKNOWN: 'subject',
   DATE_MISSING: 'date',
@@ -456,23 +462,27 @@ function readWords(
     };
     blocking.push(makeIssue('SUBJECT_AMBIGUOUS'));
   } else if (ctx.subjects.length === 0) {
-    // There is nothing to choose from: a general activity is the only possible reading, so it is decided.
-    subject = { kind: 'NONE', reason: 'NO_SUBJECTS', certainty: 'EXACT', origin: 'DEFAULT' };
+    // Nothing to choose from: a general activity.
+    subject = { kind: 'NONE', reason: 'NO_SUBJECTS', certainty: 'MISSING', origin: 'DEFAULT' };
   } else {
+    // Only a construction that names a subject ("parcial DE ciberseguridad") is an attempt; saying nothing about one is a
+    // general activity, decided, with no question for the student.
     suggestedName = suggestSubjectName(tokens, words.typeCertainty === 'EXACT');
-    subject = {
-      kind: 'UNRESOLVED',
-      reason: suggestedName ? 'UNKNOWN_NAME' : 'MISSING',
-      candidates: [],
-      suggestedName,
-      certainty: suggestedName ? 'LIKELY' : 'MISSING',
-      origin: 'PARSED',
-    };
-    blocking.push(
-      suggestedName
-        ? makeIssue('SUBJECT_UNKNOWN', `La asignatura «${suggestedName}» no existe todavía.`)
-        : makeIssue('SUBJECT_MISSING'),
-    );
+    if (suggestedName) {
+      subject = {
+        kind: 'UNRESOLVED',
+        reason: 'UNKNOWN_NAME',
+        candidates: [],
+        suggestedName,
+        certainty: 'LIKELY',
+        origin: 'PARSED',
+      };
+      blocking.push(
+        makeIssue('SUBJECT_UNKNOWN', `La asignatura «${suggestedName}» no existe todavía.`),
+      );
+    } else {
+      subject = { kind: 'NONE', reason: 'NOT_MENTIONED', certainty: 'MISSING', origin: 'DEFAULT' };
+    }
   }
 
   // Title: what the words say; if only the subject's name is left, that name; the type's label when a subject name
@@ -767,14 +777,12 @@ export function computeCorrections(proposals: readonly CaptureProposal[]): Captu
     const s = p.subject;
     if (s.kind === 'UNRESOLVED') {
       const key =
-        s.reason === 'MISSING'
-          ? 'MISSING'
-          : s.reason === 'AMBIGUOUS'
-            ? `AMBIGUOUS:${s.candidates
-                .map((c) => c.id)
-                .sort()
-                .join(',')}`
-            : `UNKNOWN:${normalizeNameKey(s.suggestedName ?? '')}`;
+        s.reason === 'AMBIGUOUS'
+          ? `AMBIGUOUS:${s.candidates
+              .map((c) => c.id)
+              .sort()
+              .join(',')}`
+          : `UNKNOWN:${normalizeNameKey(s.suggestedName ?? '')}`;
       const found = bySubject.get(key);
       if (found) found.clientIds.push(p.clientId);
       else

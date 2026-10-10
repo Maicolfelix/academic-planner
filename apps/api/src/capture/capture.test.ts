@@ -72,7 +72,7 @@ describe('the user from the session decides what it sees', () => {
     const { capture } = await parse(a.agent, 'parcial secreta de B martes');
     expect(JSON.stringify(capture)).not.toContain(secret.id);
     expect(JSON.stringify(capture)).not.toContain(b.subject.id);
-    expect(capture.proposals[0]!.subject).toMatchObject({ kind: 'UNRESOLVED' });
+    expect(capture.proposals[0]!.subject.kind).not.toBe('EXISTING');
   });
 
   it('a student with no subjects gets general activities, decided, in their own period', async () => {
@@ -95,7 +95,7 @@ describe('the user from the session decides what it sees', () => {
 });
 
 describe('the engine through the API', () => {
-  it('the critical example: four proposals with their hours, one correction for the subject', async () => {
+  it('the critical example: four READY proposals with their hours and no subject, nothing to correct', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     const { capture } = await parse(
       agent,
@@ -107,9 +107,12 @@ describe('the engine through the API', () => {
       ['Ensayo', '2026-10-15', '17:40'],
       ['Ensayo', '2026-10-16', '17:40'],
     ]);
-    expect(capture.corrections).toEqual([
-      expect.objectContaining({ field: 'subject', clientIds: ['p1', 'p2', 'p3', 'p4'] }),
-    ]);
+    expect(
+      capture.proposals.every(
+        (p) => p.status === 'READY' && p.selected && p.subject.kind === 'NONE',
+      ),
+    ).toBe(true);
+    expect(capture.corrections).toEqual([]);
   });
 
   it('several activities, and the READY ones are ticked', async () => {

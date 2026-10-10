@@ -1,7 +1,7 @@
 import type { Weekday } from './calendar.js';
 import {
   WEEKDAY_BY_NAME,
-  bareHourAlternatives,
+  bareTimeAlternatives,
   findDateExpressions,
   isFree,
   matchTimeAt,
@@ -182,6 +182,36 @@ function matchQuantifierAt(
   return { kind, count, start: i, length };
 }
 
+// ───────────────────────── Am/pm said in words ─────────────────────────
+
+/**
+ * "de la mañana" / "de la tarde" / "de la noche" / "de la madrugada" right after a time with no am/pm. It only decides
+ * when the words leave no doubt for THAT hour ("7:30 de la noche" is 19:30; "1 de la noche" or "12 de la mañana" are
+ * not clear, so they stay a question). Returns the time and how many tokens the phrase used.
+ */
+function meridiemWords(
+  tokens: readonly Token[],
+  at: number,
+  alternatives: readonly string[],
+): { value: string | null; length: number } | null {
+  const [am, pm] = alternatives as [string, string];
+  const hour = Number(am.slice(0, 2));
+  if (tokens[at]?.used || tokens[at + 1]?.used || tokens[at + 2]?.used) return null;
+  if (tokens[at]?.norm !== 'de' || tokens[at + 1]?.norm !== 'la') return null;
+  const part = tokens[at + 2]?.norm;
+  if (!['manana', 'madrugada', 'tarde', 'noche'].includes(part ?? '')) return null;
+  const twelve = hour === 0 || hour === 12;
+  // am[0..1] is "00" for 12:xx, so the readings of 12 are [00:mm, 12:mm].
+  if (part === 'manana' && !twelve) return { value: am, length: 3 };
+  if (part === 'madrugada' && !twelve && hour <= 6) return { value: am, length: 3 };
+  if (part === 'tarde' && (twelve || (hour >= 1 && hour <= 8))) return { value: pm, length: 3 };
+  if (part === 'noche' && twelve) return { value: am, length: 3 }; // 12 de la noche = 00:mm
+  if (part === 'noche' && hour >= 6 && hour <= 11) return { value: pm, length: 3 };
+  // The phrase is there but does not settle it ("1 de la noche", "12 de la mañana"): the time stays a question, and
+  // "mañana" in it is not the word for tomorrow.
+  return { value: null, length: 3 };
+}
+
 // ───────────────────────── The plan ─────────────────────────
 
 interface TimeItem {
@@ -231,6 +261,24 @@ export function planTemporal(tokens: Token[]): TemporalPlan {
     const item = timeItems.length;
     timeStarts.add(start);
     if (match.alternatives) {
+      // "7:30 de la mañana", "8 de la noche": the words say which one it is, so there is nothing to ask.
+      const resolved = meridiemWords(tokens, match.start + match.length, match.alternatives);
+      if (resolved) use(tokens, match.start + match.length, resolved.length);
+      if (resolved && resolved.value !== null) {
+        timeItems.push({
+          pos: start,
+          time: {
+            value: resolved.value,
+            alternatives: [],
+            certainty: 'EXACT',
+            text: match.text,
+            item,
+          },
+        });
+        use(tokens, start, length);
+        i = match.start + match.length + resolved.length - 1;
+        continue;
+      }
       timeItems.push({
         pos: start,
         time: {
@@ -276,7 +324,7 @@ export function planTemporal(tokens: Token[]): TemporalPlan {
           pos: i + 1,
           time: {
             value: null,
-            alternatives: bareHourAlternatives(hour),
+            alternatives: bareTimeAlternatives(hour),
             certainty: 'AMBIGUOUS',
             text: number.raw,
             item: next,

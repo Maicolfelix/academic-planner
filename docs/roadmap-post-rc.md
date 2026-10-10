@@ -90,7 +90,7 @@ Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → pilot
 **Decisiones aprobadas para F1-2:**
 
 1. **Endpoint de lote transaccional: aprobado.** Puede existir una ruta de confirmación propia para Captura rápida y Bandeja si reutiliza las invariantes de `Activity` y `Subject` y no duplica reglas de dominio. (Esto matiza el invariante «sin camino de creación propio» de `CLAUDE.md`: hasta F1-2c no existe.)
-2. **Asignatura sin reconocer:** decisión explícita **Elegir / Crear / Omitir**; no se asume «sin asignatura» automáticamente. Excepción: un usuario con 0 asignaturas puede empezar en «sin asignatura».
+2. **Asignatura:** si las palabras **no mencionan** ninguna, la actividad es general (`NONE`) y queda lista, sin preguntar (asignatura omitida en el lenguaje ≠ asignatura sin resolver; un usuario con 0 asignaturas se comporta igual). Si el estudiante **intentó** nombrar una y no se resuelve (no existe, o varias encajan), decisión explícita **Elegir / Crear / Omitir**; nunca se asigna ni se crea en silencio.
 3. **Hora sin a. m./p. m.** («a las 6»): **ambigua**, con alternativas; no se inventa 06:00.
 4. **Si solo queda el nombre de la asignatura como título:** se usa como título con certeza `LIKELY`.
 5. **Recurrencia:** se detecta y se muestra como **sugerencia dentro de `CaptureReview`**; la persistencia del `ScheduleBlock` queda para F1-2e.

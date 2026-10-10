@@ -351,12 +351,14 @@ export interface MatchTimeOptions {
   ambiguousBareHours?: boolean;
 }
 
-/** The two readings of an hour written without am/pm, the usual one first (1-6 are mostly afternoon, 7-11 morning). */
-export function bareHourAlternatives(hour: number): string[] {
-  if (hour === 12) return ['12:00', '00:00'];
-  const am = `${pad(hour)}:00`;
-  const pm = `${pad(hour + 12)}:00`;
-  return hour <= 6 ? [pm, am] : [am, pm];
+/**
+ * The two readings of a time written without am/pm, in clock order (a. m. first): no reading is presented as the usual
+ * one, because habit is not certainty. 12:xx without a marker is midnight or noon.
+ */
+export function bareTimeAlternatives(hour: number, minute = 0): string[] {
+  const mm = pad(minute);
+  if (hour === 12) return [`00:${mm}`, `12:${mm}`];
+  return [`${pad(hour)}:${mm}`, `${pad(hour + 12)}:${mm}`];
 }
 
 export function matchTimeAt(
@@ -412,7 +414,7 @@ export function matchTimeAt(
       if (options.ambiguousBareHours && hour >= 1 && hour <= 12) {
         return {
           value: null,
-          alternatives: bareHourAlternatives(hour),
+          alternatives: bareTimeAlternatives(hour),
           text: t.raw,
           start: i,
           length: 1,
@@ -436,6 +438,17 @@ export function matchTimeAt(
   if (h) {
     const [hour, minute] = [Number(h[1]), Number(h[2])];
     const valid = hour <= 23 && minute <= 59;
+    // "7:30" with no am/pm is 07:30 or 19:30: only 13-23 and 0 (24-hour clocks) are certain by themselves.
+    if (options.ambiguousBareHours && valid && hour >= 1 && hour <= 12) {
+      return {
+        value: null,
+        alternatives: bareTimeAlternatives(hour, minute),
+        text: t.raw,
+        start: i,
+        length: 1,
+        likely: true,
+      };
+    }
     return {
       value: valid ? `${pad(hour)}:${pad(minute)}` : null,
       text: t.raw,

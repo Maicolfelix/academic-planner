@@ -1,6 +1,6 @@
 # Motor de propuestas de captura (F1-2b)
 
-Un solo texto produce **1..N propuestas**, ya resueltas, para Captura rápida y para la Bandeja académica. Principio de producto: **el estudiante escribe una vez, la aplicación interpreta todo lo posible y solo pide intervención donde de verdad falta información.**
+Un solo texto produce **1..N propuestas**, ya resueltas, para Captura rápida y para la Bandeja académica. Principio de producto: **el estudiante escribe una vez, la aplicación interpreta todo lo posible y solo pide intervención donde de verdad falta información** (mínima intervención). Corolario: **asignatura omitida en el lenguaje ≠ asignatura sin resolver.** Una actividad puede no tener asignatura, así que no nombrar ninguna es una decisión ya tomada (`NONE`), nunca una pregunta; solo un intento fallido (se nombró una que no existe, o varias encajan) pregunta.
 
 **Estado:** implementado en `packages/core` (`captureProposals.ts`, `captureTemporal.ts`) y expuesto solo como interpretación (`POST /api/capture/parse`): **no persiste nada, no crea asignaturas ni actividades** y **no cambia ninguna pantalla** todavía. Las pantallas actuales de Captura rápida y Bandeja siguen usando sus rutas anteriores (`/api/quick-capture/parse`, `/api/academic-inbox/parse`); la nueva interfaz de revisión es **F1-2d**, la confirmación en lote es **F1-2c** y la persistencia de bloques de Agenda es **F1-2e** ([roadmap](roadmap-post-rc.md#f1-actividades-sin-asignatura)). El aviso «Captura rápida admite una actividad a la vez» solo lo emite el parser anterior, que F1-2d deja de usar; el motor nuevo nunca lo emite.
 
@@ -42,7 +42,7 @@ Reglas de asignación de horas (en este orden):
 
 Rangos: «lunes a viernes» y «de lunes a viernes» son cinco días, en el orden de la semana. Una lista de días de la semana se lee como **una corrida coherente**: si un día cae antes que el anterior es el de la semana siguiente (escrito un lunes por la tarde, «lunes, martes… a las 7:30 am» es el lunes **y** el martes de la semana próxima, nunca el martes antes del lunes).
 
-**Hora sin a. m./p. m.** («a las 6», «a las 8 y 10»): **ambigua**, nunca 06:00. Lleva sus dos lecturas, la usual primero (1–6 suelen ser de la tarde, 7–11 de la mañana): `['18:00','06:00']`. «a las 14», «6 pm», «7:30» no son ambiguas. Las propuestas que comparten una expresión de hora comparten `time.groupKey`: **una corrección** las resuelve todas.
+**Hora sin a. m./p. m.** («a las 6», «a las 8 y 10», **«7:30»**; de 1:00 a 11:59 y 12:xx): **ambigua**, nunca se adivina. Lleva sus dos lecturas **en orden de reloj, a. m. primero**, sin presentar ninguna como «la usual» (el hábito no es certeza): `['06:00','18:00']`, `['07:30','19:30']`, y para las 12 `['00:00','12:00']`. Es lo único que bloquea a «Ensayo lunes a las 7:30»: la asignatura no se pregunta. Se resuelve sola, sin preguntar, con lo que las palabras dicen: «7:30 am/pm», «19:30», «a las 14» y «de la mañana / tarde / noche / madrugada» cuando no deja duda («7:30 de la noche» → 19:30; «3 de la tarde» → 15:00; «12 de la noche» → 00:00). Si la frase no la resuelve («12 de la mañana», «1 de la noche») la hora sigue siendo una pregunta, y «mañana» ahí **no** se lee como el día siguiente. Las propuestas que comparten una expresión de hora comparten `time.groupKey`: **una corrección** las resuelve todas.
 
 ## La propuesta (`CaptureProposal`)
 
@@ -50,21 +50,23 @@ Compartida por Captura rápida y Bandeja. Por campo hay valor, `certainty` (`EXA
 
 **Estados**
 
-| Estado         | Significa                                                                                                 | `selected` |
-| -------------- | --------------------------------------------------------------------------------------------------------- | ---------- |
-| `READY`        | nada bloquea; no hay que tocarla                                                                          | sí         |
-| `NEEDS_REVIEW` | falta o es ambiguo algo real: la asignatura, una hora sin a. m./p. m., un día sin hora asignada, la fecha | no         |
-| `INVALID`      | lo escrito no sirve tal cual: fecha imposible, ningún título                                              | no         |
+| Estado         | Significa                                                                                                                              | `selected` |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `READY`        | nada bloquea; no hay que tocarla                                                                                                       | sí         |
+| `NEEDS_REVIEW` | falta o es ambiguo algo real: una asignatura nombrada que no se resuelve, una hora sin a. m./p. m., un día sin hora asignada, la fecha | no         |
+| `INVALID`      | lo escrito no sirve tal cual: fecha imposible, ningún título                                                                           | no         |
 
-**Bloqueos frente a avisos.** `blockingIssues` impiden crear tal cual (`TITLE_MISSING`, `SUBJECT_MISSING`, `SUBJECT_AMBIGUOUS`, `SUBJECT_UNKNOWN`, `DATE_MISSING`, `DATE_INVALID`, `TIME_AMBIGUOUS`, `TIME_INVALID`, `TIME_UNASSIGNED`, `TIME_COUNT_MISMATCH`). `warnings` solo informan y **nunca bloquean** (`TYPE_DEFAULTED`, `TITLE_FROM_SUBJECT`, `PAST_DATE`, `PAST_TIME_TODAY`, `MOVED_TO_NEXT_WEEK`, `WEEKDAY_MISMATCH`, `DATE_OUTSIDE_PERIOD`, `SUBJECT_INHERITED`, `POSSIBLE_DUPLICATE`…). La hora es opcional y el tipo usa el valor por omisión con aviso: ninguno de los dos bloquea.
+**`READY` = se puede persistir sin inventar nada:** título y fecha, hora opcional, tipo por omisión, asignatura `NONE` válida; los avisos nunca la impiden.
 
-**Asignatura** (`subject`): `EXISTING` (una del estudiante, `EXACT` o `LIKELY`), `NONE` (**solo** cuando el estudiante no tiene ninguna: no hay alternativa y no se le pide una decisión inútil) o `UNRESOLVED` con `reason`: `MISSING` (no se mencionó), `AMBIGUOUS` (varias encajan: `candidates`) o `UNKNOWN_NAME` («parcial de ciberseguridad» y Ciberseguridad no existe: `suggestedName`, solo tras un tipo reconocido y un «de», hasta cuatro palabras, sin dígitos ni sustantivos genéricos como «unidad»; «parcial unidad 3» o «parcial final» no son asignaturas). El motor **ofrece**, nunca aplica ni crea: elegir, crear u omitir es decisión del estudiante (F1-2d) y la creación, de F1-2c.
+**Bloqueos frente a avisos.** `blockingIssues` impiden crear tal cual (`TITLE_MISSING`, `SUBJECT_AMBIGUOUS`, `SUBJECT_UNKNOWN`, `DATE_MISSING`, `DATE_INVALID`, `TIME_AMBIGUOUS`, `TIME_INVALID`, `TIME_UNASSIGNED`, `TIME_COUNT_MISMATCH`). `warnings` solo informan y **nunca bloquean** (`TYPE_DEFAULTED`, `TITLE_FROM_SUBJECT`, `PAST_DATE`, `PAST_TIME_TODAY`, `MOVED_TO_NEXT_WEEK`, `WEEKDAY_MISMATCH`, `DATE_OUTSIDE_PERIOD`, `SUBJECT_INHERITED`, `POSSIBLE_DUPLICATE`…). La hora es opcional y el tipo usa el valor por omisión con aviso: ninguno de los dos bloquea.
+
+**Asignatura** (`subject`): `EXISTING` (una del estudiante, `EXACT` o `LIKELY`), `NONE` (actividad general, **nunca bloquea**; `reason`: `NOT_MENTIONED` —las palabras no dicen asignatura, tenga o no el estudiante asignaturas—, `NO_SUBJECTS` —no tiene ninguna— o `USER` —la omitió él en la interfaz—; «Ensayo lunes» es `READY` con `NONE` aunque el estudiante tenga cuatro asignaturas) o `UNRESOLVED`, solo para un **intento** que falla, con `reason`: `AMBIGUOUS` (varias encajan: `candidates`) o `UNKNOWN_NAME` («parcial de ciberseguridad» y Ciberseguridad no existe: `suggestedName`, solo tras un tipo reconocido y un «de», hasta cuatro palabras, sin dígitos ni sustantivos genéricos como «unidad»; «parcial unidad 3» o «parcial final» no son asignaturas). El motor **ofrece**, nunca aplica ni crea: elegir, crear u omitir es decisión del estudiante (F1-2d) y la creación, de F1-2c.
 
 **Título.** Lo que dicen las palabras; si solo queda el nombre de la asignatura, ese nombre con certeza `LIKELY` (aviso `TITLE_FROM_SUBJECT`); cuando se ofrece un nombre de asignatura nueva, la etiqueta del tipo («Parcial»). Sin nada: `INVALID`.
 
 ## Correcciones compartidas
 
-`result.corrections[]` lista cada pregunta que **dos o más** propuestas comparten: la misma asignatura faltante, ambigua o desconocida (entre actividades distintas también) y los días que comparten una hora ambigua. Una decisión se propaga a todas mientras ninguna se haya personalizado (el estado `USER` lo lleva la interfaz). Una pregunta que solo tiene una propuesta no se lista: su tarjeta la hace.
+`result.corrections[]` lista cada pregunta que **dos o más** propuestas comparten: la misma asignatura ambigua o desconocida (entre actividades distintas también) y los días que comparten una hora ambigua. Una decisión se propaga a todas mientras ninguna se haya personalizado (el estado `USER` lo lleva la interfaz). Una pregunta que solo tiene una propuesta no se lista: su tarjeta la hace.
 
 ## Recurrencia
 
@@ -83,6 +85,6 @@ No se crea ningún bloque aquí. **Evidencia fuerte** («todos los martes», «c
 ## Compatibilidad y límites
 
 - Una frase simple (`parcial redes martes 10am`, `tarea bases viernes`…) da **una** propuesta con el mismo título, tipo, asignatura, fecha y hora que Captura rápida siempre dio (pruebas lado a lado con el parser anterior); un mensaje pegado da las mismas actividades que la Bandeja.
-- Cambia a propósito: «a las 6» ya no es 06:00 sino una pregunta con alternativas.
+- Cambia a propósito: «a las 6» (y «7:30») ya no se adivinan sino que son una pregunta con alternativas, a. m. primero; y una frase sin asignatura ya no pregunta por ella.
 - Solo español; fraseos muy libres pueden no reconocerse. Los ordinales fuera de una lista de días («el primer parcial») no se toman por posiciones.
 - Aún sin interfaz: las tarjetas, las correcciones de grupo, el «Crear N actividades» y la confirmación son F1-2c y F1-2d.
