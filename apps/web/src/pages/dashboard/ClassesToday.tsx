@@ -1,6 +1,7 @@
 import type { ScheduleOccurrence } from '@planner/core';
 import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
+import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { timeRange } from '../calendar/format';
 
 interface Props {
@@ -20,7 +21,7 @@ export function ClassesToday({ classes, timeZone }: Props) {
           <Card as="li" key={`${c.blockId}-${c.startAt}`} className="flex min-w-0 overflow-hidden">
             <span
               aria-hidden="true"
-              style={{ backgroundColor: c.subject?.color ?? '#64748B' }}
+              style={{ backgroundColor: c.subject?.color ?? NO_SUBJECT_COLOR }}
               className="w-1.5 shrink-0"
             />
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5 p-3">

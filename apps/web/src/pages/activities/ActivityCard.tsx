@@ -13,7 +13,7 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { downloadActivityCalendar } from '../../api/activities';
 import { useJustCompleted } from '../../lib/useJustCompleted';
-import { withAlpha } from '../../lib/readableInk';
+import { NO_SUBJECT_COLOR, withAlpha } from '../../lib/readableInk';
 import { ActionMenu } from '../../components/ui/ActionMenu';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -73,7 +73,7 @@ export function ActivityCard({
   const justCompleted = useJustCompleted(activity.status);
   // Read-only: nothing to invalidate. The browser/OS decides what opens the downloaded file.
   const addToCalendar = useMutation({ mutationFn: () => downloadActivityCalendar(activity.id) });
-  const color = subject?.color ?? '#64748B';
+  const color = subject?.color ?? NO_SUBJECT_COLOR;
   const pill = STATUS_PILL[activity.status];
 
   return (
@@ -111,14 +111,18 @@ export function ActivityCard({
             {activity.title}
           </h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-            {subject && (
+            {/* A general activity says so (a discreet line in the neutral color); a subject that is merely not in the
+                list (not loaded) says nothing, as before. */}
+            {(subject || activity.subjectId === null) && (
               <>
                 <span
                   aria-hidden="true"
                   style={{ backgroundColor: color }}
                   className="size-2 shrink-0 rounded-full"
                 />
-                <span className="min-w-0 break-words">{subject.name}</span>
+                <span className="min-w-0 break-words">
+                  {subject ? subject.name : 'Sin asignatura'}
+                </span>
               </>
             )}
           </p>

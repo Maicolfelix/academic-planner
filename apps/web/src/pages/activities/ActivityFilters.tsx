@@ -3,6 +3,7 @@ import {
   ACTIVITY_PRIORITY_LABELS,
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_LABELS,
+  NO_SUBJECT_FILTER,
   RADAR_GROUP_LABELS,
   RADAR_STATUSES,
   type ActivityStatus,
@@ -81,7 +82,11 @@ export function ActivityFilters({ filters, subjects, onChange }: Props) {
         placeholder="Todas"
         value={filters.subject ?? ''}
         onChange={(v) => onChange({ ...filters, subject: v || undefined })}
-        options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+        options={[
+          ...subjects.map((s) => ({ value: s.id, label: s.name })),
+          // Always offered: it does not depend on there being general activities right now.
+          { value: NO_SUBJECT_FILTER, label: 'Sin asignatura' },
+        ]}
       />
       <SelectField
         id="filter-priority"

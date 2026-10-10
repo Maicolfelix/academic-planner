@@ -41,6 +41,22 @@ describe('activity filters in the URL', () => {
     expect(serializeFilters({}).toString()).toBe('');
   });
 
+  it('"Sin asignatura" is `subject=none`: it parses, serializes, round-trips, coexists with the rest and reaches the API', () => {
+    expect(parse('subject=none')).toMatchObject({ subject: 'none' });
+    const filters = { status: 'PENDING', subject: 'none', priority: 'HIGH', type: 'EXAM' } as const;
+    expect(serializeFilters(filters).toString()).toBe(
+      'status=PENDING&subject=none&priority=HIGH&type=EXAM',
+    );
+    expect(parseFilters(serializeFilters(filters))).toEqual(filters);
+    expect(hasActiveFilters({ subject: 'none' })).toBe(true);
+    expect(toApiQuery({ subject: 'none' }, 'p1').subjectId).toBe('none');
+  });
+
+  it('clearing the filters leaves no `subject=none` behind', () => {
+    expect(serializeFilters({}).toString()).toBe('');
+    expect(parseFilters(serializeFilters({})).subject).toBeUndefined();
+  });
+
   it('knows when a filter is active', () => {
     expect(hasActiveFilters({})).toBe(false);
     expect(hasActiveFilters({ overdue: true })).toBe(true);

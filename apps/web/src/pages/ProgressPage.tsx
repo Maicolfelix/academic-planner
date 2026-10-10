@@ -143,6 +143,8 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
     );
   }
   const text = `${general.completed} de ${general.total} actividades completadas`;
+  // The general progress counts the activities with no subject too; they have no row below, so the rows may add up to less.
+  const withoutSubject = general.total - subjects.reduce((n, s) => n + s.total, 0);
   return (
     <>
       <div className="flex flex-col gap-2 rounded-lg border border-slate-300 p-4">
@@ -165,6 +167,8 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
         )}
         <p className="text-sm text-slate-600">
           Mide solo las actividades que has registrado en este periodo. Todas pesan lo mismo.
+          {withoutSubject > 0 &&
+            ` Incluye ${withoutSubject === 1 ? '1 actividad sin asignatura' : `${withoutSubject} actividades sin asignatura`}, que no aparece en ninguna asignatura.`}
         </p>
       </div>
       <h3 className="sr-only">Por asignatura</h3>

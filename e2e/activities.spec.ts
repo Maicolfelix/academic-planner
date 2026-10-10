@@ -141,8 +141,10 @@ test('activity flow: create, edit, status, persistence, subject guard, delete, e
     .click();
   await expect(page.getByText('Aún no tienes asignaturas.')).toBeVisible();
   await nav(page).getByRole('link', { name: 'Actividades' }).click();
-  await expect(page.getByText('Primero agrega una asignatura.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Agregar actividad' })).toHaveCount(0);
+  // F1-1: having no subject no longer blocks the screen; activities can still be added (as "Sin asignatura").
+  await expect(page.getByText('Primero agrega una asignatura.')).toHaveCount(0);
+  await expect(page.getByText('Aún no tienes actividades.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Agregar actividad' })).toBeVisible();
 
   // The session and data survive a full logout/login cycle. Let the screen finish loading first: logging out with
   // the activities request still in flight is answered 401 by the server (seen under 4 parallel browsers).
