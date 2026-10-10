@@ -111,7 +111,34 @@ export const QUICK_CAPTURE_TYPE_ALIASES: Readonly<Record<string, ActivityType>> 
   taller: 'WORKSHOP',
   lectura: 'READING',
   otro: 'OTHER',
+  // plurals ("dos tareas", "los parciales"): the same type, said about several
+  tareas: 'TASK',
+  trabajos: 'TASK',
+  parciales: 'EXAM',
+  examenes: 'EXAM',
+  quices: 'QUIZ',
+  quizzes: 'QUIZ',
+  proyectos: 'PROJECT',
+  exposiciones: 'PRESENTATION',
+  presentaciones: 'PRESENTATION',
+  talleres: 'WORKSHOP',
+  lecturas: 'READING',
 };
+
+/** The plural forms above: "dos tareas" is two activities, "las tareas" a group already mentioned. */
+export const PLURAL_TYPE_WORDS: ReadonlySet<string> = new Set([
+  'tareas',
+  'trabajos',
+  'parciales',
+  'examenes',
+  'quices',
+  'quizzes',
+  'proyectos',
+  'exposiciones',
+  'presentaciones',
+  'talleres',
+  'lecturas',
+]);
 
 export const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
   lunes: 1,
@@ -251,6 +278,81 @@ const TITLE_FILLERS = new Set([
   'luego',
   'despues',
   'asimismo',
+]);
+
+/**
+ * Chatter of a loose sentence ("tengo", "quiero", "para dos días distintos") that is never part of a title. Dropped only by
+ * the multi-activity engine, which reads long, informal text.
+ */
+const LOOSE_FILLERS = new Set([
+  'tengo',
+  'tienes',
+  'tiene',
+  'tuve',
+  'quiero',
+  'necesito',
+  'debo',
+  'voy',
+  'vamos',
+  'puedo',
+  'entonces',
+  'pues',
+  'pero',
+  'porque',
+  'dia',
+  'distintos',
+  'distintas',
+  'diferentes',
+  'diferente',
+  'semana',
+  'semanas',
+  'entrego',
+  'presento',
+  'hago',
+  'hare',
+  'envio',
+  'subo',
+  'estudiar',
+]);
+
+/** "entregarlas", "presentarlo": a delivery verb with its pronoun glued on says nothing about WHAT the activity is. */
+const CLITIC_VERB = /^(entreg|present|envi|sub|mand|hac|realiz|termin|subi)\w*(lo|la|los|las)$/;
+const isLooseFiller = (norm: string) => LOOSE_FILLERS.has(norm) || CLITIC_VERB.test(norm);
+
+/**
+ * Words that END the title after the type word: whatever comes after them is about something else ("tarea PARA el
+ * jueves Y otra ..."). Used only by the multi-activity engine, which reads long, loose sentences.
+ */
+const QUALIFIER_STOPS = new Set([
+  'para',
+  'por',
+  'que',
+  'y',
+  'e',
+  'o',
+  'u',
+  'a',
+  'al',
+  'uno',
+  'una',
+  'unos',
+  'unas',
+  'otro',
+  'otra',
+  'otros',
+  'otras',
+  'es',
+  'son',
+  'sera',
+  'seran',
+  'era',
+  'ademas',
+  'tambien',
+  'luego',
+  'despues',
+  'cada',
+  'ambos',
+  'ambas',
 ]);
 
 // ───────────────────────── Tokens ─────────────────────────
@@ -498,8 +600,11 @@ function detectTime(
 
 export type DateExpression =
   | { kind: 'relative'; offset: 0 | 1 | 2 }
-  /** `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may. */
-  | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean }
+  /**
+   * `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may.
+   * `nextWeek`: "el jueves de la otra semana" is that weekday of the week AFTER this one (Monday to Sunday).
+   */
+  | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean; nextWeek?: boolean }
   | { kind: 'explicit'; day: number; month: number; year: number | null };
 
 export interface DateMatch {
@@ -510,6 +615,57 @@ export interface DateMatch {
 
 const YEAR_OF = (raw: string): number => (raw.length === 2 ? 2000 + Number(raw) : Number(raw));
 
+/**
+ * The words right after a weekday that say WHICH week: "de la otra semana", "de la próxima semana", "de la semana que
+ * viene", "de esta semana" (said, but changes nothing) and "que viene" ("el lunes que viene").
+ */
+function weekModifierAt(
+  tokens: readonly Token[],
+  at: number,
+): { length: number; nextWeek: boolean; strictlyAfter: boolean } {
+  const norms: string[] = [];
+  for (let k = 0; k < 5; k++) {
+    const t = tokens[at + k];
+    if (!isFree(t)) break;
+    norms.push(t.norm);
+  }
+  let k = 0;
+  if (norms[k] === 'de' || norms[k] === 'en') k++;
+  if (norms[k] === 'la' || norms[k] === 'esta') {
+    const article = norms[k];
+    const next = norms[k + 1];
+    if (
+      article === 'la' &&
+      next === 'semana' &&
+      ['proxima', 'siguiente'].includes(norms[k + 2] ?? '')
+    ) {
+      return { length: k + 3, nextWeek: true, strictlyAfter: false };
+    }
+    if (
+      article === 'la' &&
+      next === 'semana' &&
+      norms[k + 2] === 'que' &&
+      norms[k + 3] === 'viene'
+    ) {
+      return { length: k + 4, nextWeek: true, strictlyAfter: false };
+    }
+    if (
+      next !== undefined &&
+      ['otra', 'proxima', 'siguiente', 'entrante'].includes(next) &&
+      norms[k + 2] === 'semana'
+    ) {
+      return { length: k + 3, nextWeek: true, strictlyAfter: false };
+    }
+    if (article === 'esta' && next === 'semana') {
+      return { length: k + 2, nextWeek: false, strictlyAfter: false };
+    }
+  }
+  if (norms[0] === 'que' && norms[1] === 'viene') {
+    return { length: 2, nextWeek: false, strictlyAfter: true };
+  }
+  return { length: 0, nextWeek: false, strictlyAfter: false };
+}
+
 function matchDateAt(tokens: Token[], i: number): DateMatch | null {
   const t = tokens[i];
   if (!isFree(t)) return null;
@@ -519,17 +675,27 @@ function matchDateAt(tokens: Token[], i: number): DateMatch | null {
     return { expr: { kind: 'relative', offset: 2 }, start: i, length: 2 };
   }
   if (t.norm === 'hoy') return { expr: { kind: 'relative', offset: 0 }, start: i, length: 1 };
-  if (t.norm === 'manana') return { expr: { kind: 'relative', offset: 1 }, start: i, length: 1 };
+  // "de la mañana" / "esta mañana" is the morning, never tomorrow.
+  const beforeNorm = tokens[i - 1]?.norm;
+  if (t.norm === 'manana' && beforeNorm !== 'la' && beforeNorm !== 'esta') {
+    return { expr: { kind: 'relative', offset: 1 }, start: i, length: 1 };
+  }
 
   const weekday = WEEKDAY_BY_NAME[t.norm];
   if (weekday !== undefined) {
     // "este martes" = the next Tuesday, today included. "próximo martes" = the next one AFTER today.
     const before = isFree(tokens[i - 1]) ? tokens[i - 1]!.norm : '';
     const modifier = before === 'este' || before === 'proximo';
+    const week = weekModifierAt(tokens, i + 1);
     return {
-      expr: { kind: 'weekday', weekday, strictlyAfter: before === 'proximo' },
+      expr: {
+        kind: 'weekday',
+        weekday,
+        strictlyAfter: before === 'proximo' || week.strictlyAfter,
+        ...(week.nextWeek && { nextWeek: true }),
+      },
       start: modifier ? i - 1 : i,
-      length: modifier ? 2 : 1,
+      length: (modifier ? 2 : 1) + week.length,
     };
   }
 
@@ -606,6 +772,11 @@ export function resolveDate(
     case 'relative':
       return { date: addDays(today, expr.offset), certainty: 'EXACT' };
     case 'weekday': {
+      if (expr.nextWeek) {
+        // "el jueves de la otra semana": that weekday of the week after this one, whatever today is.
+        const monday = addDays(today, 1 - weekdayOf(today));
+        return { date: addDays(monday, 7 + expr.weekday - 1), certainty: 'LIKELY' };
+      }
       // "próximo martes": the next one after today. Otherwise the NEXT occurrence of that day, today included ...
       let date = firstWeekdayOnOrAfter(
         expr.strictlyAfter ? addDays(today, 1) : today,
@@ -895,6 +1066,11 @@ export interface InterpretOptions {
    * quiz", "En Redes tendremos…"). They only fill what the activity's own words did not say.
    */
   shared?: readonly Token[];
+  /**
+   * The title ends at the first connector after the type word ("tarea PARA el jueves y otra…" is "Tarea"): for the
+   * multi-activity engine, whose stretches are long and loose. Off for a short phrase, whose every word is the title.
+   */
+  cutTitleAtStops?: boolean;
 }
 
 export interface InterpretMeta {
@@ -1012,6 +1188,16 @@ export function interpretWords(
   // 5. Title: the type's label plus whatever text is left (connectors at the edges removed).
   let rest = tokens.filter((t) => !t.used);
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
+  if (options.cutTitleAtStops) rest = rest.filter((t) => !isLooseFiller(t.norm));
+  if (options.cutTitleAtStops) {
+    // After the type word the first connector ends the title ("tarea PARA el jueves"); with no type word, after the
+    // first real word ("ensayo de ciberseguridad PARA el lunes").
+    const from = first
+      ? rest.findIndex((t) => tokens.indexOf(t) > first.start)
+      : rest.findIndex((t) => !QUALIFIER_STOPS.has(t.norm) && !STOPWORDS.has(t.norm)) + 1;
+    const cut = from < 0 ? -1 : rest.findIndex((t, i) => i >= from && QUALIFIER_STOPS.has(t.norm));
+    if (cut >= 0) rest = rest.slice(0, cut);
+  }
   while (rest.length > 0 && STOPWORDS.has(rest[0]!.norm)) rest.shift();
   while (rest.length > 0 && STOPWORDS.has(rest.at(-1)!.norm)) rest.pop();
   const words = rest.map((t) => t.raw);

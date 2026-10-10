@@ -491,7 +491,7 @@ describe('the title', () => {
   });
 
   it('an unknown type is the usual default with an informative warning that does NOT block', () => {
-    const [p] = run('Ensayo martes', []).proposals;
+    const [p] = run('Cumpleaños de Ana martes', []).proposals;
     expect(p!.type).toMatchObject({ value: 'TASK', certainty: 'MISSING', origin: 'DEFAULT' });
     expect(p!.warnings.map((w) => w.code)).toContain('TYPE_DEFAULTED');
     expect(p!.status).toBe('READY');
@@ -589,8 +589,8 @@ describe('the limit and the edges', () => {
 
   it('an empty text, and a text over the limit of its mode', () => {
     expect(run('   ').status).toBe('EMPTY');
-    expect(run('x'.repeat(301)).status).toBe('TOO_LONG');
-    expect(run('x'.repeat(301), SUBJECTS, 'INBOX').status).not.toBe('TOO_LONG'); // a pasted message may be longer
+    expect(run('x'.repeat(1001)).status).toBe('TOO_LONG');
+    expect(run('x'.repeat(1001), SUBJECTS, 'INBOX').status).not.toBe('TOO_LONG'); // a pasted message may be longer
     expect(run('x'.repeat(5001), SUBJECTS, 'INBOX').status).toBe('TOO_LONG');
   });
 

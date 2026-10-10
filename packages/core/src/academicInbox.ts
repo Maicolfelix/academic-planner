@@ -128,7 +128,15 @@ export function splitSentences(text: string): string[] {
 
 // ───────────────────────── Activity detection ─────────────────────────
 
-const CLAUSE_SPLITTERS = new Set(['y', 'e', 'ademas', 'tambien', 'luego', 'despues', 'asimismo']);
+export const CLAUSE_SPLITTERS = new Set([
+  'y',
+  'e',
+  'ademas',
+  'tambien',
+  'luego',
+  'despues',
+  'asimismo',
+]);
 /** "presentación del proyecto": the second type word only qualifies the first one. */
 const PHRASE_CONNECTORS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para']);
 const DELIVER_VERBS = new Set([
@@ -216,7 +224,7 @@ export const ACADEMIC_CUES = new Set([
   'programada',
 ]);
 
-interface Anchor {
+export interface Anchor {
   start: number;
   length: number;
   /** Set when the activity is recognised from wording ("entregar informe") rather than from a type word. */
@@ -247,6 +255,8 @@ function exactSubjectRanges(tokens: Token[], entries: SubjectEntry[]): [number, 
  * capture asks for them (`extendedAnchors`): the inbox keeps its conservative reading of pasted messages.
  */
 const MEETING_NOUNS = new Set(['reunion', 'reuniones', 'cita', 'citas', 'tramite', 'tramites']);
+/** "ensayo": a written (or rehearsed) piece of work that is not one of the school types. It is a TASK by default. */
+const ESSAY_NOUNS = new Set(['ensayo', 'ensayos']);
 const ERRAND_VERBS = new Set([
   'llevar',
   'pagar',
@@ -258,10 +268,17 @@ const ERRAND_VERBS = new Set([
   'matricular',
 ]);
 
-function findAnchors(tokens: Token[], entries: SubjectEntry[], extended = false): Anchor[] {
+export function findAnchors(
+  tokens: Token[],
+  entries: SubjectEntry[],
+  extended = false,
+  /** Type words to ignore as anchors ("otro": in running text it is "uno … otro", not the type "Otro"). */
+  skipWords: ReadonlySet<string> = new Set(),
+): Anchor[] {
   const subjectRanges = exactSubjectRanges(tokens, entries);
   const anchors: Anchor[] = [];
   for (const hit of findTypes(tokens)) {
+    if (skipWords.has(tokens[hit.start]!.norm)) continue;
     if (subjectRanges.some(([from, to]) => hit.start >= from && hit.start + hit.length <= to))
       continue;
     const previous = anchors.at(-1);
@@ -292,13 +309,25 @@ function findAnchors(tokens: Token[], entries: SubjectEntry[], extended = false)
       const word = tokens[i]!.norm;
       const implicitType: ActivityType | null = MEETING_NOUNS.has(word)
         ? 'OTHER'
-        : ERRAND_VERBS.has(word)
+        : ERRAND_VERBS.has(word) || ESSAY_NOUNS.has(word)
           ? 'TASK'
           : null;
       if (implicitType === null) continue;
       const inside = anchors.some((a) => i >= a.start && i < a.start + a.length);
       const inSubjectName = subjectRanges.some(([from, to]) => i >= from && i < to);
-      if (!inside && !inSubjectName) anchors.push({ start: i, length: 1, implicitType });
+      // "entregar el ensayo": the delivery verb already is the anchor of that activity.
+      const ofDelivery =
+        ESSAY_NOUNS.has(word) &&
+        anchors.some(
+          (a) =>
+            a.implicitType !== null &&
+            a.start < i &&
+            i - a.start <= 4 &&
+            tokens.slice(a.start + 1, i).every((t) => NOUN_SKIPPABLE.has(t.norm)),
+        );
+      if (!inside && !inSubjectName && !ofDelivery) {
+        anchors.push({ start: i, length: 1, implicitType });
+      }
     }
   }
   return anchors.sort((a, b) => a.start - b.start);
