@@ -5,6 +5,7 @@ export * from './activity.js';
 export * from './attention.js';
 export * from './auth.js';
 export * from './calendar.js';
+export * from './captureProposals.js';
 export * from './schedule.js';
 export * from './dashboard.js';
 export * from './health.js';

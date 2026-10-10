@@ -113,7 +113,7 @@ export const QUICK_CAPTURE_TYPE_ALIASES: Readonly<Record<string, ActivityType>> 
   otro: 'OTHER',
 };
 
-const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
+export const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
   lunes: 1,
   martes: 2,
   miercoles: 3,
@@ -329,9 +329,11 @@ export const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slic
 
 // ───────────────────────── Time ─────────────────────────
 
-interface TimeMatch {
-  /** HH:mm, or null when the text looked like a time but is not a valid one. */
+export interface TimeMatch {
+  /** HH:mm, or null when the text looked like a time but is not a valid one (or is ambiguous: see `alternatives`). */
   value: string | null;
+  /** "a las 6": 06:00 or 18:00. Only with `ambiguousBareHours`; `value` is then null and the student chooses. */
+  alternatives?: string[];
   text: string;
   start: number;
   length: number;
@@ -341,7 +343,29 @@ interface TimeMatch {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-function matchTimeAt(tokens: Token[], i: number): TimeMatch | null {
+export interface MatchTimeOptions {
+  /**
+   * An hour with no am/pm ("a las 6") is not read as 06:00: it is AMBIGUOUS and carries both readings (1-12 only; "a las
+   * 14" is unambiguous). Off by default: quick capture and the inbox keep reading it as before.
+   */
+  ambiguousBareHours?: boolean;
+}
+
+/**
+ * The two readings of a time written without am/pm, in clock order (a. m. first): no reading is presented as the usual
+ * one, because habit is not certainty. 12:xx without a marker is midnight or noon.
+ */
+export function bareTimeAlternatives(hour: number, minute = 0): string[] {
+  const mm = pad(minute);
+  if (hour === 12) return [`00:${mm}`, `12:${mm}`];
+  return [`${pad(hour)}:${mm}`, `${pad(hour + 12)}:${mm}`];
+}
+
+export function matchTimeAt(
+  tokens: Token[],
+  i: number,
+  options: MatchTimeOptions = {},
+): TimeMatch | null {
   const t = tokens[i];
   if (!isFree(t)) return null;
 
@@ -387,6 +411,16 @@ function matchTimeAt(tokens: Token[], i: number): TimeMatch | null {
       (following === 'de' && (tokens[i + 2]?.norm ?? '') in MONTH_BY_NAME);
     if (!startsADate) {
       const hour = Number(bare[1]);
+      if (options.ambiguousBareHours && hour >= 1 && hour <= 12) {
+        return {
+          value: null,
+          alternatives: bareTimeAlternatives(hour),
+          text: t.raw,
+          start: i,
+          length: 1,
+          likely: true,
+        };
+      }
       const h24 = hour >= 1 && hour <= 5 ? hour + 12 : hour;
       const valid = hour >= 1 && h24 <= 23;
       return {
@@ -404,6 +438,17 @@ function matchTimeAt(tokens: Token[], i: number): TimeMatch | null {
   if (h) {
     const [hour, minute] = [Number(h[1]), Number(h[2])];
     const valid = hour <= 23 && minute <= 59;
+    // "7:30" with no am/pm is 07:30 or 19:30: only 13-23 and 0 (24-hour clocks) are certain by themselves.
+    if (options.ambiguousBareHours && valid && hour >= 1 && hour <= 12) {
+      return {
+        value: null,
+        alternatives: bareTimeAlternatives(hour, minute),
+        text: t.raw,
+        start: i,
+        length: 1,
+        likely: true,
+      };
+    }
     return {
       value: valid ? `${pad(hour)}:${pad(minute)}` : null,
       text: t.raw,
@@ -451,13 +496,13 @@ function detectTime(
 
 // ───────────────────────── Dates ─────────────────────────
 
-type DateExpression =
+export type DateExpression =
   | { kind: 'relative'; offset: 0 | 1 | 2 }
   /** `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may. */
   | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean }
   | { kind: 'explicit'; day: number; month: number; year: number | null };
 
-interface DateMatch {
+export interface DateMatch {
   expr: DateExpression;
   start: number;
   length: number;
@@ -543,14 +588,14 @@ function matchDateAt(tokens: Token[], i: number): DateMatch | null {
 const ymd = (year: number, month: number, day: number): DateOnly =>
   `${year}-${pad(month)}-${pad(day)}`;
 
-interface ResolvedDate {
+export interface ResolvedDate {
   date: DateOnly | null;
   certainty: FieldCertainty;
   invalidText?: string;
   movedToNextWeek?: boolean;
 }
 
-function resolveDate(
+export function resolveDate(
   expr: DateExpression,
   today: DateOnly,
   time: string | null,
@@ -597,7 +642,7 @@ function resolveDate(
   }
 }
 
-interface FoundDate {
+export interface FoundDate {
   match: DateMatch;
   text: string;
   /** "martes 13 de octubre": the weekday written next to an explicit date only qualifies it. */
@@ -605,20 +650,13 @@ interface FoundDate {
 }
 
 /**
- * Every date expression is found; the first valid one is used. A different second one means the text probably
- * holds more than one activity, except a weekday written right next to an explicit date ("el próximo martes 13
- * de octubre"): that is ONE date, the explicit one wins, and a weekday that does not match it is reported.
+ * Every date expression of the tokens, in order, with the weekday written right next to an explicit date merged into
+ * it ("martes 13 de octubre" is ONE date, the explicit one, and the weekday only qualifies it). Nothing is consumed.
  */
-function detectDate(
-  tokens: Token[],
-  time: string | null,
-  today: DateOnly,
-  ctx: Pick<QuickCaptureContext, 'now' | 'timeZone'>,
-  warn: (w: CaptureWarning) => void,
-): { date: DateOnly | null; certainty: FieldCertainty; multiple: boolean } {
+export function findDateExpressions(tokens: readonly Token[]): FoundDate[] {
   const found: FoundDate[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    const match = matchDateAt(tokens, i);
+    const match = matchDateAt(tokens as Token[], i);
     if (!match) continue;
     const text = tokens
       .slice(match.start, match.start + match.length)
@@ -653,6 +691,22 @@ function detectDate(
       merged.push(a);
     }
   }
+  return merged;
+}
+
+/**
+ * Every date expression is found; the first valid one is used. A different second one means the text probably
+ * holds more than one activity, except a weekday written right next to an explicit date ("el próximo martes 13
+ * de octubre"): that is ONE date, the explicit one wins, and a weekday that does not match it is reported.
+ */
+function detectDate(
+  tokens: Token[],
+  time: string | null,
+  today: DateOnly,
+  ctx: Pick<QuickCaptureContext, 'now' | 'timeZone'>,
+  warn: (w: CaptureWarning) => void,
+): { date: DateOnly | null; certainty: FieldCertainty; multiple: boolean } {
+  const merged = findDateExpressions(tokens);
 
   let date: DateOnly | null = null;
   let certainty: FieldCertainty = 'MISSING';
@@ -849,51 +903,36 @@ export interface InterpretMeta {
   timeFromShared: boolean;
 }
 
-export function interpretTokens(
+/** What the words that are not a time or a date say: subject, type and title. */
+export interface WordsInterpretation {
+  title: string;
+  type: ActivityType;
+  typeCertainty: FieldCertainty;
+  subjectId: string | null;
+  subjectCertainty: FieldCertainty;
+  /** The words as typed where the subject was recognised (to use as a title when nothing else is left). */
+  subjectText: string | null;
+  ambiguities: Interpretation['ambiguities'];
+  warnings: CaptureWarning[];
+  /** A second type or a second clear subject: probably two activities (quick capture's old single-activity rule). */
+  multiple: boolean;
+  meta: { subjectFromShared: boolean };
+}
+
+/**
+ * Subject, type and title of ONE activity from the tokens that a time or a date has not already used.
+ * `interpretTokens` calls it after reading the time and the date; the multi-activity engine calls it after planning
+ * its own days and times. The rules are the same ones in both.
+ */
+export function interpretWords(
   tokens: Token[],
-  context: QuickCaptureContext,
+  context: Pick<QuickCaptureContext, 'subjects'>,
   options: InterpretOptions = {},
-): Interpretation & { meta: InterpretMeta } {
+): WordsInterpretation {
   const warnings: CaptureWarning[] = [];
   const warn = (w: CaptureWarning) => warnings.push(w);
-  const today = toLocalParts(context.now, context.timeZone).date;
-  const meta: InterpretMeta = {
-    subjectFromShared: false,
-    dateFromShared: false,
-    timeFromShared: false,
-  };
+  const meta = { subjectFromShared: false };
   let multiple = false;
-
-  // 1. Time: its own, else the shared one.
-  const ownTime = detectTime(tokens, warn);
-  let dueTime = ownTime.value;
-  let timeLikely = ownTime.likely;
-  if (dueTime === null && options.shared) {
-    const sharedTime = detectTime(cloneTokens(options.shared), () => undefined);
-    dueTime = sharedTime.value;
-    timeLikely = sharedTime.likely;
-    meta.timeFromShared = dueTime !== null;
-  }
-
-  // 2. Date: its own, else the shared one.
-  const own = detectDate(tokens, dueTime, today, context, warn);
-  let dueDate = own.date;
-  let dateCertainty = own.certainty;
-  if (own.multiple) multiple = true;
-  if (dueDate === null && options.shared) {
-    const sharedDate = detectDate(
-      cloneTokens(options.shared),
-      dueTime,
-      today,
-      context,
-      () => undefined,
-    );
-    if (sharedDate.date !== null) {
-      dueDate = sharedDate.date;
-      dateCertainty = sharedDate.certainty;
-      meta.dateFromShared = true;
-    }
-  }
 
   // 3. Subject: its own, else the shared one.
   const entries = buildSubjectEntries(context.subjects);
@@ -908,6 +947,7 @@ export function interpretTokens(
     }
   }
   let subjectId: string | null = null;
+  let subjectText: string | null = null;
   let subjectCertainty: FieldCertainty = 'MISSING';
   const ambiguities: Interpretation['ambiguities'] = [];
   if (found.kind === 'match') {
@@ -915,6 +955,10 @@ export function interpretTokens(
     // A subject taken from the rest of the sentence is inferred from context, so it is never EXACT.
     subjectCertainty = found.exact && !fromShared ? 'EXACT' : 'LIKELY';
     if (!fromShared) {
+      subjectText = tokens
+        .slice(found.start, found.start + found.length)
+        .map((t) => t.raw)
+        .join(' ');
       use(tokens, found.start, found.length);
       // A second, different subject that is also clearly named: probably two activities.
       const other = matchSubject(tokens, entries);
@@ -978,6 +1022,73 @@ export function interpretTokens(
     title = title.slice(0, ACTIVITY_TITLE_MAX).trimEnd();
     warn({ code: 'TITLE_TRUNCATED', message: QUICK_CAPTURE_MESSAGES.TITLE_TRUNCATED });
   }
+
+  return {
+    title,
+    type,
+    typeCertainty,
+    subjectId,
+    subjectCertainty,
+    subjectText,
+    ambiguities,
+    warnings,
+    multiple,
+    meta,
+  };
+}
+
+export function interpretTokens(
+  tokens: Token[],
+  context: QuickCaptureContext,
+  options: InterpretOptions = {},
+): Interpretation & { meta: InterpretMeta } {
+  const warnings: CaptureWarning[] = [];
+  const warn = (w: CaptureWarning) => warnings.push(w);
+  const today = toLocalParts(context.now, context.timeZone).date;
+  const meta: InterpretMeta = {
+    subjectFromShared: false,
+    dateFromShared: false,
+    timeFromShared: false,
+  };
+  let multiple = false;
+
+  // 1. Time: its own, else the shared one.
+  const ownTime = detectTime(tokens, warn);
+  let dueTime = ownTime.value;
+  let timeLikely = ownTime.likely;
+  if (dueTime === null && options.shared) {
+    const sharedTime = detectTime(cloneTokens(options.shared), () => undefined);
+    dueTime = sharedTime.value;
+    timeLikely = sharedTime.likely;
+    meta.timeFromShared = dueTime !== null;
+  }
+
+  // 2. Date: its own, else the shared one.
+  const own = detectDate(tokens, dueTime, today, context, warn);
+  let dueDate = own.date;
+  let dateCertainty = own.certainty;
+  if (own.multiple) multiple = true;
+  if (dueDate === null && options.shared) {
+    const sharedDate = detectDate(
+      cloneTokens(options.shared),
+      dueTime,
+      today,
+      context,
+      () => undefined,
+    );
+    if (sharedDate.date !== null) {
+      dueDate = sharedDate.date;
+      dateCertainty = sharedDate.certainty;
+      meta.dateFromShared = true;
+    }
+  }
+
+  // 3-5. Subject, type and title: the words that are not a time or a date.
+  const words = interpretWords(tokens, context, options);
+  const { subjectId, subjectCertainty, typeCertainty, type, title, ambiguities } = words;
+  meta.subjectFromShared = words.meta.subjectFromShared;
+  if (words.multiple) multiple = true;
+  warnings.push(...words.warnings);
 
   // 6. Checks that need the context.
   if (dueDate === null) {

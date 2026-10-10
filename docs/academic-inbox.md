@@ -1,3 +1,5 @@
+> **F1-2b:** el mismo motor de propuestas que usa ahora Captura rápida ([capture-proposals.md](capture-proposals.md), `POST /api/capture/parse` con `mode: 'INBOX'`) ya existe y da las mismas actividades que esta pantalla, más listas de días y horas por posición. **Esta pantalla todavía usa su ruta anterior** (F1-2d).
+
 # Bandeja académica (Fase 12)
 
 ## Objetivo
