@@ -5,11 +5,13 @@ import { useSearchParams } from 'react-router';
 import { useUpdateActivity, useActivities } from '../activities/useActivities';
 import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
+import { clearDraft, useStoredDraft } from '../lib/drafts';
 import { useNow } from '../lib/useNow';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
+import { activityDraftSchema, activityDraftScope, isBlank } from './activities/activityDraft';
 import { ActivityFormDialog } from './activities/ActivityFormDialog';
 import { ActivityList } from './activities/ActivityList';
 import { DeleteActivityDialog } from './activities/DeleteActivityDialog';
@@ -30,7 +32,11 @@ export function ActivitiesPage() {
   const { period } = useCurrentPeriod();
   const subjects = useSubjects(period?.id);
   const activities = useActivities(toApiQuery(filters, period?.id), period !== undefined);
-  const timeZone = useMe().data?.timezone ?? DEFAULT_TIMEZONE;
+  const me = useMe().data;
+  const timeZone = me?.timezone ?? DEFAULT_TIMEZONE;
+  // An activity the student began and did not finish (kept as a draft): offered back, never forced.
+  const createScope = activityDraftScope(undefined, period?.id);
+  const unfinished = useStoredDraft(me?.id, createScope, activityDraftSchema)?.payload;
   const now = useNow();
   const updateStatus = useUpdateActivity();
 
@@ -102,6 +108,31 @@ export function ActivitiesPage() {
       {statusError && (
         <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink">
           No se pudo cambiar el estado: {statusError}
+        </p>
+      )}
+
+      {unfinished && !isBlank(unfinished) && current === null && (
+        <p
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 rounded-control border border-border bg-surface p-3 text-sm"
+        >
+          <span className="min-w-0 break-words">
+            Tienes una actividad sin terminar
+            {unfinished.title.trim() ? `: «${unfinished.title.trim()}»` : ''}.
+          </span>
+          <span className="flex flex-wrap gap-x-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-accent-ink"
+              onClick={() => setEditing('new')}
+            >
+              Retomar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => me && clearDraft(me.id, createScope)}>
+              Descartar borrador
+            </Button>
+          </span>
         </p>
       )}
 

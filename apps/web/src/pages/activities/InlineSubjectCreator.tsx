@@ -23,6 +23,9 @@ interface Props {
   /** `existing`: the name was already one of the student's subjects, so it was selected and nothing was created. */
   onCreated: (subject: Subject, existing: boolean) => void;
   onCancel: () => void;
+  /** The name typed before (a restored draft), and a way to keep what is typed: nothing is created by keeping it. */
+  initialName?: string;
+  onNameChange?: (name: string) => void;
 }
 
 export type InlineSubjectDecision =
@@ -75,10 +78,17 @@ export function decideInlineSubject(
  * A name the student already has (compared like the database does) selects that subject instead of creating a
  * duplicate; the id always comes from the student's own list, never guessed from an error.
  */
-export function InlineSubjectCreator({ subjects, periodId, onCreated, onCancel }: Props) {
+export function InlineSubjectCreator({
+  subjects,
+  periodId,
+  onCreated,
+  onCancel,
+  initialName = '',
+  onNameChange,
+}: Props) {
   const create = useCreateSubject();
   const qc = useQueryClient();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
 
@@ -138,6 +148,7 @@ export function InlineSubjectCreator({ subjects, periodId, onCreated, onCancel }
         value={name}
         onChange={(value) => {
           setName(value);
+          onNameChange?.(value);
           setNameError(undefined);
         }}
         error={nameError}
