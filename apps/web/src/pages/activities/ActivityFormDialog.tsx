@@ -15,6 +15,7 @@ import {
   type Subject,
 } from '@planner/core';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCurrentPeriod } from '../../academic/useAcademic';
 import { useCreateActivity, useUpdateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
 import { FormField } from '../../components/FormField';
@@ -25,6 +26,7 @@ import { SelectField } from '../../components/SelectField';
 import { FIELD_LABEL } from '../../components/ui/fieldStyles';
 import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { ReminderSection } from '../reminders/ReminderSection';
+import { INLINE_SUBJECT_NAME_ID, InlineSubjectCreator } from './InlineSubjectCreator';
 
 interface Props {
   subjects: Subject[];
@@ -45,6 +47,10 @@ interface Props {
  * activity, e.g. an errand or a meeting) and "Elegir asignatura" brings the selector back. It is never the default when
  * there are subjects: it takes one explicit tap. The last subject chosen is kept while the form is open, so going
  * back and forth does not lose it. Saving in the "Sin asignatura" state sends `subjectId: null`.
+ *
+ * "Crear asignatura" opens a small creator INLINE (not a nested dialog, not another page): everything typed in the
+ * activity stays where it is, and the new subject is added to the options and selected. Nothing is created until the
+ * student asks for it.
  */
 export function ActivityFormDialog({
   subjects,
@@ -57,6 +63,7 @@ export function ActivityFormDialog({
   const create = useCreateActivity();
   const update = useUpdateActivity();
   const pending = create.isPending || update.isPending;
+  const { period } = useCurrentPeriod();
 
   // The wall-clock date/time come from core: the form never does timezone math itself.
   const local = activity ? toLocalParts(activity.dueAt, timeZone) : undefined;
@@ -82,32 +89,62 @@ export function ActivityFormDialog({
   );
   // The swap between the selector and the state animates only once the student asks for it (not when the form opens).
   const [swapped, setSwapped] = useState(false);
-  const focusAfterSwap = useRef<string | null>(null);
-  useEffect(() => {
-    if (!focusAfterSwap.current) return;
-    document.getElementById(focusAfterSwap.current)?.focus();
-    focusAfterSwap.current = null;
-  }, [subjectless]);
+  // Subjects created from this form: they are options at once, without waiting for the list to refresh.
+  const [created, setCreated] = useState<Subject[]>([]);
+  const [creating, setCreating] = useState(false);
+  // Said after selecting a subject the student already had instead of creating a duplicate.
+  const [notice, setNotice] = useState<string>();
+  const options = [...subjects, ...created.filter((c) => !subjects.some((s) => s.id === c.id))];
 
   // The control that was pressed disappears: keep the focus on the one that takes its place.
-  function omitSubject() {
-    focusAfterSwap.current = 'activity-subject-choose';
+  const focusAfter = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusAfter.current) return;
+    document.getElementById(focusAfter.current)?.focus();
+    focusAfter.current = null;
+  });
+
+  const withoutSubjectError = () =>
     setFieldErrors((e) => {
       const rest = { ...e };
       delete rest.subjectId;
       return rest;
     });
+  function omitSubject() {
+    focusAfter.current = 'activity-subject-choose';
+    withoutSubjectError();
+    setNotice(undefined);
     setSwapped(true);
     setSubjectless(true);
   }
   function chooseSubject() {
-    focusAfterSwap.current = 'activity-subject';
+    focusAfter.current = 'activity-subject';
     setSwapped(true);
     setSubjectless(false);
   }
+  function openCreator() {
+    setNotice(undefined);
+    setFormError(undefined);
+    setCreating(true); // the creator focuses its own name
+  }
+  function cancelCreator() {
+    focusAfter.current = 'activity-subject-create';
+    setCreating(false);
+  }
+  /** The new (or already existing) subject becomes the selected one; the rest of the form is untouched. */
+  function subjectCreated(subject: Subject, existing: boolean) {
+    setCreated((all) => (all.some((s) => s.id === subject.id) ? all : [...all, subject]));
+    setSubjectId(subject.id);
+    setSubjectless(false);
+    withoutSubjectError();
+    setNotice(existing ? `Ya tenías «${subject.name}»: la seleccioné.` : undefined);
+    setSwapped(true);
+    setCreating(false);
+    focusAfter.current = 'activity-subject';
+  }
 
   // With a single subject there is nothing to choose.
-  const effectiveSubjectId = subjectId || (subjects.length === 1 ? subjects[0]!.id : '');
+  const effectiveSubjectId = subjectId || (options.length === 1 ? options[0]!.id : '');
   const subjectToSend = subjectless ? null : effectiveSubjectId;
 
   const advancedInUse = Boolean(
@@ -129,6 +166,12 @@ export function ActivityFormDialog({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
+    if (creating) {
+      // The new subject is half made: finish or cancel it first (saving now would leave the subject undecided).
+      setFormError('Termina de crear la asignatura o cancélala para guardar la actividad.');
+      document.getElementById(INLINE_SUBJECT_NAME_ID)?.focus();
+      return;
+    }
 
     if (activity) {
       const parsed = updateActivitySchema.safeParse({
@@ -174,7 +217,14 @@ export function ActivityFormDialog({
           onChange={setTitle}
           error={fieldErrors.title?.[0]}
         />
-        {subjectless ? (
+        {creating ? (
+          <InlineSubjectCreator
+            subjects={options}
+            periodId={period?.id ?? subjects[0]?.periodId}
+            onCreated={subjectCreated}
+            onCancel={cancelCreator}
+          />
+        ) : subjectless ? (
           <div
             role="group"
             aria-labelledby="activity-subject-label"
@@ -192,19 +242,30 @@ export function ActivityFormDialog({
                 />
                 Sin asignatura
               </p>
-              {subjects.length > 0 && (
+              <div className="-mr-2 flex flex-wrap items-center">
+                {options.length > 0 && (
+                  <Button
+                    id="activity-subject-choose"
+                    size="sm"
+                    variant="ghost"
+                    className="text-accent-ink"
+                    onClick={chooseSubject}
+                  >
+                    Elegir asignatura
+                  </Button>
+                )}
                 <Button
-                  id="activity-subject-choose"
+                  id="activity-subject-create"
                   size="sm"
                   variant="ghost"
-                  className="-mr-2 text-accent-ink"
-                  onClick={chooseSubject}
+                  className="text-accent-ink"
+                  onClick={openCreator}
                 >
-                  Elegir asignatura
+                  Crear asignatura
                 </Button>
-              )}
+              </div>
             </div>
-            {subjects.length === 0 && (
+            {options.length === 0 && (
               <p className="text-sm text-muted-foreground">Aún no tienes asignaturas.</p>
             )}
             {fieldErrors.subjectId?.[0] && (
@@ -218,20 +279,34 @@ export function ActivityFormDialog({
             <SelectField
               id="activity-subject"
               label="Asignatura"
-              placeholder={subjects.length === 1 ? undefined : 'Elige una asignatura'}
+              placeholder={options.length === 1 ? undefined : 'Elige una asignatura'}
               value={effectiveSubjectId}
-              onChange={setSubjectId}
-              options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+              onChange={(value) => {
+                setNotice(undefined);
+                setSubjectId(value);
+              }}
+              options={options.map((s) => ({ value: s.id, label: s.name }))}
               error={fieldErrors.subjectId?.[0]}
             />
-            <Button
-              size="sm"
-              variant="ghost"
-              className="self-start text-accent-ink"
-              onClick={omitSubject}
-            >
-              Omitir asignatura
-            </Button>
+            {notice && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {notice}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-x-1">
+              <Button size="sm" variant="ghost" className="text-accent-ink" onClick={omitSubject}>
+                Omitir asignatura
+              </Button>
+              <Button
+                id="activity-subject-create"
+                size="sm"
+                variant="ghost"
+                className="text-accent-ink"
+                onClick={openCreator}
+              >
+                Crear asignatura
+              </Button>
+            </div>
           </div>
         )}
         {/* When it is edited, the state sits beside the date (two short controls on one row from 640 px). */}
