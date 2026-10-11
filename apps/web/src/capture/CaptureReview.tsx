@@ -87,7 +87,7 @@ export function CaptureReview({
     state.items.filter((i) => ids.includes(i.proposal.clientId));
   const describe = (ids: readonly string[]) =>
     itemsOf(ids)
-      .map((i) => `${effectiveTitle(i)} (${shortDate(effectiveDate(i))})`)
+      .map((i) => `${effectiveTitle(state, i)} (${shortDate(effectiveDate(i))})`)
       .join(', ');
 
   const goToFirstToReview = () => {

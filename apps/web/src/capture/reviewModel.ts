@@ -94,7 +94,22 @@ export function timeCorrectionOf(state: ReviewState, item: ReviewItem): CaptureC
   return state.corrections.find((c) => c.field === 'time' && c.key === key) ?? null;
 }
 
-export const effectiveTitle = (item: ReviewItem) => item.title ?? item.proposal.title.value;
+/**
+ * The title: the student's own edit, else every word the engine read. When the subject was only an OFFERED name ("parcial de
+ * ciberseguridad") and the student accepts a subject for it, the name is the subject and the title is the shorter one.
+ */
+export function effectiveTitle(state: ReviewState, item: ReviewItem): string {
+  if (item.title !== undefined) return item.title;
+  const { value, withoutSubject } = item.proposal.title;
+  const subject = effectiveSubject(state, item);
+  const offered =
+    item.proposal.subject.kind === 'UNRESOLVED' ? item.proposal.subject.suggestedName : null;
+  const accepted =
+    offered !== null &&
+    (subject?.kind === 'NEW' || subject?.kind === 'EXISTING') &&
+    normalizeNameKey(subject.name) === normalizeNameKey(offered);
+  return withoutSubject !== null && accepted ? withoutSubject : value;
+}
 export const effectiveType = (item: ReviewItem): ActivityType =>
   item.type ?? item.proposal.type.value;
 export const effectiveDate = (item: ReviewItem) => item.date ?? item.proposal.date.value ?? '';
@@ -129,7 +144,7 @@ const hasBlocking = (p: CaptureProposal, field: PendingField) =>
 /** What the student still has to settle on this proposal before it can be created. */
 export function pendingOf(state: ReviewState, item: ReviewItem): PendingField[] {
   const out: PendingField[] = [];
-  if (effectiveTitle(item).trim() === '') out.push('title');
+  if (effectiveTitle(state, item).trim() === '') out.push('title');
   const date = effectiveDate(item);
   const dateInDoubt = item.date === undefined && item.proposal.date.certainty === 'AMBIGUOUS';
   if (date === '' || dateInDoubt) out.push('date');
@@ -294,7 +309,7 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
     const description = effectiveDescription(item).trim();
     items.push({
       clientId: item.proposal.clientId,
-      title: effectiveTitle(item).trim(),
+      title: effectiveTitle(state, item).trim(),
       type: effectiveType(item),
       dueDate: effectiveDate(item),
       ...(time ? { dueTime: time } : {}),

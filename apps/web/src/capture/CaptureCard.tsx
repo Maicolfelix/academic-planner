@@ -97,7 +97,7 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
   const [editing, setEditing] = useState(false);
   const [own, setOwn] = useState<Partial<Record<PendingField, boolean>>>({});
 
-  const title = effectiveTitle(item);
+  const title = effectiveTitle(state, item);
   const description = effectiveDescription(item);
   const subject = effectiveSubject(state, item);
   const timeGroup = timeCorrectionOf(state, item);

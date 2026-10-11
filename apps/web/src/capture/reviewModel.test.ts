@@ -14,6 +14,7 @@ import {
   createReview,
   effectiveSubject,
   effectiveTime,
+  effectiveTitle,
   isComplete,
   pendingOf,
   reconcileSubjects,
@@ -22,6 +23,7 @@ import {
   setDescription,
   setSubject,
   setTime,
+  setTitle,
   summarize,
   toggle,
 } from './reviewModel';
@@ -344,5 +346,46 @@ describe('fifty proposals', () => {
       JSON.parse(JSON.stringify(toCaptureDraft(fifty, state))),
     );
     expect(restored.review!.items).toHaveLength(50);
+  });
+});
+
+describe('the title keeps every word until a subject is accepted for it', () => {
+  it('"Proyecto de grado" with no such subject: the title is complete, and "sin asignatura" keeps it that way', () => {
+    let state = review('Proyecto de grado el viernes');
+    const item = state.items[0]!;
+    expect(effectiveTitle(state, item)).toBe('Proyecto de grado');
+    state = setSubject(state, item.proposal.clientId, { kind: 'NONE' });
+    expect(buildConfirmRequest(state).items[0]!.title).toBe('Proyecto de grado');
+  });
+
+  it('accepting the offered subject ("Crear «grado»") shortens the title, because the name is now the subject', () => {
+    let state = review('Parcial de ciberseguridad el martes', [SUBJECTS[0]!]);
+    const item = state.items[0]!;
+    expect(effectiveTitle(state, item)).toBe('Parcial de ciberseguridad');
+    state = setSubject(state, item.proposal.clientId, { kind: 'NEW', name: 'Ciberseguridad' });
+    expect(effectiveTitle(state, state.items[0]!)).toBe('Parcial');
+    expect(buildConfirmRequest(state).items[0]).toMatchObject({
+      title: 'Parcial',
+      subject: { kind: 'NEW', name: 'Ciberseguridad' },
+    });
+  });
+
+  it('another subject picked for it is not the offered name: the words stay', () => {
+    let state = review('Parcial de ciberseguridad el martes', [SUBJECTS[0]!]);
+    const id = state.items[0]!.proposal.clientId;
+    state = setSubject(state, id, {
+      kind: 'EXISTING',
+      id: SUBJECTS[0]!.id,
+      name: SUBJECTS[0]!.name,
+    });
+    expect(effectiveTitle(state, state.items[0]!)).toBe('Parcial de ciberseguridad');
+  });
+
+  it('the title the student typed always wins', () => {
+    let state = review('Parcial de ciberseguridad el martes', [SUBJECTS[0]!]);
+    const id = state.items[0]!.proposal.clientId;
+    state = setTitle(state, id, 'Mi parcial');
+    state = setSubject(state, id, { kind: 'NEW', name: 'Ciberseguridad' });
+    expect(effectiveTitle(state, state.items[0]!)).toBe('Mi parcial');
   });
 });

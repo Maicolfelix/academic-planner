@@ -45,8 +45,6 @@ const STAGE = [
 
 type Item = NonNullable<ReturnType<typeof useAttention>['data']>['recommendation'] & object;
 
-const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 /**
  * "¿Qué hago ahora?": the next activities by deadline (at most five, the API's `upcoming`), one hero each, in a strip
  * that snaps: swipe on a phone, dots anywhere. The internal score is never shown. With a single activity it is just
@@ -82,48 +80,130 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
   );
 }
 
+/** A slide counts as the one on screen when this much of it is inside the strip. */
+const VISIBLE_RATIO = 0.6;
+
+/** The scroll position that centres `slide` in `strip`, from where the slide really is (its width, gaps and padding included). */
+function scrollTargetOf(strip: HTMLElement, slide: HTMLElement): number {
+  const centred = slide.offsetLeft - (strip.clientWidth - slide.offsetWidth) / 2;
+  return Math.min(Math.max(0, centred), Math.max(0, strip.scrollWidth - strip.clientWidth));
+}
+
 /**
- * The active slide is state (by id, so it survives a reorder), and the strip follows it: a swipe updates the state, a
- * dot sets it and the strip scrolls to it. If the active activity disappears (completed, deleted) the first one is shown.
+ * ONE source of truth: `activeId`, the INTENT (which activity the student is looking at, by id so it survives a reorder).
+ * The scroll position is only its projection:
+ *  - a dot, a key or a data change calls `goTo`, which sets the intent and scrolls the strip there. Each call replaces the
+ *    previous one (`pending` holds the latest only), so a late event of an older navigation can never overwrite it;
+ *  - a swipe is the one thing that moves the strip without `goTo`: when a slide becomes the one on screen while the student
+ *    has the strip in hand (touch, pointer or wheel since the last `goTo`), it becomes the intent. If the strip moves with
+ *    nobody holding it (the browser finishing an old fling), the intent stands and the strip is put back.
+ * "Which slide is on screen" comes from an IntersectionObserver (where the slides really are), never from dividing
+ * `scrollLeft` by a width the CSS may not match. If the active activity disappears (completed, deleted) the first one is
+ * shown; a resize puts the strip back on the active one.
  */
 function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: string; now: Date }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
-  const smooth = useRef(false); // the next scroll comes from a dot: animate it
-  const settling = useRef<number | null>(null); // a programmatic scroll is on its way to this index
+  const pending = useRef<{ index: number } | null>(null);
+  /** The student has their finger/wheel on the strip since the last `goTo`: a slide that settles is theirs to choose. */
+  const held = useRef(false);
+  const latest = useRef({ items, active: 0 });
   const active = Math.max(
     0,
     items.findIndex((i) => i.activity.id === activeId),
   );
   const order = items.map((i) => i.activity.id).join();
 
-  // Bring the strip to the active slide whenever the state, or the order, says it is elsewhere.
   useEffect(() => {
-    const el = strip.current;
-    if (!el || el.clientWidth === 0) return;
-    if (Math.round(el.scrollLeft / el.clientWidth) === active) return;
-    const animate = smooth.current && !prefersReducedMotion();
-    smooth.current = false;
-    settling.current = animate ? active : null;
-    el.scrollTo({ left: active * el.clientWidth, behavior: animate ? 'smooth' : 'auto' });
-  }, [active, order]);
+    latest.current = { items, active };
+  });
 
-  const onScroll = () => {
+  const slides = () =>
+    strip.current ? [...strip.current.querySelectorAll<HTMLElement>('[data-slide]')] : [];
+
+  /** Scroll the strip to slide `index`. Does nothing if it is already there (so nothing is left "on its way"). */
+  const scrollToSlide = (index: number, behavior: ScrollBehavior) => {
     const el = strip.current;
-    if (!el || el.clientWidth === 0) return;
-    const index = Math.round(el.scrollLeft / el.clientWidth);
-    if (settling.current !== null) {
-      if (index === settling.current) settling.current = null;
+    const slide = slides()[index];
+    if (!el || !slide) return;
+    const left = scrollTargetOf(el, slide);
+    if (Math.abs(el.scrollLeft - left) <= 1) {
+      pending.current = null;
       return;
     }
-    const id = items[index]?.activity.id;
-    if (id && id !== items[active]?.activity.id) setActiveId(id);
+    pending.current = behavior === 'smooth' ? { index } : null;
+    el.scrollTo({ left, behavior });
   };
 
-  const pick = (index: number) => {
-    smooth.current = true;
+  const goTo = (wanted: number) => {
+    const index = Math.min(Math.max(0, wanted), items.length - 1);
+    held.current = false;
     setActiveId(items[index]!.activity.id);
+    scrollToSlide(
+      index,
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    );
   };
+
+  // The data changed under the strip (finished, deleted, a nearer one, a moved deadline): show the active one again.
+  useEffect(() => {
+    scrollToSlide(latest.current.active, 'auto');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a change of order/length realigns
+  }, [order]);
+
+  // The width changed (rotation, resize, even in the middle of an animation): same activity, new position.
+  useEffect(() => {
+    const el = strip.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      scrollToSlide(latest.current.active, 'auto');
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollToSlide only reads refs
+  }, []);
+
+  // Which slide is on screen: the one most inside the strip, once it is mostly inside.
+  useEffect(() => {
+    const el = strip.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const targets = slides();
+    const ratios = new Map<Element, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) ratios.set(e.target, e.intersectionRatio);
+        let best = -1;
+        let bestRatio = 0;
+        targets.forEach((t, i) => {
+          const r = ratios.get(t) ?? 0;
+          if (r > bestRatio) {
+            best = i;
+            bestRatio = r;
+          }
+        });
+        if (best < 0 || bestRatio < VISIBLE_RATIO) return;
+        const wanted = pending.current;
+        if (wanted !== null) {
+          if (wanted.index === best) pending.current = null; // arrived
+          return; // on its way: the intent is already set, whatever passes by on the road
+        }
+        const { items: current, active: now } = latest.current;
+        const seen = current[best]?.activity.id;
+        if (seen === undefined || best === now) return;
+        // A swipe settled on another slide: theirs. If nobody touched the strip, the browser moved it by itself (a fling
+        // that was still snapping when a dot was pressed): the intent stands and the strip goes back to it.
+        if (held.current) setActiveId(seen);
+        else scrollToSlide(now, 'auto');
+      },
+      { root: el, threshold: [0, 0.25, 0.5, VISIBLE_RATIO, 0.75, 1] },
+    );
+    targets.forEach((t) => observer.observe(t));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollToSlide only reads refs; only a new order re-observes
+  }, [order]);
 
   const onDotKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const last = items.length - 1;
@@ -139,7 +219,7 @@ function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: strin
               : null;
     if (next === null) return;
     e.preventDefault();
-    pick(next);
+    goTo(next);
     e.currentTarget.querySelectorAll('button')[next]?.focus();
   };
 
@@ -147,16 +227,24 @@ function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: strin
     <div className="flex flex-col gap-2">
       <div
         ref={strip}
-        onScroll={onScroll}
-        onPointerDown={() => (settling.current = null)}
+        // The student takes the strip in hand: whatever navigation was on its way is theirs now.
+        onPointerDown={() => {
+          pending.current = null;
+          held.current = true;
+        }}
+        onWheel={() => {
+          pending.current = null;
+          held.current = true;
+        }}
         role="group"
         aria-roledescription="carrusel"
         aria-label="Próximas actividades"
-        className="-mx-1 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative -mx-1 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items.map((item, i) => (
           <div
             key={item.activity.id}
+            data-slide=""
             role="group"
             aria-roledescription="actividad"
             aria-label={`${i + 1} de ${items.length}`}
@@ -181,7 +269,7 @@ function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: strin
               type="button"
               aria-label={`Ver actividad ${i + 1} de ${items.length}`}
               aria-current={i === active}
-              onClick={() => pick(i)}
+              onClick={() => goTo(i)}
               className="group inline-flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary"
             >
               <span
