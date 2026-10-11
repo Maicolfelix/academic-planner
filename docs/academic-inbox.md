@@ -11,7 +11,7 @@ Convertir un mensaje largo de un profesor ("El martes tendremos parcial de Redes
 |           | Captura rápida (F11)            | Bandeja académica (F12)                                    |
 | --------- | ------------------------------- | ---------------------------------------------------------- |
 | Entrada   | una frase, hasta 300 caracteres | un mensaje, hasta 5000                                     |
-| Resultado | una actividad                   | de 0 a 10 propuestas                                       |
+| Resultado | una actividad                   | de 0 a 50 propuestas                                       |
 | Contexto  | una sola cláusula               | contexto por oración (asignatura, fecha, hora compartidas) |
 | Endpoint  | `POST /api/quick-capture/parse` | `POST /api/academic-inbox/parse`                           |
 
@@ -24,7 +24,7 @@ Ambas usan los mismos bloques (`packages/core/src/captureShared.ts`): alias de t
 3. **Cláusulas** (`clauseStart`): varias actividades en una oración se cortan en la última conjunción (`y`, `además`, `luego`…) o coma entre anclas.
 4. **Interpretación**: cada cláusula pasa por `interpretTokens` (el parser de F11).
 5. **Filtro**: se conserva una propuesta solo si entendió fecha, hora o asignatura, hay asignatura ambigua o hay una palabra de intención (tendremos, deben, entregar…). Las idénticas se colapsan.
-6. **Límite**: máximo 10; si hay más, aviso "Encontré más de 10 actividades".
+6. **Límite**: máximo 50; si hay más, aviso "Encontré más de 50 actividades. Divide el mensaje en dos partes para revisarlas mejor." (el motor vigente y su revisión: [capture-proposals.md](capture-proposals.md)).
 7. **Duplicados** (solo en la API): ver abajo.
 
 ## Contexto y herencia

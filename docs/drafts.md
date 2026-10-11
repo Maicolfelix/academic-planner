@@ -22,7 +22,7 @@ Para que se vea que existe, la página de Actividades ofrece «Tienes una activi
 
 ## Dónde y cómo se guarda
 
-`localStorage`, por decisión: los borradores son pequeños (un formulario, o hasta diez propuestas); es **síncrono** (se puede volcar desde `pagehide`, donde una escritura asíncrona puede no terminar) y sobrevive a la recarga. `sessionStorage` no sobrevive a que Safari reconstruya la pestaña; IndexedDB no aporta nada a este tamaño y es asíncrono justo donde duele. No hay API de borradores en el servidor.
+`localStorage`, por decisión: los borradores son pequeños (un formulario, o hasta cincuenta propuestas: unos 42 KB medidos); es **síncrono** (se puede volcar desde `pagehide`, donde una escritura asíncrona puede no terminar) y sobrevive a la recarga. `sessionStorage` no sobrevive a que Safari reconstruya la pestaña; IndexedDB no aporta nada a este tamaño y es asíncrono justo donde duele. No hay API de borradores en el servidor.
 
 Entrada: `academic-planner:draft:v1:<userId>:<scope>` → `{ version, updatedAt, payload }`.
 

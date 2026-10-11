@@ -13,7 +13,7 @@ Aplicación web progresiva (PWA) para **organizar asignaturas, actividades, agen
 - **Recordatorios internos** (automáticos según el tipo de actividad y manuales).
 - **Radar académico:** clasifica lo pendiente por tiempo restante. **¿Qué hago ahora?:** recomienda a qué prestar atención primero y explica por qué.
 - **Progreso y carga semanal** (descriptivos).
-- **Captura rápida** (una frase → una actividad), **Bandeja académica** (un mensaje → hasta 10 actividades) e **Importación de horario** (imagen o PDF → clases, con OCR local). Las tres **proponen** y solo guardan al confirmar.
+- **Captura rápida** (una frase → una actividad), **Bandeja académica** (un mensaje → hasta 50 actividades) e **Importación de horario** (imagen o PDF → clases, con OCR local). Las tres **proponen** y solo guardan al confirmar.
 - **PWA instalable** (el shell abre sin conexión; los datos requieren conexión).
 
 Descripción completa sin código: [docs/system-overview.md](docs/system-overview.md).

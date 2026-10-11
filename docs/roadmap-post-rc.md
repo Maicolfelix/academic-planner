@@ -94,7 +94,7 @@ Orden vigente tras la revisión: **UX1-lite → UX2a → B1/B2 (notas) → pilot
 3. **Hora sin a. m./p. m.** («a las 6»): **ambigua**, con alternativas; no se inventa 06:00.
 4. **Si solo queda el nombre de la asignatura como título:** se usa como título con certeza `LIKELY`.
 5. **Recurrencia:** se detecta y se muestra como **sugerencia dentro de `CaptureReview`**; la persistencia del `ScheduleBlock` queda para F1-2e.
-6. **Máximo de 10 propuestas por entrada.** Nunca se trunca en silencio (si hay más, se avisa).
+6. **Máximo de 50 propuestas por entrada** (era 10; ampliado en el PR #31 tras medirlo). Nunca se trunca en silencio (si hay más, se avisa).
 7. **Atomicidad:** solo participan las propuestas **seleccionadas**. Si una seleccionada es inválida, **ninguna seleccionada se guarda**; las desmarcadas no bloquean el lote.
 8. **«Asignatura + varios días + hora» sin tipo de actividad:** se trata como **posible recurrencia**. No se asume ni una actividad múltiple ni un `ScheduleBlock` automáticamente; la interfaz ofrece una decisión explícita cuando la evidencia es ambigua.
 
