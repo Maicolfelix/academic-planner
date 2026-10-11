@@ -325,7 +325,7 @@ describe('the title keeps the words the student wrote, in the order they wrote t
     expect(p!.title.value).toBe('Parcial');
     expect(p!.subject).toMatchObject({ kind: 'EXISTING', name: 'Redes de Computadores' });
     expect(title('Taller de redes')).toBe('Taller');
-    expect(title('Examen de redes el viernes')).toBe('Parcial'); // the type's own label opens the title, as always
+    expect(title('Examen de redes el viernes')).toBe('Examen'); // the student's own word opens the title
     expect(title('Tarea de redes de programación el lunes')).toBe('Tarea de redes');
   });
 

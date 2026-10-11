@@ -244,7 +244,7 @@ describe('family 7 — references to what was said before', () => {
       'Tengo un examen de redes el lunes a las 7 am y un ensayo de ciberseguridad el martes a las 9 el martes y tengo dos tareas para dos dias distintos uno para el jueves y otro para el viernes las dos tareas tengo que entregarlas a las 8 AM',
     );
     expect(rows(r)).toEqual([
-      ['Parcial', 'EXAM', 'Redes de Computadores', '2026-10-12', '07:00', 'READY'],
+      ['Examen', 'EXAM', 'Redes de Computadores', '2026-10-12', '07:00', 'READY'],
       ['Ensayo', 'TASK', 'Ciberseguridad', '2026-10-06', null, 'NEEDS_REVIEW'],
       ['Tarea', 'TASK', 'NONE', '2026-10-08', '08:00', 'READY'],
       ['Tarea', 'TASK', 'NONE', '2026-10-09', '08:00', 'READY'],

@@ -389,3 +389,33 @@ describe('the title keeps every word until a subject is accepted for it', () => 
     expect(effectiveTitle(state, state.items[0]!)).toBe('Mi parcial');
   });
 });
+
+describe('the announced count does not match what was found', () => {
+  it('"Tengo 3 actividades…" with 2 found: the notice is shown, nothing is ticked, and what the student ticks stays', () => {
+    let state = review(
+      'Tengo 3 actividades para el martes: un taller a las 8 am y un examen a las 2 pm',
+    );
+    expect(state.notice).toBe('Dijiste que eran 3 actividades, pero solo pude identificar 2.');
+    expect(state.items).toHaveLength(2);
+    expect(state.items.every((i) => !i.selected && i.selectionTouched)).toBe(true);
+    expect(buildConfirmRequest(state).items).toEqual([]);
+    state = toggle(state, state.items[0]!.proposal.clientId, true);
+    expect(buildConfirmRequest(state).items).toHaveLength(1);
+    // a later change on the other card does not tick it behind the student's back
+    state = setDate(state, state.items[1]!.proposal.clientId, '2026-10-14');
+    expect(state.items.map((i) => i.selected)).toEqual([true, false]);
+  });
+
+  it('the notice survives in the draft, and a text whose count matches has none', () => {
+    const state = review(
+      'Tengo 3 actividades para el martes: un taller a las 8 am y un examen a las 2 pm',
+    );
+    const restored = captureDraftSchema.parse(
+      JSON.parse(JSON.stringify(toCaptureDraft('x', state))),
+    );
+    expect(restored.review!.notice).toBe(state.notice);
+    expect(
+      review('Son 2 actividades: parcial de redes el lunes y quiz el martes').notice,
+    ).toBeNull();
+  });
+});

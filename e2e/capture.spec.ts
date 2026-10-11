@@ -198,7 +198,7 @@ test('3. loose language: exam + essay + two tasks + a later "las dos tareas" are
     [5, '08:00'],
   ]);
   expect(created.find((c) => c.a.title === 'Ensayo')).toMatchObject({ weekday: 2, time: '09:00' });
-  expect(created.find((c) => c.a.title === 'Parcial')).toMatchObject({ weekday: 1, time: '07:00' });
+  expect(created.find((c) => c.a.title === 'Examen')).toMatchObject({ weekday: 1, time: '07:00' });
   assertClean();
 });
 
@@ -793,5 +793,90 @@ test('27. the title keeps the connectors and the order the student wrote, and an
     'Parcial',
     'Proyecto de grado',
   ]);
+  assertClean();
+});
+
+const CONTRACT_4 = `Tengo 3 actividades para el día martes
+un taller sobre informática a las 8:00 am,
+la otra es un examen de lógica de programación a las 2:00 PM,
+y la última es un proyecto con Cisco a las 7:30 PM`;
+
+test('28. "Tengo 3 actividades para el martes…": three activities, no "3 actividades" in a title, no wrong subject', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page, ['Programación con PYTHON', 'Ciberseguridad', 'Redes de Computadores']);
+  await write(page, CONTRACT_4);
+
+  await expect(cards(page)).toHaveCount(3);
+  const titles = (await cards(page).getByRole('heading').allInnerTexts()).map((t) =>
+    t.replace(/^Propuesta \d+:\s*/, '').trim(),
+  );
+  expect(titles).toEqual([
+    'Taller sobre informática',
+    'Examen de lógica de programación',
+    'Proyecto con Cisco',
+  ]);
+  await expect(cards(page).filter({ hasText: '3 actividades' })).toHaveCount(0); // the count is not a title
+  await expect(cards(page).nth(0)).toContainText('8:00 a. m.');
+  await expect(cards(page).nth(1)).toContainText('2:00 p. m.');
+  await expect(cards(page).nth(2)).toContainText('7:30 p. m.');
+  // the shared Tuesday: nobody is asked for a day
+  await expect(quick(page).getByRole('group', { name: 'Fecha por decidir' })).toHaveCount(0);
+  // "programación" alone is not evidence of "Programación con PYTHON": the exam ASKS, and offers it
+  const exam = cards(page).nth(1);
+  await expect(exam).toContainText('Falta algo');
+  const ask = exam.getByRole('group', { name: 'Asignatura por decidir' });
+  await expect(ask.getByRole('button', { name: 'Programación con PYTHON' })).toBeVisible();
+  await expect(cards(page).nth(0)).toContainText('Sin asignatura');
+  await expect(cards(page).nth(2)).toContainText('Sin asignatura');
+  await expect(createButton(page, 2)).toBeEnabled();
+
+  await ask.getByRole('button', { name: 'Sin asignatura' }).click();
+  await expect(createButton(page, 3)).toBeEnabled();
+  await createButton(page, 3).click();
+  await expect(
+    quick(page).getByRole('status').filter({ hasText: '3 actividades creadas.' }),
+  ).toBeVisible();
+  const created = (await activities(page)).map((a) => ({ a, ...local(a) }));
+  expect(created.map((c) => [c.a.title, c.weekday, c.time])).toEqual([
+    ['Taller sobre informática', 2, '08:00'],
+    ['Examen de lógica de programación', 2, '14:00'],
+    ['Proyecto con Cisco', 2, '19:30'],
+  ]);
+  expect(new Set(created.map((c) => c.date)).size).toBe(1);
+  expect(created.every((c) => c.a.subjectId === null)).toBe(true);
+  assertClean();
+});
+
+test('29. an announced count that does not match is told, and nothing is ticked until the student looks', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(
+    page,
+    'Tengo 3 actividades para el martes: un taller a las 8 am y un examen a las 2 pm',
+  );
+  await expect(cards(page)).toHaveCount(2);
+  await expect(
+    quick(page).getByText('Dijiste que eran 3 actividades, pero solo pude identificar 2.'),
+  ).toBeVisible();
+  await expect(cards(page).first().getByRole('checkbox')).not.toBeChecked();
+  await expect(cards(page).last().getByRole('checkbox')).not.toBeChecked();
+  await expect(createButton(page, 0)).toBeDisabled();
+  await cards(page).first().getByRole('checkbox').check();
+  await cards(page).last().getByRole('checkbox').check();
+  await expect(createButton(page, 2)).toBeEnabled();
+  // the notice survives a reload with the draft
+  await page.reload();
+  await expect(
+    quick(page).getByText('Dijiste que eran 3 actividades, pero solo pude identificar 2.'),
+  ).toBeVisible();
+  await expect(cards(page).first().getByRole('checkbox')).toBeChecked();
+  await createButton(page, 2).click();
+  await expect(
+    quick(page).getByRole('status').filter({ hasText: '2 actividades creadas.' }),
+  ).toBeVisible();
   assertClean();
 });

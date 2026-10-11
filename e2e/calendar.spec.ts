@@ -508,7 +508,7 @@ test('a second user gets an empty agenda and cannot open the first user’s bloc
   await register(other, uniqueEmail(), 'Otra Persona');
   await completeOnboarding(other, 'Semestre', period());
   await other.goto('/calendar');
-  await expect(other.getByText('No tienes bloques esta semana.')).toBeVisible();
+  await expect(other.getByText('No tienes nada programado esta semana.')).toBeVisible();
   await expect(other.getByText('Privado de A')).toHaveCount(0);
 
   const peek = await other.request.get(`/api/schedule/${block.id}`);

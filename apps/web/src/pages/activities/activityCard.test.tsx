@@ -74,7 +74,7 @@ describe('ActivityCard hierarchy', () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it('has ONE primary action ("Completar") and "Editar" within reach; the rest wait behind a menu', () => {
+  it('has ONE primary action ("Completar"), "Editar" and "Añadir al calendario" visible; only "Eliminar" waits behind a menu', () => {
     // the one primary action is a tonal button (a list of solid dark ones would shout twelve times)
     expect(out.match(/bg-accent-soft text-accent-ink/g)).toHaveLength(1);
     expect(out).toContain('aria-label="Completar Parcial de Redes"');
@@ -85,7 +85,10 @@ describe('ActivityCard hierarchy', () => {
     expect(out).toContain('aria-expanded="false"');
     expect(out).not.toContain('role="menu"');
     expect(out).not.toContain('Eliminar');
-    expect(out).not.toContain('Añadir al calendario');
+    // the calendar action is a visible button of its own (its label gives way to the icon on a phone), never in the menu
+    expect(out).toContain('aria-label="Añadir al calendario: Parcial de Redes"');
+    expect(out).toContain('>Calendario</span>');
+    expect(out).toContain('min-w-11'); // the icon-only forms keep a 44 px target
   });
 
   it('the status control is still a native select with its name and its three exact states', () => {
@@ -113,13 +116,13 @@ describe('ActivityCard hierarchy', () => {
 
   it('the type is quiet metadata (text, not another pill) and the priority keeps its symbol and word', () => {
     expect(out).toMatch(
-      /<span class="px-1 text-xs text-muted-foreground"><span class="sr-only">Tipo <\/span>Parcial<\/span>/,
+      /<span class="text-xs text-muted-foreground"><span class="sr-only">Tipo <\/span>Parcial<\/span>/,
     );
     expect(out).toContain('▲');
   });
 
   it('every touch target is at least 44 px', () => {
-    expect(out.match(/min-h-11/g)!.length).toBeGreaterThanOrEqual(3); // select, Completar, Editar
+    expect(out.match(/min-h-11/g)!.length).toBeGreaterThanOrEqual(4); // select, Completar, Editar, Calendario
     expect(out).toContain('size-11'); // the menu trigger
   });
 });
