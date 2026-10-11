@@ -52,18 +52,24 @@ export interface ReviewState {
   groupSubject: Record<string, SubjectChoice>;
   corrections: CaptureCorrection[];
   suggestions: RecurrenceSuggestion[];
+  /** Something to read before ticking anything ("Dijiste que eran 3 actividades, pero solo pude identificar 2."). */
+  notice?: string | null;
 }
 
 // ───────────────────────── Building ─────────────────────────
 
 export function createReview(
-  result: Pick<CaptureResult, 'proposals' | 'corrections' | 'suggestions'>,
+  result: Pick<CaptureResult, 'proposals' | 'corrections' | 'suggestions' | 'warnings'>,
 ): ReviewState {
+  // The count the student announced does not match what was found: nothing is ticked until they have looked (and what they
+  // tick by hand stays as they left it).
+  const mismatch = result.warnings.find((w) => w.code === 'COUNT_MISMATCH');
   return {
+    notice: mismatch?.message ?? null,
     items: result.proposals.map((proposal) => ({
       proposal,
-      selected: proposal.selected,
-      selectionTouched: false,
+      selected: mismatch ? false : proposal.selected,
+      selectionTouched: mismatch !== undefined,
       allowDuplicate: false,
     })),
     groupTime: {},

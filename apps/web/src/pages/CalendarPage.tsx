@@ -6,17 +6,22 @@ import {
   isRealDateOnly,
   toLocalParts,
   weekRangeOf,
+  type Activity,
   type ScheduleBlock,
   type ScheduleOccurrence,
+  type Subject,
 } from '@planner/core';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { usePeriods, useCurrentPeriod } from '../academic/useAcademic';
+import { useActivities } from '../activities/useActivities';
+import { usePeriods, useCurrentPeriod, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
 import { useIsDesktop } from '../lib/useIsDesktop';
 import { useNow } from '../lib/useNow';
 import { useSchedule, useScheduleBlock } from '../schedule/useSchedule';
+import { agendaActivities } from './calendar/agendaActivities';
+import { ActivityFormDialog } from './activities/ActivityFormDialog';
 import { BlockFormDialog } from './calendar/BlockFormDialog';
 import { DayList } from './calendar/DayList';
 import { DeleteBlockDialog } from './calendar/DeleteBlockDialog';
@@ -27,7 +32,11 @@ const primary =
 const secondary =
   'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
 
-/** The weekly agenda (Monday–Sunday): a grid on desktop, a day-by-day list on phones. */
+/**
+ * The weekly agenda (Monday–Sunday): a grid on desktop, a day-by-day list on phones. It draws TWO things on the same
+ * days: the schedule blocks (classes, study sessions: `/api/schedule`) and the student's open activities
+ * (`/api/activities?from&to`, the same records as the Activities page: nothing is copied). Both are one request per week.
+ */
 export function CalendarPage() {
   const [params, setParams] = useSearchParams();
   const timeZone = useMe().data?.timezone ?? DEFAULT_TIMEZONE;
@@ -47,6 +56,19 @@ export function CalendarPage() {
 
   const schedule = useSchedule(week.from, week.to);
   const occurrences = schedule.data?.occurrences ?? [];
+  // The week's activities: one range query (kept fresh by every activity mutation: its key starts with 'activities').
+  const weekActivities = useActivities({ from: week.from, to: week.to }, true);
+  const subjects = useSubjects(period?.id);
+  const subjectMap = useMemo(
+    () => new Map<string, Subject>((subjects.data ?? []).map((s) => [s.id, s])),
+    [subjects.data],
+  );
+  const activities = useMemo(
+    () => agendaActivities(weekActivities.data ?? [], timeZone, now),
+    [weekActivities.data, timeZone, now],
+  );
+  // An activity opens the SAME form as on the Activities page: status, date and hour are edited there, not here.
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
   const [picked, setPicked] = useState<string>();
   const selectedDay =
@@ -55,6 +77,8 @@ export function CalendarPage() {
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [deleting, setDeleting] = useState<ScheduleBlock | null>(null);
   const [notice, setNotice] = useState<string>();
+  // Both halves of the week must have answered before an empty week is declared empty.
+  const ready = schedule.isSuccess && weekActivities.isSuccess;
 
   if (!period) return null; // RequirePeriod guarantees one; keeps the type honest
 
@@ -108,21 +132,42 @@ export function CalendarPage() {
       {schedule.isPending && <p role="status">Cargando agenda…</p>}
       <QueryError query={schedule} title="No se pudo cargar la agenda" />
 
-      {schedule.isSuccess && occurrences.length === 0 && (
+      <QueryError query={weekActivities} title="No se pudieron cargar las actividades" />
+
+      {ready && occurrences.length === 0 && activities.length === 0 && (
         <p className="rounded-md border border-dashed border-slate-300 p-3 text-slate-700">
-          No tienes bloques esta semana. Agrega tus clases y sesiones de estudio con «Agregar
-          bloque».
+          No tienes nada programado esta semana. Agrega tus clases y sesiones de estudio con
+          «Agregar bloque», o tus tareas desde Actividades.
         </p>
       )}
 
-      {schedule.isSuccess &&
+      {ready && activities.length > 0 && (
+        <p
+          aria-hidden="true"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-4 rounded-sm border border-l-4 border-slate-400 bg-white" />
+            Clase o bloque
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-4 rounded-sm border border-l-4 border-dashed border-accent/60 bg-accent-soft/60" />
+            Actividad
+          </span>
+        </p>
+      )}
+
+      {ready &&
         (isDesktop ? (
           <WeekGrid
             days={days}
             occurrences={occurrences}
+            activities={activities}
+            subjects={subjectMap}
             timeZone={timeZone}
             today={today}
             onOpen={open}
+            onOpenActivity={setEditingActivity}
           />
         ) : (
           <DayList
@@ -130,9 +175,12 @@ export function CalendarPage() {
             selected={selectedDay}
             today={today}
             occurrences={occurrences}
+            activities={activities}
+            subjects={subjectMap}
             timeZone={timeZone}
             onSelect={setPicked}
             onOpen={open}
+            onOpenActivity={setEditingActivity}
           />
         ))}
 
@@ -163,6 +211,18 @@ export function CalendarPage() {
           onDelete={(block) => {
             setEditing(null);
             setDeleting(block);
+          }}
+        />
+      )}
+      {editingActivity && subjects.isSuccess && (
+        <ActivityFormDialog
+          subjects={subjects.data}
+          activity={editingActivity}
+          timeZone={timeZone}
+          onClose={() => setEditingActivity(null)}
+          onSaved={(message) => {
+            setEditingActivity(null);
+            setNotice(message);
           }}
         />
       )}

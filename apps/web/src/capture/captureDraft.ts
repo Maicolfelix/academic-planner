@@ -43,6 +43,7 @@ const reviewSchema = z.object({
   groupSubject: z.record(z.string(), subjectChoice),
   corrections: z.array(captureCorrectionSchema),
   suggestions: z.array(recurrenceSuggestionSchema),
+  notice: z.string().nullable().optional(),
 });
 
 export const captureDraftSchema = z.object({
@@ -66,6 +67,7 @@ export function toCaptureDraft(text: string, review: ReviewState | null): Captur
       groupSubject: review.groupSubject,
       corrections: review.corrections,
       suggestions: review.suggestions,
+      notice: review.notice ?? null,
     },
   };
 }

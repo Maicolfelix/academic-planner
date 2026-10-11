@@ -21,6 +21,9 @@ export interface ActivityQuery {
   type?: ActivityType;
   overdue?: boolean;
   radar?: RadarStatus;
+  /** Inclusive local days (YYYY-MM-DD): the Agenda asks for one week with these two. */
+  from?: string;
+  to?: string;
 }
 
 export async function fetchActivities(query: ActivityQuery): Promise<Activity[]> {

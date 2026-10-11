@@ -2,6 +2,7 @@ import { type Subject } from '@planner/core';
 import { Link } from 'react-router';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { AlertIcon } from '../components/ui/icons';
 import { CaptureCard, Heading, SubjectQuestion, TimeAsk, type CardActions } from './CaptureCard';
 import { clockLabel, shortDate } from './format';
 import {
@@ -122,6 +123,15 @@ export function CaptureReview({
             {summary.total - summary.needsReview === 1 ? 'lista' : 'listas'}
             {summary.needsReview > 0 &&
               `, ${summary.needsReview} ${summary.needsReview === 1 ? 'necesita' : 'necesitan'} revisión`}
+          </p>
+        )}
+        {state.notice && (
+          <p
+            role="status"
+            className="flex gap-2 rounded-control border border-warning-line bg-warning-soft/60 p-3 text-sm"
+          >
+            <AlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>{state.notice} Revisa las que encontré y marca las que quieras crear.</span>
           </p>
         )}
         <p className="text-sm text-muted-foreground">
