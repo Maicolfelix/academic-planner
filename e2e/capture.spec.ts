@@ -652,7 +652,7 @@ test('21. what is said ABOUT the activity becomes its description: collapsed, ed
     quick(page).getByRole('status').filter({ hasText: '1 actividad creada.' }),
   ).toBeVisible();
   const [created] = await activities(page);
-  expect(created!.title).toBe('Tarea programación');
+  expect(created!.title).toBe('Tarea de programación');
   expect(created!.description).toBe('Subir el PDF al campus antes de las 11');
   assertClean();
 });
@@ -760,5 +760,38 @@ test('26. the description the student edits is part of the draft: a reload bring
   await expect(quick(page).locator('#capture-review-title')).toBeVisible();
   await cards(page).first().getByText('Descripción', { exact: true }).click();
   await expect(cards(page).first()).toContainText('Nota que escribí yo');
+  assertClean();
+});
+
+test('27. the title keeps the connectors and the order the student wrote, and an offered subject name loses no word', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page, ['Redes de Computadores']);
+  await write(
+    page,
+    'Lectura del capítulo 4 el martes, informe final del proyecto el jueves, proyecto de grado el viernes, parcial de redes el lunes',
+  );
+  await expect(cards(page)).toHaveCount(4);
+  const titles = await cards(page).getByRole('heading').allInnerTexts();
+  expect(titles.map((t) => t.replace(/^Propuesta \d+:\s*/, '').trim())).toEqual([
+    'Lectura del capítulo 4',
+    'Informe final del proyecto',
+    'Proyecto de grado',
+    'Parcial',
+  ]);
+  // "grado" is only OFFERED as a subject: answering "sin asignatura" creates the activity with every word of its title
+  await cards(page).nth(2).getByRole('button', { name: 'Sin asignatura' }).click();
+  await expect(cards(page).nth(2)).toContainText('Proyecto de grado');
+  await createButton(page, 4).click();
+  await expect(
+    quick(page).getByRole('status').filter({ hasText: '4 actividades creadas.' }),
+  ).toBeVisible();
+  expect((await activities(page)).map((a) => a.title).sort()).toEqual([
+    'Informe final del proyecto',
+    'Lectura del capítulo 4',
+    'Parcial',
+    'Proyecto de grado',
+  ]);
   assertClean();
 });

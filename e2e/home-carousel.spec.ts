@@ -14,6 +14,9 @@ import {
 
 /** The Home hero: up to five next activities by deadline, a snapping strip with dots that are real buttons. */
 
+// The race tests repeat each navigation and wait for animations: they need more than the default 30 s.
+test.describe.configure({ timeout: 120_000 });
+
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
@@ -36,11 +39,29 @@ async function make(page: Page, subjectId: string, title: string, offsetMs: numb
   return apiCreateActivity(page, { subjectId, title, type: 'TASK', ...inBogota(offsetMs) });
 }
 
-/** The strip is at slide `index` (its scroll position, not just the state). */
-const scrolledTo = (page: Page, index: number) =>
-  expect
-    .poll(() => strip(page).evaluate((el) => Math.round(el.scrollLeft / el.clientWidth)))
-    .toBe(index);
+/** The slide that is really on screen (its centre is the strip's centre), 0-based, whatever the CSS step is. */
+const visibleSlide = (page: Page) =>
+  strip(page).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const mid = r.left + r.width / 2;
+    return Array.from(el.querySelectorAll('[data-slide]')).findIndex((s) => {
+      const b = s.getBoundingClientRect();
+      return b.left <= mid && b.right >= mid;
+    });
+  });
+/** The strip shows slide `index`. */
+const scrolledTo = (page: Page, index: number) => expect.poll(() => visibleSlide(page)).toBe(index);
+/** Intent (dot), projection (strip) and content (the slide that is not inert) all agree on `index`. */
+async function expectAllAt(page: Page, index: number, title?: string) {
+  await expect(dots(page).nth(index)).toHaveAttribute('aria-current', 'true');
+  await expect(
+    dots(page).evaluateAll(
+      (ds) => ds.filter((d) => d.getAttribute('aria-current') === 'true').length,
+    ),
+  ).resolves.toBe(1);
+  await scrolledTo(page, index);
+  if (title) await expect(onScreen(page).locator('p[id^="attention-activity-"]')).toHaveText(title);
+}
 
 test('up to five activities by deadline, soonest first, whatever their priority; the rest stay out', async ({
   page,
@@ -188,13 +209,23 @@ test('the strip snaps, a swipe moves the current dot, and a dot moves the strip'
   await expect(dots(page)).toHaveCount(3);
 
   await expect(strip(page)).toHaveCSS('scroll-snap-type', 'x mandatory');
-  // A swipe is a scroll of the strip: the current dot and the slide on screen follow it.
+  // A swipe is a scroll of the strip WITH the student's hand on it (a touch or a wheel): the dot and the slide on screen
+  // follow it. (The same scroll with nobody holding the strip is the browser's own doing: the intent stands, see below.)
+  await strip(page).dispatchEvent('pointerdown');
   await strip(page).evaluate((el) =>
-    el.scrollTo({ left: el.clientWidth * 2, behavior: 'instant' }),
+    el.scrollTo({
+      left: el.querySelectorAll<HTMLElement>('[data-slide]')[2]!.offsetLeft,
+      behavior: 'instant',
+    }),
   );
   await expect(dots(page).nth(2)).toHaveAttribute('aria-current', 'true');
   await expect(onScreen(page).getByRole('article', { name: 'Tres' })).toBeVisible();
-  await strip(page).evaluate((el) => el.scrollTo({ left: el.clientWidth, behavior: 'instant' }));
+  await strip(page).evaluate((el) =>
+    el.scrollTo({
+      left: el.querySelectorAll<HTMLElement>('[data-slide]')[1]!.offsetLeft,
+      behavior: 'instant',
+    }),
+  );
   await expect(dots(page).nth(1)).toHaveAttribute('aria-current', 'true');
   // ...and a dot moves the strip back (and the state does not bounce while it travels)
   await dots(page).nth(0).click();
@@ -202,6 +233,19 @@ test('the strip snaps, a swipe moves the current dot, and a dot moves the strip'
   await expect(dots(page).nth(0)).toHaveAttribute('aria-current', 'true');
   await expect(dots(page).nth(1)).toHaveAttribute('aria-current', 'false');
   assertClean();
+});
+
+test('a scroll nobody asked for (the browser, not the student) is undone: the intent stands', async ({
+  page,
+}) => {
+  await fiveActivities(page);
+  await dots(page).nth(3).click();
+  await expectAllAt(page, 3, 'D');
+  await page.waitForTimeout(800);
+  for (let round = 0; round < REPEAT; round++) {
+    await strip(page).evaluate((el) => el.scrollTo({ left: 0, behavior: 'instant' })); // nobody touched it
+    await expectAllAt(page, 3, 'D'); // back where the intent is
+  }
 });
 
 test('with reduced motion a dot jumps at once (no smooth scroll)', async ({ page }) => {
@@ -248,3 +292,213 @@ for (const width of [320, 390, 430, 768, 1366]) {
     expect(violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([]);
   });
 }
+
+// ───────────────────────── Races: one intent, the strip only follows it ─────────────────────────
+
+const REPEAT = 5;
+const NAMES = ['A', 'B', 'C', 'D', 'E'];
+
+async function fiveActivities(page: Page) {
+  const redes = await newUser(page);
+  for (const [i, t] of NAMES.entries()) await make(page, redes.id, t, (i + 1) * 20 * HOUR);
+  await page.goto('/dashboard');
+  await expect(dots(page)).toHaveCount(5);
+  await page.waitForTimeout(600); // the entrance
+}
+
+test('rapid dots: 5 then 1 right away ends on 1; 5 → 2 → 4 ends on 4; every time', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await fiveActivities(page);
+  for (let round = 0; round < REPEAT; round++) {
+    await dots(page).nth(4).click({ delay: 0 });
+    await dots(page).nth(0).click({ delay: 0 });
+    await expectAllAt(page, 0, 'A');
+    await page.waitForTimeout(900); // nothing old arrives later and moves it
+    await expectAllAt(page, 0, 'A');
+
+    await dots(page).nth(4).click({ delay: 0 });
+    await dots(page).nth(1).click({ delay: 0 });
+    await dots(page).nth(3).click({ delay: 0 });
+    await expectAllAt(page, 3, 'D');
+    await page.waitForTimeout(900);
+    await expectAllAt(page, 3, 'D');
+    await dots(page).nth(0).click();
+    await expectAllAt(page, 0, 'A');
+  }
+  assertClean();
+});
+
+test('the same dot twice, and a dot for where it already is, leave nothing half done', async ({
+  page,
+}) => {
+  await fiveActivities(page);
+  for (let round = 0; round < REPEAT; round++) {
+    await dots(page).nth(2).click();
+    await dots(page).nth(2).click();
+    await expectAllAt(page, 2, 'C');
+    await dots(page).nth(2).click(); // already there: no navigation is left "on its way"
+    await dots(page).nth(0).click();
+    await expectAllAt(page, 0, 'A');
+    await page.waitForTimeout(300);
+    await expectAllAt(page, 0, 'A');
+  }
+});
+
+test('the keyboard: several arrows in a row, then Home and End, end where the arithmetic says', async ({
+  page,
+}) => {
+  await fiveActivities(page);
+  await dots(page).nth(0).focus();
+  for (let round = 0; round < REPEAT; round++) {
+    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+    await expectAllAt(page, 3, 'D');
+    await expect(dots(page).nth(3)).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    await expectAllAt(page, 2, 'C');
+    for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight'); // clamps at the last one
+    await expectAllAt(page, 4, 'E');
+    await page.keyboard.press('Home');
+    await expectAllAt(page, 0, 'A');
+    await expect(dots(page).nth(0)).toBeFocused();
+    await page.keyboard.press('End');
+    await expectAllAt(page, 4, 'E');
+    await page.keyboard.press('Home');
+    await expectAllAt(page, 0, 'A');
+  }
+});
+
+test('resize in the middle of a navigation keeps the same activity: strip, dot and content agree', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await fiveActivities(page);
+  for (let round = 0; round < REPEAT; round++) {
+    await dots(page).nth(0).click();
+    await expectAllAt(page, 0, 'A');
+    await dots(page).nth(3).click(); // animating...
+    await page.setViewportSize({ width: 900 + round * 40, height: 800 }); // ...and the width changes under it
+    await expectAllAt(page, 3, 'D');
+    await page.waitForTimeout(900);
+    await expectAllAt(page, 3, 'D');
+    await expectNoHorizontalOverflow(page);
+  }
+  assertClean();
+});
+
+test('resize at rest (landscape ↔ portrait) keeps the active activity', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await fiveActivities(page);
+  await dots(page).nth(2).click();
+  await expectAllAt(page, 2, 'C');
+  for (let round = 0; round < REPEAT; round++) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectAllAt(page, 2, 'C');
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expectAllAt(page, 2, 'C');
+  }
+  await dots(page).nth(4).click();
+  await page.setViewportSize({ width: 360, height: 700 });
+  await expectAllAt(page, 4, 'E');
+});
+
+test('slides are positioned by where they really are: no drift on the last one, at any width', async ({
+  page,
+}) => {
+  await fiveActivities(page);
+  for (const width of [320, 390, 430, 768, 1366]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.reload();
+    await expect(dots(page)).toHaveCount(5);
+    await page.waitForTimeout(600); // the entrance
+    for (const i of [4, 2, 3, 1, 4]) {
+      await dots(page).nth(i).click();
+      await expectAllAt(page, i, NAMES[i]);
+      await page.waitForTimeout(700);
+      // centred: the slide's centre is the strip's centre, within a pixel or two
+      const off = await strip(page).evaluate((el, index) => {
+        const slide = el.querySelectorAll('[data-slide]')[index]!.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return Math.abs(slide.left + slide.width / 2 - (r.left + r.width / 2));
+      }, i);
+      expect(off, `width ${width}, slide ${i}`).toBeLessThan(3);
+    }
+  }
+});
+
+test('swipe, then a tap on a dot right away: the last intention wins; then a swipe again', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile-360', 'a touch swipe needs the phone project');
+  const assertClean = watch(page);
+  await fiveActivities(page);
+  const cdp = await page.context().newCDPSession(page);
+  const box = (await strip(page).boundingBox())!;
+  const y = Math.round(box.y + 120);
+  const drag = async (fromX: number, toX: number) => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: fromX, y }],
+    });
+    for (let i = 1; i <= 10; i++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: fromX + ((toX - fromX) * i) / 10, y }],
+      });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  for (let round = 0; round < REPEAT; round++) {
+    await drag(300, 60); // swipe to the next one...
+    await dots(page).nth(3).tap(); // ...and, before it settles, the student taps dot 4
+    await expectAllAt(page, 3, 'D');
+    await page.waitForTimeout(800);
+    await expectAllAt(page, 3, 'D');
+    await dots(page).nth(0).tap();
+    await expectAllAt(page, 0, 'A');
+    await drag(300, 60);
+    await page.waitForTimeout(900); // how far a fling goes depends on its speed: it lands on 2nd or 3rd
+    const lit = await dots(page).evaluateAll((ds) =>
+      ds.findIndex((d) => d.getAttribute('aria-current') === 'true'),
+    );
+    expect(lit).toBeGreaterThanOrEqual(1); // a swipe on its own is followed by the dot
+    await expectAllAt(page, lit);
+    await dots(page).nth(0).tap();
+    await expectAllAt(page, 0, 'A');
+  }
+  assertClean();
+});
+
+test('finishing the active activity while the strip is still moving: coherent, on the first one', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await page.clock.install();
+  const redes = await newUser(page);
+  const made: { id: string }[] = [];
+  for (const [i, t] of NAMES.entries())
+    made.push(await make(page, redes.id, t, (i + 1) * 20 * HOUR));
+  await page.goto('/dashboard');
+  await expect(dots(page)).toHaveCount(5);
+  await dots(page).nth(3).click(); // heading to D...
+  // ...and D is finished somewhere else; the next refetch (a minute later on the page's own clock) brings the news
+  const res = await page.request.patch(`/api/activities/${made[3]!.id}`, {
+    data: { status: 'COMPLETED' },
+  });
+  expect(res.ok()).toBe(true);
+  await page.clock.fastForward(61_000);
+  await expect(dots(page)).toHaveCount(4);
+  await expect(titlesOf(page)).toHaveText(['A', 'B', 'C', 'E']);
+  await page.waitForTimeout(900);
+  const where = await visibleSlide(page);
+  const lit = await dots(page).evaluateAll((ds) =>
+    ds.findIndex((d) => d.getAttribute('aria-current') === 'true'),
+  );
+  expect([where, lit], 'strip, dot and content agree').toEqual([lit, lit]);
+  await expect(onScreen(page)).toHaveCount(1);
+  assertClean();
+});
