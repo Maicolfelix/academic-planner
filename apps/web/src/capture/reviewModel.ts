@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   normalizeNameKey,
   type ActivityType,
   type CaptureConfirmRequest,
@@ -22,7 +23,7 @@ import {
 export type SubjectChoice =
   { kind: 'NONE' } | { kind: 'EXISTING'; id: string; name: string } | { kind: 'NEW'; name: string };
 
-export type PendingField = 'title' | 'date' | 'time' | 'subject';
+export type PendingField = 'title' | 'date' | 'time' | 'subject' | 'description';
 
 export interface ReviewItem {
   proposal: CaptureProposal;
@@ -38,6 +39,8 @@ export interface ReviewItem {
   /** 'HH:mm', or '' for "sin hora". */
   time?: string;
   subject?: SubjectChoice;
+  /** Optional context for the activity; '' = none (also the answer to "do not use the offered one"). */
+  description?: string;
   /** A message from the last attempt to create it (the server refused this one). */
   error?: string;
 }
@@ -95,6 +98,8 @@ export const effectiveTitle = (item: ReviewItem) => item.title ?? item.proposal.
 export const effectiveType = (item: ReviewItem): ActivityType =>
   item.type ?? item.proposal.type.value;
 export const effectiveDate = (item: ReviewItem) => item.date ?? item.proposal.date.value ?? '';
+export const effectiveDescription = (item: ReviewItem) =>
+  item.description ?? item.proposal.description.value ?? '';
 
 /** The subject chosen for it, or undefined while the student still has to decide. */
 export function effectiveSubject(state: ReviewState, item: ReviewItem): SubjectChoice | undefined {
@@ -130,6 +135,10 @@ export function pendingOf(state: ReviewState, item: ReviewItem): PendingField[] 
   if (date === '' || dateInDoubt) out.push('date');
   if (effectiveTime(state, item) === undefined) out.push('time');
   if (effectiveSubject(state, item) === undefined) out.push('subject');
+  // Words about the activity that could not be tied to one: the student says whether this is its description.
+  if (item.description === undefined && hasBlocking(item.proposal, 'description')) {
+    out.push('description');
+  }
   return out;
 }
 
@@ -166,6 +175,9 @@ export const setDate = (s: ReviewState, id: string, date: string) => patchItem(s
 export const setTime = (s: ReviewState, id: string, time: string) => patchItem(s, id, { time });
 export const setSubject = (s: ReviewState, id: string, subject: SubjectChoice) =>
   patchItem(s, id, { subject });
+/** '' = none. Never longer than the server accepts (the field stops there too). */
+export const setDescription = (s: ReviewState, id: string, description: string) =>
+  patchItem(s, id, { description: description.slice(0, ACTIVITY_DESCRIPTION_MAX) });
 
 /** The shared answer to an hour question: every proposal of the group that was not changed by hand takes it. */
 export const chooseGroupTime = (state: ReviewState, key: string, time: string): ReviewState =>
@@ -230,6 +242,8 @@ export function reconcileSubjects(state: ReviewState, subjects: readonly Subject
 
 export interface ReviewSummary {
   total: number;
+  /** Missing something the student has to decide, ticked or not. */
+  needsReview: number;
   /** Ticked and complete: what "Crear N" creates. */
   toCreate: number;
   /** Ticked but still missing something: the button waits. */
@@ -244,8 +258,10 @@ export function summarize(state: ReviewState): ReviewSummary {
   let toCreate = 0;
   let incomplete = 0;
   let skipped = 0;
+  let needsReview = 0;
   const names = new Map<string, string>();
   for (const item of state.items) {
+    if (!isComplete(state, item)) needsReview++;
     if (!item.selected) {
       skipped++;
       continue;
@@ -260,6 +276,7 @@ export function summarize(state: ReviewState): ReviewSummary {
   }
   return {
     total: state.items.length,
+    needsReview,
     toCreate,
     incomplete,
     skipped,
@@ -274,12 +291,14 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
     if (!item.selected || !isComplete(state, item)) continue;
     const subject = effectiveSubject(state, item)!;
     const time = effectiveTime(state, item);
+    const description = effectiveDescription(item).trim();
     items.push({
       clientId: item.proposal.clientId,
       title: effectiveTitle(item).trim(),
       type: effectiveType(item),
       dueDate: effectiveDate(item),
       ...(time ? { dueTime: time } : {}),
+      ...(description ? { description } : {}),
       subject:
         subject.kind === 'EXISTING'
           ? { kind: 'EXISTING', subjectId: subject.id }

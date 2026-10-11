@@ -1,11 +1,6 @@
 import { QueryError } from '../../components/QueryError';
-import {
-  RADAR_LABELS,
-  RADAR_STATUSES,
-  formatDue,
-  radarExplanation,
-  type RadarStatus,
-} from '@planner/core';
+import { RADAR_LABELS, formatDue, radarExplanation, type RadarStatus } from '@planner/core';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
 import { useAttention } from '../../attention/useAttention';
 import { Card } from '../../components/ui/Card';
@@ -15,9 +10,9 @@ import { RadarDot } from '../radar/RadarDot';
 /** Calm, neutral wording: it orients, the student decides. No alarm, no blame, no orders. */
 const INTRO: Record<RadarStatus, string> = {
   OVERDUE: 'Tienes actividades vencidas. Esta es la que actualmente requiere mayor atención.',
-  IMMEDIATE: 'Actividad que requiere mayor atención.',
-  UPCOMING: 'Actividad que requiere mayor atención.',
-  PLANNABLE: 'Actividad que requiere mayor atención.',
+  IMMEDIATE: 'Próxima entrega.',
+  UPCOMING: 'Próxima entrega.',
+  PLANNABLE: 'Próxima entrega.',
   UNDER_CONTROL: 'Todo está bajo control. Si quieres avanzar, podrías continuar con:',
 };
 
@@ -39,46 +34,6 @@ const SURFACE = (status: RadarStatus) =>
     ? 'bg-(image:--gradient-hero)'
     : 'bg-(image:--gradient-hero-calm)';
 
-/**
- * A tiny timeline: the five Radar states as nodes on a line, and the current one lit and breathing. It repeats, in
- * miniature, the spectrum of the Radar card: the same idea of "where this sits in your load". Decoration only: the
- * state is already written as a word at the top of the hero.
- */
-function Rail({ status }: { status: RadarStatus }) {
-  const current = RADAR_STATUSES.indexOf(status);
-  return (
-    <svg
-      viewBox="0 0 96 22"
-      aria-hidden="true"
-      focusable="false"
-      className="pointer-events-none hidden h-5 w-24 shrink-0 min-[380px]:block"
-    >
-      <line x1="6" y1="11" x2="90" y2="11" stroke="white" strokeOpacity="0.28" strokeWidth="1.5" />
-      {RADAR_STATUSES.map((s, i) => (
-        <g key={s}>
-          {i === current && (
-            <circle
-              cx={6 + i * 21}
-              cy="11"
-              r="8"
-              fill="white"
-              fillOpacity="0.16"
-              className="origin-center [transform-box:fill-box] motion-safe:animate-node"
-            />
-          )}
-          <circle
-            cx={6 + i * 21}
-            cy="11"
-            r={i === current ? 4 : 2.5}
-            fill="white"
-            fillOpacity={i === current ? 1 : i < current ? 0.25 : 0.5}
-          />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 // Entrance: the card settles, then its parts follow a few milliseconds apart. One-shot; nothing loops.
 const STAGE = [
   '[animation-delay:60ms]',
@@ -88,13 +43,23 @@ const STAGE = [
   '[animation-delay:260ms]',
 ] as const;
 
+type Item = NonNullable<ReturnType<typeof useAttention>['data']>['recommendation'] & object;
+
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /**
- * "¿Qué hago ahora?": ONE suggested activity and the plain reasons behind it. The internal score is never
- * shown, and neither are the alternatives the API returns (the full list lives in Activities).
- * It is the one hero of the Home: the only deep surface on the screen.
+ * "¿Qué hago ahora?": the next activities by deadline (at most five, the API's `upcoming`), one hero each, in a strip
+ * that snaps: swipe on a phone, dots anywhere. The internal score is never shown. With a single activity it is just
+ * the hero (no dots). Falls back to the engine's recommendation when only forgotten overdue ones remain.
  */
 export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }) {
   const attention = useAttention();
+  const data = attention.data;
+  const items: Item[] = data?.upcoming.length
+    ? data.upcoming
+    : data?.recommendation
+      ? [data.recommendation]
+      : [];
 
   return (
     <section aria-labelledby="attention-title" className="flex flex-col gap-2">
@@ -106,32 +71,145 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
 
       <QueryError query={attention} title="No se pudo cargar la sugerencia" />
 
-      {attention.data && !attention.data.recommendation && (
+      {data && items.length === 0 && (
         <Card variant="dashed" className="p-4">
           No tienes actividades pendientes en este momento.
         </Card>
       )}
 
-      {attention.data?.recommendation && (
-        <Suggestion item={attention.data.recommendation} timeZone={timeZone} now={now} />
-      )}
+      {items.length > 0 && <HeroCarousel items={items} timeZone={timeZone} now={now} />}
     </section>
   );
 }
 
-export function Suggestion({
-  item,
-  timeZone,
-  now,
-}: {
-  item: NonNullable<ReturnType<typeof useAttention>['data']>['recommendation'] & object;
-  timeZone: string;
-  now: Date;
-}) {
+/**
+ * The active slide is state (by id, so it survives a reorder), and the strip follows it: a swipe updates the state, a
+ * dot sets it and the strip scrolls to it. If the active activity disappears (completed, deleted) the first one is shown.
+ */
+function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: string; now: Date }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const strip = useRef<HTMLDivElement>(null);
+  const smooth = useRef(false); // the next scroll comes from a dot: animate it
+  const settling = useRef<number | null>(null); // a programmatic scroll is on its way to this index
+  const active = Math.max(
+    0,
+    items.findIndex((i) => i.activity.id === activeId),
+  );
+  const order = items.map((i) => i.activity.id).join();
+
+  // Bring the strip to the active slide whenever the state, or the order, says it is elsewhere.
+  useEffect(() => {
+    const el = strip.current;
+    if (!el || el.clientWidth === 0) return;
+    if (Math.round(el.scrollLeft / el.clientWidth) === active) return;
+    const animate = smooth.current && !prefersReducedMotion();
+    smooth.current = false;
+    settling.current = animate ? active : null;
+    el.scrollTo({ left: active * el.clientWidth, behavior: animate ? 'smooth' : 'auto' });
+  }, [active, order]);
+
+  const onScroll = () => {
+    const el = strip.current;
+    if (!el || el.clientWidth === 0) return;
+    const index = Math.round(el.scrollLeft / el.clientWidth);
+    if (settling.current !== null) {
+      if (index === settling.current) settling.current = null;
+      return;
+    }
+    const id = items[index]?.activity.id;
+    if (id && id !== items[active]?.activity.id) setActiveId(id);
+  };
+
+  const pick = (index: number) => {
+    smooth.current = true;
+    setActiveId(items[index]!.activity.id);
+  };
+
+  const onDotKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const last = items.length - 1;
+    const next =
+      e.key === 'ArrowRight'
+        ? Math.min(active + 1, last)
+        : e.key === 'ArrowLeft'
+          ? Math.max(active - 1, 0)
+          : e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? last
+              : null;
+    if (next === null) return;
+    e.preventDefault();
+    pick(next);
+    e.currentTarget.querySelectorAll('button')[next]?.focus();
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        ref={strip}
+        onScroll={onScroll}
+        onPointerDown={() => (settling.current = null)}
+        role="group"
+        aria-roledescription="carrusel"
+        aria-label="Próximas actividades"
+        className="-mx-1 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {items.map((item, i) => (
+          <div
+            key={item.activity.id}
+            role="group"
+            aria-roledescription="actividad"
+            aria-label={`${i + 1} de ${items.length}`}
+            inert={i !== active}
+            className="w-full shrink-0 snap-center snap-always px-0.5"
+          >
+            <Suggestion item={item} timeZone={timeZone} now={now} />
+          </div>
+        ))}
+      </div>
+
+      {items.length > 1 && (
+        <div
+          role="group"
+          aria-label="Elegir actividad"
+          onKeyDown={onDotKey}
+          className="flex justify-center"
+        >
+          {items.map((item, i) => (
+            <button
+              key={item.activity.id}
+              type="button"
+              aria-label={`Ver actividad ${i + 1} de ${items.length}`}
+              aria-current={i === active}
+              onClick={() => pick(i)}
+              className="group inline-flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary"
+            >
+              <span
+                aria-hidden="true"
+                className={`block rounded-full transition-[width,background-color] duration-(--duration-fast) ease-standard ${
+                  i === active
+                    ? 'h-2 w-6 bg-primary'
+                    : 'size-2 bg-primary/30 group-hover:bg-primary/60'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+      <p role="status" className="sr-only">
+        {items.length > 1
+          ? `Actividad ${active + 1} de ${items.length}: ${items[active]?.activity.title}`
+          : ''}
+      </p>
+    </div>
+  );
+}
+
+export function Suggestion({ item, timeZone, now }: { item: Item; timeZone: string; now: Date }) {
   const { activity, radarStatus, reasons } = item;
   return (
     <article
-      aria-labelledby="attention-activity"
+      aria-labelledby={`attention-activity-${activity.id}`}
       className={`${HALO[radarStatus]} ${SURFACE(radarStatus)} relative isolate flex animate-rise flex-col gap-4 overflow-hidden rounded-hero p-5 text-primary-foreground shadow-hero ring-1 ring-white/10 ring-inset lg:p-7`}
     >
       {/* Decoration, all of it hidden from assistive tech and unable to catch a tap, behind the text: an orb of the
@@ -163,7 +241,10 @@ export function Suggestion({
       </div>
 
       <div className={`min-w-0 animate-rise ${STAGE[1]}`}>
-        <p id="attention-activity" className="text-2xl leading-tight font-semibold break-words">
+        <p
+          id={`attention-activity-${activity.id}`}
+          className="text-2xl leading-tight font-semibold break-words"
+        >
           {activity.title}
         </p>
         <p className="mt-0.5 text-primary-foreground/80 break-words">
@@ -182,10 +263,10 @@ export function Suggestion({
       >
         <p>{INTRO[radarStatus]}</p>
         <div>
-          <p id="attention-why" className="font-semibold text-primary-foreground">
+          <p id={`attention-why-${activity.id}`} className="font-semibold text-primary-foreground">
             ¿Por qué esta?
           </p>
-          <ul aria-labelledby="attention-why" className="mt-1 list-disc pl-5">
+          <ul aria-labelledby={`attention-why-${activity.id}`} className="mt-1 list-disc pl-5">
             {reasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
@@ -193,9 +274,8 @@ export function Suggestion({
         </div>
       </div>
 
-      {/* A white button on the deep surface; its focus ring is white too, the page's dark ring would vanish here. The
-          rail sits beside it, in the flow, so it can never overlap the text or the button. */}
-      <div className="flex items-center justify-between gap-4">
+      {/* A white button on the deep surface; its focus ring is white too, the page's dark ring would vanish here. */}
+      <div>
         <Link
           to={`/activities?edit=${activity.id}`}
           aria-label={`Ver actividad: ${activity.title}`}
@@ -209,7 +289,6 @@ export function Suggestion({
             →
           </span>
         </Link>
-        <Rail status={radarStatus} />
       </div>
     </article>
   );

@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_LABELS,
   type ActivityType,
@@ -14,6 +15,7 @@ import { AlertIcon, CheckIcon, ChevronDownIcon } from '../components/ui/icons';
 import { clockLabel, humanDate } from './format';
 import {
   effectiveDate,
+  effectiveDescription,
   effectiveSubject,
   effectiveTime,
   effectiveTitle,
@@ -34,6 +36,7 @@ export interface CardActions {
   setDate: (v: string) => void;
   setTime: (v: string) => void;
   setSubject: (v: SubjectChoice) => void;
+  setDescription: (v: string) => void;
   toggle: (selected: boolean) => void;
   remove: () => void;
 }
@@ -95,6 +98,7 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
   const [own, setOwn] = useState<Partial<Record<PendingField, boolean>>>({});
 
   const title = effectiveTitle(item);
+  const description = effectiveDescription(item);
   const subject = effectiveSubject(state, item);
   const timeGroup = timeCorrectionOf(state, item);
   const subjectGroup = subjectCorrectionOf(state, item);
@@ -107,6 +111,12 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
     pending.includes(field) &&
     !own[field] &&
     ((field === 'time' && timeGroup !== null) || (field === 'subject' && subjectGroup !== null));
+
+  // What the student wrote and the engine could not tie to this activity, said exactly (nothing was applied).
+  const unresolved = (field: PendingField) =>
+    p.blockingIssues.find(
+      (b) => b.field === field && /^(UNRESOLVED_|REFERENCE_AMBIGUOUS)/.test(b.code),
+    )?.message;
 
   const notes = p.warnings.filter((w) => w.code !== 'POSSIBLE_DUPLICATE');
 
@@ -138,6 +148,16 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
               {title || 'Sin título'}
             </Heading>
             <p className="text-sm break-words text-muted-foreground">{summaryOf(state, item)}</p>
+            {description && (
+              <details className="mt-1 text-sm">
+                <summary className="flex min-h-11 cursor-pointer items-center font-medium text-accent-ink">
+                  Descripción
+                </summary>
+                <p className="mt-1 break-words whitespace-pre-line text-muted-foreground">
+                  {description}
+                </p>
+              </details>
+            )}
           </div>
           {complete ? (
             <Badge tone="success">
@@ -176,6 +196,7 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
                   ? '¿Es esta la fecha?'
                   : '¿Qué día es?'}
             </p>
+            {unresolved('date') && <p className="text-muted-foreground">{unresolved('date')}</p>}
             {p.date.alternatives.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {p.date.alternatives.map((d) => (
@@ -192,6 +213,31 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
               value={item.date ?? ''}
               onChange={actions.setDate}
             />
+          </div>
+        )}
+
+        {pending.includes('description') && (
+          <div className={askClass} role="group" aria-label="Descripción por decidir">
+            <p className="font-medium">
+              {unresolved('description') ?? 'Hay un texto que no pude asignar a una actividad.'}
+            </p>
+            {p.description.offered && (
+              <>
+                <p className="break-words text-muted-foreground">«{p.description.offered}»</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => actions.setDescription(p.description.offered ?? '')}
+                  >
+                    Usarlo como descripción
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => actions.setDescription('')}>
+                    No usarlo
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -303,6 +349,15 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
                 />
               </div>
             </div>
+            <FormField
+              id={`${id}-edit-description`}
+              label="Descripción (opcional)"
+              placeholder="Añade contexto, instrucciones o algo que quieras recordar…"
+              multiline
+              maxLength={ACTIVITY_DESCRIPTION_MAX}
+              value={description}
+              onChange={actions.setDescription}
+            />
             <SelectField
               id={`${id}-edit-type`}
               label="Tipo"

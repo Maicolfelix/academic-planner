@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_TYPES,
   CAPTURE_ENGINE_VERSION,
   captureCorrectionSchema,
@@ -35,6 +36,7 @@ const reviewSchema = z.object({
       date: z.string().max(10).optional(),
       time: z.string().max(5).optional(),
       subject: subjectChoice.optional(),
+      description: z.string().max(ACTIVITY_DESCRIPTION_MAX).optional(),
     }),
   ),
   groupTime: z.record(z.string(), z.string()),

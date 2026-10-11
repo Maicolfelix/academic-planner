@@ -10,6 +10,9 @@ interface FormFieldProps {
   autoComplete?: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
+  /** Stops typing at this length (the server's own limit), so nothing typed is cut afterwards. */
+  maxLength?: number;
   error?: string;
   hint?: string;
   /** Announces the field as required to assistive technology (the form validates; nothing is drawn). */
@@ -30,6 +33,8 @@ export function FormField({
   autoComplete,
   value,
   onChange,
+  placeholder,
+  maxLength,
   error,
   hint,
   required,
@@ -42,6 +47,8 @@ export function FormField({
     name: id,
     value,
     disabled,
+    placeholder,
+    maxLength,
     'aria-invalid': error ? true : undefined,
     'aria-required': required ? true : undefined,
     'aria-describedby': describedBy || undefined,

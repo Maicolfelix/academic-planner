@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_PRIORITIES,
   ACTIVITY_PRIORITY_LABELS,
   ACTIVITY_STATUSES,
@@ -508,8 +509,10 @@ export function ActivityFormDialog({
           </div>
           <FormField
             id="activity-description"
-            label="Descripción"
+            label="Descripción (opcional)"
+            placeholder="Añade contexto, instrucciones o algo que quieras recordar…"
             multiline
+            maxLength={ACTIVITY_DESCRIPTION_MAX}
             value={description}
             onChange={setDescription}
             error={fieldErrors.description?.[0]}

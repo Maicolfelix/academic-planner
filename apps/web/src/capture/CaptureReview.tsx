@@ -9,8 +9,10 @@ import {
   chooseGroupTime,
   effectiveDate,
   effectiveTitle,
+  pendingOf,
   remove,
   setDate,
+  setDescription,
   setSubject,
   setTime,
   setTitle,
@@ -61,6 +63,7 @@ export function CaptureReview({
     setDate: (v) => onChange(setDate(state, clientId, v)),
     setTime: (v) => onChange(setTime(state, clientId, v)),
     setSubject: (v) => onChange(setSubject(state, clientId, v)),
+    setDescription: (v) => onChange(setDescription(state, clientId, v)),
     toggle: (v) => onChange(toggle(state, clientId, v)),
     remove: () => onChange(remove(state, clientId)),
   });
@@ -87,6 +90,15 @@ export function CaptureReview({
       .map((i) => `${effectiveTitle(i)} (${shortDate(effectiveDate(i))})`)
       .join(', ');
 
+  const goToFirstToReview = () => {
+    const first = state.items.find((i) => pendingOf(state, i).length > 0);
+    if (!first) return;
+    const target = document.getElementById(`capture-${first.proposal.clientId}-title`);
+    target?.scrollIntoView({ block: 'center' });
+    target?.setAttribute('tabindex', '-1');
+    target?.focus({ preventScroll: true });
+  };
+
   const count = summary.toCreate;
   const label = `Crear ${count} ${count === 1 ? 'actividad' : 'actividades'}`;
   const waiting = summary.incomplete;
@@ -104,9 +116,24 @@ export function CaptureReview({
             ? 'Sin actividades'
             : `${summary.total} ${summary.total === 1 ? 'actividad encontrada' : 'actividades encontradas'}`}
         </Heading>
+        {summary.total > 1 && (
+          <p className="text-sm font-medium">
+            {summary.total - summary.needsReview}{' '}
+            {summary.total - summary.needsReview === 1 ? 'lista' : 'listas'}
+            {summary.needsReview > 0 &&
+              `, ${summary.needsReview} ${summary.needsReview === 1 ? 'necesita' : 'necesitan'} revisión`}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           Nada se guarda hasta que pulses «{label}». Lo que no tiene dudas ya está listo.
         </p>
+        {summary.needsReview > 0 && summary.total > 4 && (
+          <div>
+            <Button size="sm" onClick={goToFirstToReview}>
+              Ir a la primera que necesita revisión
+            </Button>
+          </div>
+        )}
       </div>
 
       {openTime.map((c) => {
