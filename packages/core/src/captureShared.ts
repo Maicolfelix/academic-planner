@@ -1,11 +1,13 @@
 import { isRealDateOnly, normalizeNameKey, type DateOnly } from './academic.js';
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_TITLE_MAX,
   ACTIVITY_TYPE_LABELS,
   DEFAULT_ACTIVITY_TYPE,
   type ActivityType,
 } from './activity.js';
 import { addDays, firstWeekdayOnOrAfter, weekdayOf, type Weekday } from './calendar.js';
+import { cueLength, describeTokens } from './captureContext.js';
 import { dueFromLocal, toLocalParts } from './time.js';
 
 /**
@@ -312,7 +314,6 @@ const LOOSE_FILLERS = new Set([
   'hare',
   'envio',
   'subo',
-  'estudiar',
 ]);
 
 /** "entregarlas", "presentarlo": a delivery verb with its pronoun glued on says nothing about WHAT the activity is. */
@@ -1092,6 +1093,8 @@ export interface WordsInterpretation {
   warnings: CaptureWarning[];
   /** A second type or a second clear subject: probably two activities (quick capture's old single-activity rule). */
   multiple: boolean;
+  /** What the student said ABOUT the activity (multi-activity engine only; null when nothing says anything). */
+  description: string | null;
   meta: { subjectFromShared: boolean };
 }
 
@@ -1187,17 +1190,28 @@ export function interpretWords(
 
   // 5. Title: the type's label plus whatever text is left (connectors at the edges removed).
   let rest = tokens.filter((t) => !t.used);
-  if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
-  if (options.cutTitleAtStops) rest = rest.filter((t) => !isLooseFiller(t.norm));
+  let description: string | null = null;
   if (options.cutTitleAtStops) {
-    // After the type word the first connector ends the title ("tarea PARA el jueves"); with no type word, after the
-    // first real word ("ensayo de ciberseguridad PARA el lunes").
+    // The title is the words right after the type word, up to a connector ("tarea PARA el jueves"), a comma or a cue of
+    // context. With no type word ("ensayo de ciberseguridad PARA el lunes") it starts after the first real word. Whatever
+    // follows is not lost: it is the description when it says something.
     const from = first
       ? rest.findIndex((t) => tokens.indexOf(t) > first.start)
       : rest.findIndex((t) => !QUALIFIER_STOPS.has(t.norm) && !STOPWORDS.has(t.norm)) + 1;
-    const cut = from < 0 ? -1 : rest.findIndex((t, i) => i >= from && QUALIFIER_STOPS.has(t.norm));
-    if (cut >= 0) rest = rest.slice(0, cut);
+    const cut =
+      from < 0
+        ? -1
+        : rest.findIndex(
+            (t, i) =>
+              i >= from && (QUALIFIER_STOPS.has(t.norm) || t.afterBreak || cueLength(rest, i) > 0),
+          );
+    if (cut >= 0) {
+      description = describeTokens(rest.slice(cut));
+      rest = rest.slice(0, cut);
+    }
+    rest = rest.filter((t) => !isLooseFiller(t.norm));
   }
+  if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
   while (rest.length > 0 && STOPWORDS.has(rest[0]!.norm)) rest.shift();
   while (rest.length > 0 && STOPWORDS.has(rest.at(-1)!.norm)) rest.pop();
   const words = rest.map((t) => t.raw);
@@ -1207,6 +1221,9 @@ export function interpretWords(
   if (title.length > ACTIVITY_TITLE_MAX) {
     title = title.slice(0, ACTIVITY_TITLE_MAX).trimEnd();
     warn({ code: 'TITLE_TRUNCATED', message: QUICK_CAPTURE_MESSAGES.TITLE_TRUNCATED });
+  }
+  if (description !== null && description.length > ACTIVITY_DESCRIPTION_MAX) {
+    description = description.slice(0, ACTIVITY_DESCRIPTION_MAX).trimEnd();
   }
 
   return {
@@ -1219,6 +1236,7 @@ export function interpretWords(
     ambiguities,
     warnings,
     multiple,
+    description,
     meta,
   };
 }

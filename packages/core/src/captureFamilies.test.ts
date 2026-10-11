@@ -470,22 +470,41 @@ describe('family 16 — partial success', () => {
   });
 });
 
-describe('family 17 — the limit', () => {
-  it('eleven activities are reported, never cut', () => {
-    const text = Array.from(
-      { length: 11 },
-      (_, i) =>
-        `tarea ${['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i % 7]} del taller ${i}`,
-    ).join(', ');
-    const r = run(text, []);
-    expect(['OK', 'TOO_MANY_PROPOSALS']).toContain(r.status);
-    if (r.status === 'OK') expect(r.proposals.length).toBeLessThanOrEqual(10);
+describe('family 17 — the limit (fifty) and scale', () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const day = String((i % 28) + 1).padStart(2, '0');
+      return `Taller ${i + 1} el ${day}/${i < 28 ? '12' : '01'}`;
+    }).join(', ');
+
+  it('20, 30, 40 and 50 activities are all there, in order, none cut', () => {
+    for (const n of [20, 30, 40, 50]) {
+      const r = run(many(n), []);
+      expect(r.status, String(n)).toBe('OK');
+      expect(r.proposals.map((p) => p.title.value)).toEqual(
+        Array.from({ length: n }, (_, i) => `Taller ${i + 1}`),
+      );
+    }
   });
-  it('quantity counts toward it: twelve tasks are too many', () => {
-    expect(run('tengo doce tareas para el viernes', []).proposals.length).toBeLessThanOrEqual(10);
-    const r = run('tengo 9 tareas para el viernes y 2 quices para el lunes', []);
+
+  it('51 is reported and cut nowhere: no proposal at all, the message says what to do', () => {
+    const r = run(many(51), []);
     expect(r.status).toBe('TOO_MANY_PROPOSALS');
     expect(r.proposals).toEqual([]);
+    expect(r.warnings[0]!.message).toContain('Divide el mensaje en dos partes');
+  });
+
+  it('a quantity counts toward it', () => {
+    expect(run('tengo 40 tareas para el viernes', []).proposals).toHaveLength(40);
+    expect(run('tengo 30 tareas para el viernes y 30 quices para el lunes', []).status).toBe(
+      'TOO_MANY_PROPOSALS',
+    );
+  });
+
+  it('parsing fifty is fast (no quadratic blow-up): well under a second', () => {
+    const t0 = Date.now();
+    run(many(50), SUBJECTS, 'INBOX');
+    expect(Date.now() - t0).toBeLessThan(1000);
   });
 });
 

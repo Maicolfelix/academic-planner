@@ -62,11 +62,11 @@ describe('POST /api/capture/confirm: access and input', () => {
     expect(await counts()).toEqual({ activities: 0, subjects: 1, reminders: 0 });
   });
 
-  it('needs between 1 and 10 activities, with distinct client ids', async () => {
+  it('needs between 1 and 50 activities, with distinct client ids', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     expect((await confirm(agent, [])).status).toBe(400);
-    const eleven = Array.from({ length: 11 }, (_, i) => item(`p${i}`));
-    expect((await confirm(agent, eleven)).status).toBe(400);
+    const tooMany = Array.from({ length: 51 }, (_, i) => item(`p${i}`));
+    expect((await confirm(agent, tooMany)).status).toBe(400);
     expect((await confirm(agent, [item('p1'), item('p1', { dueDate: '2026-10-13' })])).status).toBe(
       400,
     );
@@ -278,5 +278,93 @@ describe('POST /api/capture/confirm: copies and double submits', () => {
     const retry = await confirm(agent, CRITICAL);
     expect(retry.status).toBe(409);
     expect(await prisma.activity.count()).toBe(4);
+  });
+});
+
+describe('POST /api/capture/confirm: the description is optional context', () => {
+  it('is saved with each activity, including a general one (no subject, no hour)', async () => {
+    const { agent } = await setupUser(app, 'a@example.com', 'Redes');
+    const res = await confirm(agent, [
+      item('p1', {
+        description: 'Estudiar VLAN, subnetting y routing estático',
+        dueTime: undefined,
+      }),
+      item('p2', { dueDate: '2026-10-13', description: 'Hay que subirla en PDF al campus' }),
+      item('p3', { dueDate: '2026-10-14' }), // none: it is optional
+    ]);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    const rows = await prisma.activity.findMany({ orderBy: { dueAt: 'asc' } });
+    expect(rows.map((r) => r.description)).toEqual([
+      'Estudiar VLAN, subnetting y routing estático',
+      'Hay que subirla en PDF al campus',
+      null,
+    ]);
+    expect(rows.every((r) => r.subjectId === null)).toBe(true);
+  });
+
+  it('is trimmed, an empty one is null, and the one the single create would refuse is refused here too', async () => {
+    const { agent } = await setupUser(app, 'a@example.com', 'Redes');
+    expect(
+      (
+        await confirm(agent, [
+          item('p1', { description: '   ' }),
+          item('p2', { dueDate: '2026-10-13', description: '  Con espacios  ' }),
+        ])
+      ).status,
+    ).toBe(201);
+    const rows = await prisma.activity.findMany({ orderBy: { dueAt: 'asc' } });
+    expect(rows.map((r) => r.description)).toEqual([null, 'Con espacios']);
+    // Over 2000 characters, or a NUL character: a clear 400, never a 500, and nothing is created.
+    for (const description of ['x'.repeat(2001), 'a\u0000b']) {
+      const bad = await confirm(agent, [item('p3', { dueDate: '2026-10-14', description })]);
+      expect(bad.status, description.slice(0, 10)).toBe(400);
+    }
+    expect(await prisma.activity.count()).toBe(2);
+  });
+});
+
+describe('POST /api/capture/confirm: fifty at once', () => {
+  const fifty = (): Item[] =>
+    Array.from({ length: 50 }, (_, i) =>
+      item(`p${i}`, {
+        title: `Taller ${i + 1}`,
+        dueDate:
+          i < 28
+            ? `2026-12-${String(i + 1).padStart(2, '0')}`
+            : `2027-01-${String(i - 27).padStart(2, '0')}`,
+        dueTime: '08:00',
+        type: i % 2 ? 'EXAM' : 'TASK',
+        description: i % 5 === 0 ? 'Hay que llevar el portátil' : undefined,
+        subject: i % 10 === 0 ? { kind: 'NEW', name: 'Criptografía' } : { kind: 'NONE' },
+      }),
+    );
+
+  it('creates all fifty (and the one new subject, once, and every reminder) in one transaction, in a sensible time', async () => {
+    const { agent } = await setupUser(app, 'a@example.com', 'Redes');
+    const t0 = Date.now();
+    const res = await confirm(agent, fifty());
+    const took = Date.now() - t0;
+    expect(res.status, JSON.stringify(res.body).slice(0, 200)).toBe(201);
+    expect(res.body.count).toBe(50);
+    expect(res.body.createdSubjects).toHaveLength(1);
+    expect(await prisma.activity.count()).toBe(50);
+    expect(await prisma.subject.count({ where: { name: 'Criptografía' } })).toBe(1);
+    expect(await prisma.reminder.count()).toBeGreaterThanOrEqual(50);
+    console.info(`confirm of 50 activities: ${took} ms`);
+    expect(took).toBeLessThan(15_000); // measured at a fraction of this: it only catches a blow-up (N+1 round trips)
+  });
+
+  it('is all or nothing at that size too: one refused card, none of the fifty', async () => {
+    const owner = await setupUser(app, 'a@example.com', 'Redes');
+    const other = await setupUser(app, 'b@example.com', 'Secreta');
+    const items = fifty();
+    items[37] = item('p37', { subject: { kind: 'EXISTING', subjectId: other.subject.id } });
+    const res = await confirm(owner.agent, items);
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.items.map((i: { clientId: string }) => i.clientId)).toEqual([
+      'p37',
+    ]);
+    expect(await prisma.activity.count()).toBe(0);
+    expect(await prisma.subject.count({ where: { name: 'Criptografía' } })).toBe(0);
   });
 });

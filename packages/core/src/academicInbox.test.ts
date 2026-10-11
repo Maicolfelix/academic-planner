@@ -47,10 +47,24 @@ const codes = (p: AcademicInboxProposal) => p.warnings.map((w) => w.code);
 describe('splitSentences', () => {
   it('splits on periods, line breaks, semicolons, question and exclamation marks', () => {
     expect(splitSentences('Uno. Dos. Tres.')).toEqual(['Uno.', 'Dos.', 'Tres.']);
+    // A line break alone is NOT a boundary (hard-wrapped e-mails, a phone's Enter): it needs a sentence end, a list item
+    // or a blank line.
     expect(splitSentences('Primera línea\nSegunda línea\r\nTercera')).toEqual([
-      'Primera línea',
-      'Segunda línea',
-      'Tercera',
+      'Primera línea Segunda línea Tercera',
+    ]);
+    expect(splitSentences('Tengo parcial el lunes.\nTarea el martes\n\nQuiz el jueves')).toEqual([
+      'Tengo parcial el lunes.',
+      'Tarea el martes',
+      'Quiz el jueves',
+    ]);
+    expect(splitSentences('1. Parcial el lunes\n2. Quiz el martes\n- Taller el jueves')).toEqual([
+      '1. Parcial el lunes',
+      '2. Quiz el martes',
+      '- Taller el jueves',
+    ]);
+    // ...and a line that continues in lowercase after a period is the same sentence (the "a. m." of an hour).
+    expect(splitSentences('El parcial es a las 10 a. m.\ny el quiz a las 2')).toEqual([
+      'El parcial es a las 10 a. m. y el quiz a las 2',
     ]);
     expect(splitSentences('Parcial el martes; taller el viernes')).toEqual([
       'Parcial el martes;',

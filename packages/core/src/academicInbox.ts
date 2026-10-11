@@ -99,14 +99,45 @@ function periodEndsSentence(line: string, i: number): boolean {
   return true;
 }
 
-/** Sentences of a message: line breaks, ";" and sentence-ending periods, "!" and "?". Never throws. */
+/**
+ * The lines of a text as the writer meant them. A line break is NOT a sentence boundary by itself: an e-mail wraps its
+ * lines at 70 columns and a phone breaks a long sentence wherever the student pressed Enter, so "...dos días distintos"
+ * and "uno para el jueves y otro para el viernes" are ONE sentence. A break counts only when the previous line ends a
+ * sentence (. ! ? ; :) and the next one does not continue it in lowercase, when the next line is a list item ("1.",
+ * "-", "•"), or when there is a blank line (a paragraph).
+ */
+function logicalLines(text: string): string[] {
+  const raw = text.replace(/\r\n?/g, '\n').split('\n');
+  const lines: string[] = [];
+  let pendingBlank = false;
+  for (const piece of raw) {
+    const cur = piece.trim();
+    if (cur === '') {
+      pendingBlank = true;
+      continue;
+    }
+    const prev = lines.at(-1);
+    const endsSentence = prev !== undefined && /[.!?;:]["')\]»”]*$/.test(prev);
+    const isListItem = /^([-•*–]|\d+[.)])\s/.test(cur);
+    const continues = /^\p{Ll}/u.test(cur);
+    if (prev === undefined || pendingBlank || isListItem || (endsSentence && !continues)) {
+      lines.push(cur);
+    } else {
+      lines[lines.length - 1] = `${prev} ${cur}`;
+    }
+    pendingBlank = false;
+  }
+  return lines;
+}
+
+/** Sentences of a message: paragraph and list breaks, ";" and sentence-ending periods, "!" and "?". Never throws. */
 export function splitSentences(text: string): string[] {
   const sentences: string[] = [];
   const push = (s: string) => {
     const trimmed = s.trim();
     if (trimmed !== '') sentences.push(trimmed);
   };
-  for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
+  for (const line of logicalLines(text)) {
     let start = 0;
     for (let i = 0; i < line.length; i++) {
       const c = line[i]!;

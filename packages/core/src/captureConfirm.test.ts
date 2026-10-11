@@ -50,12 +50,12 @@ describe('the confirmation request', () => {
     }
   });
 
-  it('needs between 1 and 10 activities with distinct client ids', () => {
+  it('needs between 1 and 50 activities with distinct client ids', () => {
     expect(parse([]).success).toBe(false);
-    expect(parse(Array.from({ length: 11 }, (_, i) => item({ clientId: `p${i}` }))).success).toBe(
+    expect(parse(Array.from({ length: 51 }, (_, i) => item({ clientId: `p${i}` }))).success).toBe(
       false,
     );
-    expect(parse(Array.from({ length: 10 }, (_, i) => item({ clientId: `p${i}` }))).success).toBe(
+    expect(parse(Array.from({ length: 50 }, (_, i) => item({ clientId: `p${i}` }))).success).toBe(
       true,
     );
     expect(parse([item(), item({ dueDate: '2026-10-13' })]).success).toBe(false);

@@ -3,6 +3,7 @@ import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
 import { titlesAreRelated, ACADEMIC_CUES } from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
+import { describeTokens } from './captureContext.js';
 import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
   FIELD_CERTAINTIES,
@@ -48,16 +49,16 @@ import { dueFromLocal, toLocalParts } from './time.js';
  * Blocking issues are separate from warnings: a warning ("the date already passed") informs and never blocks.
  */
 
-export const CAPTURE_MAX_PROPOSALS = 10;
+export const CAPTURE_MAX_PROPOSALS = 50;
 /**
  * The shape and meaning of a result. A review the student left half done is kept as a draft; a draft written by another
  * version of the engine is not trusted (it is dropped, never repaired). Bump it when the proposals change.
  */
-export const CAPTURE_ENGINE_VERSION = 1;
+export const CAPTURE_ENGINE_VERSION = 2;
 export const CAPTURE_MODES = ['QUICK', 'INBOX'] as const;
 export type CaptureMode = (typeof CAPTURE_MODES)[number];
 /** Characters a text of each mode may have (a quick phrase vs a pasted message). */
-export const CAPTURE_MAX_LENGTH: Record<CaptureMode, number> = { QUICK: 1000, INBOX: 5000 };
+export const CAPTURE_MAX_LENGTH: Record<CaptureMode, number> = { QUICK: 5000, INBOX: 5000 };
 /** Hard cap of the request body: far above the product limits, only a guard against abuse. */
 export const CAPTURE_REQUEST_MAX = 20_000;
 
@@ -65,7 +66,7 @@ export const CAPTURE_MESSAGES = {
   EMPTY: 'Escribe o pega algo para continuar.',
   TOO_LONG_QUICK: 'Este texto parece demasiado largo para Captura rápida.',
   TOO_LONG_INBOX: 'El texto es demasiado largo. Pega únicamente el mensaje académico relevante.',
-  TOO_MANY_PROPOSALS: `Encontré más de ${CAPTURE_MAX_PROPOSALS} actividades. Divide el mensaje en dos partes.`,
+  TOO_MANY_PROPOSALS: `Encontré más de ${CAPTURE_MAX_PROPOSALS} actividades. Divide el mensaje en dos partes para revisarlas mejor.`,
   NO_ACTIVITIES: 'No encontramos actividades claras en este mensaje.',
 } as const;
 
@@ -95,6 +96,9 @@ export const CAPTURE_ISSUE_CODES = [
   'CONFLICTING_TIME',
   'REFERENCE_AMBIGUOUS',
   'QUANTITY_DATE_MISMATCH',
+  'UNRESOLVED_TIME_REFERENCE',
+  'UNRESOLVED_DATE_REFERENCE',
+  'UNRESOLVED_DESCRIPTION_REFERENCE',
 ] as const;
 export type CaptureIssueCode = (typeof CAPTURE_ISSUE_CODES)[number];
 
@@ -115,7 +119,7 @@ export type CaptureWarningCode = (typeof CAPTURE_WARNING_CODES)[number];
 
 const issue = z.object({
   code: z.enum(CAPTURE_ISSUE_CODES),
-  field: z.enum(['title', 'subject', 'date', 'time']),
+  field: z.enum(['title', 'subject', 'date', 'time', 'description']),
   message: z.string(),
 });
 const warning = z.object({ code: z.enum(CAPTURE_WARNING_CODES), message: z.string() });
@@ -183,6 +187,16 @@ export const captureProposalSchema = z.object({
     alternatives: z.array(z.string()),
     /** The days that share one time expression share this key: one correction fixes them all. */
     groupKey: z.string().nullable(),
+  }),
+  /**
+   * What the student said ABOUT the activity (optional, never blocks): only words they wrote, kept in order. `offered` is
+   * a piece of context that could not be assigned with certainty: shown to be taken or ignored, never applied.
+   */
+  description: z.object({
+    value: z.string().nullable(),
+    certainty,
+    origin,
+    offered: z.string().nullable(),
   }),
   /** Anything that keeps it from being created as it is. Empty when READY. */
   blockingIssues: z.array(issue),
@@ -284,6 +298,10 @@ const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
   CONFLICTING_TIME: 'El texto da horas distintas para la misma actividad: elige una.',
   REFERENCE_AMBIGUOUS: 'No quedó claro a qué actividad se refiere una aclaración.',
   QUANTITY_DATE_MISMATCH: 'La cantidad de actividades no coincide con la de fechas.',
+  UNRESOLVED_TIME_REFERENCE: 'Mencionaste una hora, pero no pude asignarla a esta actividad.',
+  UNRESOLVED_DATE_REFERENCE: 'Mencionaste una fecha, pero no pude asignarla a esta actividad.',
+  UNRESOLVED_DESCRIPTION_REFERENCE:
+    'Mencionaste un detalle, pero no pude saber a qué actividad corresponde.',
 };
 const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][number]['field']> = {
   TITLE_MISSING: 'title',
@@ -299,6 +317,9 @@ const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][nu
   CONFLICTING_TIME: 'time',
   REFERENCE_AMBIGUOUS: 'time',
   QUANTITY_DATE_MISMATCH: 'date',
+  UNRESOLVED_TIME_REFERENCE: 'time',
+  UNRESOLVED_DATE_REFERENCE: 'date',
+  UNRESOLVED_DESCRIPTION_REFERENCE: 'description',
 };
 const makeIssue = (
   code: CaptureIssueCode,
@@ -452,6 +473,7 @@ interface Reading {
   warnings: CaptureWarningCode[];
   blocking: CaptureProposal['blockingIssues'];
   implicit: boolean;
+  description: string | null;
 }
 
 function readWords(
@@ -555,6 +577,7 @@ function readWords(
     warnings,
     blocking,
     implicit: span.implicitType !== null,
+    description: words.description,
   };
 }
 
@@ -577,6 +600,17 @@ function statusOf(blocking: CaptureProposal['blockingIssues']): CaptureProposal[
 // ───────────────────────── Mentions and references ─────────────────────────
 
 /** One activity the text introduced, with everything its own words said and everything later words added to it. */
+/** A mention of an hour, a day or a detail that nobody could own for sure. */
+interface PendingReference {
+  /** AMBIGUOUS: it could be several activities. ORPHAN: it could be none the engine can name. */
+  kind: 'AMBIGUOUS' | 'ORPHAN';
+  field: 'date' | 'time' | 'description';
+  text: string;
+  times: PlannedTime[];
+  days: PlannedDay[];
+  description: string | null;
+}
+
 interface Mention {
   span: DiscourseSpan;
   groupId: string;
@@ -590,15 +624,13 @@ interface Mention {
   /** Later words gave this activity a day the first ones did not agree with: all of them, kept for the student. */
   dateConflict: PlannedDay[] | null;
   /**
-   * A later reference could have been this activity or another one. What it carried is offered, not applied: the
-   * student says whether it is this one.
+   * Later words that mention a day, an hour or a piece of context this activity may be the owner of, but that could not be
+   * tied to it (or to anyone) with certainty. What they carry is OFFERED to the student, never applied.
    */
-  ambiguousRef: {
-    field: 'date' | 'time';
-    text: string;
-    times: PlannedTime[];
-    days: PlannedDay[];
-  } | null;
+  pending: PendingReference[];
+  /** What the student said about the activity (its own words, then what later clauses added). */
+  description: string | null;
+  descriptionFromReference: boolean;
   /** The subject came from a later reference. */
   subjectFromReference: boolean;
   suggested: boolean;
@@ -661,11 +693,19 @@ function applyReference(
   targets: Mention[],
   plan: TemporalPlan,
   subject: { id: string; exact: boolean } | null,
+  description: string | null,
   spanIndex: number,
   ctx: QuickCaptureContext,
 ): void {
   for (const m of targets) {
     if (m.suggested) continue;
+    if (description) {
+      // Context adds up: what was said before and what a later clause adds are both the student's words.
+      if (m.description === null) m.description = description;
+      else if (!m.description.includes(description))
+        m.description = `${m.description}. ${description}`;
+      m.descriptionFromReference = true;
+    }
     if (subject && m.reading.subject.kind === 'NONE') {
       const found = ctx.subjects.find((s) => s.id === subject.id);
       if (found) {
@@ -733,7 +773,10 @@ export function parseCaptureProposals(
   }
 
   const entries = buildSubjectEntries(context.subjects);
-  let spans = segmentDiscourse(trimmed, context, { splitLeading: mode === 'QUICK' });
+  let spans = segmentDiscourse(trimmed, context, {
+    splitLeading: mode === 'QUICK',
+    implicitDetails: mode === 'QUICK',
+  });
   if (spans.length === 0 && mode === 'QUICK') {
     // No activity word: the whole phrase is one activity ("Cumpleaños de Ana martes").
     spans = [
@@ -751,6 +794,7 @@ export function parseCaptureProposals(
         typeKey: 'leading',
         anchorIndex: -1,
         headIndex: 0,
+        anchorLength: 0,
         targets: [],
         ambiguous: false,
       },
@@ -803,7 +847,9 @@ export function parseCaptureProposals(
       sharedTime,
       count: span.count,
       dateConflict: null,
-      ambiguousRef: null,
+      pending: [],
+      description: reading.description,
+      descriptionFromReference: false,
       subjectFromReference: false,
       suggested: false,
     };
@@ -849,30 +895,58 @@ export function parseCaptureProposals(
     bySpan.set(span.index, mention);
   }
 
-  // 2. The references, in the order written: each adds its day, hour or subject to the activity it refers to.
+  // 2. The references, in the order written: each adds its day, hour, subject or context to the activity it refers to.
+  // What nobody can own for sure is OFFERED to the candidates (never applied, never silently dropped).
   for (const span of spans) {
     if (span.role !== 'REFER') continue;
     const tokens = tokenize(span.text);
     const plan = planTemporal(tokens);
     const found = matchSubject(tokens, entries);
+    // The words that only name what is referred to ("las dos tareas", "el parcial") and the subject are not a detail.
+    if (span.kind !== 'DETAIL') {
+      const end = Math.min(tokens.length, span.anchorIndex + Math.max(span.anchorLength, 1));
+      for (let i = span.headIndex; i < end; i++) tokens[i]!.used = true;
+    }
+    if (found.kind === 'match') {
+      for (let i = found.start; i < found.start + found.length; i++) tokens[i]!.used = true;
+    }
     const subject = found.kind === 'match' ? { id: found.subject.id, exact: found.exact } : null;
+    const description = describeTokens(tokens.filter((t) => !t.used));
     const carriesDate = plan.days.length > 0;
     const carriesTime = plan.timeItems > 0;
-    if (!carriesDate && !carriesTime && !subject) continue;
+    if (!carriesDate && !carriesTime && !subject && !description) continue;
     const targets = span.targets.map((i) => bySpan.get(i)).filter((m): m is Mention => !!m);
-    if (span.ambiguous) {
-      // Could be several activities and no word chooses: add to none, and say so to each of them.
-      for (const m of targets) {
-        m.ambiguousRef ??= {
-          field: carriesDate ? 'date' : 'time',
-          text: span.rawSegment,
-          times: plan.times.filter((t): t is PlannedTime => t !== null),
-          days: plan.days,
-        };
+    if (span.ambiguous || targets.length === 0) {
+      const holders =
+        targets.length > 0
+          ? targets
+          : mentions.filter(
+              (m) =>
+                m.span.index < span.index &&
+                m.span.sentenceIndex ===
+                  Math.max(
+                    -1,
+                    ...mentions
+                      .filter((x) => x.span.index < span.index)
+                      .map((x) => x.span.sentenceIndex),
+                  ),
+            );
+      const kind = span.ambiguous ? 'AMBIGUOUS' : 'ORPHAN';
+      const base = {
+        kind,
+        text: span.rawSegment,
+        times: plan.times.filter((t): t is PlannedTime => t !== null),
+        days: plan.days,
+        description: null,
+      } as const;
+      for (const m of holders) {
+        if (carriesDate) m.pending.push({ ...base, field: 'date' });
+        if (carriesTime) m.pending.push({ ...base, field: 'time' });
+        if (description) m.pending.push({ ...base, field: 'description', description });
       }
       continue;
     }
-    applyReference(targets, plan, subject, span.index, context);
+    applyReference(targets, plan, subject, description, span.index, context);
   }
 
   // 3. Proposals.
@@ -927,6 +1001,12 @@ export function parseCaptureProposals(
       }
     }
     const quantityMismatch = quantity !== null && days.length > 1 && days.length !== quantity;
+    // Hours that were written in this activity's own words and reached none of its days.
+    const timesLost =
+      plan.timeItems > 0 &&
+      mention.sharedTime === null &&
+      !(days.length === 0 && plan.timeItems === 1) &&
+      days.every((d) => d.time === null && d.timeIssue === null);
 
     rows.forEach((row) => {
       const day = row.index >= 0 ? days[row.index]! : null;
@@ -982,26 +1062,74 @@ export function parseCaptureProposals(
       } else if (planned?.certainty === 'AMBIGUOUS') {
         blocking.push(makeIssue('TIME_AMBIGUOUS'));
       }
-      // A later clause that could be about this activity or another: only worth asking when it carries what this one
-      // lacks. Its hour (or day) is offered as the choice; nothing is applied until the student says it is this one.
-      const ref = mention.ambiguousRef;
+      // Words that mention a day, an hour or a detail this activity may own but nobody could tie to it for sure: only
+      // worth asking when it carries what this one lacks. What they say is OFFERED as the choice; nothing is applied
+      // until the student says it is this one. A hint that says exactly what could not be resolved.
       let offeredTimes: string[] = [];
       let offeredDates: string[] = [];
-      if (ref) {
-        const lacksTime = ref.field === 'time' && (planned === null || planned.value === null);
-        const lacksDate = ref.field === 'date' && mention.days.length === 0;
-        if (lacksTime || lacksDate) {
-          if (lacksTime)
-            offeredTimes = ref.times.flatMap((t) => (t.value ? [t.value] : t.alternatives));
-          else
-            offeredDates = ref.days
-              .map((d) => resolveDate(d.expr, today, null, context, d.text).date)
-              .filter((d): d is DateOnly => d !== null);
+      let offeredDescription: string | null = null;
+      for (const ref of mention.pending) {
+        const ambiguous = ref.kind === 'AMBIGUOUS';
+        if (
+          ref.field === 'time' &&
+          (planned === null || planned.value === null) &&
+          offeredTimes.length === 0
+        ) {
+          offeredTimes = ref.times.flatMap((t) => (t.value ? [t.value] : t.alternatives));
+          blocking.push(
+            ambiguous
+              ? makeIssue(
+                  'REFERENCE_AMBIGUOUS',
+                  `No quedó claro a qué actividad se refiere «${ref.text}».`,
+                  'time',
+                )
+              : makeIssue(
+                  'UNRESOLVED_TIME_REFERENCE',
+                  `Mencionaste una hora («${ref.times.map((t) => t.text).join(', ')}»), pero no pude asignarla a esta actividad.`,
+                ),
+          );
+        } else if (ref.field === 'date' && mention.days.length === 0 && offeredDates.length === 0) {
+          offeredDates = ref.days
+            .map((d) => resolveDate(d.expr, today, null, context, d.text).date)
+            .filter((d): d is DateOnly => d !== null);
+          blocking.push(
+            ambiguous
+              ? makeIssue(
+                  'REFERENCE_AMBIGUOUS',
+                  `No quedó claro a qué actividad se refiere «${ref.text}».`,
+                  'date',
+                )
+              : makeIssue(
+                  'UNRESOLVED_DATE_REFERENCE',
+                  `Mencionaste una fecha («${ref.days.map((d) => d.text).join(', ')}»), pero no pude asignarla a esta actividad.`,
+                ),
+          );
+        } else if (
+          ref.field === 'description' &&
+          mention.description === null &&
+          offeredDescription === null
+        ) {
+          offeredDescription = ref.description;
           blocking.push(
             makeIssue(
-              'REFERENCE_AMBIGUOUS',
-              `No quedó claro a qué actividad se refiere «${ref.text}».`,
-              ref.field,
+              'UNRESOLVED_DESCRIPTION_REFERENCE',
+              `Mencionaste «${ref.description}», pero no pude saber a qué actividad corresponde.`,
+            ),
+          );
+        }
+      }
+      // An hour the student wrote inside this activity's own words that ended up on nobody ("a las 8 y a las 10" with no
+      // day to share them): it is not an optional hour that was left out, it is one that could not be placed.
+      if (timesLost && offeredTimes.length === 0 && !day?.timeConflict && !day?.timeIssue) {
+        const written = plan.times.filter((t): t is PlannedTime => t !== null);
+        if (written.length === 0) {
+          blocking.push(makeIssue('TIME_INVALID', 'La hora escrita no es válida.'));
+        } else {
+          offeredTimes = written.flatMap((t) => (t.value ? [t.value] : t.alternatives));
+          blocking.push(
+            makeIssue(
+              'UNRESOLVED_TIME_REFERENCE',
+              `Mencionaste ${written.length === 1 ? 'una hora' : 'horas'} («${written.map((t) => t.text).join(', ')}»), pero no pude asignarla${written.length === 1 ? '' : 's'} a esta actividad.`,
             ),
           );
         }
@@ -1056,6 +1184,17 @@ export function parseCaptureProposals(
                 ? conflictValues
                 : (planned?.alternatives ?? []),
           groupKey: planned ? (planned.key ?? `${reading.groupId}:t${planned.item}`) : null,
+        },
+        description: {
+          value: mention.description,
+          certainty: mention.description === null ? 'MISSING' : 'LIKELY',
+          origin:
+            mention.description === null
+              ? 'DEFAULT'
+              : mention.descriptionFromReference
+                ? 'REFERENCE'
+                : 'PARSED',
+          offered: offeredDescription,
         },
         blockingIssues: blocking,
         warnings: warnings.map(makeWarning),

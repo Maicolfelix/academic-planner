@@ -1,4 +1,5 @@
 import { splitSentences, findAnchors, CLAUSE_SPLITTERS, type Anchor } from './academicInbox.js';
+import { cueLength } from './captureContext.js';
 import type { ActivityType } from './activity.js';
 import {
   PLURAL_TYPE_WORDS,
@@ -7,6 +8,7 @@ import {
   buildSubjectEntries,
   findDateExpressions,
   matchSubject,
+  matchTimeAt,
   tokenize,
   type QuickCaptureContext,
   type SubjectEntry,
@@ -31,7 +33,7 @@ import {
  * proposals.
  */
 
-export type SpanKind = 'TYPE' | 'IMPLICIT' | 'ELLIPTICAL' | 'PRONOUN' | 'LEADING';
+export type SpanKind = 'TYPE' | 'IMPLICIT' | 'ELLIPTICAL' | 'PRONOUN' | 'LEADING' | 'DETAIL';
 export type SpanRole = 'INTRO' | 'REFER';
 
 export interface DiscourseSpan {
@@ -58,6 +60,8 @@ export interface DiscourseSpan {
   anchorIndex: number;
   /** Index where the noun phrase ("las dos", "un") starts. */
   headIndex: number;
+  /** How many tokens the activity word (or the pronoun) takes. */
+  anchorLength: number;
   /** REFER: the `index` of every introduced span it adds details to. Empty: nothing to add to. */
   targets: number[];
   /** REFER that could have been several activities and no word chose one. */
@@ -147,6 +151,10 @@ const PRONOUN_FOLLOWERS = new Set([
   'presentarlos',
   'con',
   'en',
+  'hay',
+  'que',
+  'ya',
+  'no',
 ]);
 const NOUN_IMPLICIT = new Set([
   'ensayo',
@@ -342,10 +350,40 @@ function subjectOfText(text: string, entries: SubjectEntry[]): string | null {
 export function segmentDiscourse(
   text: string,
   context: Pick<QuickCaptureContext, 'subjects'>,
-  options: { splitLeading?: boolean } = {},
+  options: { splitLeading?: boolean; implicitDetails?: boolean } = {},
 ): DiscourseSpan[] {
   const entries = buildSubjectEntries(context.subjects);
   const raws: RawSpan[] = [];
+
+  /**
+   * "Es el jueves a las 7": a sentence with no activity word but with a day or an hour, right after one that named
+   * activities, is a detail about THEM (Quick Capture only: a pasted message may have sentences about anything). Which
+   * one is decided with the references.
+   */
+  const pushDetail = (sentence: string, tokens: Token[], sentenceIndex: number) => {
+    if (!options.implicitDetails || raws.length === 0) return;
+    const temporal =
+      findDateExpressions(tokens).length > 0 ||
+      tokens.some((_, i) => matchTimeAt(tokens, i, { ambiguousBareHours: true }) !== null);
+    // ...or a piece of context ("Hay que subirlas en PDF"): it is about the activities just named.
+    const context = tokens.some((_, i) => cueLength(tokens, i) > 0);
+    if (!temporal && !context) return;
+    raws.push({
+      sentenceIndex,
+      rawSegment: sentence,
+      text: sentence,
+      sharedText: '',
+      implicitType: null,
+      kind: 'DETAIL',
+      count: null,
+      definite: true,
+      typeKey: 'detail',
+      anchorIndex: -1,
+      headIndex: 0,
+      anchorLength: 0,
+      subjectId: subjectOfText(sentence, entries),
+    });
+  };
 
   splitSentences(text).forEach((sentence, sentenceIndex) => {
     const tokens = tokenize(sentence);
@@ -359,10 +397,24 @@ export function segmentDiscourse(
       const { count } = nounPhrase(tokens, headStart, a.start, plural);
       return { ...a, kind, count, headStart };
     });
-    if (base.length === 0 && !tokens.some((t) => numberOf(t.norm) !== null)) return;
+    if (base.length === 0 && !tokens.some((t) => numberOf(t.norm) !== null)) {
+      pushDetail(sentence, tokens, sentenceIndex);
+      return;
+    }
     let anchors: DiscourseAnchor[] = [...base, ...extraAnchors(tokens, base)];
     anchors.sort((a, b) => a.start - b.start);
     anchors = [...anchors, ...ellipticalAnchors(tokens, anchors)].sort((a, b) => a.start - b.start);
+    // "Reunión el viernes, LLEVAR el portátil": a verb of preparing right after another activity, with no day or hour
+    // of its own, is context for that activity (its description), not a new activity.
+    anchors = anchors.filter((a, i) => {
+      if (i === 0 || a.kind !== 'IMPLICIT' || cueLength(tokens, a.start) === 0) return true;
+      const end = anchors[i + 1]?.headStart ?? tokens.length;
+      const own = tokens.slice(a.start, end);
+      const dated =
+        findDateExpressions(own).length > 0 ||
+        own.some((_, j) => matchTimeAt(own, j, { ambiguousBareHours: true }) !== null);
+      return dated;
+    });
     // A pronoun with nothing before it to refer to is not an activity: only keep it when a real anchor precedes it.
     anchors = anchors.filter(
       (a, i) =>
@@ -370,7 +422,10 @@ export function segmentDiscourse(
         anchors.slice(0, i).some((b) => b.kind !== 'PRONOUN') ||
         sentenceIndex > 0,
     );
-    if (anchors.length === 0) return;
+    if (anchors.length === 0) {
+      pushDetail(sentence, tokens, sentenceIndex);
+      return;
+    }
 
     const starts: number[] = [0];
     for (let k = 1; k < anchors.length; k++) {
@@ -419,6 +474,7 @@ export function segmentDiscourse(
           typeKey: 'leading',
           anchorIndex: -1,
           headIndex: 0,
+          anchorLength: 0,
           subjectId: subjectOfText(own, entries),
         });
         starts[0] = anchors[0]!.headStart;
@@ -501,6 +557,7 @@ export function segmentDiscourse(
         typeKey,
         anchorIndex,
         headIndex,
+        anchorLength: anchor.kind === 'ELLIPTICAL' ? 1 : anchor.length,
         subjectId: subjectMatch.kind === 'match' ? subjectMatch.subject.id : null,
       });
     });
@@ -534,6 +591,7 @@ function resolveReferences(raws: RawSpan[]): DiscourseSpan[] {
     typeKey: r.typeKey,
     anchorIndex: r.anchorIndex,
     headIndex: r.headIndex,
+    anchorLength: r.anchorLength,
     targets: [],
     ambiguous: false,
   }));
@@ -549,6 +607,17 @@ function resolveReferences(raws: RawSpan[]): DiscourseSpan[] {
 
   spans.forEach((span, i) => {
     const subjectId = raws[i]!.subjectId;
+
+    if (span.kind === 'DETAIL') {
+      // About the activities of the previous sentence that named some: one of them, or it could be several.
+      span.role = 'REFER';
+      const before = intros.filter((x) => x.span.sentenceIndex < span.sentenceIndex);
+      const last = before.at(-1)?.span.sentenceIndex;
+      const same = before.filter((x) => x.span.sentenceIndex === last);
+      span.targets = same.map((x) => x.span.index);
+      span.ambiguous = same.length > 1;
+      return;
+    }
 
     if (span.kind === 'PRONOUN') {
       span.role = 'REFER';

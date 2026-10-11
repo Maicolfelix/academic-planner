@@ -116,7 +116,7 @@ describe('parsers do not stall or crash on hostile text', () => {
     }
     // The shared engine, both ways of reading: days, hours, ranges and positions are not a way to make it work hard.
     for (const [mode, size] of [
-      ['QUICK', 1000],
+      ['QUICK', 5000],
       ['INBOX', 5000],
     ] as const) {
       const engine = [
@@ -170,7 +170,7 @@ describe('parsers do not stall or crash on hostile text', () => {
       { items: [{ ...base, dueDate: '9999-99-99' }] },
       { items: [{ ...base, dueTime: '25:61' }] },
       { items: [{ ...base, type: 'DROP TABLE' }] },
-      { items: Array.from({ length: 11 }, (_, i) => ({ ...base, clientId: `c${i}` })) },
+      { items: Array.from({ length: 51 }, (_, i) => ({ ...base, clientId: `c${i}` })) },
       { items: [base], constructor: { prototype: { polluted: true } } },
     ];
     for (const body of bodies) {
