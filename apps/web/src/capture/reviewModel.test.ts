@@ -19,6 +19,7 @@ import {
   reconcileSubjects,
   remove,
   setDate,
+  setDescription,
   setSubject,
   setTime,
   summarize,
@@ -246,5 +247,102 @@ describe('what is kept as a draft', () => {
     state.items[0]!.error = 'algo';
     const draft = toCaptureDraft('parcial martes', state)!;
     expect(JSON.stringify(draft)).not.toContain('algo');
+  });
+});
+
+describe('the description and what could not be tied to an activity', () => {
+  it('the description the engine understood goes to the request; an edit replaces it and "" removes it', () => {
+    let state = review('Tarea de programación viernes, hay que subirla en PDF al campus');
+    expect(buildConfirmRequest(state).items[0]!.description).toBe(
+      'Hay que subirla en PDF al campus',
+    );
+    state = setDescription(state, state.items[0]!.proposal.clientId, '  Subir el PDF  ');
+    expect(buildConfirmRequest(state).items[0]!.description).toBe('Subir el PDF');
+    state = setDescription(state, state.items[0]!.proposal.clientId, '');
+    expect('description' in buildConfirmRequest(state).items[0]!).toBe(false);
+  });
+
+  it('is optional: no description, no key, and the proposal is READY', () => {
+    const state = review('Tarea jueves');
+    expect(pendingOf(state, state.items[0]!)).toEqual([]);
+    expect('description' in buildConfirmRequest(state).items[0]!).toBe(false);
+  });
+
+  it('is never longer than an activity accepts', () => {
+    let state = review('Tarea jueves');
+    state = setDescription(state, state.items[0]!.proposal.clientId, 'x'.repeat(3000));
+    expect(buildConfirmRequest(state).items[0]!.description).toHaveLength(2000);
+  });
+
+  it('an offered description (it could belong to either) is a question: use it, or say no', () => {
+    const base = review('tarea de redes y quiz de bases. Hay que subirlos en PDF.');
+    const first = base.items[0]!;
+    expect(pendingOf(base, first)).toContain('description');
+    const used = setDescription(base, first.proposal.clientId, first.proposal.description.offered!);
+    expect(pendingOf(used, used.items[0]!)).not.toContain('description');
+    expect(buildConfirmRequest(used).items.map((i) => i.description)).toEqual(
+      ['Hay que subirlos en PDF'].slice(0, buildConfirmRequest(used).items.length),
+    );
+    const refused = setDescription(base, first.proposal.clientId, '');
+    expect(pendingOf(refused, refused.items[0]!)).not.toContain('description');
+  });
+
+  it('the lost hour is not lost: both tasks get 08:00 and need nothing', () => {
+    const state = review('tengo dos tareas, una el jueves y otra el viernes, las dos a las 8 AM');
+    expect(state.items).toHaveLength(2);
+    expect(state.items.every((i) => pendingOf(state, i).length === 0)).toBe(true);
+    expect(buildConfirmRequest(state).items.map((i) => i.dueTime)).toEqual(['08:00', '08:00']);
+  });
+
+  it('an hour written but tied to nobody keeps the proposal in review and says which field', () => {
+    const state = review('tarea a las 8 y a las 10');
+    const item = state.items[0]!;
+    expect(pendingOf(state, item)).toContain('time');
+    expect(item.proposal.blockingIssues.find((b) => b.field === 'time')!.message).toContain(
+      'Mencionaste',
+    );
+    expect(summarize(state).needsReview).toBe(1);
+  });
+
+  it('counts: how many need review, whatever is ticked', () => {
+    const state = review('Tarea jueves, parcial de redes viernes a las 7');
+    const summary = summarize(state);
+    expect(summary.total).toBe(2);
+    expect(summary.needsReview).toBe(state.items.filter((i) => pendingOf(state, i).length).length);
+  });
+
+  it('a draft keeps the description the student wrote, and drops one that is too long', () => {
+    let state = review('Tarea jueves');
+    state = setDescription(state, state.items[0]!.proposal.clientId, 'Con calculadora');
+    const draft = toCaptureDraft('Tarea jueves', state)!;
+    const restored = captureDraftSchema.parse(JSON.parse(JSON.stringify(draft)));
+    expect(buildConfirmRequest(restored.review as never).items[0]!.description).toBe(
+      'Con calculadora',
+    );
+  });
+});
+
+describe('fifty proposals', () => {
+  const fifty = Array.from(
+    { length: 50 },
+    (_, i) => `Taller ${i + 1} el ${String((i % 28) + 1).padStart(2, '0')}/${i < 28 ? '12' : '01'}`,
+  ).join(', ');
+
+  it('are all in the review, all ready, and one request carries them', () => {
+    const state = review(fifty, SUBJECTS, 'INBOX');
+    expect(state.items).toHaveLength(50);
+    expect(summarize(state)).toMatchObject({ total: 50, needsReview: 0, toCreate: 50 });
+    expect(buildConfirmRequest(state).items).toHaveLength(50);
+  });
+
+  it('a draft of fifty is small enough for local storage (a few hundred KB at most)', () => {
+    const state = review(fifty, SUBJECTS, 'INBOX');
+    const bytes = JSON.stringify(toCaptureDraft(fifty, state)).length;
+    console.info(`draft of 50 proposals: ${(bytes / 1024).toFixed(0)} KB`);
+    expect(bytes).toBeLessThan(1_000_000);
+    const restored = captureDraftSchema.parse(
+      JSON.parse(JSON.stringify(toCaptureDraft(fifty, state))),
+    );
+    expect(restored.review!.items).toHaveLength(50);
   });
 });

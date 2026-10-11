@@ -53,6 +53,7 @@ interface Created {
   subjectId: string | null;
   hasTime: boolean;
   dueAt: string;
+  description: string | null;
 }
 const activities = async (page: Page) =>
   (await (await page.request.get('/api/activities')).json()).activities as Created[];
@@ -625,5 +626,139 @@ test('20. the review is readable at every width: no sideways scroll, touch targe
     expect(small, `controls under 44 px at ${width}`).toEqual([]);
     await quick(page).getByRole('button', { name: 'Descartar' }).click();
   }
+  assertClean();
+});
+
+test('21. what is said ABOUT the activity becomes its description: collapsed, editable, and it is saved', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, 'Tarea de programación el viernes, hay que subirla en PDF al campus');
+  await expect(cards(page)).toHaveCount(1);
+  const card = cards(page).first();
+  await expect(card).toContainText('Lista');
+  // Collapsed by default: the text is in the DOM but the card does not spend a line of its own on it.
+  await expect(card.locator('details')).not.toHaveAttribute('open', '');
+  await card.getByText('Descripción', { exact: true }).click();
+  await expect(card).toContainText('Hay que subirla en PDF al campus');
+  // Editable in the card.
+  await card.getByRole('button', { name: 'Editar' }).click();
+  const field = card.getByLabel('Descripción (opcional)');
+  await expect(field).toHaveValue('Hay que subirla en PDF al campus');
+  await field.fill('Subir el PDF al campus antes de las 11');
+  await createButton(page, 1).click();
+  await expect(
+    quick(page).getByRole('status').filter({ hasText: '1 actividad creada.' }),
+  ).toBeVisible();
+  const [created] = await activities(page);
+  expect(created!.title).toBe('Tarea programación');
+  expect(created!.description).toBe('Subir el PDF al campus antes de las 11');
+  assertClean();
+});
+
+test('22. an hour that was written but could not be tied to the activity is not silently dropped: it says so', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, 'Tarea a las 8 y a las 10');
+  const card = cards(page).first();
+  await expect(card).toContainText('Falta algo');
+  await expect(card).toContainText('Mencionaste horas');
+  await expect(card.getByRole('button', { name: '8:00 a. m.' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '10:00 a. m.' })).toBeVisible();
+  // Only what the text leaves open is asked (the day it never gave, and the hour it gave twice): no subject or description question.
+  await expect(card.getByRole('group').and(card.getByLabel(/por decidir/))).toHaveCount(2);
+  await expect(card.getByRole('group', { name: 'Asignatura por decidir' })).toHaveCount(0);
+  await expect(card.getByRole('group', { name: 'Descripción por decidir' })).toHaveCount(0);
+  assertClean();
+});
+
+test('23. a short activity with nothing else is READY and asks nothing (the optional is never a question)', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, 'Tarea jueves');
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page).first()).toContainText('Lista');
+  await expect(cards(page).first().getByRole('group')).toHaveCount(0);
+  await expect(cards(page).first().locator('details')).toHaveCount(0);
+  assertClean();
+});
+
+/** n distinct activities on n different upcoming days: "Taller 1 el 11/10, Taller 2 el 12/10 …" (Bogotá days). */
+const many = (n: number) =>
+  Array.from({ length: n }, (_, i) => {
+    const [, m, d] = bogotaToday(i + 1).split('-');
+    return `Taller ${i + 1} el ${d}/${m}`;
+  }).join(', ');
+
+test('24. thirty activities: the summary counts them, the review is usable, one click creates all thirty', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, many(30));
+  await expect(cards(page)).toHaveCount(30);
+  await expect(quick(page).locator('#capture-review-title')).toHaveText(
+    '30 actividades encontradas',
+  );
+  await expect(quick(page).getByText('30 listas')).toBeVisible();
+  await expect(createButton(page, 30)).toBeEnabled();
+  await expectNoHorizontalOverflow(page);
+  // The last card is reachable and one of the middle ones can be taken out without touching the rest.
+  await cards(page)
+    .nth(14)
+    .getByRole('button', { name: /^Quitar/ })
+    .click();
+  await expect(cards(page)).toHaveCount(29);
+  await createButton(page, 29).click();
+  await expect(
+    quick(page).getByRole('status').filter({ hasText: '29 actividades creadas.' }),
+  ).toBeVisible();
+  expect(await activities(page)).toHaveLength(29);
+  assertClean();
+});
+
+test('25. fifty are accepted; more than fifty are refused with a clear message and NOTHING is lost', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, many(50));
+  await expect(cards(page)).toHaveCount(50);
+  await expect(quick(page).getByText('50 listas')).toBeVisible();
+  await quick(page).getByRole('button', { name: 'Volver al texto' }).click();
+
+  const tooMany = many(51);
+  await box(page).fill(tooMany);
+  await quick(page).getByRole('button', { name: 'Interpretar', exact: true }).click();
+  await expect(
+    quick(page).getByText(
+      'Encontré más de 50 actividades. Divide el mensaje en dos partes para revisarlas mejor.',
+    ),
+  ).toBeVisible();
+  await expect(cards(page)).toHaveCount(0);
+  await expect(box(page)).toHaveValue(tooMany); // the text is still there, to split
+  expect(await activities(page)).toHaveLength(0);
+  assertClean();
+});
+
+test('26. the description the student edits is part of the draft: a reload brings the review back with it', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await newUser(page);
+  await write(page, 'Tarea de programación el viernes, hay que subirla en PDF');
+  const card = cards(page).first();
+  await card.getByRole('button', { name: 'Editar' }).click();
+  await card.getByLabel('Descripción (opcional)').fill('Nota que escribí yo');
+  await expect.poll(() => draftKeys(page).then((k) => k.length)).toBeGreaterThan(0);
+  await page.reload();
+  await expect(quick(page).locator('#capture-review-title')).toBeVisible();
+  await cards(page).first().getByText('Descripción', { exact: true }).click();
+  await expect(cards(page).first()).toContainText('Nota que escribí yo');
   assertClean();
 });

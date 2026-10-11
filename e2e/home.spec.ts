@@ -40,7 +40,7 @@ test('the hero comes first, then how am I doing, then what comes next (two colum
   await apiCreateActivity(page, { subjectId: bio.id, title: 'Lectura', dueDate: daysFromNow(6) });
 
   await page.goto('/dashboard');
-  await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toBeVisible();
+  await expect(region(page, '¿Qué hago ahora?').getByRole('article').first()).toBeVisible();
 
   const names = [
     '¿Qué hago ahora?',
@@ -299,7 +299,7 @@ test('the Home fits the screen and passes axe with a full week of data', async (
   for (const width of [320, 390, 430, 768, 1366]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/dashboard');
-    await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toBeVisible();
+    await expect(region(page, '¿Qué hago ahora?').getByRole('article').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
   await page.waitForTimeout(700); // let the entrance finish: axe must read the final colors, not a fade
