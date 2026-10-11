@@ -40,7 +40,7 @@ test('the hero comes first, then how am I doing, then what comes next (two colum
   await apiCreateActivity(page, { subjectId: bio.id, title: 'Lectura', dueDate: daysFromNow(6) });
 
   await page.goto('/dashboard');
-  await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toBeVisible();
+  await expect(region(page, '¿Qué hago ahora?').getByRole('article').first()).toBeVisible();
 
   const names = [
     '¿Qué hago ahora?',
@@ -243,10 +243,10 @@ test('the Home keeps working with the bottom navigation and capture in their new
   await page.goto('/dashboard');
 
   const capture = region(page, 'Captura rápida');
-  await expect(capture.getByLabel('Escribe la actividad en una frase')).toBeVisible();
-  await capture.getByLabel('Escribe la actividad en una frase').fill('   ');
+  await expect(capture.getByLabel('Escribe lo que tienes pendiente')).toBeVisible();
+  await capture.getByLabel('Escribe lo que tienes pendiente').fill('   ');
   await capture.getByRole('button', { name: 'Interpretar' }).click();
-  await expect(capture.locator('#quick-capture-error')).toBeVisible();
+  await expect(capture.locator('#capture-error-QUICK')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Interpretar mensaje' })).toBeVisible();
 
   const nav = page.getByRole('navigation', { name: 'Principal' });
@@ -299,7 +299,7 @@ test('the Home fits the screen and passes axe with a full week of data', async (
   for (const width of [320, 390, 430, 768, 1366]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/dashboard');
-    await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toBeVisible();
+    await expect(region(page, '¿Qué hago ahora?').getByRole('article').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
   await page.waitForTimeout(700); // let the entrance finish: axe must read the final colors, not a fade

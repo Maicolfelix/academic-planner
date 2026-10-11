@@ -1,6 +1,7 @@
 import {
   ATTENTION_ALTERNATIVES_LIMIT,
   buildAttentionReasons,
+  nearestDeadlines,
   rankActivitiesForAttention,
   type Attention,
   type AttentionItem,
@@ -25,19 +26,27 @@ export function createAttentionService(
       const now = clock();
       const generatedAt = now.toISOString();
       const period = await periods.findCurrent(actor.id);
-      if (!period) return { generatedAt, period: null, recommendation: null, alternatives: [] };
+      if (!period) {
+        return { generatedAt, period: null, recommendation: null, alternatives: [], upcoming: [] };
+      }
 
-      const ranked = rankActivitiesForAttention(await radar.listOpen(actor.id, period.id), now);
-      const items: AttentionItem[] = ranked.slice(0, 1 + ATTENTION_ALTERNATIVES_LIMIT).map((c) => ({
+      const open = await radar.listOpen(actor.id, period.id);
+      const toItem = (c: {
+        activity: (typeof open)[number];
+        radarStatus: AttentionItem['radarStatus'];
+      }) => ({
         activity: toDashboardActivityDto(c.activity),
         radarStatus: c.radarStatus,
         reasons: buildAttentionReasons(c.activity, now, actor.timezone),
-      }));
+      });
+      const ranked = rankActivitiesForAttention(open, now);
+      const items: AttentionItem[] = ranked.slice(0, 1 + ATTENTION_ALTERNATIVES_LIMIT).map(toItem);
       return {
         generatedAt,
         period: toPeriodDto(period),
         recommendation: items[0] ?? null,
         alternatives: items.slice(1),
+        upcoming: nearestDeadlines(open, now).map(toItem),
       };
     },
   };

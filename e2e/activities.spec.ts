@@ -360,16 +360,21 @@ test('activity form: validation, keyboard, focus and responsive layout with long
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
   expect(box.y).toBeGreaterThanOrEqual(0);
 
-  // The student has typed: Escape asks before throwing it away ("Seguir editando" is the safe, focused answer)...
+  // The student has typed: the form keeps it as a draft, so Escape closes it without asking and loses nothing...
   await page.keyboard.press('Escape');
-  await expect(dialog.getByRole('alert')).toContainText('Tienes cambios sin guardar');
-  await expect(dialog.getByRole('button', { name: 'Seguir editando' })).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/^Tienes una actividad sin terminar/)).toBeVisible();
+  await page.getByRole('button', { name: 'Retomar' }).click();
   await expect(dialog.getByLabel('Descripción')).toHaveValue(/texto texto/);
-  // ...and discarding closes it, with focus back on the trigger.
+  // ...and discarding it is the student's explicit act: the draft is dropped and the form is empty again.
+  await dialog.getByRole('button', { name: 'Descartar borrador' }).click();
+  await expect(dialog.getByLabel('Descripción')).toHaveValue('');
   await page.keyboard.press('Escape');
-  await dialog.getByRole('button', { name: 'Descartar cambios' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/^Tienes una actividad sin terminar/)).toHaveCount(0);
+  // Nothing typed any more: closing is immediate and the focus goes back to the button that opened it.
+  await addButton.click();
+  await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(addButton).toBeFocused();
 

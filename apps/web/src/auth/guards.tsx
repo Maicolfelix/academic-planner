@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet } from 'react-router';
 import { usePeriods } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
+import { sweepDrafts } from '../lib/drafts';
 import { OFFLINE_DETAIL, OFFLINE_MESSAGE } from '../pwa/pwaState';
 import {
   clearSessionExpired,
@@ -64,6 +65,11 @@ function RedirectToLogin() {
 /** Renders child routes only for a signed-in user; otherwise sends them to /login. */
 export function RequireAuth() {
   const me = useMe();
+  const userId = me.data?.id;
+  // Unfinished work older than a week is dropped (private to each user; see lib/drafts).
+  useEffect(() => {
+    if (userId) sweepDrafts(userId);
+  }, [userId]);
 
   if (me.isPending) return <FullPageMessage>Verificando sesión…</FullPageMessage>;
   // A failed background refetch (e.g. the connection dropped) keeps the data already loaded on screen.

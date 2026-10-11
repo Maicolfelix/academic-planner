@@ -171,10 +171,9 @@ test('the dialog keeps the keyboard inside, asks before throwing away what was t
   await opener.click();
   const again = page.getByRole('dialog', { name: 'Agregar actividad' });
   await again.getByLabel('Título', { exact: true }).fill('Algo');
-  await page.keyboard.press('Escape'); // typed: it asks, with the safe answer focused
-  await expect(again.getByRole('alert')).toContainText('Tienes cambios sin guardar');
-  await expect(again.getByRole('button', { name: 'Seguir editando' })).toBeFocused();
-  await again.getByRole('button', { name: 'Seguir editando' }).click();
+  await page.keyboard.press('Escape'); // typed: the form keeps a draft, so it closes without asking and loses nothing
+  await expect(again).toHaveCount(0);
+  await page.getByRole('button', { name: 'Retomar' }).click();
   await expect(again.getByLabel('Título', { exact: true })).toHaveValue('Algo');
 
   // Tab never reaches the page behind: every stop is inside the dialog (or, at the end of the loop, the browser's own

@@ -92,12 +92,11 @@ test('the "more actions" menu works from the keyboard and never hides what it ho
   await page.keyboard.press('Enter');
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   const menu = page.getByRole('menu', { name: 'Más acciones: Tarea 1' });
-  await expect(menu.getByRole('menuitem')).toHaveText(['Añadir al calendario', 'Eliminar']);
-  await expect(menu.getByRole('menuitem', { name: 'Añadir al calendario: Tarea 1' })).toBeFocused();
-  await page.keyboard.press('ArrowDown');
+  // "Añadir al calendario" is a visible button of the card now; only what is destructive or rare waits in the menu.
+  await expect(menu.getByRole('menuitem')).toHaveText(['Eliminar']);
   await expect(menu.getByRole('menuitem', { name: 'Eliminar Tarea 1' })).toBeFocused();
-  await page.keyboard.press('ArrowDown'); // wraps
-  await expect(menu.getByRole('menuitem', { name: 'Añadir al calendario: Tarea 1' })).toBeFocused();
+  await page.keyboard.press('ArrowDown'); // wraps onto the only item
+  await expect(menu.getByRole('menuitem', { name: 'Eliminar Tarea 1' })).toBeFocused();
   // each item is a 44 px target; deleting is told apart by its color and its word
   for (const b of await menu.getByRole('menuitem').all())
     expect(await b.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(44); // layout height: the menu may still be entering

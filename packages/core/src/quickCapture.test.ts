@@ -129,7 +129,11 @@ describe('activity types', () => {
       const r = parse(`${alias} redes viernes`);
       expect(r.type, alias).toBe(type);
       expect(r.certainty.type, alias).toBe('EXACT');
-      expect(r.title, alias).toBe(ACTIVITY_TYPE_LABELS[type]);
+      // the type's label, or the student's own word when it is another one ("trabajo", "examen")
+      expect(
+        [ACTIVITY_TYPE_LABELS[type], alias.charAt(0).toUpperCase() + alias.slice(1)],
+        alias,
+      ).toContain(r.title);
     }
   });
 

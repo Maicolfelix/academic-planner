@@ -60,6 +60,13 @@ export const ATTENTION_IN_PROGRESS_BONUS = 1;
 /** Candidates returned by the endpoint: the recommendation plus this many alternatives. */
 export const ATTENTION_ALTERNATIVES_LIMIT = 2;
 
+/**
+ * How many activities the Home hero lets the student walk through, nearest deadline first. Five: enough to see the week
+ * ahead without turning the hero into a list (the rest is in "Próximas entregas" and Activities), and few enough that its
+ * dots stay a control one can tap, not a scale.
+ */
+export const HERO_MAX_ACTIVITIES = 5;
+
 /** The activity fields the engine reads. */
 export interface AttentionInput {
   id: string;
@@ -141,6 +148,27 @@ export function rankActivitiesForAttention<T extends AttentionInput>(
   return candidates.sort(compareAttentionCandidates);
 }
 
+/**
+ * The activities the Home hero walks through: open ones, soonest deadline first (an overdue one that is still recent is
+ * the soonest of all). One forgotten for more than a week is left out: it must not be the first thing every day. At most
+ * HERO_MAX_ACTIVITIES. Ties: the older one, then the id, so the order is always the same. Pure and deterministic.
+ */
+export function nearestDeadlines<T extends AttentionInput>(
+  activities: readonly T[],
+  now: Date,
+): AttentionCandidate<T>[] {
+  return rankActivitiesForAttention(activities, now)
+    .filter((c) => attentionTier(c.activity, now) !== 'OVERDUE_STALE')
+    .sort((a, b) => {
+      const due = time(a.activity.dueAt) - time(b.activity.dueAt);
+      if (due !== 0) return due;
+      const created = time(a.activity.createdAt) - time(b.activity.createdAt);
+      if (created !== 0) return created;
+      return a.activity.id < b.activity.id ? -1 : a.activity.id > b.activity.id ? 1 : 0;
+    })
+    .slice(0, HERO_MAX_ACTIVITIES);
+}
+
 /** Fixed templates, one per Radar category. */
 export const ATTENTION_RADAR_REASONS: Record<RadarStatus, string> = {
   OVERDUE: 'Esta actividad ya está vencida.',
@@ -190,6 +218,11 @@ export const attentionSchema = z.object({
   period: periodSchema.nullable(),
   recommendation: attentionItemSchema.nullable(),
   alternatives: z.array(attentionItemSchema).max(ATTENTION_ALTERNATIVES_LIMIT),
+  /**
+   * The Home hero's activities, nearest deadline first (at most HERO_MAX_ACTIVITIES; empty when only forgotten ones are
+   * open, and then the hero falls back to `recommendation`).
+   */
+  upcoming: z.array(attentionItemSchema).max(HERO_MAX_ACTIVITIES),
 });
 
 export const attentionResponseSchema = z.object({ attention: attentionSchema });

@@ -92,10 +92,23 @@ test('axe: dialogs, filters, validation errors and the unsaved-changes question'
   await expect(dialog.getByText('Ingresa un título.')).toBeVisible();
   await axe(page, 'activity form with errors');
   await dialog.getByLabel('Título').fill('Algo');
+  await axe(page, 'activity form with a draft');
+  await page.keyboard.press('Escape'); // the activity form keeps a draft: closing asks nothing and loses nothing
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Tienes una actividad sin terminar: «Algo».')).toBeVisible();
+  await axe(page, 'activities with an unfinished activity');
+  await page.getByRole('button', { name: 'Descartar borrador' }).click();
+
+  // The other dialogs still ask before discarding what was typed.
+  await page.goto('/subjects');
+  await page.getByRole('button', { name: 'Agregar asignatura' }).click();
+  const subjectDialog = page.getByRole('dialog', { name: 'Agregar asignatura' });
+  await subjectDialog.getByLabel('Nombre').fill('Algo');
   await page.keyboard.press('Escape'); // the unsaved-changes question
-  await expect(dialog.getByRole('alert')).toBeVisible();
+  await expect(subjectDialog.getByRole('alert')).toBeVisible();
   await axe(page, 'unsaved-changes question');
-  await dialog.getByRole('button', { name: 'Descartar cambios' }).click();
+  await subjectDialog.getByRole('button', { name: 'Descartar cambios' }).click();
+  await page.goto('/activities');
 
   await openActivityMenu(page, new RegExp(LONG_TITLE.slice(0, 20)));
   await page
@@ -119,6 +132,20 @@ test('axe: Academic Inbox and schedule import with proposals, warnings and ambig
   await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
   await expect(page.getByRole('article').first()).toBeVisible();
   await axe(page, 'inbox with proposals');
+
+  // The review with doubts: a question on a card, and a question several cards share. (The first review was kept as a
+  // draft when leaving: it is discarded to write the next message.)
+  await page.goto('/inbox');
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click();
+  await page
+    .getByLabel('Mensaje del profesor o instrucción académica')
+    .fill(
+      'Ensayo de criptografía lunes, martes y jueves a las 7:30. Parcial de criptografía el sábado. El parcial de redes es el viernes.',
+    );
+  await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
+  await expect(page.getByText('Una sola respuesta')).toBeVisible();
+  await axe(page, 'inbox review with shared questions');
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click();
 
   await page.goto('/calendar/import');
   await axe(page, 'import before reading');
@@ -294,13 +321,13 @@ test('keyboard only: review and create the proposals of the Academic Inbox', asy
   await page.keyboard.press('Enter');
   const card = page.getByRole('article').first();
   await expect(card).toBeVisible();
-  await expect(page.getByRole('region', { name: /propuesta/ })).toBeFocused();
+  await expect(page.locator('#capture-review-title')).toBeFocused();
   const include = card.getByLabel(/Incluir/);
   await include.focus();
   if (!(await include.isChecked())) await page.keyboard.press('Space');
-  await page.getByRole('button', { name: 'Crear seleccionadas' }).focus();
+  await page.getByRole('button', { name: 'Crear 1 actividad' }).focus();
   await page.keyboard.press('Enter');
-  await expect(card).toContainText('Actividad creada');
+  await expect(page.getByRole('status').filter({ hasText: '1 actividad creada.' })).toBeVisible();
 });
 
 test('dialogs: focus goes in, comes back, and unsaved text is never lost by accident', async ({
@@ -526,5 +553,7 @@ test('ten proposals of the Academic Inbox stay readable and inside the screen', 
   await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
   await expect(page.getByRole('article')).toHaveCount(10);
   await expectNoHorizontalOverflow(page);
-  await expect(page.getByRole('heading', { level: 2, name: '10 propuestas' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 2, name: '10 actividades encontradas' }),
+  ).toBeVisible();
 });

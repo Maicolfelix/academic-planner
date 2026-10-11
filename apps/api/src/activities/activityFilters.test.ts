@@ -165,4 +165,76 @@ describe('GET /api/activities', () => {
     expect(titles(await q(agent, '?from=2026-10-10&to=2026-10-10'))).toEqual(['nz']);
     expect(titles(await q(agent, '?from=2026-10-09&to=2026-10-09'))).toEqual([]);
   });
+
+  it('one request is one week of the Agenda: timed, untimed, general, overdue and finished activities, both edges, nothing outside', async () => {
+    const { agent, subject } = await setupUser(app, 'week@example.com', 'S1');
+    const post = (body: object) =>
+      agent.post('/api/activities').send({ type: 'TASK', priority: 'MEDIUM', ...body });
+    // Mon 8 June .. Sun 14 June 2026 (after the clock of this file: nothing there is overdue)
+    await post({
+      title: 'lunes 00:00',
+      subjectId: subject.id,
+      dueDate: '2026-06-08',
+      dueTime: '00:00',
+    });
+    await post({
+      title: 'martes 14:00',
+      subjectId: subject.id,
+      dueDate: '2026-06-09',
+      dueTime: '14:00',
+    });
+    await post({ title: 'miércoles sin hora', subjectId: subject.id, dueDate: '2026-06-10' });
+    await post({ title: 'general sin hora', dueDate: '2026-06-10' }); // no subject
+    await post({
+      title: 'domingo 23:59',
+      subjectId: subject.id,
+      dueDate: '2026-06-14',
+      dueTime: '23:59',
+    });
+    await post({
+      title: 'domingo anterior',
+      subjectId: subject.id,
+      dueDate: '2026-06-07',
+      dueTime: '23:59',
+    });
+    await post({
+      title: 'lunes siguiente',
+      subjectId: subject.id,
+      dueDate: '2026-06-15',
+      dueTime: '00:00',
+    });
+    const done = await post({
+      title: 'hecha',
+      subjectId: subject.id,
+      dueDate: '2026-06-11',
+      dueTime: '09:00',
+    });
+    await agent.patch(`/api/activities/${done.body.activity.id}`).send({ status: 'COMPLETED' });
+    // an earlier week, already due and still open
+    await post({
+      title: 'vencida',
+      subjectId: subject.id,
+      dueDate: '2026-05-27',
+      dueTime: '10:00',
+    });
+
+    const week = await q(agent, '?from=2026-06-08&to=2026-06-14');
+    expect(titles(week)).toEqual([
+      'lunes 00:00',
+      'martes 14:00',
+      'miércoles sin hora',
+      'general sin hora',
+      'hecha',
+      'domingo 23:59',
+    ]);
+    const byTitle = (t: string) =>
+      week.body.activities.find((a: { title: string }) => a.title === t);
+    expect(byTitle('miércoles sin hora')).toMatchObject({ hasTime: false, subjectId: subject.id });
+    expect(byTitle('general sin hora')).toMatchObject({ hasTime: false, subjectId: null });
+    expect(byTitle('hecha')).toMatchObject({ status: 'COMPLETED' }); // the Agenda hides it, the API does not decide that
+    expect(titles(await q(agent, '?from=2026-05-25&to=2026-05-31'))).toEqual(['vencida']);
+    expect((await q(agent, '?from=2026-05-25&to=2026-05-31')).body.activities[0]).toMatchObject({
+      status: 'PENDING',
+    });
+  });
 });

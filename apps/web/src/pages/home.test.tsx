@@ -54,8 +54,10 @@ describe('the hero: "¿Qué hago ahora?"', () => {
   it('is one article named by the activity, with its subject, deadline, reasons and a labelled link', () => {
     const out = hero('IMMEDIATE');
     expect(out.match(/<article/g)).toHaveLength(1);
-    expect(out).toContain('aria-labelledby="attention-activity"');
-    expect(out).toContain('id="attention-activity"');
+    expect(out).toContain(
+      'aria-labelledby="attention-activity-0b9e5c1a-7d3f-4c1e-9a52-3f1d2c4b6a70"',
+    );
+    expect(out).toContain('id="attention-activity-0b9e5c1a-7d3f-4c1e-9a52-3f1d2c4b6a70"');
     expect(out).toContain('Parcial de Redes');
     expect(out).toContain('Redes de Computadores');
     expect(out).toContain('¿Por qué esta?');
@@ -71,7 +73,7 @@ describe('the hero: "¿Qué hago ahora?"', () => {
   });
 
   it('keeps the calm intro of every state (it orients, it does not alarm)', () => {
-    expect(hero('IMMEDIATE')).toContain('Actividad que requiere mayor atención.');
+    expect(hero('IMMEDIATE')).toContain('Próxima entrega.');
     expect(hero('OVERDUE')).toContain('Tienes actividades vencidas.');
     expect(hero('UNDER_CONTROL')).toContain('Todo está bajo control.');
   });
@@ -277,15 +279,7 @@ describe('motion (index.css)', () => {
   it('loops are either the loading placeholder or AMBIENT (slow, discreet), and reduced motion stops loops', () => {
     const loops = [...css.matchAll(/--animate-([a-z-]+):[^;]*infinite[^;]*;/g)].map((m) => m[1]);
     // `breathe` is the loading placeholder; the rest are the ambient category (documented in ux-accessibility.md)
-    expect(loops.sort()).toEqual([
-      'breathe',
-      'drift',
-      'drift-slow',
-      'halo',
-      'node',
-      'orbit',
-      'scan',
-    ]);
+    expect(loops.sort()).toEqual(['breathe', 'drift', 'drift-slow', 'halo', 'orbit', 'scan']);
     const block = /@media \(prefers-reduced-motion: reduce\)\s*{([\s\S]*?)\n}/.exec(css)?.[1] ?? '';
     expect(block).toContain('animation-iteration-count: 1 !important');
   });

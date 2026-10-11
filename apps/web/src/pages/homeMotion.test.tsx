@@ -70,29 +70,14 @@ describe('hero personality', () => {
     ];
     expect(spans, 'orb, grid and ring').toHaveLength(3);
     for (const [, classes] of spans) expect(classes).toContain('-z-10');
-    // the timeline rail is decoration too, and it sits in the flow (beside the button), never over the text
-    expect(out).toMatch(/<svg[^>]*aria-hidden="true"[^>]*pointer-events-none/);
-    expect(out).not.toMatch(/<svg[^>]*-z-10/);
   });
 
-  it('its light drifts and its current node breathes only with motion welcome, and the orb is calmer when nothing presses', () => {
+  it('its light drifts only with motion welcome, and the orb is calmer when nothing presses', () => {
     const out = hero('IMMEDIATE');
     expect(out).toContain('motion-safe:animate-drift');
-    expect(out).toContain('motion-safe:animate-node');
-    expect(out).not.toMatch(/(^|[^:])animate-(drift|node)/); // never without the motion-safe: prefix
+    expect(out).not.toMatch(/(^|[^:])animate-drift/); // never without the motion-safe: prefix
     expect(hero('UNDER_CONTROL')).toContain('opacity-70');
     expect(hero('IMMEDIATE')).not.toContain('opacity-70');
-  });
-
-  it('the rail lights the node of the current state (five nodes, one of them current)', () => {
-    for (const [i, status] of RADAR_STATUSES.entries()) {
-      const out = hero(status);
-      const lit = [
-        ...out.matchAll(/<circle cx="(\d+)" cy="11" r="4" fill="white" fill-opacity="1"/g),
-      ];
-      expect(lit, status).toHaveLength(1);
-      expect(Number(lit[0]![1]), status).toBe(6 + i * 21);
-    }
   });
 
   it('the parts enter one after another within a quarter of a second, and the arrow is decoration', () => {

@@ -41,7 +41,12 @@ export interface PlannedTime {
   text: string;
   /** Which time item of the text it is: the days that share it share this number. */
   item: number;
+  /** Overrides the group key (a time that came from a later reference clause is shared across mentions). */
+  key?: string;
 }
+
+/** How the time reached its day: written next to it, by position ("los dos primeros"), or "respectivamente". */
+export type TimeVia = 'DIRECT' | 'POSITIONAL' | 'RESPECTIVELY';
 
 export interface PlannedDay {
   expr: DateExpression;
@@ -50,6 +55,12 @@ export interface PlannedDay {
   weekdayHint?: Weekday;
   time: PlannedTime | null;
   timeIssue: TimeIssue | null;
+  /** How `time` was assigned (provenance). */
+  timeVia?: TimeVia;
+  /** This day, or its time, was added by a later clause ("el parcial es a las 7"), not by the words around it. */
+  fromReference?: { date?: boolean; time?: boolean };
+  /** Two readings that disagree about this day's time (a later clause said another): the student chooses. */
+  timeConflict?: PlannedTime[];
   /** The text of an invalid time that belongs to this day (to say it in the message). */
   invalidTimeText?: string;
   fromRange: boolean;
@@ -539,9 +550,10 @@ function assignTimes(
   respectively: boolean,
 ): void {
   if (days.length === 0 || items.length === 0) return;
-  const give = (index: number, item: TimeItem) => {
+  const give = (index: number, item: TimeItem, via: TimeVia = 'DIRECT') => {
     const day = days[index]!;
     day.time = item.time;
+    day.timeVia = via;
     if (item.time === null) {
       day.timeIssue = 'TIME_INVALID';
       if (item.invalidText) day.invalidTimeText = item.invalidText;
@@ -579,7 +591,7 @@ function assignTimes(
           : quant.kind === 'LAST'
             ? free.splice(free.length - need, need)
             : free.splice(0);
-      for (const i of take) give(i, item);
+      for (const i of take) give(i, item, 'POSITIONAL');
     }
     for (const i of free) mark(i, 'TIME_UNASSIGNED'); // days no phrase reached
     return;
@@ -588,7 +600,7 @@ function assignTimes(
   // "a las 8 y 10 respectivamente": the times in the order of the days, only when they match one to one.
   if (respectively) {
     if (items.length === days.length) {
-      items.forEach((item, i) => give(i, item));
+      items.forEach((item, i) => give(i, item, 'RESPECTIVELY'));
     } else {
       days.forEach((_, i) => mark(i, 'TIME_COUNT_MISMATCH'));
     }

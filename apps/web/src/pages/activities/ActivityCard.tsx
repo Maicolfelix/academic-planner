@@ -53,7 +53,7 @@ const URGENT: RadarStatus[] = ['OVERDUE', 'IMMEDIATE'];
  * deadline), HOW URGENT (Radar mark and priority; the type is quiet metadata), and then the actions:
  * ONE primary ("Completar", the same change as choosing "Finalizada" in the state control; a tonal button, because a
  * list of twelve solid dark buttons would be twelve things shouting) and "Editar" within reach,
- * with the rest ("Añadir al calendario", "Eliminar") one tap away in a menu. A finished activity has no primary action:
+ * and "Calendario" (add to the calendar) visible too, with only "Eliminar" behind the menu. A finished activity has no primary action:
  * it rests on a quieter surface. Nothing here loops or animates continuously: a list can be long.
  */
 export function ActivityCard({
@@ -84,7 +84,7 @@ export function ActivityCard({
       style={{
         backgroundImage: `radial-gradient(130% 70% at 0% 0%, ${withAlpha(color, 0.1)}, transparent 60%)`,
       }}
-      className={`relative flex min-w-0 flex-col gap-2 p-3 pl-4 transition-shadow duration-(--duration-fast) ease-standard hover:shadow-lift ${
+      className={`relative flex min-w-0 flex-col gap-1 px-3 py-2.5 pl-4 transition-shadow duration-(--duration-fast) ease-standard hover:shadow-lift ${
         radar && URGENT.includes(radar) ? 'border-danger-line' : ''
       } ${justCompleted ? 'animate-complete' : ''}`}
     >
@@ -154,18 +154,28 @@ export function ActivityCard({
         </span>
       </div>
 
-      <p className="text-sm text-foreground">
-        {formatDue(activity, timeZone)}
-        {radar && (
-          <>
-            <span aria-hidden="true" className="text-muted-foreground">
-              {' '}
-              ·{' '}
-            </span>
-            <span className="font-semibold">{radarExplanation(activity, now, timeZone)}</span>
-          </>
-        )}
-      </p>
+      {/* WHEN and HOW URGENT share one flowing line: the deadline in words, then the Radar mark, the priority and the type
+          (quiet metadata). One row less than before, and on a phone they still wrap on their own. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <p className="text-sm text-foreground">
+          {formatDue(activity, timeZone)}
+          {radar && (
+            <>
+              <span aria-hidden="true" className="text-muted-foreground">
+                {' '}
+                ·{' '}
+              </span>
+              <span className="font-semibold">{radarExplanation(activity, now, timeZone)}</span>
+            </>
+          )}
+        </p>
+        {radar && <RadarBadge status={radar} />}
+        <PriorityBadge priority={activity.priority} />
+        <span className="text-xs text-muted-foreground">
+          <span className="sr-only">Tipo </span>
+          {ACTIVITY_TYPE_LABELS[activity.type]}
+        </span>
+      </div>
 
       {activity.description && (
         <p className="line-clamp-2 text-sm text-muted-foreground break-words">
@@ -173,17 +183,10 @@ export function ActivityCard({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {radar && <RadarBadge status={radar} />}
-        <PriorityBadge priority={activity.priority} />
-        {/* The type is metadata: quiet text, not another pill. */}
-        <span className="px-1 text-xs text-muted-foreground">
-          <span className="sr-only">Tipo </span>
-          {ACTIVITY_TYPE_LABELS[activity.type]}
-        </span>
-      </div>
-
-      <div className="-mb-1 mt-auto flex items-center gap-1 pt-0.5">
+      {/* The actions, in the order of how often they are used: Completar, Editar, Calendario (all visible), then the menu
+          with what is rare or destructive. On a phone the labels of Editar and Calendario give way to their icons (the
+          accessible names stay) so the row never overflows at 320 px; every target is at least 44 px. */}
+      <div className="-mb-1.5 mt-auto flex items-center gap-1">
         {!done && (
           <Button
             size="sm"
@@ -201,22 +204,27 @@ export function ActivityCard({
           variant="ghost"
           aria-label={`Editar ${activity.title}`}
           onClick={onEdit}
-          className="gap-1.5"
+          className="min-w-11 gap-1.5 px-2.5 min-[420px]:px-3"
         >
           <PencilIcon />
-          Editar
+          <span className="hidden min-[420px]:inline">Editar</span>
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={`Añadir al calendario: ${activity.title}`}
+          title="Añadir al calendario"
+          disabled={addToCalendar.isPending}
+          onClick={() => addToCalendar.mutate()}
+          className="min-w-11 gap-1.5 px-2.5 sm:px-3"
+        >
+          <CalendarPlusIcon />
+          <span className="hidden sm:inline">Calendario</span>
         </Button>
         <span className="ml-auto">
           <ActionMenu
             label={`Más acciones: ${activity.title}`}
             items={[
-              {
-                label: 'Añadir al calendario',
-                ariaLabel: `Añadir al calendario: ${activity.title}`,
-                icon: <CalendarPlusIcon />,
-                disabled: addToCalendar.isPending,
-                onSelect: () => addToCalendar.mutate(),
-              },
               {
                 label: 'Eliminar',
                 ariaLabel: `Eliminar ${activity.title}`,

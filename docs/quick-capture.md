@@ -1,6 +1,6 @@
 # Captura rápida (Fase 11)
 
-> **F1-2b:** el motor que interpreta varias actividades y varios días por texto, con propuestas `READY` / `NEEDS_REVIEW` / `INVALID`, ya existe ([capture-proposals.md](capture-proposals.md), `POST /api/capture/parse`). **Esta pantalla todavía no lo usa** (F1-2d): sigue con el parser descrito abajo, que admite una actividad por frase y por eso emite «Captura rápida admite una actividad a la vez.».
+> **Vigente (F1-2cdp):** Captura rápida ya **no** usa el parser de esta página. Escribe lo que tienes pendiente (una actividad o varias, con sus días y horas, en cualquier orden), `POST /api/capture/parse` lo interpreta, una revisión compartida con la Bandeja muestra solo lo dudoso y **«Crear N actividades»** crea todo con una confirmación (`POST /api/capture/confirm`, todo o nada); lo escrito y lo decidido se conserva como borrador. Todo eso está en [capture-proposals.md](capture-proposals.md) y [drafts.md](drafts.md). **El aviso «Captura rápida admite una actividad a la vez.» ya no existe en la interfaz.** Lo que sigue describe el parser anterior (`POST /api/quick-capture/parse`, una frase = una actividad), que se **conserva por compatibilidad** sin que la interfaz lo use, y cuyas reglas de asignaturas y tipos siguen siendo las del motor nuevo.
 
 ## Objetivo
 

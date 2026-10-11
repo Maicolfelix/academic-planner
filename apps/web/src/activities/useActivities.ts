@@ -25,7 +25,7 @@ export function useActivities(query: ActivityQuery, enabled: boolean) {
 // Every activity mutation refreshes all cached activity lists (any filter combination), the Dashboard
 // (derived from the same data) AND the reminders (a new deadline, type or completion rewrites them
 // on the server), so the UI is consistent and never needs a reload.
-function useInvalidateActivities() {
+export function useInvalidateActivities() {
   const qc = useQueryClient();
   return () =>
     Promise.all([

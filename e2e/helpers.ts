@@ -200,8 +200,8 @@ export async function seedRichData(page: Page) {
 }
 
 /**
- * The secondary actions of an activity card ("Añadir al calendario", "Eliminar") live behind its "Más acciones" menu
- * (UX1-3). Opens that menu for the card with this title (a string is matched exactly; a RegExp is matched from the start).
+ * What is rare or destructive on an activity card ("Eliminar") lives behind its "Más acciones" menu ("Añadir al calendario"
+ * is a visible button since PR #31). Opens that menu for the card with this title (a string is matched exactly; a RegExp is matched from the start).
  */
 export async function openActivityMenu(page: Page, title: string | RegExp) {
   const trigger =

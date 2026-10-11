@@ -191,7 +191,7 @@ test.describe('offline', () => {
 
     await page.context().setOffline(true);
     await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
-    await expect(page.getByRole('alert')).toContainText('No pudimos interpretar el mensaje');
+    await expect(page.getByRole('alert')).toContainText('No pudimos interpretar el texto');
     await expect(page.getByRole('article')).toHaveCount(0); // nothing pretends to have worked
     await expect(page.getByRole('status').filter({ hasText: 'Sin conexión' })).toBeVisible();
     await expect(page.getByLabel('Mensaje del profesor o instrucción académica')).not.toHaveValue(

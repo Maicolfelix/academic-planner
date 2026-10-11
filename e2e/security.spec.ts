@@ -193,12 +193,18 @@ test('stored XSS: markup typed by a user is shown as text everywhere and never r
   expect(
     await page.evaluate(() => (window as never as Record<string, unknown>).__xss),
   ).toBeUndefined();
+  // What is kept as a draft is the student's own text and decisions: nothing of the session.
+  const stored = await page.evaluate(() =>
+    Object.entries(localStorage)
+      .filter(([k]) => k.startsWith('academic-planner:draft:'))
+      .map(([, v]) => v)
+      .join(' '),
+  );
+  expect(stored).not.toMatch(/csrf|token|password|session|@/i);
   await page.goto('/dashboard');
-  await page
-    .getByLabel('Escribe la actividad en una frase')
-    .fill(`parcial redes viernes ${XSS[2]}`);
+  await page.getByLabel('Escribe lo que tienes pendiente').fill(`parcial redes viernes ${XSS[2]}`);
   await page.getByRole('button', { name: 'Interpretar', exact: true }).click();
-  await expect(page.getByRole('group', { name: 'Vista previa de la actividad' })).toBeVisible();
+  await expect(page.getByRole('article').first()).toBeVisible();
   expect(dialogs).toEqual([]);
   expect(
     await page.evaluate(() => (window as never as Record<string, unknown>).__xss),

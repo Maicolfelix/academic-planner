@@ -1,11 +1,13 @@
 import { isRealDateOnly, normalizeNameKey, type DateOnly } from './academic.js';
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_TITLE_MAX,
   ACTIVITY_TYPE_LABELS,
   DEFAULT_ACTIVITY_TYPE,
   type ActivityType,
 } from './activity.js';
 import { addDays, firstWeekdayOnOrAfter, weekdayOf, type Weekday } from './calendar.js';
+import { cueLength, describeTokens } from './captureContext.js';
 import { dueFromLocal, toLocalParts } from './time.js';
 
 /**
@@ -111,7 +113,34 @@ export const QUICK_CAPTURE_TYPE_ALIASES: Readonly<Record<string, ActivityType>> 
   taller: 'WORKSHOP',
   lectura: 'READING',
   otro: 'OTHER',
+  // plurals ("dos tareas", "los parciales"): the same type, said about several
+  tareas: 'TASK',
+  trabajos: 'TASK',
+  parciales: 'EXAM',
+  examenes: 'EXAM',
+  quices: 'QUIZ',
+  quizzes: 'QUIZ',
+  proyectos: 'PROJECT',
+  exposiciones: 'PRESENTATION',
+  presentaciones: 'PRESENTATION',
+  talleres: 'WORKSHOP',
+  lecturas: 'READING',
 };
+
+/** The plural forms above: "dos tareas" is two activities, "las tareas" a group already mentioned. */
+export const PLURAL_TYPE_WORDS: ReadonlySet<string> = new Set([
+  'tareas',
+  'trabajos',
+  'parciales',
+  'examenes',
+  'quices',
+  'quizzes',
+  'proyectos',
+  'exposiciones',
+  'presentaciones',
+  'talleres',
+  'lecturas',
+]);
 
 export const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
   lunes: 1,
@@ -253,6 +282,80 @@ const TITLE_FILLERS = new Set([
   'asimismo',
 ]);
 
+/**
+ * Chatter of a loose sentence ("tengo", "quiero", "para dos días distintos") that is never part of a title. Dropped only by
+ * the multi-activity engine, which reads long, informal text.
+ */
+const LOOSE_FILLERS = new Set([
+  'tengo',
+  'tienes',
+  'tiene',
+  'tuve',
+  'quiero',
+  'necesito',
+  'debo',
+  'voy',
+  'vamos',
+  'puedo',
+  'entonces',
+  'pues',
+  'pero',
+  'porque',
+  'dia',
+  'distintos',
+  'distintas',
+  'diferentes',
+  'diferente',
+  'semana',
+  'semanas',
+  'entrego',
+  'presento',
+  'hago',
+  'hare',
+  'envio',
+  'subo',
+]);
+
+/** "entregarlas", "presentarlo": a delivery verb with its pronoun glued on says nothing about WHAT the activity is. */
+const CLITIC_VERB = /^(entreg|present|envi|sub|mand|hac|realiz|termin|subi)\w*(lo|la|los|las)$/;
+const isLooseFiller = (norm: string) => LOOSE_FILLERS.has(norm) || CLITIC_VERB.test(norm);
+
+/**
+ * Words that END the title after the type word: whatever comes after them is about something else ("tarea PARA el
+ * jueves Y otra ..."). Used only by the multi-activity engine, which reads long, loose sentences.
+ */
+const QUALIFIER_STOPS = new Set([
+  'para',
+  'por',
+  'que',
+  'y',
+  'e',
+  'o',
+  'u',
+  'a',
+  'al',
+  'uno',
+  'una',
+  'unos',
+  'unas',
+  'otro',
+  'otra',
+  'otros',
+  'otras',
+  'es',
+  'son',
+  'sera',
+  'seran',
+  'era',
+  'ademas',
+  'tambien',
+  'luego',
+  'despues',
+  'cada',
+  'ambos',
+  'ambas',
+]);
+
 // ───────────────────────── Tokens ─────────────────────────
 
 export interface Token {
@@ -275,6 +378,77 @@ function foldToken(raw: string): string {
   return normalizeNameKey(raw)
     .replace(/^(\d{1,2}(?::\d{2})?)([ap])\.?m$/, '$1$2m')
     .replace(/^([ap])\.?m$/, '$1m');
+}
+
+/**
+ * Punctuation is a weak signal, not a wall. A comma that sits INSIDE a construction ("dos, tareas", "para el, dia jueves",
+ * "ensayo, de ciberseguridad") was typed by someone who paused, not by someone who ended a clause; treating it as a
+ * boundary splits a quantity from its noun, a preposition from its complement and a noun from its "de ..." and loses
+ * what was written. Two syntactic facts decide it, with no knowledge of the words around:
+ *  - a comma right AFTER a word that cannot end a clause (an article, preposition, determiner, quantity, conjunction or
+ *    copula: it always needs what comes next) is not a boundary;
+ *  - a comma right BEFORE "de"/"del" is not a boundary: it complements the noun that precedes it;
+ *  - a comma right BEFORE a number that follows a word is not a boundary: the number counts that word.
+ * Only `afterBreak` changes; the raw text and every offset stay as typed.
+ */
+const DANGLING = new Set([
+  ...STOPWORDS,
+  'dos',
+  'tres',
+  'cuatro',
+  'cinco',
+  'seis',
+  'siete',
+  'ocho',
+  'nueve',
+  'diez',
+  'ambos',
+  'ambas',
+  'cada',
+  'otro',
+  'otra',
+  'otros',
+  'otras',
+  'este',
+  'esta',
+  'estos',
+  'estas',
+  'ese',
+  'esa',
+  'esos',
+  'esas',
+  'mi',
+  'mis',
+  'su',
+  'sus',
+  'tu',
+  'tus',
+  'que',
+  'sobre',
+  'entre',
+  'hasta',
+  'desde',
+  'sin',
+  'es',
+  'son',
+  'sera',
+  'seran',
+  'era',
+  'dia', // "el dia, jueves": the word that announces the day
+]);
+const COMPLEMENT_OPENERS = new Set(['de', 'del']);
+
+function softenInternalBreaks(tokens: Token[]): void {
+  for (let i = 1; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (!t.afterBreak) continue;
+    const prev = tokens[i - 1]!;
+    // "capítulo, 4": a number belongs to the word it counts, however the writer paused.
+    const countsPrevious = /^\d+$/.test(t.norm) && !/\d/.test(prev.norm);
+    if (DANGLING.has(prev.norm) || COMPLEMENT_OPENERS.has(t.norm) || countsPrevious) {
+      t.afterBreak = false;
+    }
+  }
 }
 
 export function tokenize(text: string): Token[] {
@@ -316,6 +490,7 @@ export function tokenize(text: string): Token[] {
       });
     }
   }
+  softenInternalBreaks(tokens);
   return tokens;
 }
 
@@ -498,8 +673,11 @@ function detectTime(
 
 export type DateExpression =
   | { kind: 'relative'; offset: 0 | 1 | 2 }
-  /** `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may. */
-  | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean }
+  /**
+   * `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may.
+   * `nextWeek`: "el jueves de la otra semana" is that weekday of the week AFTER this one (Monday to Sunday).
+   */
+  | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean; nextWeek?: boolean }
   | { kind: 'explicit'; day: number; month: number; year: number | null };
 
 export interface DateMatch {
@@ -510,6 +688,57 @@ export interface DateMatch {
 
 const YEAR_OF = (raw: string): number => (raw.length === 2 ? 2000 + Number(raw) : Number(raw));
 
+/**
+ * The words right after a weekday that say WHICH week: "de la otra semana", "de la próxima semana", "de la semana que
+ * viene", "de esta semana" (said, but changes nothing) and "que viene" ("el lunes que viene").
+ */
+function weekModifierAt(
+  tokens: readonly Token[],
+  at: number,
+): { length: number; nextWeek: boolean; strictlyAfter: boolean } {
+  const norms: string[] = [];
+  for (let k = 0; k < 5; k++) {
+    const t = tokens[at + k];
+    if (!isFree(t)) break;
+    norms.push(t.norm);
+  }
+  let k = 0;
+  if (norms[k] === 'de' || norms[k] === 'en') k++;
+  if (norms[k] === 'la' || norms[k] === 'esta') {
+    const article = norms[k];
+    const next = norms[k + 1];
+    if (
+      article === 'la' &&
+      next === 'semana' &&
+      ['proxima', 'siguiente'].includes(norms[k + 2] ?? '')
+    ) {
+      return { length: k + 3, nextWeek: true, strictlyAfter: false };
+    }
+    if (
+      article === 'la' &&
+      next === 'semana' &&
+      norms[k + 2] === 'que' &&
+      norms[k + 3] === 'viene'
+    ) {
+      return { length: k + 4, nextWeek: true, strictlyAfter: false };
+    }
+    if (
+      next !== undefined &&
+      ['otra', 'proxima', 'siguiente', 'entrante'].includes(next) &&
+      norms[k + 2] === 'semana'
+    ) {
+      return { length: k + 3, nextWeek: true, strictlyAfter: false };
+    }
+    if (article === 'esta' && next === 'semana') {
+      return { length: k + 2, nextWeek: false, strictlyAfter: false };
+    }
+  }
+  if (norms[0] === 'que' && norms[1] === 'viene') {
+    return { length: 2, nextWeek: false, strictlyAfter: true };
+  }
+  return { length: 0, nextWeek: false, strictlyAfter: false };
+}
+
 function matchDateAt(tokens: Token[], i: number): DateMatch | null {
   const t = tokens[i];
   if (!isFree(t)) return null;
@@ -519,17 +748,27 @@ function matchDateAt(tokens: Token[], i: number): DateMatch | null {
     return { expr: { kind: 'relative', offset: 2 }, start: i, length: 2 };
   }
   if (t.norm === 'hoy') return { expr: { kind: 'relative', offset: 0 }, start: i, length: 1 };
-  if (t.norm === 'manana') return { expr: { kind: 'relative', offset: 1 }, start: i, length: 1 };
+  // "de la mañana" / "esta mañana" is the morning, never tomorrow.
+  const beforeNorm = tokens[i - 1]?.norm;
+  if (t.norm === 'manana' && beforeNorm !== 'la' && beforeNorm !== 'esta') {
+    return { expr: { kind: 'relative', offset: 1 }, start: i, length: 1 };
+  }
 
   const weekday = WEEKDAY_BY_NAME[t.norm];
   if (weekday !== undefined) {
     // "este martes" = the next Tuesday, today included. "próximo martes" = the next one AFTER today.
     const before = isFree(tokens[i - 1]) ? tokens[i - 1]!.norm : '';
     const modifier = before === 'este' || before === 'proximo';
+    const week = weekModifierAt(tokens, i + 1);
     return {
-      expr: { kind: 'weekday', weekday, strictlyAfter: before === 'proximo' },
+      expr: {
+        kind: 'weekday',
+        weekday,
+        strictlyAfter: before === 'proximo' || week.strictlyAfter,
+        ...(week.nextWeek && { nextWeek: true }),
+      },
       start: modifier ? i - 1 : i,
-      length: modifier ? 2 : 1,
+      length: (modifier ? 2 : 1) + week.length,
     };
   }
 
@@ -606,6 +845,11 @@ export function resolveDate(
     case 'relative':
       return { date: addDays(today, expr.offset), certainty: 'EXACT' };
     case 'weekday': {
+      if (expr.nextWeek) {
+        // "el jueves de la otra semana": that weekday of the week after this one, whatever today is.
+        const monday = addDays(today, 1 - weekdayOf(today));
+        return { date: addDays(monday, 7 + expr.weekday - 1), certainty: 'LIKELY' };
+      }
       // "próximo martes": the next one after today. Otherwise the NEXT occurrence of that day, today included ...
       let date = firstWeekdayOnOrAfter(
         expr.strictlyAfter ? addDays(today, 1) : today,
@@ -752,7 +996,50 @@ export interface SubjectEntry {
 export type SubjectMatch =
   | { kind: 'none' }
   | { kind: 'match'; subject: SubjectEntry; exact: boolean; start: number; length: number }
-  | { kind: 'ambiguous'; candidates: SubjectEntry[]; start: number; length: number };
+  | {
+      kind: 'ambiguous';
+      candidates: SubjectEntry[];
+      start: number;
+      length: number;
+      /** Only a generic word ("programación") matched: not evidence enough to choose, so the words stay in the title. */
+      weak?: boolean;
+    };
+
+/**
+ * Words that name a whole field or a kind of work, not a subject: sharing one of them proves nothing ("lógica de
+ * PROGRAMACIÓN" is not "PROGRAMACIÓN con Python"). A partial match is only evidence when it hits a distinctive word of the
+ * subject's name; matching only these asks the student instead of choosing for them. An exact name always matches.
+ */
+export const GENERIC_SUBJECT_WORDS = new Set([
+  'programacion',
+  'informatica',
+  'sistemas',
+  'proyecto',
+  'proyectos',
+  'laboratorio',
+  'introduccion',
+  'fundamentos',
+  'gestion',
+  'ingenieria',
+  'analisis',
+  'desarrollo',
+  'tecnologia',
+  'tecnologias',
+  'computacion',
+  'ciencias',
+  'ciencia',
+  'teoria',
+  'practica',
+  'taller',
+  'curso',
+  'avanzada',
+  'avanzado',
+  'basica',
+  'basico',
+  'general',
+  'aplicada',
+  'aplicado',
+]);
 
 const subjectTokens = (norm: string) => norm.split(/[^a-z0-9]+/).filter(Boolean);
 
@@ -812,7 +1099,9 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
     }
   }
 
-  // 2. Words / unambiguous prefixes.
+  // 2. Words / unambiguous prefixes. Only a hit on a DISTINCTIVE word of the name is evidence (see GENERIC_SUBJECT_WORDS);
+  // a hit on generic words alone is remembered and, if nothing better turns up, offered as a question.
+  let weakHit: { start: number; length: number; candidates: SubjectEntry[] } | null = null;
   for (let length = MAX_PREFIX_WINDOW; length >= 1; length--) {
     const found: { start: number; candidates: SubjectEntry[] }[] = [];
     for (const [from, to] of runs) {
@@ -832,7 +1121,18 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
               (w.length >= MIN_PREFIX_LENGTH && s.tokens.some((st) => st.startsWith(w))),
           ),
         );
-        if (candidates.length > 0) found.push({ start, candidates });
+        const strong = candidates.filter((s) => {
+          const distinctive = s.tokens.filter(
+            (t) => !GENERIC_SUBJECT_WORDS.has(t) && !STOPWORDS.has(t),
+          );
+          return window.some(
+            (w) =>
+              distinctive.includes(w) ||
+              (w.length >= MIN_PREFIX_LENGTH && distinctive.some((st) => st.startsWith(w))),
+          );
+        });
+        if (strong.length > 0) found.push({ start, candidates: strong });
+        else if (candidates.length > 0 && weakHit === null) weakHit = { start, length, candidates };
       }
     }
     if (found.length === 0) continue;
@@ -849,6 +1149,7 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
         }
       : { kind: 'ambiguous', candidates: [...union.values()], start: first.start, length };
   }
+  if (weakHit !== null) return { kind: 'ambiguous', weak: true, ...weakHit };
   return { kind: 'none' };
 }
 
@@ -895,6 +1196,11 @@ export interface InterpretOptions {
    * quiz", "En Redes tendremos…"). They only fill what the activity's own words did not say.
    */
   shared?: readonly Token[];
+  /**
+   * The title ends at the first connector after the type word ("tarea PARA el jueves y otra…" is "Tarea"): for the
+   * multi-activity engine, whose stretches are long and loose. Off for a short phrase, whose every word is the title.
+   */
+  cutTitleAtStops?: boolean;
 }
 
 export interface InterpretMeta {
@@ -916,6 +1222,8 @@ export interface WordsInterpretation {
   warnings: CaptureWarning[];
   /** A second type or a second clear subject: probably two activities (quick capture's old single-activity rule). */
   multiple: boolean;
+  /** What the student said ABOUT the activity (multi-activity engine only; null when nothing says anything). */
+  description: string | null;
   meta: { subjectFromShared: boolean };
 }
 
@@ -968,7 +1276,7 @@ export function interpretWords(
     }
   } else if (found.kind === 'ambiguous') {
     subjectCertainty = 'AMBIGUOUS';
-    if (!fromShared) use(tokens, found.start, found.length);
+    if (!fromShared && !found.weak) use(tokens, found.start, found.length);
     ambiguities.push({
       field: 'subject',
       candidates: found.candidates
@@ -1009,18 +1317,84 @@ export function interpretWords(
     typeCertainty = 'LIKELY';
   }
 
-  // 5. Title: the type's label plus whatever text is left (connectors at the edges removed).
-  let rest = tokens.filter((t) => !t.used);
+  // 5. Title: the words the student wrote, in the order they wrote them. The type word stays where it was (as the type's
+  // label when it opens the title: "examen" -> "Parcial"); what a date, a time or the subject consumed is gone. A
+  // connector ("de", "del", "para"...) is dropped only when it dangles at an edge or where something it linked was
+  // consumed: "Parcial de redes" with Redes as the subject is "Parcial", but "Tarea de programación" with no such
+  // subject keeps its "de".
+  const typeTokens = first ? tokens.slice(first.start, first.start + first.length) : [];
+  const isTypeToken = (t: Token) => typeTokens.includes(t);
+  let rest = tokens.filter((t) => !t.used || isTypeToken(t));
+  let description: string | null = null;
+  if (options.cutTitleAtStops) {
+    // The title is the words right after the type word, up to a connector ("tarea PARA el jueves"), a comma or a cue of
+    // context. With no type word ("ensayo de ciberseguridad PARA el lunes") it starts after the first real word. Whatever
+    // follows is not lost: it is the description when it says something.
+    const typeEnd = first ? first.start + first.length - 1 : -1;
+    const from = first
+      ? rest.findIndex((t) => tokens.indexOf(t) > typeEnd)
+      : rest.findIndex((t) => !QUALIFIER_STOPS.has(t.norm) && !STOPWORDS.has(t.norm)) + 1;
+    const cut =
+      from < 0
+        ? -1
+        : rest.findIndex(
+            (t, i) =>
+              i >= from && (QUALIFIER_STOPS.has(t.norm) || t.afterBreak || cueLength(rest, i) > 0),
+          );
+    if (cut >= 0) {
+      description = describeTokens(rest.slice(cut));
+      rest = rest.slice(0, cut);
+    }
+    rest = rest.filter((t) => !isLooseFiller(t.norm));
+  }
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
-  while (rest.length > 0 && STOPWORDS.has(rest[0]!.norm)) rest.shift();
-  while (rest.length > 0 && STOPWORDS.has(rest.at(-1)!.norm)) rest.pop();
-  const words = rest.map((t) => t.raw);
-  if (ordinal !== null && !/^\d+$/.test(words[0] ?? '')) words.unshift(String(ordinal));
-  const residual = words.join(' ');
-  let title = first ? `${ACTIVITY_TYPE_LABELS[type]} ${residual}`.trim() : capitalize(residual);
+  const dangling = (t: Token | undefined) =>
+    t !== undefined && STOPWORDS.has(t.norm) && !isTypeToken(t);
+  while (dangling(rest[0])) rest.shift();
+  while (dangling(rest.at(-1))) rest.pop();
+  // A connector whose right-hand side was consumed ("de" REDES, "para" EL JUEVES) linked something that is no longer in the
+  // title: it goes with it.
+  rest = rest.filter((t, i) => {
+    const next = rest[i + 1];
+    return !(dangling(t) && next !== undefined && tokens.indexOf(next) - tokens.indexOf(t) > 1);
+  });
+  const typeFirst = first !== undefined && rest[0] !== undefined && isTypeToken(rest[0]);
+  const words: string[] = [];
+  // The student's own type word opens the title ("Examen de lógica", not "Parcial de lógica"); a plural ("tareas") says
+  // the label, since each activity is one.
+  const typedWord = typeTokens.map((t) => t.raw).join(' ');
+  const typedIsPlural = typeTokens.some(
+    (t) => PLURAL_TYPE_WORDS.has(t.norm) || t.norm === 'ensayos',
+  );
+  for (const t of rest) {
+    if (typeFirst && t === typeTokens[0]) {
+      const label = ACTIVITY_TYPE_LABELS[type];
+      // The label when it is the same word (right accents and capital: "exposicion" -> "Exposición"); the student's own
+      // word when it is another one ("examen", "presentación").
+      words.push(
+        typedIsPlural || typedWord === '' || normalizeNameKey(typedWord) === normalizeNameKey(label)
+          ? label
+          : capitalize(typedWord.toLowerCase()),
+      );
+    } else if (typeFirst && isTypeToken(t)) {
+      continue; // the rest of a two-word type ("trabajo final")
+    } else words.push(t.raw);
+  }
+  if (ordinal !== null && !/^\d+$/.test(words[typeFirst ? 1 : 0] ?? '')) {
+    words.splice(typeFirst ? 1 : 0, 0, String(ordinal));
+  }
+  let title = capitalize(words.join(' ').trim());
+  // Only the cue of a description was left ("tengo que entregar el informe..."): those words ARE the activity.
+  if (title === '' && description !== null && !first) {
+    title = description.replace(/\s*,\s*/g, ' ');
+    description = null;
+  }
   if (title.length > ACTIVITY_TITLE_MAX) {
     title = title.slice(0, ACTIVITY_TITLE_MAX).trimEnd();
     warn({ code: 'TITLE_TRUNCATED', message: QUICK_CAPTURE_MESSAGES.TITLE_TRUNCATED });
+  }
+  if (description !== null && description.length > ACTIVITY_DESCRIPTION_MAX) {
+    description = description.slice(0, ACTIVITY_DESCRIPTION_MAX).trimEnd();
   }
 
   return {
@@ -1033,6 +1407,7 @@ export function interpretWords(
     ambiguities,
     warnings,
     multiple,
+    description,
     meta,
   };
 }

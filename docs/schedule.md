@@ -48,6 +48,8 @@ _Limitación conocida:_ la zona es la del perfil; si una futura función permiti
 
 **Semana** = lunes a domingo (`weekRangeOf`, una sola definición en `core/calendar.ts`). La Agenda abre en la semana actual **del usuario**.
 
+**La Agenda también muestra actividades (PR #31).** Además de estas ocurrencias, dibuja las actividades abiertas de la semana, leídas con `GET /api/activities?from&to` (no se copian ni se guardan como bloques): ver [ux-accessibility.md](ux-accessibility.md#agenda-unificada-bloques-y-actividades-pr-31).
+
 ## Ocurrencias derivadas (`ScheduleOccurrence`)
 
 No son una tabla: son un DTO calculado al leer. Campos: `blockId`, `periodId`, `occurrenceDate`, `startAt`, `endAt`, `title`, `type`, `subject`, `isRecurring`, `hasConflict`.

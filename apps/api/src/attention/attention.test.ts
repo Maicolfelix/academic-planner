@@ -408,3 +408,53 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
     expect(large.ms).toBeLessThan(1500);
   });
 });
+
+describe('GET /api/attention: upcoming (the Home hero walks through them)', () => {
+  it('lists the open activities by deadline, soonest first, at most five, never finished or forgotten ones', async () => {
+    const { agent, subject } = await setupUser(app, 'a@example.com');
+    await mk(agent, subject.id, 'Tercera', 3 * DAY, { priority: 'HIGH' });
+    await mk(agent, subject.id, 'Primera', 2 * HOUR, { priority: 'LOW' });
+    await mk(agent, subject.id, 'Segunda', DAY);
+    await mk(agent, subject.id, 'Hecha', HOUR, { status: 'COMPLETED' });
+    await mk(agent, subject.id, 'Olvidada', -30 * DAY);
+    for (const [i, t] of ['Cuarta', 'Quinta', 'Sexta', 'Séptima'].entries()) {
+      await mk(agent, subject.id, t, (4 + i) * DAY);
+    }
+    const a = await getAttention(agent);
+    expect(a.upcoming.map((i) => i.activity.title)).toEqual([
+      'Primera',
+      'Segunda',
+      'Tercera',
+      'Cuarta',
+      'Quinta',
+    ]);
+    // Each one carries its own reasons and Radar state, like the recommendation.
+    expect(a.upcoming.every((i) => i.reasons.length > 0)).toBe(true);
+  });
+
+  it('changes with the data: finishing the first one and moving a deadline reorder it', async () => {
+    const { agent, subject } = await setupUser(app, 'a@example.com');
+    const first = await mk(agent, subject.id, 'A', 2 * HOUR);
+    const second = await mk(agent, subject.id, 'B', DAY);
+    await mk(agent, subject.id, 'C', 2 * DAY);
+    expect((await getAttention(agent)).upcoming.map((i) => i.activity.title)).toEqual([
+      'A',
+      'B',
+      'C',
+    ]);
+    await agent.patch(`/api/activities/${first}`).send({ status: 'COMPLETED' });
+    expect((await getAttention(agent)).upcoming.map((i) => i.activity.title)).toEqual(['B', 'C']);
+    await prisma.activity.update({
+      where: { id: second },
+      data: { dueAt: new Date(NOW.getTime() + 5 * DAY) },
+    });
+    expect((await getAttention(agent)).upcoming.map((i) => i.activity.title)).toEqual(['C', 'B']);
+  });
+
+  it('is empty without a period and when nothing is open', async () => {
+    const { agent } = await signUp(app, 'noperiod@example.com');
+    expect((await getAttention(agent)).upcoming).toEqual([]);
+    const other = await setupUser(app, 'b@example.com');
+    expect((await getAttention(other.agent)).upcoming).toEqual([]);
+  });
+});

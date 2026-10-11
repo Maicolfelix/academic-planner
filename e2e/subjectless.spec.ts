@@ -403,11 +403,9 @@ test('a general activity downloads its calendar file with just its title', async
   const [response, file] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/calendar.ics')),
     page.waitForEvent('download'),
-    openActivityMenu(page, 'Cita con el tutor').then(() =>
-      page
-        .getByRole('menuitem', { name: 'Añadir al calendario: Cita con el tutor', exact: true })
-        .click(),
-    ),
+    page
+      .getByRole('button', { name: 'Añadir al calendario: Cita con el tutor', exact: true })
+      .click(),
   ]);
   expect(response.status()).toBe(200);
   const chunks: Buffer[] = [];

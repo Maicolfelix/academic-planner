@@ -240,18 +240,16 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
 
   // E2E-04 — Quick Capture: preview, edit the title, confirm.
   await page.goto('/dashboard');
-  await page
-    .getByLabel('Escribe la actividad en una frase')
-    .fill(`parcial redes ${dayName(4)} 10am`);
+  await page.getByLabel('Escribe lo que tienes pendiente').fill(`parcial redes ${dayName(4)} 10am`);
   await page.getByRole('button', { name: 'Interpretar', exact: true }).click();
-  const preview = page.getByRole('group', { name: 'Vista previa de la actividad' });
-  await expect(preview.getByLabel('Fecha')).toHaveValue(bogotaToday(4));
-  await expect(preview.getByLabel('Hora (opcional)')).toHaveValue('10:00');
-  await preview.getByLabel('Título').fill('Parcial 1 de Redes');
-  await preview.getByRole('button', { name: 'Crear actividad' }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Actividad creada: Parcial 1 de Redes.' }),
-  ).toBeVisible();
+  const card = page.getByRole('region', { name: 'Captura rápida' }).getByRole('article');
+  await expect(card).toHaveCount(1);
+  await card.getByRole('button', { name: 'Editar' }).click();
+  await expect(card.getByLabel('Fecha')).toHaveValue(bogotaToday(4));
+  await expect(card.getByLabel('Hora (opcional)')).toHaveValue('10:00');
+  await card.getByLabel('Título', { exact: true }).fill('Parcial 1 de Redes');
+  await page.getByRole('button', { name: 'Crear 1 actividad' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '1 actividad creada.' })).toBeVisible();
 
   // E2E-05 — Academic Inbox: two proposals from one message, both created.
   await page.goto('/inbox');
@@ -262,9 +260,9 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
     );
   await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
   await expect(page.getByRole('article')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Crear seleccionadas' }).click();
+  await page.getByRole('button', { name: 'Crear 2 actividades' }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: '2 creadas, 0 pendientes' }),
+    page.getByRole('status').filter({ hasText: '2 actividades creadas.' }),
   ).toBeVisible();
 
   // E2E-06 — a manual weekly class (through the API; the dialog is covered by calendar.spec), then
@@ -723,7 +721,7 @@ test.describe('failures injected into the network', () => {
     await expect(page.getByText('No debe perderse')).toBeVisible();
   });
 
-  test('E2E-17: when one proposal of the Inbox fails the others stay created and the failed one can be retried', async ({
+  test('E2E-17: when the confirmation of the Inbox fails NOTHING is created (all or nothing) and it can be retried', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -736,27 +734,22 @@ test.describe('failures injected into the network', () => {
       );
     await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
     await expect(page.getByRole('article')).toHaveCount(2);
-    let posts = 0;
-    await page.route(/\/api\/activities(\?.*)?$/, (route) => {
-      if (route.request().method() !== 'POST') return route.continue();
-      posts += 1;
-      return posts === 2
-        ? route.fulfill({
-            status: 500,
-            contentType: 'application/json',
-            body: '{"error":{"code":"INTERNAL_ERROR","message":"x"}}',
-          })
-        : route.continue();
-    });
-    await page.getByRole('button', { name: 'Crear seleccionadas' }).click();
+    await page.route(/\/api\/capture\/confirm$/, (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: '{"error":{"code":"INTERNAL_ERROR","message":"x"}}',
+      }),
+    );
+    await page.getByRole('button', { name: 'Crear 2 actividades' }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    expect((await oracle(page)).activities).toHaveLength(0); // not one of the two
+    await expect(page.getByRole('article')).toHaveCount(2); // and the review is still there, as it was
+    await page.unroute(/\/api\/capture\/confirm$/);
+    await page.getByRole('button', { name: 'Crear 2 actividades' }).click();
     await expect(
-      page.getByRole('status').filter({ hasText: '1 creada, 1 pendiente' }),
+      page.getByRole('status').filter({ hasText: '2 actividades creadas.' }),
     ).toBeVisible();
-    expect((await oracle(page)).activities).toHaveLength(1);
-    await expect(page.getByRole('article').filter({ hasText: 'Actividad creada' })).toHaveCount(1);
-    await page.unroute(/\/api\/activities(\?.*)?$/);
-    await page.getByRole('button', { name: 'Crear seleccionadas' }).click();
-    await expect(page.getByRole('article').filter({ hasText: 'Actividad creada' })).toHaveCount(2);
     expect((await oracle(page)).activities).toHaveLength(2);
   });
 
@@ -812,13 +805,13 @@ test('E2E-18: a browser in Tokyo still lives in the student’s day (profile tim
   const page = await context.newPage();
   await newStudent(page);
   await page.goto('/dashboard');
-  await page.getByLabel('Escribe la actividad en una frase').fill('tarea redes mañana');
+  await page.getByLabel('Escribe lo que tienes pendiente').fill('tarea redes mañana');
   await page.getByRole('button', { name: 'Interpretar', exact: true }).click();
-  await expect(
-    page.getByRole('group', { name: 'Vista previa de la actividad' }).getByLabel('Fecha'),
-  ).toHaveValue(bogotaToday(1));
-  await page.getByRole('button', { name: 'Crear actividad' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Actividad creada' })).toBeVisible();
+  const quick = page.getByRole('region', { name: 'Captura rápida' }).getByRole('article');
+  await quick.getByRole('button', { name: 'Editar' }).click();
+  await expect(quick.getByLabel('Fecha')).toHaveValue(bogotaToday(1));
+  await page.getByRole('button', { name: 'Crear 1 actividad' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '1 actividad creada.' })).toBeVisible();
   const dash = (await oracle(page)).dashboard;
   expect(dash.localDate).toBe(bogotaToday());
   await page.goto('/dashboard');

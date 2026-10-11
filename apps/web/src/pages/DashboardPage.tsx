@@ -194,7 +194,8 @@ function NextDue({
   // Until the hero is known the card would appear and then collapse into a line (a flash, and a node swapped under the
   // student's eyes): wait for the answer, and show the card as soon as it is known (or if it fails).
   if (attention.isPending) return null;
-  const heroId = attention.data?.recommendation?.activity.id;
+  // The hero opens on the first of its activities (the one due soonest): that is the one it already shows.
+  const heroId = (attention.data?.upcoming[0] ?? attention.data?.recommendation)?.activity.id;
   const quiet = activity !== null && activity.id === heroId;
   return <NextDueCard activity={activity} timeZone={timeZone} now={now} quiet={quiet} />;
 }

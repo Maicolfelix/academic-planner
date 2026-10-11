@@ -42,7 +42,10 @@ async function make(
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Principal' });
 const attention = (page: Page) => page.getByRole('region', { name: '¿Qué hago ahora?' });
-const reasonsOf = (page: Page) => attention(page).getByRole('list').getByRole('listitem');
+// The hero is a carousel: every activity has a slide, the one on screen is the only one that is not inert.
+const current = (page: Page) =>
+  attention(page).locator('[aria-roledescription="actividad"]:not([inert])');
+const reasonsOf = (page: Page) => current(page).getByRole('listitem');
 const card = (page: Page, title: string) => page.getByRole('listitem').filter({ hasText: title });
 const goHome = async (page: Page) => {
   await nav(page).getByRole('link', { name: 'Inicio' }).click();
@@ -53,7 +56,7 @@ const goActivities = async (page: Page) => {
   await expect(page).toHaveURL(/\/activities$/);
 };
 const recommended = (page: Page, title: string) =>
-  expect(attention(page).getByRole('article', { name: title })).toBeVisible();
+  expect(current(page).getByRole('article', { name: title })).toBeVisible();
 
 test('¿Qué hago ahora?: recommendation, reasons, live changes without reloading, empty state', async ({
   page,
@@ -69,21 +72,26 @@ test('¿Qué hago ahora?: recommendation, reasons, live changes without reloadin
   await make(page, 'Quiz', 5 * DAY + HOUR, { priority: 'MEDIUM' });
   await make(page, 'Taller de hoy', 5 * HOUR, { priority: 'LOW' });
 
-  // 7-9. Dashboard: the LOW activity due in 5 hours is the suggestion, with plain reasons and no score.
+  // 7-9. Dashboard: the activity due in 5 hours opens the hero (they follow the deadline, not the priority).
   await page.goto('/dashboard');
   await expect(
     attention(page).getByRole('heading', { level: 2, name: '¿Qué hago ahora?' }),
   ).toBeVisible();
   await recommended(page, 'Taller de hoy');
-  await expect(attention(page)).toContainText('Actividad que requiere mayor atención.');
-  await expect(attention(page)).toContainText('¿Por qué esta?');
+  await expect(current(page)).toContainText('Próxima entrega.');
+  await expect(current(page)).toContainText('¿Por qué esta?');
   await expect(reasonsOf(page)).toHaveText(['Vence en menos de 24 horas.']);
-  await expect(attention(page).getByText('Atención inmediata')).toBeVisible();
-  await expect(attention(page).getByText('Redes')).toBeVisible();
+  await expect(current(page).getByText('Atención inmediata')).toBeVisible();
+  await expect(current(page).getByText('Redes')).toBeVisible();
   await expect(attention(page)).not.toContainText(/score|puntos|debes|urgente|atrasad/i);
-  // One suggestion only: the other activities are not listed in this card.
-  await expect(attention(page)).not.toContainText('Lectura lejana');
-  await expect(attention(page).getByRole('article')).toHaveCount(1);
+  // One slide per activity (four), one dot per slide, and only the first is on screen.
+  await expect(attention(page).locator('[aria-roledescription="actividad"]')).toHaveCount(4);
+  await expect(attention(page).getByRole('button', { name: /Ver actividad \d de 4/ })).toHaveCount(
+    4,
+  );
+  await expect(
+    attention(page).locator('[aria-roledescription="actividad"]:not([inert])'),
+  ).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
 
   // A marker proves nothing below reloads the page.
@@ -100,7 +108,7 @@ test('¿Qué hago ahora?: recommendation, reasons, live changes without reloadin
   await expect(reasonsOf(page)).toHaveText(['Vence durante esta semana.', 'Tiene prioridad alta.']);
   expect(await stillSamePage()).toBe(true);
 
-  // 12-13. Lower that one's priority: the ranking changes and the MEDIUM quiz takes the first place.
+  // 12-13. Lower that one's priority: the hero follows the deadline, so it does not move.
   await goActivities(page);
   await page.getByRole('button', { name: 'Editar Proyecto' }).click();
   const edit = page.getByRole('dialog', { name: 'Editar actividad' });
@@ -111,23 +119,27 @@ test('¿Qué hago ahora?: recommendation, reasons, live changes without reloadin
   await edit.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(edit).toBeHidden();
   await goHome(page);
-  await recommended(page, 'Quiz');
+  await recommended(page, 'Proyecto');
   await expect(reasonsOf(page)).toHaveText(['Vence durante esta semana.']);
   expect(await stillSamePage()).toBe(true);
+  await attention(page).getByRole('button', { name: 'Ver actividad 2 de 3' }).click();
+  await recommended(page, 'Quiz');
+  await expect(reasonsOf(page)).toHaveText(['Vence durante esta semana.']);
 
-  // 14-15. Start the quiz: it stays first and now says why.
+  // 14-15. Start the quiz: it says why.
   await goActivities(page);
   await page.getByLabel('Cambiar estado de Quiz').selectOption('En proceso');
   await expect(page.getByLabel('Cambiar estado de Quiz')).toHaveValue('IN_PROGRESS');
   await goHome(page);
+  await attention(page).getByRole('button', { name: 'Ver actividad 2 de 3' }).click();
   await recommended(page, 'Quiz');
   await expect(reasonsOf(page)).toHaveText([
     'Vence durante esta semana.',
     'Ya comenzaste esta actividad.',
   ]);
-  await expect(attention(page).getByText('En proceso')).toBeVisible();
+  await expect(current(page).getByText('En proceso')).toBeVisible();
 
-  // 16-17. Delete the suggested one: the next one is suggested.
+  // 16-17. Delete it: the strip has one slide fewer and the first one is on screen.
   await goActivities(page);
   await openActivityMenu(page, 'Quiz');
   await page.getByRole('menuitem', { name: 'Eliminar Quiz' }).click();
@@ -150,6 +162,7 @@ test('¿Qué hago ahora?: recommendation, reasons, live changes without reloadin
   await expect(attention(page)).toContainText('No tienes actividades pendientes en este momento.');
   await expect(attention(page).getByRole('article')).toHaveCount(0);
   await expect(attention(page).getByRole('link', { name: /Ver actividad/ })).toHaveCount(0);
+  await expect(attention(page).getByRole('button', { name: /Ver actividad/ })).toHaveCount(0);
   expect(await stillSamePage()).toBe(true);
 
   // 20. No console errors, no uncaught exceptions and no failed API calls along the whole flow.
@@ -164,7 +177,7 @@ test('"Ver actividad" opens that activity for editing', async ({ page }) => {
 
   await page.goto('/dashboard');
   await recommended(page, 'Informe de laboratorio');
-  await attention(page)
+  await current(page)
     .getByRole('link', { name: /Ver actividad/ })
     .click();
 
@@ -237,7 +250,7 @@ test('layout and accessibility: long title, three reasons, keyboard, headings', 
   const box = (await attention(page).getByRole('article').boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-  const link = attention(page).getByRole('link', { name: /Ver actividad/ });
+  const link = current(page).getByRole('link', { name: /Ver actividad/ });
   expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
   // Keyboard: the link is reachable and Enter opens the activity.

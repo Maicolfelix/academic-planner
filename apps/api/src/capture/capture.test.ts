@@ -56,8 +56,8 @@ describe('POST /api/capture/parse: access and input', () => {
   it('the mode defaults to QUICK; empty and over-limit texts are a clear status, not a 500', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     expect((await parse(agent, '   ')).capture.status).toBe('EMPTY');
-    expect((await parse(agent, 'x'.repeat(301))).capture.status).toBe('TOO_LONG');
-    expect((await parse(agent, 'x'.repeat(301), 'INBOX')).capture.status).toBe('OK');
+    expect((await parse(agent, 'x'.repeat(5001))).capture.status).toBe('TOO_LONG');
+    expect((await parse(agent, 'x'.repeat(5000), 'INBOX')).capture.status).toBe('OK');
     expect((await agent.post('/api/capture/parse').send({ text: 'x'.repeat(20_001) })).status).toBe(
       400,
     );
@@ -141,19 +141,23 @@ describe('the engine through the API', () => {
     });
   });
 
-  it('recurrence is a suggestion; more than 10 is refused whole, not truncated', async () => {
+  it('recurrence is a suggestion; more than 50 is refused whole, not truncated', async () => {
     const { agent } = await setupUser(app, 'a@example.com', 'Redes');
     const rec = (await parse(agent, 'redes todos los martes y jueves')).capture;
     expect(rec.proposals).toEqual([]);
     expect(rec.suggestions).toHaveLength(1);
-    const many = (
-      await parse(
-        agent,
-        'tarea lunes, tarea martes, tarea miércoles, tarea jueves, tarea viernes, taller lunes, taller martes, taller miércoles, taller jueves, taller viernes, quiz sábado',
-      )
-    ).capture;
-    expect(many.status).toBe('TOO_MANY_PROPOSALS');
-    expect(many.proposals).toEqual([]);
+    const many = (n: number) =>
+      Array.from(
+        { length: n },
+        (_, i) =>
+          `Taller ${i + 1} el ${String((i % 28) + 1).padStart(2, '0')}/${i < 28 ? '12' : '01'}`,
+      ).join(', ');
+    const fifty = (await parse(agent, many(50), 'INBOX')).capture;
+    expect(fifty.status).toBe('OK');
+    expect(fifty.proposals).toHaveLength(50);
+    const tooMany = (await parse(agent, many(51), 'INBOX')).capture;
+    expect(tooMany.status).toBe('TOO_MANY_PROPOSALS');
+    expect(tooMany.proposals).toEqual([]);
   });
 
   it('flags what the student already has (same subject, day, type, related title): unticked, never blocked', async () => {

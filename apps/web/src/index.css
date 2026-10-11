@@ -186,7 +186,6 @@ body[data-ambient='done'] {
   --animate-drift-slow: drift 28s ease-in-out -9s infinite alternate-reverse;
   --animate-halo: halo 6s ease-out infinite;
   --animate-scan: scan 9s ease-in-out infinite;
-  --animate-node: node 7s ease-in-out infinite;
   --animate-orbit: orbit 48s linear infinite;
 
   @keyframes rise {
@@ -293,19 +292,6 @@ body[data-ambient='done'] {
   @keyframes orbit {
     to {
       transform: rotate(360deg);
-    }
-  }
-
-  /* The current node of the hero rail breathes in and out, slowly. */
-  @keyframes node {
-    0%,
-    100% {
-      opacity: 0.55;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.35);
     }
   }
 
