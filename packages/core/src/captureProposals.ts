@@ -3,7 +3,7 @@ import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
 import { titlesAreRelated, ACADEMIC_CUES } from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
-import { describeTokens } from './captureContext.js';
+import { describeTokens, maskMetaText } from './captureContext.js';
 import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
   FIELD_CERTAINTIES,
@@ -99,6 +99,7 @@ export const CAPTURE_ISSUE_CODES = [
   'UNRESOLVED_TIME_REFERENCE',
   'UNRESOLVED_DATE_REFERENCE',
   'UNRESOLVED_DESCRIPTION_REFERENCE',
+  'COUNT_MISMATCH',
 ] as const;
 export type CaptureIssueCode = (typeof CAPTURE_ISSUE_CODES)[number];
 
@@ -119,7 +120,7 @@ export type CaptureWarningCode = (typeof CAPTURE_WARNING_CODES)[number];
 
 const issue = z.object({
   code: z.enum(CAPTURE_ISSUE_CODES),
-  field: z.enum(['title', 'subject', 'date', 'time', 'description']),
+  field: z.enum(['title', 'subject', 'date', 'time', 'description', 'count']),
   message: z.string(),
 });
 const warning = z.object({ code: z.enum(CAPTURE_WARNING_CODES), message: z.string() });
@@ -261,7 +262,7 @@ export const captureResultSchema = z.object({
   corrections: z.array(captureCorrectionSchema),
   warnings: z.array(
     z.object({
-      code: z.enum(['EMPTY', 'TOO_LONG', 'TOO_MANY_PROPOSALS', 'NO_ACTIVITIES']),
+      code: z.enum(['EMPTY', 'TOO_LONG', 'TOO_MANY_PROPOSALS', 'NO_ACTIVITIES', 'COUNT_MISMATCH']),
       message: z.string(),
     }),
   ),
@@ -270,6 +271,8 @@ export const captureResultSchema = z.object({
     /** Activities found before the limit and the duplicate collapse. */
     found: z.number().int().nonnegative(),
     collapsed: z.number().int().nonnegative(),
+    /** How many activities the student said there were ("tengo 3 actividades…"), or null when they did not say. */
+    expected: z.number().int().positive().nullable().default(null),
   }),
 });
 export type CaptureResult = z.infer<typeof captureResultSchema>;
@@ -309,6 +312,7 @@ const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
   UNRESOLVED_DATE_REFERENCE: 'Mencionaste una fecha, pero no pude asignarla a esta actividad.',
   UNRESOLVED_DESCRIPTION_REFERENCE:
     'Mencionaste un detalle, pero no pude saber a qué actividad corresponde.',
+  COUNT_MISMATCH: 'La cantidad de actividades no coincide con la que dijiste.',
 };
 const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][number]['field']> = {
   TITLE_MISSING: 'title',
@@ -327,6 +331,7 @@ const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][nu
   UNRESOLVED_TIME_REFERENCE: 'time',
   UNRESOLVED_DATE_REFERENCE: 'date',
   UNRESOLVED_DESCRIPTION_REFERENCE: 'description',
+  COUNT_MISMATCH: 'count',
 };
 const makeIssue = (
   code: CaptureIssueCode,
@@ -358,7 +363,7 @@ const emptyResult = (
   suggestions: [],
   corrections: [],
   warnings: [{ code: status, message }],
-  stats: { characters, found: 0, collapsed: 0 },
+  stats: { characters, found: 0, collapsed: 0, expected: null },
 });
 
 /** Words that follow "parcial de …" without being a subject ("parcial de unidad"): never offered as a new subject's name. */
@@ -786,11 +791,14 @@ export function parseCaptureProposals(
   }
 
   const entries = buildSubjectEntries(context.subjects);
-  let spans = segmentDiscourse(trimmed, context, {
+  // "Tengo 3 actividades…" and "la otra es…" are about the text, not activities: blanked out (offsets stay), never a title.
+  const meta = maskMetaText(trimmed);
+  let spans = segmentDiscourse(meta.text, context, {
     splitLeading: mode === 'QUICK',
     implicitDetails: mode === 'QUICK',
   });
-  if (spans.length === 0 && mode === 'QUICK') {
+  // "Tengo 3 actividades para el martes" and nothing else says nothing about WHICH ones: no activity is made up.
+  if (spans.length === 0 && mode === 'QUICK' && meta.expected === null) {
     // No activity word: the whole phrase is one activity ("Cumpleaños de Ana martes").
     spans = [
       {
@@ -835,6 +843,11 @@ export function parseCaptureProposals(
     if (days.length === 0 && sharedPlan && sharedPlan.days.length > 0) {
       days = sharedPlan.days.map((d) => ({ ...d }));
       daysInherited = true;
+      // "Tengo 3 actividades para el martes: un taller a las 8, un examen a las 2…": the day is shared, the hour is its own.
+      const ownTimes = plan.times.filter((t): t is PlannedTime => t !== null);
+      if (plan.timeItems === 1 && ownTimes.length === 1) {
+        days = days.map((d) => ({ ...d, time: ownTimes[0]!, timeIssue: null }));
+      }
     }
     // A time nobody gave this stretch but the sentence did, once.
     let sharedTime: PlannedTime | null = null;
@@ -1247,25 +1260,46 @@ export function parseCaptureProposals(
       suggestions: [],
       corrections: [],
       warnings: [{ code: 'TOO_MANY_PROPOSALS', message: CAPTURE_MESSAGES.TOO_MANY_PROPOSALS }],
-      stats: { characters, found, collapsed },
+      stats: { characters, found, collapsed, expected: meta.expected },
     };
   }
 
-  const proposals: CaptureProposal[] = unique.map(({ draft }, index) => ({
+  let proposals: CaptureProposal[] = unique.map(({ draft }, index) => ({
     clientId: `p${index + 1}`,
     selected: draft.status === 'READY',
     ...draft,
   }));
+  // "Tengo 3 actividades…" and the engine found another number: what was found is real, the rest is NOT invented, and the
+  // student is told so before anything is created (nothing is ticked until they look).
+  const countWarning =
+    meta.expected !== null && proposals.length > 0 && proposals.length !== meta.expected
+      ? {
+          code: 'COUNT_MISMATCH' as const,
+          message:
+            proposals.length < meta.expected
+              ? `Dijiste que eran ${meta.expected} actividades, pero solo pude identificar ${proposals.length}.`
+              : `Dijiste que eran ${meta.expected} actividades, pero identifiqué ${proposals.length}.`,
+        }
+      : null;
+  if (countWarning) {
+    proposals = proposals.map((p) => ({
+      ...p,
+      selected: false,
+      status: p.status === 'READY' ? 'NEEDS_REVIEW' : p.status,
+      blockingIssues: [...p.blockingIssues, makeIssue('COUNT_MISMATCH', countWarning.message)],
+    }));
+  }
   const result: CaptureResult = {
     status: 'OK',
     proposals,
     suggestions: suggestions.map((s, i) => ({ clientId: `s${i + 1}`, ...s })),
     corrections: computeCorrections(proposals),
-    warnings:
-      proposals.length === 0 && suggestions.length === 0
+    warnings: countWarning
+      ? [countWarning]
+      : proposals.length === 0 && suggestions.length === 0
         ? [{ code: 'NO_ACTIVITIES', message: CAPTURE_MESSAGES.NO_ACTIVITIES }]
         : [],
-    stats: { characters, found, collapsed },
+    stats: { characters, found, collapsed, expected: meta.expected },
   };
   return result;
 }

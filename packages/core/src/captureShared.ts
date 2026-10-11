@@ -996,7 +996,50 @@ export interface SubjectEntry {
 export type SubjectMatch =
   | { kind: 'none' }
   | { kind: 'match'; subject: SubjectEntry; exact: boolean; start: number; length: number }
-  | { kind: 'ambiguous'; candidates: SubjectEntry[]; start: number; length: number };
+  | {
+      kind: 'ambiguous';
+      candidates: SubjectEntry[];
+      start: number;
+      length: number;
+      /** Only a generic word ("programación") matched: not evidence enough to choose, so the words stay in the title. */
+      weak?: boolean;
+    };
+
+/**
+ * Words that name a whole field or a kind of work, not a subject: sharing one of them proves nothing ("lógica de
+ * PROGRAMACIÓN" is not "PROGRAMACIÓN con Python"). A partial match is only evidence when it hits a distinctive word of the
+ * subject's name; matching only these asks the student instead of choosing for them. An exact name always matches.
+ */
+export const GENERIC_SUBJECT_WORDS = new Set([
+  'programacion',
+  'informatica',
+  'sistemas',
+  'proyecto',
+  'proyectos',
+  'laboratorio',
+  'introduccion',
+  'fundamentos',
+  'gestion',
+  'ingenieria',
+  'analisis',
+  'desarrollo',
+  'tecnologia',
+  'tecnologias',
+  'computacion',
+  'ciencias',
+  'ciencia',
+  'teoria',
+  'practica',
+  'taller',
+  'curso',
+  'avanzada',
+  'avanzado',
+  'basica',
+  'basico',
+  'general',
+  'aplicada',
+  'aplicado',
+]);
 
 const subjectTokens = (norm: string) => norm.split(/[^a-z0-9]+/).filter(Boolean);
 
@@ -1056,7 +1099,9 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
     }
   }
 
-  // 2. Words / unambiguous prefixes.
+  // 2. Words / unambiguous prefixes. Only a hit on a DISTINCTIVE word of the name is evidence (see GENERIC_SUBJECT_WORDS);
+  // a hit on generic words alone is remembered and, if nothing better turns up, offered as a question.
+  let weakHit: { start: number; length: number; candidates: SubjectEntry[] } | null = null;
   for (let length = MAX_PREFIX_WINDOW; length >= 1; length--) {
     const found: { start: number; candidates: SubjectEntry[] }[] = [];
     for (const [from, to] of runs) {
@@ -1076,7 +1121,18 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
               (w.length >= MIN_PREFIX_LENGTH && s.tokens.some((st) => st.startsWith(w))),
           ),
         );
-        if (candidates.length > 0) found.push({ start, candidates });
+        const strong = candidates.filter((s) => {
+          const distinctive = s.tokens.filter(
+            (t) => !GENERIC_SUBJECT_WORDS.has(t) && !STOPWORDS.has(t),
+          );
+          return window.some(
+            (w) =>
+              distinctive.includes(w) ||
+              (w.length >= MIN_PREFIX_LENGTH && distinctive.some((st) => st.startsWith(w))),
+          );
+        });
+        if (strong.length > 0) found.push({ start, candidates: strong });
+        else if (candidates.length > 0 && weakHit === null) weakHit = { start, length, candidates };
       }
     }
     if (found.length === 0) continue;
@@ -1093,6 +1149,7 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
         }
       : { kind: 'ambiguous', candidates: [...union.values()], start: first.start, length };
   }
+  if (weakHit !== null) return { kind: 'ambiguous', weak: true, ...weakHit };
   return { kind: 'none' };
 }
 
@@ -1219,7 +1276,7 @@ export function interpretWords(
     }
   } else if (found.kind === 'ambiguous') {
     subjectCertainty = 'AMBIGUOUS';
-    if (!fromShared) use(tokens, found.start, found.length);
+    if (!fromShared && !found.weak) use(tokens, found.start, found.length);
     ambiguities.push({
       field: 'subject',
       candidates: found.candidates
@@ -1303,11 +1360,25 @@ export function interpretWords(
   });
   const typeFirst = first !== undefined && rest[0] !== undefined && isTypeToken(rest[0]);
   const words: string[] = [];
+  // The student's own type word opens the title ("Examen de lógica", not "Parcial de lógica"); a plural ("tareas") says
+  // the label, since each activity is one.
+  const typedWord = typeTokens.map((t) => t.raw).join(' ');
+  const typedIsPlural = typeTokens.some(
+    (t) => PLURAL_TYPE_WORDS.has(t.norm) || t.norm === 'ensayos',
+  );
   for (const t of rest) {
-    if (typeFirst && t === typeTokens[0]) words.push(ACTIVITY_TYPE_LABELS[type]);
-    else if (typeFirst && isTypeToken(t))
+    if (typeFirst && t === typeTokens[0]) {
+      const label = ACTIVITY_TYPE_LABELS[type];
+      // The label when it is the same word (right accents and capital: "exposicion" -> "Exposición"); the student's own
+      // word when it is another one ("examen", "presentación").
+      words.push(
+        typedIsPlural || typedWord === '' || normalizeNameKey(typedWord) === normalizeNameKey(label)
+          ? label
+          : capitalize(typedWord.toLowerCase()),
+      );
+    } else if (typeFirst && isTypeToken(t)) {
       continue; // the rest of a two-word type ("trabajo final")
-    else words.push(t.raw);
+    } else words.push(t.raw);
   }
   if (ordinal !== null && !/^\d+$/.test(words[typeFirst ? 1 : 0] ?? '')) {
     words.splice(typeFirst ? 1 : 0, 0, String(ordinal));

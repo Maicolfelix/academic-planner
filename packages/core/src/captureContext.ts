@@ -202,3 +202,54 @@ export function describeTokens(tokens: readonly Token[]): string | null {
     .join('');
   return capitalize(text.trim());
 }
+
+// ───────────────────────── Words ABOUT the text, not part of an activity ─────────────────────────
+
+const COUNT_WORDS: Readonly<Record<string, number>> = {
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+};
+
+/**
+ * "Tengo 3 actividades…", "son 4 actividades", "tengo dos cosas para…", "tengo tres entregas": how many activities the
+ * student MEANS to list. Only with a generic noun that is not a type word ("tres tareas" IS three tasks, handled by the
+ * quantities of the engine). It is information about the text, so it never reaches a title.
+ */
+const EXPECTED_COUNT =
+  /(?<![\p{L}\p{N}])(?:(?:tengo|tenemos|tendr[eé]|tendremos|hay|son|ser[aá]n|quedan|debo|debemos)\s+(?:que\s+(?:hacer|entregar)\s+)?)?(\d{1,2}|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:actividades|cosas|entregas|pendientes|compromisos)(?![\p{L}\p{N}])/iu;
+
+/**
+ * "…, la otra es un examen…", "y la última es un proyecto": a position marker introducing the next activity. The marker is
+ * not a word of the title; the activity is whatever follows "es".
+ */
+const POSITION_MARKER =
+  /(?<![\p{L}\p{N}])(?:la|el|las|los)\s+(?:otra|otro|[uú]ltima|[uú]ltimo|primera|primero|segunda|segundo|tercera|tercero|cuarta|cuarto|quinta|quinto)\s+(?:es|son|ser[aá]|ser[ií]a)(?![\p{L}\p{N}])/giu;
+
+/**
+ * The text with those two kinds of words blanked out (same length: every offset stays where it was typed) and the count
+ * the student announced, or null. Nothing is invented: the count is only ever compared with what is found.
+ */
+export function maskMetaText(text: string): { text: string; expected: number | null } {
+  let masked = text;
+  let expected: number | null = null;
+  const count = EXPECTED_COUNT.exec(masked);
+  if (count) {
+    const n = Number(count[1]) || COUNT_WORDS[count[1]!.toLowerCase()] || null;
+    if (n !== null && n >= 2) {
+      expected = n;
+      masked =
+        masked.slice(0, count.index) +
+        ' '.repeat(count[0].length) +
+        masked.slice(count.index + count[0].length);
+    }
+  }
+  masked = masked.replace(POSITION_MARKER, (m) => ' '.repeat(m.length));
+  return { text: masked, expected };
+}
