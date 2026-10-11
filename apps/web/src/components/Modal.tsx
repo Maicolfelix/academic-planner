@@ -19,10 +19,16 @@ export function Modal({
   title,
   onClose,
   children,
+  keepsWork = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /**
+   * The form keeps what is typed as a draft: closing it (Escape, the backdrop) loses nothing, so it does not ask. Discarding
+   * is then an explicit act of the form itself.
+   */
+  keepsWork?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const keepEditing = useRef<HTMLButtonElement>(null);
@@ -49,7 +55,7 @@ export function Modal({
     if (asking) keepEditing.current?.focus();
   }, [asking]);
 
-  const requestClose = () => (dirty ? setAsking(true) : onClose());
+  const requestClose = () => (dirty && !keepsWork ? setAsking(true) : onClose());
 
   return (
     <dialog

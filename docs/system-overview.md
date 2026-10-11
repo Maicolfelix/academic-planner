@@ -29,7 +29,7 @@ Estudiantes universitarios con una cuenta personal. Cada estudiante ve y modific
 | ¿Qué hago ahora?            | Señala a qué actividad prestar atención primero y explica por qué                                                        |
 | Progreso y carga semanal    | Cuántas actividades están finalizadas y cuántos compromisos tiene la semana (descriptivo, sin juicios)                   |
 | Captura rápida              | Se escribe una frase («parcial redes martes 10am») y se propone una actividad para confirmar                             |
-| Bandeja académica           | Se pega un mensaje largo y se proponen hasta 10 actividades para revisar y confirmar                                     |
+| Bandeja académica           | Se pega un mensaje largo y se proponen hasta 50 actividades para revisar y confirmar                                     |
 | Importación de horario      | Se sube una imagen o PDF del horario y se proponen clases para revisar y confirmar                                       |
 | Aplicación instalable (PWA) | Se puede instalar en el dispositivo; sin conexión solo abre la estructura de la app, los datos requieren conexión        |
 

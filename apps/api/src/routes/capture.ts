@@ -7,5 +7,6 @@ export function captureRouter(
 ): Router {
   const router = Router();
   router.post('/parse', requireAuth, controller.parse);
+  router.post('/confirm', requireAuth, controller.confirm);
   return router;
 }

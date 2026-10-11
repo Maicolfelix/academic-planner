@@ -97,4 +97,4 @@ Ciclo de vida: `PENDING` → `SHOWN` (la app lo mostró) o `CANCELLED` (la activ
 
 ## Intérpretes de texto
 
-Captura rápida (una actividad), Bandeja académica (hasta 10 propuestas) e Importación de horario (hasta 40 clases): determinísticos, **proponen** y solo guardan al confirmar. Captura rápida y Bandeja nunca crean una asignatura; la Importación de horario sí puede crear las asignaturas **nuevas** que el estudiante vio y confirmó en la vista previa (A1). Límites y fraseos: [quick-capture.md](quick-capture.md), [academic-inbox.md](academic-inbox.md), [schedule-import.md](schedule-import.md).
+Captura rápida (una actividad), Bandeja académica (hasta 50 propuestas) e Importación de horario (hasta 40 clases): determinísticos, **proponen** y solo guardan al confirmar. Captura rápida y Bandeja nunca crean una asignatura; la Importación de horario sí puede crear las asignaturas **nuevas** que el estudiante vio y confirmó en la vista previa (A1). Límites y fraseos: [quick-capture.md](quick-capture.md), [academic-inbox.md](academic-inbox.md), [schedule-import.md](schedule-import.md).

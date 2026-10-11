@@ -10,7 +10,9 @@ import {
   attentionTier,
   buildAttentionReasons,
   calculateAttentionScore,
+  HERO_MAX_ACTIVITIES,
   compareAttentionCandidates,
+  nearestDeadlines,
   rankActivitiesForAttention,
   type ActivityPriority,
   type ActivityStatus,
@@ -472,6 +474,7 @@ describe('response schema', () => {
     period: null,
     recommendation: item,
     alternatives: [],
+    upcoming: [item],
   };
 
   it('accepts a recommendation, or null when nothing is open', () => {
@@ -490,5 +493,52 @@ describe('response schema', () => {
       'radarStatus',
       'reasons',
     ]);
+  });
+
+  it('upcoming holds at most the hero maximum', () => {
+    const five = Array(HERO_MAX_ACTIVITIES).fill(item);
+    expect(attentionSchema.safeParse({ ...base, upcoming: five }).success).toBe(true);
+    expect(attentionSchema.safeParse({ ...base, upcoming: [...five, item] }).success).toBe(false);
+  });
+});
+
+describe('nearestDeadlines: what the Home hero walks through', () => {
+  it('soonest deadline first, whatever the priority (the first one is the one due first)', () => {
+    const late = act(5 * DAY, 'HIGH');
+    const soon = act(2 * HOUR, 'LOW');
+    const mid = act(2 * DAY, 'MEDIUM');
+    expect(nearestDeadlines([late, soon, mid], NOW).map((c) => c.activity.id)).toEqual([
+      soon.id,
+      mid.id,
+      late.id,
+    ]);
+  });
+
+  it('a recent overdue one is the soonest of all; one forgotten for over a week is left out', () => {
+    const recent = act(-2 * DAY);
+    const stale = act(-ATTENTION_STALE_OVERDUE_MS - HOUR);
+    const next = act(HOUR);
+    expect(nearestDeadlines([next, stale, recent], NOW).map((c) => c.activity.id)).toEqual([
+      recent.id,
+      next.id,
+    ]);
+  });
+
+  it('finished activities never take part', () => {
+    const done = act(HOUR, 'MEDIUM', 'COMPLETED');
+    const open = act(2 * HOUR);
+    expect(nearestDeadlines([done, open], NOW).map((c) => c.activity.id)).toEqual([open.id]);
+  });
+
+  it('at most five, and the same order every time (ties: older first, then id)', () => {
+    const items = Array.from({ length: 9 }, (_, i) => act((i % 3) * HOUR + HOUR));
+    const once = nearestDeadlines(items, NOW).map((c) => c.activity.id);
+    expect(once).toHaveLength(HERO_MAX_ACTIVITIES);
+    expect(nearestDeadlines([...items].reverse(), NOW).map((c) => c.activity.id)).toEqual(once);
+  });
+
+  it('nothing open: empty (and the hero falls back to the recommendation)', () => {
+    expect(nearestDeadlines([], NOW)).toEqual([]);
+    expect(nearestDeadlines([act(-ATTENTION_STALE_OVERDUE_MS - DAY)], NOW)).toEqual([]);
   });
 });

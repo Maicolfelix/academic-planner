@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateOnlySchema, isRealDateOnly } from './academic.js';
+import { INVALID_CHARACTERS, dateOnlySchema, hasNoNul, isRealDateOnly } from './academic.js';
 
 // ───────────────────────── Enums (value + Spanish label) ─────────────────────────
 
@@ -105,7 +105,8 @@ const title = z
   .max(
     ACTIVITY_TITLE_MAX,
     `El título es demasiado largo (máximo ${ACTIVITY_TITLE_MAX} caracteres).`,
-  );
+  )
+  .refine(hasNoNul, INVALID_CHARACTERS);
 
 const description = z
   .string()
@@ -114,6 +115,7 @@ const description = z
     ACTIVITY_DESCRIPTION_MAX,
     `La descripción es demasiado larga (máximo ${ACTIVITY_DESCRIPTION_MAX} caracteres).`,
   )
+  .refine(hasNoNul, INVALID_CHARACTERS)
   .nullish()
   .transform((v) => (v === undefined ? undefined : v === null || v === '' ? null : v));
 

@@ -165,7 +165,7 @@ test('with reduced motion nothing slides, springs or waits, and everything is st
 
   // Home: the hero is there at once, with no animation time or delay left
   await page.goto('/dashboard');
-  const hero = page.getByRole('region', { name: '¿Qué hago ahora?' }).getByRole('article');
+  const hero = page.getByRole('region', { name: '¿Qué hago ahora?' }).getByRole('article').first(); // the carousel has one per activity; the first is on screen
   await expect(hero).toBeVisible();
   const heroMotion = await hero.evaluate((el) => {
     const cs = getComputedStyle(el);
@@ -231,7 +231,8 @@ test('the ambient light and the Radar rings are alive, and with reduced motion t
   await expect(orbs.first()).toHaveCSS('animation-name', 'none'); // the background light is still on purpose (cost)
   const heroOrb = page
     .getByRole('region', { name: '¿Qué hago ahora?' })
-    .locator('[class*="animate-drift"]');
+    .locator('[class*="animate-drift"]')
+    .first();
   await expect(heroOrb).toHaveCSS('animation-name', 'drift'); // the hero's own light does drift
   const rings = page
     .getByRole('region', { name: 'Radar académico' })

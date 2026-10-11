@@ -76,14 +76,14 @@ Cada requisito se traza a su **implementación**, la **pantalla o endpoint** don
 
 Se agregaron durante el desarrollo para reducir pasos operativos; no deben presentarse como parte del alcance original.
 
-| Extensión              | Qué es                                                                         | Documento                                  | Evidencia principal                                                  |
-| ---------------------- | ------------------------------------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------- |
-| Radar académico        | Clasifica las actividades abiertas por tiempo restante (5 categorías)          | [radar.md](radar.md)                       | `radar.test.ts` (core y API), `e2e/radar.spec.ts`                    |
-| ¿Qué hago ahora?       | Recomienda a qué prestar atención primero, con razones; determinístico, sin IA | [attention-engine.md](attention-engine.md) | `attention.test.ts` (core y API), `e2e/attention.spec.ts`            |
-| Captura rápida         | Interpreta una frase como una actividad y la propone                           | [quick-capture.md](quick-capture.md)       | `quickCapture.test.ts` (core y API), `e2e/quick-capture.spec.ts`     |
-| Bandeja académica      | Interpreta un mensaje largo como 0–10 propuestas                               | [academic-inbox.md](academic-inbox.md)     | `academicInbox.test.ts` (core y API), `e2e/academic-inbox.spec.ts`   |
-| Importación de horario | Lee una imagen o PDF y propone clases (OCR local)                              | [schedule-import.md](schedule-import.md)   | `scheduleImport.test.ts` (core y API), `e2e/schedule-import.spec.ts` |
-| Datos de demostración  | Comando que crea un estudiante ficticio para presentar el proyecto             | [demo.md](demo.md)                         | `demo/demoSeed.test.ts`, `e2e/demo-seed.spec.ts`                     |
+| Extensión              | Qué es                                                                         | Documento                                  | Evidencia principal                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Radar académico        | Clasifica las actividades abiertas por tiempo restante (5 categorías)          | [radar.md](radar.md)                       | `radar.test.ts` (core y API), `e2e/radar.spec.ts`                                                                   |
+| ¿Qué hago ahora?       | Recomienda a qué prestar atención primero, con razones; determinístico, sin IA | [attention-engine.md](attention-engine.md) | `attention.test.ts` (core y API), `e2e/attention.spec.ts`                                                           |
+| Captura rápida         | Interpreta una frase como una actividad y la propone                           | [quick-capture.md](quick-capture.md)       | `captureProposals.test.ts`, `captureFamilies.test.ts` (core), `captureConfirm.test.ts` (API), `e2e/capture.spec.ts` |
+| Bandeja académica      | Interpreta un mensaje largo como 0–50 propuestas                               | [academic-inbox.md](academic-inbox.md)     | `captureFamilies.test.ts` (core), `e2e/capture.spec.ts` (Bandeja, caso 19)                                          |
+| Importación de horario | Lee una imagen o PDF y propone clases (OCR local)                              | [schedule-import.md](schedule-import.md)   | `scheduleImport.test.ts` (core y API), `e2e/schedule-import.spec.ts`                                                |
+| Datos de demostración  | Comando que crea un estudiante ficticio para presentar el proyecto             | [demo.md](demo.md)                         | `demo/demoSeed.test.ts`, `e2e/demo-seed.spec.ts`                                                                    |
 
 ## Requisitos no funcionales
 

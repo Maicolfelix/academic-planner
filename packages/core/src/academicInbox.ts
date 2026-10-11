@@ -99,14 +99,45 @@ function periodEndsSentence(line: string, i: number): boolean {
   return true;
 }
 
-/** Sentences of a message: line breaks, ";" and sentence-ending periods, "!" and "?". Never throws. */
+/**
+ * The lines of a text as the writer meant them. A line break is NOT a sentence boundary by itself: an e-mail wraps its
+ * lines at 70 columns and a phone breaks a long sentence wherever the student pressed Enter, so "...dos días distintos"
+ * and "uno para el jueves y otro para el viernes" are ONE sentence. A break counts only when the previous line ends a
+ * sentence (. ! ? ; :) and the next one does not continue it in lowercase, when the next line is a list item ("1.",
+ * "-", "•"), or when there is a blank line (a paragraph).
+ */
+function logicalLines(text: string): string[] {
+  const raw = text.replace(/\r\n?/g, '\n').split('\n');
+  const lines: string[] = [];
+  let pendingBlank = false;
+  for (const piece of raw) {
+    const cur = piece.trim();
+    if (cur === '') {
+      pendingBlank = true;
+      continue;
+    }
+    const prev = lines.at(-1);
+    const endsSentence = prev !== undefined && /[.!?;:]["')\]»”]*$/.test(prev);
+    const isListItem = /^([-•*–]|\d+[.)])\s/.test(cur);
+    const continues = /^\p{Ll}/u.test(cur);
+    if (prev === undefined || pendingBlank || isListItem || (endsSentence && !continues)) {
+      lines.push(cur);
+    } else {
+      lines[lines.length - 1] = `${prev} ${cur}`;
+    }
+    pendingBlank = false;
+  }
+  return lines;
+}
+
+/** Sentences of a message: paragraph and list breaks, ";" and sentence-ending periods, "!" and "?". Never throws. */
 export function splitSentences(text: string): string[] {
   const sentences: string[] = [];
   const push = (s: string) => {
     const trimmed = s.trim();
     if (trimmed !== '') sentences.push(trimmed);
   };
-  for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
+  for (const line of logicalLines(text)) {
     let start = 0;
     for (let i = 0; i < line.length; i++) {
       const c = line[i]!;
@@ -128,7 +159,15 @@ export function splitSentences(text: string): string[] {
 
 // ───────────────────────── Activity detection ─────────────────────────
 
-const CLAUSE_SPLITTERS = new Set(['y', 'e', 'ademas', 'tambien', 'luego', 'despues', 'asimismo']);
+export const CLAUSE_SPLITTERS = new Set([
+  'y',
+  'e',
+  'ademas',
+  'tambien',
+  'luego',
+  'despues',
+  'asimismo',
+]);
 /** "presentación del proyecto": the second type word only qualifies the first one. */
 const PHRASE_CONNECTORS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para']);
 const DELIVER_VERBS = new Set([
@@ -216,7 +255,7 @@ export const ACADEMIC_CUES = new Set([
   'programada',
 ]);
 
-interface Anchor {
+export interface Anchor {
   start: number;
   length: number;
   /** Set when the activity is recognised from wording ("entregar informe") rather than from a type word. */
@@ -247,6 +286,8 @@ function exactSubjectRanges(tokens: Token[], entries: SubjectEntry[]): [number, 
  * capture asks for them (`extendedAnchors`): the inbox keeps its conservative reading of pasted messages.
  */
 const MEETING_NOUNS = new Set(['reunion', 'reuniones', 'cita', 'citas', 'tramite', 'tramites']);
+/** "ensayo": a written (or rehearsed) piece of work that is not one of the school types. It is a TASK by default. */
+const ESSAY_NOUNS = new Set(['ensayo', 'ensayos']);
 const ERRAND_VERBS = new Set([
   'llevar',
   'pagar',
@@ -258,10 +299,17 @@ const ERRAND_VERBS = new Set([
   'matricular',
 ]);
 
-function findAnchors(tokens: Token[], entries: SubjectEntry[], extended = false): Anchor[] {
+export function findAnchors(
+  tokens: Token[],
+  entries: SubjectEntry[],
+  extended = false,
+  /** Type words to ignore as anchors ("otro": in running text it is "uno … otro", not the type "Otro"). */
+  skipWords: ReadonlySet<string> = new Set(),
+): Anchor[] {
   const subjectRanges = exactSubjectRanges(tokens, entries);
   const anchors: Anchor[] = [];
   for (const hit of findTypes(tokens)) {
+    if (skipWords.has(tokens[hit.start]!.norm)) continue;
     if (subjectRanges.some(([from, to]) => hit.start >= from && hit.start + hit.length <= to))
       continue;
     const previous = anchors.at(-1);
@@ -292,13 +340,25 @@ function findAnchors(tokens: Token[], entries: SubjectEntry[], extended = false)
       const word = tokens[i]!.norm;
       const implicitType: ActivityType | null = MEETING_NOUNS.has(word)
         ? 'OTHER'
-        : ERRAND_VERBS.has(word)
+        : ERRAND_VERBS.has(word) || ESSAY_NOUNS.has(word)
           ? 'TASK'
           : null;
       if (implicitType === null) continue;
       const inside = anchors.some((a) => i >= a.start && i < a.start + a.length);
       const inSubjectName = subjectRanges.some(([from, to]) => i >= from && i < to);
-      if (!inside && !inSubjectName) anchors.push({ start: i, length: 1, implicitType });
+      // "entregar el ensayo": the delivery verb already is the anchor of that activity.
+      const ofDelivery =
+        ESSAY_NOUNS.has(word) &&
+        anchors.some(
+          (a) =>
+            a.implicitType !== null &&
+            a.start < i &&
+            i - a.start <= 4 &&
+            tokens.slice(a.start + 1, i).every((t) => NOUN_SKIPPABLE.has(t.norm)),
+        );
+      if (!inside && !inSubjectName && !ofDelivery) {
+        anchors.push({ start: i, length: 1, implicitType });
+      }
     }
   }
   return anchors.sort((a, b) => a.start - b.start);

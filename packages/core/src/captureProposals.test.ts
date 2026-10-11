@@ -491,7 +491,7 @@ describe('the title', () => {
   });
 
   it('an unknown type is the usual default with an informative warning that does NOT block', () => {
-    const [p] = run('Ensayo martes', []).proposals;
+    const [p] = run('Cumpleaños de Ana martes', []).proposals;
     expect(p!.type).toMatchObject({ value: 'TASK', certainty: 'MISSING', origin: 'DEFAULT' });
     expect(p!.warnings.map((w) => w.code)).toContain('TYPE_DEFAULTED');
     expect(p!.status).toBe('READY');
@@ -559,25 +559,34 @@ describe('recurrence: detected, shown, never persisted or assumed', () => {
   });
 });
 
-describe('the limit and the edges', () => {
-  const eleven =
-    'tarea lunes, tarea martes, tarea miércoles, tarea jueves, tarea viernes, taller lunes, taller martes, taller miércoles, taller jueves, taller viernes, quiz sábado';
+/** n distinct, well-formed activities, one per line of text: "Taller 1 el 01/12, Taller 2 el 02/12 …". */
+const many = (n: number) =>
+  Array.from({ length: n }, (_, i) => {
+    const day = String((i % 28) + 1).padStart(2, '0');
+    const month = String(12 + Math.floor(i / 28)).padStart(2, '0');
+    return `Taller ${i + 1} el ${day}/${month === '13' ? '01' : month}`;
+  }).join(', ');
 
-  it('more than 10 proposals is TOO_MANY_PROPOSALS: nothing is truncated in silence', () => {
-    const r = run(eleven, []);
+describe('the limit and the edges', () => {
+  it('up to 50 proposals are all returned, none cut (20, 30, 40 and 50)', () => {
+    for (const n of [20, 30, 40, CAPTURE_MAX_PROPOSALS]) {
+      const r = run(many(n), [], 'INBOX');
+      expect(r.status, String(n)).toBe('OK');
+      expect(r.proposals, String(n)).toHaveLength(n);
+      expect(r.proposals.every((p) => p.status === 'READY')).toBe(true);
+    }
+  });
+
+  it('more than 50 is TOO_MANY_PROPOSALS: nothing is truncated in silence', () => {
+    const r = run(many(CAPTURE_MAX_PROPOSALS + 1), [], 'INBOX');
     expect(r.status).toBe('TOO_MANY_PROPOSALS');
     expect(r.proposals).toEqual([]);
     expect(r.warnings[0]).toEqual({
       code: 'TOO_MANY_PROPOSALS',
-      message: 'Encontré más de 10 actividades. Divide el mensaje en dos partes.',
+      message:
+        'Encontré más de 50 actividades. Divide el mensaje en dos partes para revisarlas mejor.',
     });
-    expect(r.stats.found).toBe(11);
-  });
-
-  it('exactly 10 is fine', () => {
-    const r = run(eleven.replace(', quiz sábado', ''), []);
-    expect(r.status).toBe('OK');
-    expect(r.proposals).toHaveLength(CAPTURE_MAX_PROPOSALS);
+    expect(r.stats.found).toBe(CAPTURE_MAX_PROPOSALS + 1);
   });
 
   it('the same day said twice is one proposal; identical activities collapse and are counted', () => {
@@ -589,8 +598,8 @@ describe('the limit and the edges', () => {
 
   it('an empty text, and a text over the limit of its mode', () => {
     expect(run('   ').status).toBe('EMPTY');
-    expect(run('x'.repeat(301)).status).toBe('TOO_LONG');
-    expect(run('x'.repeat(301), SUBJECTS, 'INBOX').status).not.toBe('TOO_LONG'); // a pasted message may be longer
+    expect(run('x'.repeat(5001)).status).toBe('TOO_LONG');
+    expect(run('x'.repeat(4000)).status).not.toBe('TOO_LONG'); // room for fifty activities
     expect(run('x'.repeat(5001), SUBJECTS, 'INBOX').status).toBe('TOO_LONG');
   });
 

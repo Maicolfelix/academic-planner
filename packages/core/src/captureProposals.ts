@@ -1,25 +1,31 @@
 import { z } from 'zod';
 import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
-import { titlesAreRelated, ACADEMIC_CUES, extractAcademicCandidates } from './academicInbox.js';
+import { titlesAreRelated, ACADEMIC_CUES } from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
+import { describeTokens } from './captureContext.js';
+import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
   FIELD_CERTAINTIES,
   QUICK_CAPTURE_MESSAGES,
   STOPWORDS,
+  buildSubjectEntries,
   capitalize,
   cloneTokens,
   interpretWords,
+  matchSubject,
   resolveDate,
   tokenize,
   type FieldCertainty,
   type QuickCaptureContext,
+  type SubjectEntry,
   type Token,
 } from './captureShared.js';
 import {
   planTemporal,
   type PlannedDay,
   type PlannedTime,
+  type TemporalPlan,
   type TimeIssue,
 } from './captureTemporal.js';
 import { dueFromLocal, toLocalParts } from './time.js';
@@ -43,11 +49,16 @@ import { dueFromLocal, toLocalParts } from './time.js';
  * Blocking issues are separate from warnings: a warning ("the date already passed") informs and never blocks.
  */
 
-export const CAPTURE_MAX_PROPOSALS = 10;
+export const CAPTURE_MAX_PROPOSALS = 50;
+/**
+ * The shape and meaning of a result. A review the student left half done is kept as a draft; a draft written by another
+ * version of the engine is not trusted (it is dropped, never repaired). Bump it when the proposals change.
+ */
+export const CAPTURE_ENGINE_VERSION = 2;
 export const CAPTURE_MODES = ['QUICK', 'INBOX'] as const;
 export type CaptureMode = (typeof CAPTURE_MODES)[number];
 /** Characters a text of each mode may have (a quick phrase vs a pasted message). */
-export const CAPTURE_MAX_LENGTH: Record<CaptureMode, number> = { QUICK: 300, INBOX: 5000 };
+export const CAPTURE_MAX_LENGTH: Record<CaptureMode, number> = { QUICK: 5000, INBOX: 5000 };
 /** Hard cap of the request body: far above the product limits, only a guard against abuse. */
 export const CAPTURE_REQUEST_MAX = 20_000;
 
@@ -55,15 +66,20 @@ export const CAPTURE_MESSAGES = {
   EMPTY: 'Escribe o pega algo para continuar.',
   TOO_LONG_QUICK: 'Este texto parece demasiado largo para Captura rápida.',
   TOO_LONG_INBOX: 'El texto es demasiado largo. Pega únicamente el mensaje académico relevante.',
-  TOO_MANY_PROPOSALS: `Encontré más de ${CAPTURE_MAX_PROPOSALS} actividades. Divide el mensaje en dos partes.`,
+  TOO_MANY_PROPOSALS: `Encontré más de ${CAPTURE_MAX_PROPOSALS} actividades. Divide el mensaje en dos partes para revisarlas mejor.`,
   NO_ACTIVITIES: 'No encontramos actividades claras en este mensaje.',
 } as const;
 
 // ───────────────────────── Shape ─────────────────────────
 
 const certainty = z.enum(FIELD_CERTAINTIES);
-/** Where a value came from: the text itself, the rest of the sentence or group, a default, or the student (set by the UI). */
-const origin = z.enum(['PARSED', 'INHERITED', 'DEFAULT', 'USER']);
+/**
+ * Where a value came from: the words next to it (PARSED), the rest of the sentence or group (INHERITED), a LATER clause
+ * that referred back to it ("el parcial es a las 7": REFERENCE), a positional distribution ("los dos primeros":
+ * POSITIONAL), a default, or the student (USER, set by the interface). The interface only highlights what is in doubt;
+ * this says how each value got there.
+ */
+const origin = z.enum(['PARSED', 'INHERITED', 'REFERENCE', 'POSITIONAL', 'DEFAULT', 'USER']);
 const subjectRef = z.object({ id: z.uuid(), name: z.string() });
 
 export const CAPTURE_ISSUE_CODES = [
@@ -76,6 +92,13 @@ export const CAPTURE_ISSUE_CODES = [
   'TIME_INVALID',
   'TIME_UNASSIGNED',
   'TIME_COUNT_MISMATCH',
+  'CONFLICTING_DATE',
+  'CONFLICTING_TIME',
+  'REFERENCE_AMBIGUOUS',
+  'QUANTITY_DATE_MISMATCH',
+  'UNRESOLVED_TIME_REFERENCE',
+  'UNRESOLVED_DATE_REFERENCE',
+  'UNRESOLVED_DESCRIPTION_REFERENCE',
 ] as const;
 export type CaptureIssueCode = (typeof CAPTURE_ISSUE_CODES)[number];
 
@@ -90,12 +113,13 @@ export const CAPTURE_WARNING_CODES = [
   'DATE_OUTSIDE_PERIOD',
   'SUBJECT_INHERITED',
   'POSSIBLE_DUPLICATE',
+  'QUANTITY_DATE_MISMATCH',
 ] as const;
 export type CaptureWarningCode = (typeof CAPTURE_WARNING_CODES)[number];
 
 const issue = z.object({
   code: z.enum(CAPTURE_ISSUE_CODES),
-  field: z.enum(['title', 'subject', 'date', 'time']),
+  field: z.enum(['title', 'subject', 'date', 'time', 'description']),
   message: z.string(),
 });
 const warning = z.object({ code: z.enum(CAPTURE_WARNING_CODES), message: z.string() });
@@ -146,7 +170,13 @@ export const captureProposalSchema = z.object({
   title: stringField,
   type: z.object({ value: z.enum(ACTIVITY_TYPES), certainty, origin }),
   subject: captureSubjectSchema,
-  date: z.object({ value: z.string().nullable(), certainty, origin }),
+  date: z.object({
+    value: z.string().nullable(),
+    certainty,
+    origin,
+    /** The dates the text gave for the same activity when they disagree (the student chooses). */
+    alternatives: z.array(z.string()),
+  }),
   time: z.object({
     /** HH:mm, 24 hours. null: no time, or an ambiguous one (see `alternatives`). */
     value: z.string().nullable(),
@@ -157,6 +187,16 @@ export const captureProposalSchema = z.object({
     alternatives: z.array(z.string()),
     /** The days that share one time expression share this key: one correction fixes them all. */
     groupKey: z.string().nullable(),
+  }),
+  /**
+   * What the student said ABOUT the activity (optional, never blocks): only words they wrote, kept in order. `offered` is
+   * a piece of context that could not be assigned with certainty: shown to be taken or ignored, never applied.
+   */
+  description: z.object({
+    value: z.string().nullable(),
+    certainty,
+    origin,
+    offered: z.string().nullable(),
   }),
   /** Anything that keeps it from being created as it is. Empty when READY. */
   blockingIssues: z.array(issue),
@@ -254,6 +294,14 @@ const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
   TIME_INVALID: 'La hora no es válida.',
   TIME_UNASSIGNED: 'No quedó claro a qué días corresponde cada hora.',
   TIME_COUNT_MISMATCH: 'La cantidad de horas no coincide con la de días.',
+  CONFLICTING_DATE: 'El texto da fechas distintas para la misma actividad: elige una.',
+  CONFLICTING_TIME: 'El texto da horas distintas para la misma actividad: elige una.',
+  REFERENCE_AMBIGUOUS: 'No quedó claro a qué actividad se refiere una aclaración.',
+  QUANTITY_DATE_MISMATCH: 'La cantidad de actividades no coincide con la de fechas.',
+  UNRESOLVED_TIME_REFERENCE: 'Mencionaste una hora, pero no pude asignarla a esta actividad.',
+  UNRESOLVED_DATE_REFERENCE: 'Mencionaste una fecha, pero no pude asignarla a esta actividad.',
+  UNRESOLVED_DESCRIPTION_REFERENCE:
+    'Mencionaste un detalle, pero no pude saber a qué actividad corresponde.',
 };
 const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][number]['field']> = {
   TITLE_MISSING: 'title',
@@ -265,12 +313,19 @@ const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][nu
   TIME_INVALID: 'time',
   TIME_UNASSIGNED: 'time',
   TIME_COUNT_MISMATCH: 'time',
+  CONFLICTING_DATE: 'date',
+  CONFLICTING_TIME: 'time',
+  REFERENCE_AMBIGUOUS: 'time',
+  QUANTITY_DATE_MISMATCH: 'date',
+  UNRESOLVED_TIME_REFERENCE: 'time',
+  UNRESOLVED_DATE_REFERENCE: 'date',
+  UNRESOLVED_DESCRIPTION_REFERENCE: 'description',
 };
-const makeIssue = (code: CaptureIssueCode, message = ISSUE_MESSAGES[code]) => ({
-  code,
-  field: ISSUE_FIELD[code],
-  message,
-});
+const makeIssue = (
+  code: CaptureIssueCode,
+  message = ISSUE_MESSAGES[code],
+  field: CaptureProposal['blockingIssues'][number]['field'] = ISSUE_FIELD[code],
+) => ({ code, field, message });
 const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
   TYPE_DEFAULTED: 'No reconocí un tipo: la propuse como tarea.',
   TITLE_FROM_SUBJECT: 'El título es el nombre de la asignatura: cámbialo si quieres.',
@@ -282,6 +337,7 @@ const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
   DATE_OUTSIDE_PERIOD: QUICK_CAPTURE_MESSAGES.DATE_OUTSIDE_PERIOD,
   SUBJECT_INHERITED: 'La asignatura se tomó del resto de la oración: verifícala.',
   POSSIBLE_DUPLICATE: 'Ya existe una actividad similar.',
+  QUANTITY_DATE_MISMATCH: 'La cantidad de actividades no coincide con la de fechas.',
 };
 const makeWarning = (code: CaptureWarningCode) => ({ code, message: WARNING_MESSAGES[code] });
 
@@ -417,20 +473,22 @@ interface Reading {
   warnings: CaptureWarningCode[];
   blocking: CaptureProposal['blockingIssues'];
   implicit: boolean;
+  description: string | null;
 }
 
 function readWords(
-  candidate: { rawSegment: string; implicitType: ActivityType | null },
+  span: { rawSegment: string; implicitType: ActivityType | null; cutTitle: boolean },
   tokens: Token[],
   shared: Token[] | undefined,
   groupId: string,
-  mode: CaptureMode,
   ctx: QuickCaptureContext,
+  mode: CaptureMode,
 ): Reading {
   const words = interpretWords(tokens, ctx, {
     flagMultipleTypes: false,
     richTitle: mode === 'INBOX',
-    implicitType: candidate.implicitType,
+    cutTitleAtStops: span.cutTitle,
+    implicitType: span.implicitType,
     shared,
   });
   const warnings: CaptureWarningCode[] = [];
@@ -506,7 +564,7 @@ function readWords(
   if (!typeKnown) warnings.push('TYPE_DEFAULTED');
   return {
     groupId,
-    rawSegment: candidate.rawSegment,
+    rawSegment: span.rawSegment,
     title: { value: title, certainty: titleCertainty, origin: 'PARSED' },
     type: {
       value: words.type,
@@ -518,7 +576,8 @@ function readWords(
     tokens,
     warnings,
     blocking,
-    implicit: candidate.implicitType !== null,
+    implicit: span.implicitType !== null,
+    description: words.description,
   };
 }
 
@@ -538,10 +597,165 @@ function statusOf(blocking: CaptureProposal['blockingIssues']): CaptureProposal[
     : 'NEEDS_REVIEW';
 }
 
+// ───────────────────────── Mentions and references ─────────────────────────
+
+/** One activity the text introduced, with everything its own words said and everything later words added to it. */
+/** A mention of an hour, a day or a detail that nobody could own for sure. */
+interface PendingReference {
+  /** AMBIGUOUS: it could be several activities. ORPHAN: it could be none the engine can name. */
+  kind: 'AMBIGUOUS' | 'ORPHAN';
+  field: 'date' | 'time' | 'description';
+  text: string;
+  times: PlannedTime[];
+  days: PlannedDay[];
+  description: string | null;
+}
+
+interface Mention {
+  span: DiscourseSpan;
+  groupId: string;
+  reading: Reading;
+  plan: TemporalPlan;
+  days: PlannedDay[];
+  daysInherited: boolean;
+  sharedTime: PlannedTime | null;
+  /** "dos tareas": how many activities the words say. */
+  count: number | null;
+  /** Later words gave this activity a day the first ones did not agree with: all of them, kept for the student. */
+  dateConflict: PlannedDay[] | null;
+  /**
+   * Later words that mention a day, an hour or a piece of context this activity may be the owner of, but that could not be
+   * tied to it (or to anyone) with certainty. What they carry is OFFERED to the student, never applied.
+   */
+  pending: PendingReference[];
+  /** What the student said about the activity (its own words, then what later clauses added). */
+  description: string | null;
+  descriptionFromReference: boolean;
+  /** The subject came from a later reference. */
+  subjectFromReference: boolean;
+  suggested: boolean;
+}
+
+/** The words a noun phrase puts before the activity word ("un", "las dos") and enumerators are not part of the title. */
+const ENUMERATOR_NORMS = new Set(['uno', 'una', 'unos', 'unas', 'otro', 'otra', 'otros', 'otras']);
+
+/** Marks what is noise to the reading of ONE span: its noun phrase, enumerators, and words said twice in a row. */
+function clearNoise(tokens: Token[], span: DiscourseSpan, entries: SubjectEntry[]): void {
+  if ((span.kind === 'TYPE' || span.kind === 'IMPLICIT') && span.anchorIndex > 0) {
+    for (let i = span.headIndex; i < span.anchorIndex && i < tokens.length; i++)
+      tokens[i]!.used = true;
+  }
+  if (span.count !== null && span.count > 1) {
+    tokens.forEach((t, i) => {
+      if (!t.used && ENUMERATOR_NORMS.has(t.norm) && i !== span.anchorIndex) t.used = true;
+    });
+  }
+  // "jueves jueves", "redes redes": a repeated word adds nothing.
+  for (let i = 1; i < tokens.length; i++) {
+    const [a, b] = [tokens[i - 1]!, tokens[i]!];
+    if (!b.used && a.norm === b.norm && b.norm.length > 2 && !/\d/.test(b.norm)) b.used = true;
+  }
+  // The subject said again later in the same stretch ("parcial de redes ... el de redes").
+  const found = matchSubject(tokens, entries);
+  if (found.kind === 'match' && found.length >= 1) {
+    const seq = tokens.slice(found.start, found.start + found.length).map((t) => t.norm);
+    for (let j = 0; j + seq.length <= tokens.length; j++) {
+      if (j >= found.start && j < found.start + found.length) continue;
+      const same = seq.every((n, k) => !tokens[j + k]!.used && tokens[j + k]!.norm === n);
+      if (same) for (let k = 0; k < seq.length; k++) tokens[j + k]!.used = true;
+    }
+  }
+}
+
+const sameExpr = (a: PlannedDay, b: PlannedDay) =>
+  JSON.stringify(a.expr) === JSON.stringify(b.expr);
+const sameTime = (a: PlannedTime, b: PlannedTime) =>
+  a.value === b.value && a.alternatives.join('/') === b.alternatives.join('/');
+
+/** Gives a day the time a later clause said; if it already had a different one, both are kept for the student. */
+function giveTime(day: PlannedDay, time: PlannedTime, spanIndex: number): void {
+  const incoming: PlannedTime = { ...time, key: `r${spanIndex}:t${time.item}` };
+  if (day.time === null && day.timeIssue === null) {
+    day.time = incoming;
+    day.timeVia = 'DIRECT';
+    day.fromReference = { ...day.fromReference, time: true };
+  } else if (day.time !== null && !sameTime(day.time, incoming)) {
+    day.timeConflict = [...(day.timeConflict ?? [day.time]), incoming];
+  }
+}
+
+/**
+ * A reference ("el parcial es a las 7", "las dos tareas a las 8", "el ensayo es el lunes") adds what it says to the
+ * activities it refers to. What already agrees changes nothing; what disagrees is NOT chosen between: both readings are
+ * kept and the proposal asks. Nothing here invents a day or a time.
+ */
+function applyReference(
+  targets: Mention[],
+  plan: TemporalPlan,
+  subject: { id: string; exact: boolean } | null,
+  description: string | null,
+  spanIndex: number,
+  ctx: QuickCaptureContext,
+): void {
+  for (const m of targets) {
+    if (m.suggested) continue;
+    if (description) {
+      // Context adds up: what was said before and what a later clause adds are both the student's words.
+      if (m.description === null) m.description = description;
+      else if (!m.description.includes(description))
+        m.description = `${m.description}. ${description}`;
+      m.descriptionFromReference = true;
+    }
+    if (subject && m.reading.subject.kind === 'NONE') {
+      const found = ctx.subjects.find((s) => s.id === subject.id);
+      if (found) {
+        m.reading.subject = {
+          kind: 'EXISTING',
+          id: found.id,
+          name: found.name,
+          certainty: subject.exact ? 'EXACT' : 'LIKELY',
+          origin: 'REFERENCE',
+        };
+        m.subjectFromReference = true;
+      }
+    }
+
+    for (const rd of plan.days) {
+      if (m.days.length === 0) {
+        m.days.push({ ...rd, fromReference: { date: true, time: rd.time !== null } });
+        continue;
+      }
+      const same = m.days.find((d) => sameExpr(d, rd));
+      if (same) {
+        if (rd.time) giveTime(same, rd.time, spanIndex);
+      } else {
+        m.dateConflict = [...(m.dateConflict ?? m.days), rd];
+      }
+    }
+
+    // A time with no day of its own: it goes to the days that have none.
+    const loose = plan.timeItems > 0 && plan.days.length === 0 ? plan.times : [];
+    if (loose.length === 1 && loose[0]) {
+      const time = loose[0];
+      if (m.days.length === 0) m.sharedTime ??= { ...time, key: `r${spanIndex}:t${time.item}` };
+      for (const d of m.days) giveTime(d, time, spanIndex);
+    } else if (loose.length > 1) {
+      for (const d of m.days) if (d.time === null) d.timeIssue = 'TIME_COUNT_MISMATCH';
+    }
+  }
+}
+
+// ───────────────────────── Engine ─────────────────────────
+
 /**
  * Interprets a text into proposals. Never throws. QUICK reads a short phrase (the whole text is one stretch when no
  * activity word cuts it); INBOX reads a pasted message conservatively (a sentence with no activity yields nothing).
  * At most CAPTURE_MAX_PROPOSALS: more is reported as TOO_MANY_PROPOSALS, never truncated in silence.
+ *
+ * The text becomes MENTIONS (an activity introduced, with its own days and hours) and REFERENCES (a later clause that
+ * adds a day, an hour or a subject to one: "el parcial es a las 7"); references are merged into their mention before
+ * any proposal is made, so the student never repeats what was said once. What the words contradict is kept as two
+ * readings and asked; what no word settles is left for the student, never guessed.
  */
 export function parseCaptureProposals(
   text: string,
@@ -558,24 +772,47 @@ export function parseCaptureProposals(
     );
   }
 
-  let { candidates } = extractAcademicCandidates(trimmed, context, {
-    extendedAnchors: true,
+  const entries = buildSubjectEntries(context.subjects);
+  let spans = segmentDiscourse(trimmed, context, {
     splitLeading: mode === 'QUICK',
+    implicitDetails: mode === 'QUICK',
   });
-  if (candidates.length === 0 && mode === 'QUICK') {
-    candidates = [
-      { sentenceIndex: 0, rawSegment: trimmed, text: trimmed, sharedText: '', implicitType: null },
+  if (spans.length === 0 && mode === 'QUICK') {
+    // No activity word: the whole phrase is one activity ("Cumpleaños de Ana martes").
+    spans = [
+      {
+        index: 0,
+        sentenceIndex: 0,
+        rawSegment: trimmed,
+        text: trimmed,
+        sharedText: '',
+        implicitType: null,
+        kind: 'LEADING',
+        role: 'INTRO',
+        count: null,
+        definite: false,
+        typeKey: 'leading',
+        anchorIndex: -1,
+        headIndex: 0,
+        anchorLength: 0,
+        targets: [],
+        ambiguous: false,
+      },
     ];
   }
 
   const today = toLocalParts(context.now, context.timeZone).date;
-  const drafts: { key: string; draft: Draft }[] = [];
   const suggestions: Omit<RecurrenceSuggestion, 'clientId'>[] = [];
+  const mentions: Mention[] = [];
+  const bySpan = new Map<number, Mention>();
 
-  candidates.forEach((candidate, c) => {
-    const groupId = `g${c + 1}`;
-    const tokens = tokenize(candidate.text);
-    const sharedTokens = candidate.sharedText === '' ? undefined : tokenize(candidate.sharedText);
+  // 1. Every introduced activity, with its own words.
+  for (const span of spans) {
+    if (span.role !== 'INTRO') continue;
+    const groupId = `g${mentions.length + 1}`;
+    const tokens = tokenize(span.text);
+    clearNoise(tokens, span, entries);
+    const sharedTokens = span.sharedText === '' ? undefined : tokenize(span.sharedText);
     const plan = planTemporal(tokens);
     const sharedPlan = sharedTokens ? planTemporal(cloneTokens(sharedTokens)) : null;
 
@@ -583,7 +820,7 @@ export function parseCaptureProposals(
     let days = plan.days;
     let daysInherited = false;
     if (days.length === 0 && sharedPlan && sharedPlan.days.length > 0) {
-      days = sharedPlan.days;
+      days = sharedPlan.days.map((d) => ({ ...d }));
       daysInherited = true;
     }
     // A time nobody gave this stretch but the sentence did, once.
@@ -592,18 +829,30 @@ export function parseCaptureProposals(
       sharedTime = sharedPlan.times[0] ?? null;
     }
 
-    const reading = readWords(candidate, tokens, sharedTokens, groupId, mode, context);
-    const { words } = reading;
-
-    if (mode === 'INBOX') {
-      const supported =
-        days.length > 0 ||
-        plan.timeItems > 0 ||
-        words.subjectId !== null ||
-        words.ambiguities.length > 0 ||
-        tokens.some((t) => ACADEMIC_CUES.has(t.norm));
-      if (!supported) return;
-    }
+    const reading = readWords(
+      { ...span, cutTitle: span.kind !== 'LEADING' },
+      tokens,
+      sharedTokens,
+      groupId,
+      context,
+      mode,
+    );
+    const mention: Mention = {
+      span,
+      groupId,
+      reading,
+      plan,
+      days,
+      daysInherited,
+      sharedTime,
+      count: span.count,
+      dateConflict: null,
+      pending: [],
+      description: reading.description,
+      descriptionFromReference: false,
+      subjectFromReference: false,
+      suggested: false,
+    };
 
     // It repeats: a suggestion, not a pile of one-off activities.
     const weekdayDays = days.filter((d) => d.expr.kind === 'weekday');
@@ -621,7 +870,7 @@ export function parseCaptureProposals(
       if (until === null) missing.push('until');
       suggestions.push({
         groupId,
-        rawSegment: candidate.rawSegment,
+        rawSegment: span.rawSegment,
         title: reading.title,
         subject: reading.subject,
         slots: [...slots.entries()].map(([weekday, t]) => ({
@@ -640,11 +889,89 @@ export function parseCaptureProposals(
         evidence: plan.recurrence.evidence,
         missing,
       });
-      return;
+      mention.suggested = true;
+    }
+    mentions.push(mention);
+    bySpan.set(span.index, mention);
+  }
+
+  // 2. The references, in the order written: each adds its day, hour, subject or context to the activity it refers to.
+  // What nobody can own for sure is OFFERED to the candidates (never applied, never silently dropped).
+  for (const span of spans) {
+    if (span.role !== 'REFER') continue;
+    const tokens = tokenize(span.text);
+    const plan = planTemporal(tokens);
+    const found = matchSubject(tokens, entries);
+    // The words that only name what is referred to ("las dos tareas", "el parcial") and the subject are not a detail.
+    if (span.kind !== 'DETAIL') {
+      const end = Math.min(tokens.length, span.anchorIndex + Math.max(span.anchorLength, 1));
+      for (let i = span.headIndex; i < end; i++) tokens[i]!.used = true;
+    }
+    if (found.kind === 'match') {
+      for (let i = found.start; i < found.start + found.length; i++) tokens[i]!.used = true;
+    }
+    const subject = found.kind === 'match' ? { id: found.subject.id, exact: found.exact } : null;
+    const description = describeTokens(tokens.filter((t) => !t.used));
+    const carriesDate = plan.days.length > 0;
+    const carriesTime = plan.timeItems > 0;
+    if (!carriesDate && !carriesTime && !subject && !description) continue;
+    const targets = span.targets.map((i) => bySpan.get(i)).filter((m): m is Mention => !!m);
+    if (span.ambiguous || targets.length === 0) {
+      const holders =
+        targets.length > 0
+          ? targets
+          : mentions.filter(
+              (m) =>
+                m.span.index < span.index &&
+                m.span.sentenceIndex ===
+                  Math.max(
+                    -1,
+                    ...mentions
+                      .filter((x) => x.span.index < span.index)
+                      .map((x) => x.span.sentenceIndex),
+                  ),
+            );
+      const kind = span.ambiguous ? 'AMBIGUOUS' : 'ORPHAN';
+      const base = {
+        kind,
+        text: span.rawSegment,
+        times: plan.times.filter((t): t is PlannedTime => t !== null),
+        days: plan.days,
+        description: null,
+      } as const;
+      for (const m of holders) {
+        if (carriesDate) m.pending.push({ ...base, field: 'date' });
+        if (carriesTime) m.pending.push({ ...base, field: 'time' });
+        if (description) m.pending.push({ ...base, field: 'description', description });
+      }
+      continue;
+    }
+    applyReference(targets, plan, subject, description, span.index, context);
+  }
+
+  // 3. Proposals.
+  const drafts: { key: string; draft: Draft }[] = [];
+  for (const mention of mentions) {
+    if (mention.suggested) continue;
+    const { reading, plan, span } = mention;
+    const { words } = reading;
+    let days = mention.days;
+
+    if (mode === 'INBOX') {
+      const supported =
+        days.length > 0 ||
+        plan.timeItems > 0 ||
+        words.subjectId !== null ||
+        words.ambiguities.length > 0 ||
+        mention.subjectFromReference ||
+        tokenize(span.text).some((t) => ACADEMIC_CUES.has(t.norm));
+      if (!supported) continue;
     }
 
-    const timeOf = (d: PlannedDay): PlannedTime | null => d.time ?? sharedTime;
+    const timeOf = (d: PlannedDay): PlannedTime | null => d.time ?? mention.sharedTime;
+    if (mention.dateConflict) days = mention.dateConflict;
     const resolved = days.length > 0 ? resolveDays(days, today, context, timeOf) : [];
+    const weekdayDays = days.filter((d) => d.expr.kind === 'weekday');
     const possibleRecurrence =
       plan.recurrence.plural ||
       (weekdayDays.length >= 2 &&
@@ -653,16 +980,59 @@ export function parseCaptureProposals(
         words.typeCertainty === 'MISSING' &&
         !reading.implicit);
 
-    const rows = days.length > 0 ? days : [null];
-    rows.forEach((day, i) => {
-      const r = resolved[i];
+    // How many proposals this activity is: one per day; "dos tareas" with one day is two on that day; with the days
+    // fewer than the quantity, the ones with no day are asked; with more days than the quantity, the days win.
+    const quantity = mention.count !== null && mention.count > 1 ? mention.count : null;
+    type Row = { index: number; extra: boolean; copy: number };
+    let rows: Row[];
+    if (mention.dateConflict) rows = [{ index: -1, extra: false, copy: 0 }];
+    else if (days.length === 0) {
+      rows = Array.from({ length: quantity ?? 1 }, (_, c) => ({
+        index: -1,
+        extra: false,
+        copy: c,
+      }));
+    } else if (quantity !== null && days.length === 1) {
+      rows = Array.from({ length: quantity }, (_, c) => ({ index: 0, extra: false, copy: c }));
+    } else {
+      rows = days.map((_, i) => ({ index: i, extra: false, copy: 0 }));
+      if (quantity !== null && days.length < quantity) {
+        for (let c = days.length; c < quantity; c++) rows.push({ index: -1, extra: true, copy: c });
+      }
+    }
+    const quantityMismatch = quantity !== null && days.length > 1 && days.length !== quantity;
+    // Hours that were written in this activity's own words and reached none of its days.
+    const timesLost =
+      plan.timeItems > 0 &&
+      mention.sharedTime === null &&
+      !(days.length === 0 && plan.timeItems === 1) &&
+      days.every((d) => d.time === null && d.timeIssue === null);
+
+    rows.forEach((row) => {
+      const day = row.index >= 0 ? days[row.index]! : null;
+      const r = row.index >= 0 ? resolved[row.index] : undefined;
       const blocking = [...reading.blocking];
       const warnings = [...reading.warnings, ...(r?.warnings ?? [])];
+      if (quantityMismatch && !row.extra) warnings.push('QUANTITY_DATE_MISMATCH');
 
       // Date.
       let dateValue: string | null = null;
       let dateCertainty: FieldCertainty = 'MISSING';
-      if (day === null) blocking.push(makeIssue('DATE_MISSING'));
+      let dateAlternatives: string[] = [];
+      if (mention.dateConflict) {
+        dateAlternatives = [
+          ...new Set(resolved.map((x) => x.date).filter((d): d is DateOnly => d !== null)),
+        ];
+        dateCertainty = 'AMBIGUOUS';
+        blocking.push(makeIssue('CONFLICTING_DATE'));
+      } else if (row.extra) {
+        blocking.push(
+          makeIssue(
+            'QUANTITY_DATE_MISMATCH',
+            `Dijiste ${quantity} actividades pero solo encontré ${days.length} ${days.length === 1 ? 'fecha' : 'fechas'}.`,
+          ),
+        );
+      } else if (day === null) blocking.push(makeIssue('DATE_MISSING'));
       else if (r!.date === null) {
         blocking.push(makeIssue('DATE_INVALID', `La fecha "${r!.invalidText}" no es válida.`));
       } else {
@@ -671,10 +1041,19 @@ export function parseCaptureProposals(
       }
 
       // Time.
-      const planned = day === null ? null : timeOf(day);
+      // A time with no day to attach to is not lost: the student only has to say the day.
+      const loneTime = plan.timeItems === 1 ? (plan.times[0] ?? null) : null;
+      const planned = day === null ? (mention.sharedTime ?? loneTime) : timeOf(day);
       const timeInherited =
-        day !== null && (daysInherited || (day.time === null && sharedTime !== null));
-      if (day?.timeIssue === 'TIME_INVALID') {
+        day !== null &&
+        (mention.daysInherited || (day.time === null && mention.sharedTime !== null));
+      let conflictValues: string[] = [];
+      if (day?.timeConflict) {
+        conflictValues = [
+          ...new Set(day.timeConflict.flatMap((t) => (t.value ? [t.value] : t.alternatives))),
+        ];
+        blocking.push(makeIssue('CONFLICTING_TIME'));
+      } else if (day?.timeIssue === 'TIME_INVALID') {
         blocking.push(
           makeIssue('TIME_INVALID', `La hora "${day.invalidTimeText ?? ''}" no es válida.`),
         );
@@ -683,11 +1062,96 @@ export function parseCaptureProposals(
       } else if (planned?.certainty === 'AMBIGUOUS') {
         blocking.push(makeIssue('TIME_AMBIGUOUS'));
       }
-      const hasTime = planned !== null && planned.value !== null;
+      // Words that mention a day, an hour or a detail this activity may own but nobody could tie to it for sure: only
+      // worth asking when it carries what this one lacks. What they say is OFFERED as the choice; nothing is applied
+      // until the student says it is this one. A hint that says exactly what could not be resolved.
+      let offeredTimes: string[] = [];
+      let offeredDates: string[] = [];
+      let offeredDescription: string | null = null;
+      for (const ref of mention.pending) {
+        const ambiguous = ref.kind === 'AMBIGUOUS';
+        if (
+          ref.field === 'time' &&
+          (planned === null || planned.value === null) &&
+          offeredTimes.length === 0
+        ) {
+          offeredTimes = ref.times.flatMap((t) => (t.value ? [t.value] : t.alternatives));
+          blocking.push(
+            ambiguous
+              ? makeIssue(
+                  'REFERENCE_AMBIGUOUS',
+                  `No quedó claro a qué actividad se refiere «${ref.text}».`,
+                  'time',
+                )
+              : makeIssue(
+                  'UNRESOLVED_TIME_REFERENCE',
+                  `Mencionaste una hora («${ref.times.map((t) => t.text).join(', ')}»), pero no pude asignarla a esta actividad.`,
+                ),
+          );
+        } else if (ref.field === 'date' && mention.days.length === 0 && offeredDates.length === 0) {
+          offeredDates = ref.days
+            .map((d) => resolveDate(d.expr, today, null, context, d.text).date)
+            .filter((d): d is DateOnly => d !== null);
+          blocking.push(
+            ambiguous
+              ? makeIssue(
+                  'REFERENCE_AMBIGUOUS',
+                  `No quedó claro a qué actividad se refiere «${ref.text}».`,
+                  'date',
+                )
+              : makeIssue(
+                  'UNRESOLVED_DATE_REFERENCE',
+                  `Mencionaste una fecha («${ref.days.map((d) => d.text).join(', ')}»), pero no pude asignarla a esta actividad.`,
+                ),
+          );
+        } else if (
+          ref.field === 'description' &&
+          mention.description === null &&
+          offeredDescription === null
+        ) {
+          offeredDescription = ref.description;
+          blocking.push(
+            makeIssue(
+              'UNRESOLVED_DESCRIPTION_REFERENCE',
+              `Mencionaste «${ref.description}», pero no pude saber a qué actividad corresponde.`,
+            ),
+          );
+        }
+      }
+      // An hour the student wrote inside this activity's own words that ended up on nobody ("a las 8 y a las 10" with no
+      // day to share them): it is not an optional hour that was left out, it is one that could not be placed.
+      if (timesLost && offeredTimes.length === 0 && !day?.timeConflict && !day?.timeIssue) {
+        const written = plan.times.filter((t): t is PlannedTime => t !== null);
+        if (written.length === 0) {
+          blocking.push(makeIssue('TIME_INVALID', 'La hora escrita no es válida.'));
+        } else {
+          offeredTimes = written.flatMap((t) => (t.value ? [t.value] : t.alternatives));
+          blocking.push(
+            makeIssue(
+              'UNRESOLVED_TIME_REFERENCE',
+              `Mencionaste ${written.length === 1 ? 'una hora' : 'horas'} («${written.map((t) => t.text).join(', ')}»), pero no pude asignarla${written.length === 1 ? '' : 's'} a esta actividad.`,
+            ),
+          );
+        }
+      }
+      if (offeredDates.length > 0) {
+        dateAlternatives = offeredDates;
+        dateCertainty = 'AMBIGUOUS';
+      }
+      const hasTime = !day?.timeConflict && planned !== null && planned.value !== null;
 
-      const planKey = hasTime ? planned!.value : (planned?.alternatives.join('/') ?? '');
+      const planKey = hasTime
+        ? planned!.value
+        : (day?.timeConflict ? conflictValues : (planned?.alternatives ?? [])).join('/');
+      const timeOrigin = day?.fromReference?.time
+        ? 'REFERENCE'
+        : timeInherited
+          ? 'INHERITED'
+          : day?.timeVia === 'POSITIONAL'
+            ? 'POSITIONAL'
+            : 'PARSED';
       const draft: Draft = {
-        groupId,
+        groupId: reading.groupId,
         status: statusOf(blocking),
         rawSegment: reading.rawSegment,
         title: reading.title,
@@ -696,15 +1160,41 @@ export function parseCaptureProposals(
         date: {
           value: dateValue,
           certainty: dateCertainty,
-          origin: daysInherited ? 'INHERITED' : 'PARSED',
+          origin: mention.daysInherited
+            ? 'INHERITED'
+            : day?.fromReference?.date
+              ? 'REFERENCE'
+              : 'PARSED',
+          alternatives: dateAlternatives,
         },
         time: {
           value: hasTime ? planned!.value : null,
           hasTime,
-          certainty: planned === null || day?.timeIssue ? 'MISSING' : planned.certainty,
-          origin: timeInherited ? 'INHERITED' : 'PARSED',
-          alternatives: planned?.alternatives ?? [],
-          groupKey: planned ? `${groupId}:t${planned.item}` : null,
+          certainty:
+            day?.timeConflict || offeredTimes.length > 0
+              ? 'AMBIGUOUS'
+              : planned === null || day?.timeIssue
+                ? 'MISSING'
+                : planned.certainty,
+          origin: timeOrigin,
+          alternatives:
+            offeredTimes.length > 0
+              ? offeredTimes
+              : day?.timeConflict
+                ? conflictValues
+                : (planned?.alternatives ?? []),
+          groupKey: planned ? (planned.key ?? `${reading.groupId}:t${planned.item}`) : null,
+        },
+        description: {
+          value: mention.description,
+          certainty: mention.description === null ? 'MISSING' : 'LIKELY',
+          origin:
+            mention.description === null
+              ? 'DEFAULT'
+              : mention.descriptionFromReference
+                ? 'REFERENCE'
+                : 'PARSED',
+          offered: offeredDescription,
         },
         blockingIssues: blocking,
         warnings: warnings.map(makeWarning),
@@ -719,10 +1209,12 @@ export function parseCaptureProposals(
           dateValue ?? '',
           planKey,
           subjectKey(reading.subject),
+          // "dos tareas" the same day are two activities the student asked for, not one said twice.
+          quantity !== null ? `#${reading.groupId}:${row.copy}` : '',
         ].join('|'),
       });
     });
-  });
+  }
 
   // The same activity said twice ("martes y martes", two sentences that repeat one reminder) is one.
   const seen = new Set<string>();

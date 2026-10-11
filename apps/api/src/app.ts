@@ -56,6 +56,7 @@ import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProgressService } from './services/progressService.js';
+import { createCaptureConfirmService } from './services/captureConfirmService.js';
 import { createCaptureService } from './services/captureService.js';
 import { createQuickCaptureService } from './services/quickCaptureService.js';
 import { createRadarService } from './services/radarService.js';
@@ -134,6 +135,7 @@ export function createApp(deps: AppDeps): Express {
   );
   const captureController = createCaptureController(
     createCaptureService(periodRepository, subjectRepository, activityRepository, clock),
+    createCaptureConfirmService({ runInTransaction, clock }),
   );
   const quickCaptureController = createQuickCaptureController(
     createQuickCaptureService(periodRepository, subjectRepository, clock),

@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_PRIORITIES,
   ACTIVITY_PRIORITY_LABELS,
   ACTIVITY_STATUSES,
@@ -15,8 +16,11 @@ import {
   type Subject,
 } from '@planner/core';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCurrentPeriod } from '../../academic/useAcademic';
 import { useCreateActivity, useUpdateActivity } from '../../activities/useActivities';
 import { ApiRequestError } from '../../api/client';
+import { useMe } from '../../auth/useAuth';
+import { readDraft, useDraftWriter } from '../../lib/drafts';
 import { FormField } from '../../components/FormField';
 import { Button } from '../../components/ui/Button';
 import { Disclosure, FormActions, FormError } from '../../components/ui/form';
@@ -25,6 +29,13 @@ import { SelectField } from '../../components/SelectField';
 import { FIELD_LABEL } from '../../components/ui/fieldStyles';
 import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { ReminderSection } from '../reminders/ReminderSection';
+import {
+  activityDraftSchema,
+  activityDraftScope,
+  isBlank,
+  type ActivityDraft,
+} from './activityDraft';
+import { INLINE_SUBJECT_NAME_ID, InlineSubjectCreator } from './InlineSubjectCreator';
 
 interface Props {
   subjects: Subject[];
@@ -45,6 +56,14 @@ interface Props {
  * activity, e.g. an errand or a meeting) and "Elegir asignatura" brings the selector back. It is never the default when
  * there are subjects: it takes one explicit tap. The last subject chosen is kept while the form is open, so going
  * back and forth does not lose it. Saving in the "Sin asignatura" state sends `subjectId: null`.
+ *
+ * "Crear asignatura" opens a small creator INLINE (not a nested dialog, not another page): everything typed in the
+ * activity stays where it is, and the new subject is added to the options and selected. Nothing is created until the
+ * student asks for it.
+ *
+ * What is typed is kept as a DRAFT in this browser (one for a new activity of the period, one per activity being edited):
+ * closing the dialog, changing page or reloading loses nothing, and it is dropped only when the activity is saved or the
+ * student discards it. An edit whose activity changed on the server meanwhile asks which version to keep.
  */
 export function ActivityFormDialog({
   subjects,
@@ -57,57 +76,163 @@ export function ActivityFormDialog({
   const create = useCreateActivity();
   const update = useUpdateActivity();
   const pending = create.isPending || update.isPending;
+  const { period } = useCurrentPeriod();
 
   // The wall-clock date/time come from core: the form never does timezone math itself.
   const local = activity ? toLocalParts(activity.dueAt, timeZone) : undefined;
 
-  const [title, setTitle] = useState(activity?.title ?? '');
-  const [subjectId, setSubjectId] = useState(
-    activity?.subjectId ??
+  // What the form starts with when there is no draft; the draft (if any) replaces it, and equal to it means "nothing to keep".
+  const [baseline] = useState<ActivityDraft>(() => ({
+    title: activity?.title ?? '',
+    subjectId:
+      activity?.subjectId ??
       (defaultSubjectId && subjects.some((s) => s.id === defaultSubjectId) ? defaultSubjectId : ''),
+    // A general activity opens as such; so does a new one when there is no subject to choose from.
+    subjectless: activity ? activity.subjectId === null : subjects.length === 0,
+    dueDate: local?.date ?? '',
+    dueTime: activity?.hasTime && local ? local.time : '',
+    type: activity?.type ?? DEFAULT_ACTIVITY_TYPE,
+    priority: activity?.priority ?? DEFAULT_ACTIVITY_PRIORITY,
+    status: activity?.status ?? 'PENDING',
+    description: activity?.description ?? '',
+    creatorName: null,
+    base: activity?.updatedAt ?? null,
+  }));
+
+  // Coming back: the draft of this user (and period, or activity), read once when the form opens.
+  const userId = useMe().data?.id;
+  const scope = activityDraftScope(activity?.id, period?.id);
+  const writer = useDraftWriter(userId, scope);
+  const [stored] = useState(() => (userId ? readDraft(userId, scope, activityDraftSchema) : null));
+  // The activity changed on the server since the draft began: the student chooses which version to keep.
+  const [conflict, setConflict] = useState(
+    Boolean(activity && stored && stored.payload.base !== activity.updatedAt),
   );
-  const [dueDate, setDueDate] = useState(local?.date ?? '');
-  const [dueTime, setDueTime] = useState(activity?.hasTime && local ? local.time : '');
-  const [type, setType] = useState<string>(activity?.type ?? DEFAULT_ACTIVITY_TYPE);
-  const [priority, setPriority] = useState<string>(activity?.priority ?? DEFAULT_ACTIVITY_PRIORITY);
-  const [status, setStatus] = useState<string>(activity?.status ?? 'PENDING');
-  const [description, setDescription] = useState(activity?.description ?? '');
+  const [start] = useState<ActivityDraft>(() => (stored && !conflict ? stored.payload : baseline));
+  const restored = start !== baseline;
+
+  const [title, setTitle] = useState(start.title);
+  const [subjectId, setSubjectId] = useState(
+    subjects.some((s) => s.id === start.subjectId) ? start.subjectId : baseline.subjectId,
+  );
+  const [dueDate, setDueDate] = useState(start.dueDate);
+  const [dueTime, setDueTime] = useState(start.dueTime);
+  const [type, setType] = useState<string>(start.type);
+  const [priority, setPriority] = useState<string>(start.priority);
+  const [status, setStatus] = useState<string>(start.status);
+  const [description, setDescription] = useState(start.description);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string>();
 
-  // A general activity opens as such; so does a new one when there is no subject to choose from. Otherwise the subject
-  // is chosen (the usual flow) and omitting it is the student's decision.
-  const [subjectless, setSubjectless] = useState(
-    activity ? activity.subjectId === null : subjects.length === 0,
-  );
+  // Otherwise the subject is chosen (the usual flow) and omitting it is the student's decision.
+  const [subjectless, setSubjectless] = useState(start.subjectless);
   // The swap between the selector and the state animates only once the student asks for it (not when the form opens).
   const [swapped, setSwapped] = useState(false);
-  const focusAfterSwap = useRef<string | null>(null);
-  useEffect(() => {
-    if (!focusAfterSwap.current) return;
-    document.getElementById(focusAfterSwap.current)?.focus();
-    focusAfterSwap.current = null;
-  }, [subjectless]);
+  // Subjects created from this form: they are options at once, without waiting for the list to refresh.
+  const [created, setCreated] = useState<Subject[]>([]);
+  const [creating, setCreating] = useState(start.creatorName !== null);
+  // The name typed in the inline creator so far (kept in the draft; nothing is created by keeping it).
+  const [creatorName, setCreatorName] = useState(start.creatorName ?? '');
+  // Said after selecting a subject the student already had instead of creating a duplicate.
+  const [notice, setNotice] = useState<string>();
+  const options = [...subjects, ...created.filter((c) => !subjects.some((s) => s.id === c.id))];
 
   // The control that was pressed disappears: keep the focus on the one that takes its place.
-  function omitSubject() {
-    focusAfterSwap.current = 'activity-subject-choose';
+  const focusAfter = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusAfter.current) return;
+    document.getElementById(focusAfter.current)?.focus();
+    focusAfter.current = null;
+  });
+
+  // Whatever is typed or chosen is kept; nothing is written for a form that is still as it opened.
+  const current: ActivityDraft = {
+    title,
+    subjectId,
+    subjectless,
+    dueDate,
+    dueTime,
+    type,
+    priority,
+    status,
+    description,
+    creatorName: creating ? creatorName : null,
+    base: activity?.updatedAt ?? null,
+  };
+  const json = JSON.stringify(current);
+  const baselineJson = JSON.stringify(baseline);
+  const saved = useRef(JSON.stringify(start));
+  useEffect(() => {
+    if (json === saved.current) return;
+    saved.current = json;
+    const draft = JSON.parse(json) as ActivityDraft;
+    writer.save(json === baselineJson || (!activity && isBlank(draft)) ? null : draft);
+  }, [json, baselineJson, activity, writer]);
+  const hasDraft = json !== baselineJson && (activity !== undefined || !isBlank(current));
+
+  function applyValues(v: ActivityDraft) {
+    setTitle(v.title);
+    setSubjectId(subjects.some((s) => s.id === v.subjectId) ? v.subjectId : baseline.subjectId);
+    setSubjectless(v.subjectless);
+    setDueDate(v.dueDate);
+    setDueTime(v.dueTime);
+    setType(v.type);
+    setPriority(v.priority);
+    setStatus(v.status);
+    setDescription(v.description);
+    setCreating(v.creatorName !== null);
+    setCreatorName(v.creatorName ?? '');
+    setFieldErrors({});
+    setFormError(undefined);
+  }
+  function discardDraft() {
+    applyValues(baseline);
+    writer.clear();
+    saved.current = baselineJson;
+  }
+
+  const withoutSubjectError = () =>
     setFieldErrors((e) => {
       const rest = { ...e };
       delete rest.subjectId;
       return rest;
     });
+  function omitSubject() {
+    focusAfter.current = 'activity-subject-choose';
+    withoutSubjectError();
+    setNotice(undefined);
     setSwapped(true);
     setSubjectless(true);
   }
   function chooseSubject() {
-    focusAfterSwap.current = 'activity-subject';
+    focusAfter.current = 'activity-subject';
     setSwapped(true);
     setSubjectless(false);
   }
+  function openCreator() {
+    setNotice(undefined);
+    setFormError(undefined);
+    setCreating(true); // the creator focuses its own name
+  }
+  function cancelCreator() {
+    focusAfter.current = 'activity-subject-create';
+    setCreating(false);
+    setCreatorName(''); // cancelling leaves no trace: opening it again starts clean
+  }
+  /** The new (or already existing) subject becomes the selected one; the rest of the form is untouched. */
+  function subjectCreated(subject: Subject, existing: boolean) {
+    setCreated((all) => (all.some((s) => s.id === subject.id) ? all : [...all, subject]));
+    setSubjectId(subject.id);
+    setSubjectless(false);
+    withoutSubjectError();
+    setNotice(existing ? `Ya tenías «${subject.name}»: la seleccioné.` : undefined);
+    setSwapped(true);
+    setCreating(false);
+    focusAfter.current = 'activity-subject';
+  }
 
   // With a single subject there is nothing to choose.
-  const effectiveSubjectId = subjectId || (subjects.length === 1 ? subjects[0]!.id : '');
+  const effectiveSubjectId = subjectId || (options.length === 1 ? options[0]!.id : '');
   const subjectToSend = subjectless ? null : effectiveSubjectId;
 
   const advancedInUse = Boolean(
@@ -129,6 +254,12 @@ export function ActivityFormDialog({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
+    if (creating) {
+      // The new subject is half made: finish or cancel it first (saving now would leave the subject undecided).
+      setFormError('Termina de crear la asignatura o cancélala para guardar la actividad.');
+      document.getElementById(INLINE_SUBJECT_NAME_ID)?.focus();
+      return;
+    }
 
     if (activity) {
       const parsed = updateActivitySchema.safeParse({
@@ -145,7 +276,13 @@ export function ActivityFormDialog({
       setFieldErrors({});
       update.mutate(
         { id: activity.id, input: parsed.data },
-        { onSuccess: () => onSaved('Actividad actualizada.'), onError },
+        {
+          onSuccess: () => {
+            writer.clear();
+            onSaved('Actividad actualizada.');
+          },
+          onError,
+        },
       );
     } else {
       const parsed = createActivitySchema.safeParse({
@@ -159,13 +296,54 @@ export function ActivityFormDialog({
       });
       if (!parsed.success) return setFieldErrors(fieldErrorsOf(parsed.error));
       setFieldErrors({});
-      create.mutate(parsed.data, { onSuccess: () => onSaved('Actividad creada.'), onError });
+      create.mutate(parsed.data, {
+        onSuccess: () => {
+          writer.clear();
+          onSaved('Actividad creada.');
+        },
+        onError,
+      });
     }
   }
 
   return (
-    <Modal title={activity ? 'Editar actividad' : 'Agregar actividad'} onClose={onClose}>
+    <Modal title={activity ? 'Editar actividad' : 'Agregar actividad'} onClose={onClose} keepsWork>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        {conflict && stored && (
+          <div
+            role="group"
+            aria-label="Esta actividad cambió"
+            className="flex flex-col gap-2 rounded-control border border-warning-line bg-warning-soft p-3 text-sm text-warning-ink"
+          >
+            <p>Esta actividad cambió desde que empezaste a editarla. ¿Qué versión quieres?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  applyValues(stored.payload);
+                  setConflict(false);
+                }}
+              >
+                Usar mi borrador
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  writer.clear();
+                  setConflict(false);
+                }}
+              >
+                Usar la versión actual
+              </Button>
+            </div>
+          </div>
+        )}
+        {restored && hasDraft && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Retomé lo que habías escrito.
+          </p>
+        )}
         {formError && <FormError>{formError}</FormError>}
         <FormField
           id="activity-title"
@@ -174,7 +352,16 @@ export function ActivityFormDialog({
           onChange={setTitle}
           error={fieldErrors.title?.[0]}
         />
-        {subjectless ? (
+        {creating ? (
+          <InlineSubjectCreator
+            subjects={options}
+            periodId={period?.id ?? subjects[0]?.periodId}
+            onCreated={subjectCreated}
+            onCancel={cancelCreator}
+            initialName={creatorName}
+            onNameChange={setCreatorName}
+          />
+        ) : subjectless ? (
           <div
             role="group"
             aria-labelledby="activity-subject-label"
@@ -192,19 +379,30 @@ export function ActivityFormDialog({
                 />
                 Sin asignatura
               </p>
-              {subjects.length > 0 && (
+              <div className="-mr-2 flex flex-wrap items-center">
+                {options.length > 0 && (
+                  <Button
+                    id="activity-subject-choose"
+                    size="sm"
+                    variant="ghost"
+                    className="text-accent-ink"
+                    onClick={chooseSubject}
+                  >
+                    Elegir asignatura
+                  </Button>
+                )}
                 <Button
-                  id="activity-subject-choose"
+                  id="activity-subject-create"
                   size="sm"
                   variant="ghost"
-                  className="-mr-2 text-accent-ink"
-                  onClick={chooseSubject}
+                  className="text-accent-ink"
+                  onClick={openCreator}
                 >
-                  Elegir asignatura
+                  Crear asignatura
                 </Button>
-              )}
+              </div>
             </div>
-            {subjects.length === 0 && (
+            {options.length === 0 && (
               <p className="text-sm text-muted-foreground">Aún no tienes asignaturas.</p>
             )}
             {fieldErrors.subjectId?.[0] && (
@@ -218,20 +416,34 @@ export function ActivityFormDialog({
             <SelectField
               id="activity-subject"
               label="Asignatura"
-              placeholder={subjects.length === 1 ? undefined : 'Elige una asignatura'}
+              placeholder={options.length === 1 ? undefined : 'Elige una asignatura'}
               value={effectiveSubjectId}
-              onChange={setSubjectId}
-              options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+              onChange={(value) => {
+                setNotice(undefined);
+                setSubjectId(value);
+              }}
+              options={options.map((s) => ({ value: s.id, label: s.name }))}
               error={fieldErrors.subjectId?.[0]}
             />
-            <Button
-              size="sm"
-              variant="ghost"
-              className="self-start text-accent-ink"
-              onClick={omitSubject}
-            >
-              Omitir asignatura
-            </Button>
+            {notice && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {notice}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-x-1">
+              <Button size="sm" variant="ghost" className="text-accent-ink" onClick={omitSubject}>
+                Omitir asignatura
+              </Button>
+              <Button
+                id="activity-subject-create"
+                size="sm"
+                variant="ghost"
+                className="text-accent-ink"
+                onClick={openCreator}
+              >
+                Crear asignatura
+              </Button>
+            </div>
           </div>
         )}
         {/* When it is edited, the state sits beside the date (two short controls on one row from 640 px). */}
@@ -297,14 +509,24 @@ export function ActivityFormDialog({
           </div>
           <FormField
             id="activity-description"
-            label="Descripción"
+            label="Descripción (opcional)"
+            placeholder="Añade contexto, instrucciones o algo que quieras recordar…"
             multiline
+            maxLength={ACTIVITY_DESCRIPTION_MAX}
             value={description}
             onChange={setDescription}
             error={fieldErrors.description?.[0]}
           />
         </Disclosure>
 
+        {hasDraft && (
+          <p className="text-sm text-muted-foreground">
+            Se guarda como borrador en este dispositivo.{' '}
+            <button type="button" onClick={discardDraft} className="font-medium underline">
+              Descartar borrador
+            </button>
+          </p>
+        )}
         <FormActions>
           <Button onClick={onClose} disabled={pending}>
             Cancelar
