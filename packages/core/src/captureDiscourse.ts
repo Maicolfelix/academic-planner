@@ -323,6 +323,16 @@ function cutBetween(
     else if (t.afterBreak) cut = p;
     if (cut < 0 || cut > limit) continue;
     if (cut < limit && ENUMERATORS.has(tokens[cut]!.norm)) continue;
+    // "ensayo de ciberseguridad, PARA el lunes": a deadline ("para" + a day) belongs to the activity it follows while that
+    // one has no day yet; a comma does not take it away.
+    if (
+      !CLAUSE_SPLITTERS.has(t.norm) &&
+      cut < limit &&
+      tokens[cut]!.norm === 'para' &&
+      datesIn(tokens, cut, limit) > 0 &&
+      datesIn(tokens, previousFrom, cut) === 0
+    )
+      continue;
     if (cut < limit && datesIn(tokens, cut, limit) > 0) {
       const needsMore =
         previous.count !== null &&

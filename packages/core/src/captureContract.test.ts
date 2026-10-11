@@ -286,3 +286,80 @@ describe('reading lines the way they were meant', () => {
     ]);
   });
 });
+
+describe('the title keeps the words the student wrote, in the order they wrote them', () => {
+  const title = (text: string, mode: CaptureMode = 'QUICK', subjects = SUBJECTS) =>
+    run(text, mode, subjects).proposals[0]!.title.value;
+  const NONE: typeof SUBJECTS = [];
+
+  it.each([
+    ['Tarea de programación el viernes', 'Tarea de programación'],
+    ['Proyecto de grado el viernes', 'Proyecto de grado'],
+    ['Lectura del capítulo 4 el martes', 'Lectura del capítulo 4'],
+    ['Taller de redes', 'Taller de redes'],
+    ['Quiz de bases de datos el jueves', 'Quiz de bases de datos'],
+    ['Historia de la medicina el lunes', 'Historia de la medicina'],
+    ['Fundamentos de medicina el lunes', 'Fundamentos de medicina'],
+    ['Informe final del proyecto el martes', 'Informe final del proyecto'],
+  ])('with no subject to resolve, "%s" is "%s"', (text, expected) => {
+    expect(title(text, 'QUICK', NONE)).toBe(expected);
+    // The Inbox only proposes what has an activity word or a verb of delivery, with a day: a bare phrase is not one there.
+    const inbox = run(text, 'INBOX', NONE).proposals;
+    if (inbox.length > 0) expect(inbox[0]!.title.value).toBe(expected);
+    else
+      expect(['Taller de redes', 'Historia de la medicina', 'Fundamentos de medicina']).toContain(
+        expected,
+      );
+  });
+
+  it('the type word stays where it was: "Informe final del proyecto" is never "Proyecto Informe final"', () => {
+    for (const subjects of [NONE, SUBJECTS]) {
+      expect(title('Informe final del proyecto el martes', 'QUICK', subjects)).toBe(
+        'Informe final del proyecto',
+      );
+    }
+  });
+
+  it('a connector goes only with what it linked and was consumed: Redes as the subject leaves "Parcial"', () => {
+    const [p] = run('Parcial de redes el lunes').proposals;
+    expect(p!.title.value).toBe('Parcial');
+    expect(p!.subject).toMatchObject({ kind: 'EXISTING', name: 'Redes de Computadores' });
+    expect(title('Taller de redes')).toBe('Taller');
+    expect(title('Examen de redes el viernes')).toBe('Parcial'); // the type's own label opens the title, as always
+    expect(title('Tarea de redes de programación el lunes')).toBe('Tarea de redes');
+  });
+
+  it('subject inference still works: "Parcial de redes lunes" is Parcial + Redes', () => {
+    const [p] = run('Parcial de redes lunes').proposals;
+    expect([p!.title.value, p!.type.value, p!.subject.kind]).toEqual([
+      'Parcial',
+      'EXAM',
+      'EXISTING',
+    ]);
+    expect(p!.status).toBe('READY');
+  });
+
+  it('a subject name that does not exist is only OFFERED: every word stays, the short title waits for the answer', () => {
+    const [p] = run('Proyecto de grado el viernes').proposals;
+    expect(p!.subject).toMatchObject({ kind: 'UNRESOLVED', reason: 'UNKNOWN_NAME' });
+    expect(p!.title.value).toBe('Proyecto de grado');
+    expect(p!.title.withoutSubject).toBe('Proyecto');
+    // no offered subject, no shorter title
+    expect(
+      run('Proyecto de grado el viernes', 'QUICK', NONE).proposals[0]!.title.withoutSubject,
+    ).toBeNull();
+  });
+
+  it('only the cue of a description was left: those words are the activity, not an empty title', () => {
+    const [p] = run(
+      'tengo que entregar el informe de laboratorio el miércoles a las 11 am',
+    ).proposals;
+    expect(p!.title.value).toBe('Entregar el informe de laboratorio');
+    expect(p!.status).toBe('READY');
+    expect(p!.description.value).toBeNull();
+  });
+
+  it('an ordinal still opens a pasted-message title ("primer parcial" -> "Parcial 1")', () => {
+    expect(title('primer parcial de redes el lunes', 'INBOX')).toBe('Parcial 1');
+  });
+});

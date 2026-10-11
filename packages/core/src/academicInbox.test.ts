@@ -416,7 +416,7 @@ describe('titles', () => {
     ['Parcial 2 de Redes el martes.', 'Parcial 2'],
     ['El tercer quiz de Bases es el viernes.', 'Quiz 3'],
     ['Deben entregar el taller 3 el viernes.', 'Taller 3'],
-    ['Tendremos la presentación del proyecto el jueves.', 'Exposición proyecto'],
+    ['Tendremos la presentación del proyecto el jueves.', 'Exposición del proyecto'],
     ['Deben entregar el informe de laboratorio el viernes.', 'Informe de laboratorio'],
   ])('%s -> %s', (text, title) => {
     expect(inbox(text).proposals[0]!.title).toBe(title);

@@ -167,7 +167,14 @@ export const captureProposalSchema = z.object({
   status: z.enum(['READY', 'NEEDS_REVIEW', 'INVALID']),
   /** The words this proposal came from (never stored). */
   rawSegment: z.string(),
-  title: stringField,
+  title: stringField.extend({
+    /**
+     * Only when the subject is an OFFERED name that does not exist yet ("parcial de ciberseguridad"): the title without
+     * that name ("Parcial"), for when the student accepts the subject. `value` keeps every word written, so answering
+     * "sin asignatura" loses nothing.
+     */
+    withoutSubject: z.string().nullable().default(null),
+  }),
   type: z.object({ value: z.enum(ACTIVITY_TYPES), certainty, origin }),
   subject: captureSubjectSchema,
   date: z.object({
@@ -543,11 +550,11 @@ function readWords(
     }
   }
 
-  // Title: what the words say; if only the subject's name is left, that name; the type's label when a subject name
-  // that does not exist yet was taken out of it.
+  // Title: what the words say; if only the subject's name is left, that name. A subject name that does not exist yet is
+  // only OFFERED as a subject: the words stay in the title (the student may answer "sin asignatura", and "Proyecto de
+  // grado" must not become "Proyecto").
   let title = words.title;
   let titleCertainty: FieldCertainty = 'EXACT';
-  if (suggestedName && words.typeCertainty === 'EXACT') title = ACTIVITY_TYPE_LABELS[words.type];
   if (title === '' && words.subjectText) {
     title = capitalize(words.subjectText);
     titleCertainty = 'LIKELY';
@@ -565,7 +572,13 @@ function readWords(
   return {
     groupId,
     rawSegment: span.rawSegment,
-    title: { value: title, certainty: titleCertainty, origin: 'PARSED' },
+    title: {
+      value: title,
+      certainty: titleCertainty,
+      origin: 'PARSED',
+      withoutSubject:
+        suggestedName && words.typeCertainty === 'EXACT' ? ACTIVITY_TYPE_LABELS[words.type] : null,
+    },
     type: {
       value: words.type,
       certainty: words.typeCertainty,

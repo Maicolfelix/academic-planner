@@ -380,6 +380,77 @@ function foldToken(raw: string): string {
     .replace(/^([ap])\.?m$/, '$1m');
 }
 
+/**
+ * Punctuation is a weak signal, not a wall. A comma that sits INSIDE a construction ("dos, tareas", "para el, dia jueves",
+ * "ensayo, de ciberseguridad") was typed by someone who paused, not by someone who ended a clause; treating it as a
+ * boundary splits a quantity from its noun, a preposition from its complement and a noun from its "de ..." and loses
+ * what was written. Two syntactic facts decide it, with no knowledge of the words around:
+ *  - a comma right AFTER a word that cannot end a clause (an article, preposition, determiner, quantity, conjunction or
+ *    copula: it always needs what comes next) is not a boundary;
+ *  - a comma right BEFORE "de"/"del" is not a boundary: it complements the noun that precedes it;
+ *  - a comma right BEFORE a number that follows a word is not a boundary: the number counts that word.
+ * Only `afterBreak` changes; the raw text and every offset stay as typed.
+ */
+const DANGLING = new Set([
+  ...STOPWORDS,
+  'dos',
+  'tres',
+  'cuatro',
+  'cinco',
+  'seis',
+  'siete',
+  'ocho',
+  'nueve',
+  'diez',
+  'ambos',
+  'ambas',
+  'cada',
+  'otro',
+  'otra',
+  'otros',
+  'otras',
+  'este',
+  'esta',
+  'estos',
+  'estas',
+  'ese',
+  'esa',
+  'esos',
+  'esas',
+  'mi',
+  'mis',
+  'su',
+  'sus',
+  'tu',
+  'tus',
+  'que',
+  'sobre',
+  'entre',
+  'hasta',
+  'desde',
+  'sin',
+  'es',
+  'son',
+  'sera',
+  'seran',
+  'era',
+  'dia', // "el dia, jueves": the word that announces the day
+]);
+const COMPLEMENT_OPENERS = new Set(['de', 'del']);
+
+function softenInternalBreaks(tokens: Token[]): void {
+  for (let i = 1; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (!t.afterBreak) continue;
+    const prev = tokens[i - 1]!;
+    // "capítulo, 4": a number belongs to the word it counts, however the writer paused.
+    const countsPrevious = /^\d+$/.test(t.norm) && !/\d/.test(prev.norm);
+    if (DANGLING.has(prev.norm) || COMPLEMENT_OPENERS.has(t.norm) || countsPrevious) {
+      t.afterBreak = false;
+    }
+  }
+}
+
 export function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   let previousEnd = 0;
@@ -419,6 +490,7 @@ export function tokenize(text: string): Token[] {
       });
     }
   }
+  softenInternalBreaks(tokens);
   return tokens;
 }
 
@@ -1188,15 +1260,22 @@ export function interpretWords(
     typeCertainty = 'LIKELY';
   }
 
-  // 5. Title: the type's label plus whatever text is left (connectors at the edges removed).
-  let rest = tokens.filter((t) => !t.used);
+  // 5. Title: the words the student wrote, in the order they wrote them. The type word stays where it was (as the type's
+  // label when it opens the title: "examen" -> "Parcial"); what a date, a time or the subject consumed is gone. A
+  // connector ("de", "del", "para"...) is dropped only when it dangles at an edge or where something it linked was
+  // consumed: "Parcial de redes" with Redes as the subject is "Parcial", but "Tarea de programación" with no such
+  // subject keeps its "de".
+  const typeTokens = first ? tokens.slice(first.start, first.start + first.length) : [];
+  const isTypeToken = (t: Token) => typeTokens.includes(t);
+  let rest = tokens.filter((t) => !t.used || isTypeToken(t));
   let description: string | null = null;
   if (options.cutTitleAtStops) {
     // The title is the words right after the type word, up to a connector ("tarea PARA el jueves"), a comma or a cue of
     // context. With no type word ("ensayo de ciberseguridad PARA el lunes") it starts after the first real word. Whatever
     // follows is not lost: it is the description when it says something.
+    const typeEnd = first ? first.start + first.length - 1 : -1;
     const from = first
-      ? rest.findIndex((t) => tokens.indexOf(t) > first.start)
+      ? rest.findIndex((t) => tokens.indexOf(t) > typeEnd)
       : rest.findIndex((t) => !QUALIFIER_STOPS.has(t.norm) && !STOPWORDS.has(t.norm)) + 1;
     const cut =
       from < 0
@@ -1212,12 +1291,33 @@ export function interpretWords(
     rest = rest.filter((t) => !isLooseFiller(t.norm));
   }
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
-  while (rest.length > 0 && STOPWORDS.has(rest[0]!.norm)) rest.shift();
-  while (rest.length > 0 && STOPWORDS.has(rest.at(-1)!.norm)) rest.pop();
-  const words = rest.map((t) => t.raw);
-  if (ordinal !== null && !/^\d+$/.test(words[0] ?? '')) words.unshift(String(ordinal));
-  const residual = words.join(' ');
-  let title = first ? `${ACTIVITY_TYPE_LABELS[type]} ${residual}`.trim() : capitalize(residual);
+  const dangling = (t: Token | undefined) =>
+    t !== undefined && STOPWORDS.has(t.norm) && !isTypeToken(t);
+  while (dangling(rest[0])) rest.shift();
+  while (dangling(rest.at(-1))) rest.pop();
+  // A connector whose right-hand side was consumed ("de" REDES, "para" EL JUEVES) linked something that is no longer in the
+  // title: it goes with it.
+  rest = rest.filter((t, i) => {
+    const next = rest[i + 1];
+    return !(dangling(t) && next !== undefined && tokens.indexOf(next) - tokens.indexOf(t) > 1);
+  });
+  const typeFirst = first !== undefined && rest[0] !== undefined && isTypeToken(rest[0]);
+  const words: string[] = [];
+  for (const t of rest) {
+    if (typeFirst && t === typeTokens[0]) words.push(ACTIVITY_TYPE_LABELS[type]);
+    else if (typeFirst && isTypeToken(t))
+      continue; // the rest of a two-word type ("trabajo final")
+    else words.push(t.raw);
+  }
+  if (ordinal !== null && !/^\d+$/.test(words[typeFirst ? 1 : 0] ?? '')) {
+    words.splice(typeFirst ? 1 : 0, 0, String(ordinal));
+  }
+  let title = capitalize(words.join(' ').trim());
+  // Only the cue of a description was left ("tengo que entregar el informe..."): those words ARE the activity.
+  if (title === '' && description !== null && !first) {
+    title = description.replace(/\s*,\s*/g, ' ');
+    description = null;
+  }
   if (title.length > ACTIVITY_TITLE_MAX) {
     title = title.slice(0, ACTIVITY_TITLE_MAX).trimEnd();
     warn({ code: 'TITLE_TRUNCATED', message: QUICK_CAPTURE_MESSAGES.TITLE_TRUNCATED });

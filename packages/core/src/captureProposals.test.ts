@@ -147,7 +147,9 @@ describe('the subject: not mentioned is NOT unresolved', () => {
       reason: 'UNKNOWN_NAME',
       suggestedName: 'Ciberseguridad',
     });
-    expect(p!.title.value).toBe('Parcial');
+    // every word written stays; the title without the offered name is kept for when the student accepts that subject
+    expect(p!.title.value).toBe('Parcial de ciberseguridad');
+    expect(p!.title.withoutSubject).toBe('Parcial');
     expect(p!.date.value).toBe('2026-10-06');
     expect(blocking(p!)).toEqual(['SUBJECT_UNKNOWN']);
     expect(p!.blockingIssues[0]!.message).toContain('Ciberseguridad');
@@ -159,7 +161,7 @@ describe('the subject: not mentioned is NOT unresolved', () => {
     for (const [text, title] of [
       ['Parcial unidad 3 martes', 'Parcial unidad 3'],
       ['Parcial final martes', 'Parcial final'],
-      ['Parcial de unidad 3 martes', 'Parcial unidad 3'],
+      ['Parcial de unidad 3 martes', 'Parcial de unidad 3'], // the "de" was written and nothing consumed it
     ] as const) {
       const [p] = run(text, [REDES, PROG]).proposals;
       expect(p!.subject, text).toMatchObject({ kind: 'NONE', reason: 'NOT_MENTIONED' });
