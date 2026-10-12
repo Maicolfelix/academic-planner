@@ -4,6 +4,7 @@ import { useDueReminders } from '../reminders/useReminders';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useSlidingIndicator } from '../lib/useSlidingIndicator';
 import { LogoutButton } from './LogoutButton';
+import { ReminderBadge } from './ReminderBadge';
 import { BookIcon, BrandMark, CalendarIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
 
 /**
@@ -148,15 +149,7 @@ export function AppShell() {
                         <Icon />
                       </span>
                       {label}
-                      {to === '/dashboard' && dueCount > 0 && (
-                        <span className="absolute top-1.5 left-1/2 ml-3 rounded-full border border-warning-line bg-warning-soft px-1.5 text-xs text-warning-ink lg:static lg:ml-0">
-                          <span aria-hidden="true">🔔 {dueCount}</span>
-                          <span className="sr-only">
-                            {' '}
-                            {dueCount} {dueCount === 1 ? 'recordatorio' : 'recordatorios'}
-                          </span>
-                        </span>
-                      )}
+                      {to === '/dashboard' && <ReminderBadge count={dueCount} />}
                     </>
                   )}
                 </NavLink>

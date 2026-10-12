@@ -158,7 +158,11 @@ test('reminders flow: automatic on create, recalculation, manual, complete/reope
   await expect(panel.getByRole('listitem')).toHaveCount(2);
   await expect(panel.getByRole('listitem').first()).toContainText('Parcial final de Redes');
   await expect(panel.getByText('Redes', { exact: true }).first()).toBeVisible();
-  await expect(nav(page).getByRole('link', { name: /Inicio/ })).toContainText('🔔 2');
+  await expect(nav(page).getByRole('link', { name: /Inicio/ })).toContainText('2 recordatorios');
+  // The bell is an icon of the set, never the emoji, and the badge keeps the count (the link's name says it too).
+  await expect(nav(page).locator('[data-reminder-badge]')).toContainText('2');
+  await expect(page.locator('body')).not.toContainText('🔔');
+  await expect(panel.locator('svg').first()).toHaveAttribute('aria-hidden', 'true');
 
   // Reading the panel never marks anything: after a reload they are still there.
   await page.reload();
@@ -170,14 +174,14 @@ test('reminders flow: automatic on create, recalculation, manual, complete/reope
     .first()
     .click();
   await expect(panel.getByText('Tienes 1 recordatorio', { exact: true })).toBeVisible();
-  await expect(nav(page).getByRole('link', { name: /Inicio/ })).toContainText('🔔 1');
+  await expect(nav(page).getByRole('link', { name: /Inicio/ })).toContainText('1 recordatorio');
   await page.reload();
   await expect(panel.getByText('Tienes 1 recordatorio', { exact: true })).toBeVisible();
   await panel.getByRole('button', { name: /Marcar como visto/ }).click();
   await expect(page.getByRole('heading', { name: 'Recordatorios' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Recordatorios' })).toHaveCount(0);
-  await expect(nav(page).getByRole('link', { name: 'Inicio' })).not.toContainText('🔔');
+  await expect(nav(page).getByRole('link', { name: 'Inicio' })).not.toContainText('recordatorio');
 
   // The seen ones show as "Mostrado" in the activity.
   await nav(page).getByRole('link', { name: 'Actividades' }).click();

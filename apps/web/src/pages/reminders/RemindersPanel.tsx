@@ -1,4 +1,5 @@
 import { DUE_REMINDERS_LIMIT, reminderMessage } from '@planner/core';
+import { BellIcon } from '../../components/ui/icons';
 import { useDueReminders, useMarkSeen } from '../../reminders/useReminders';
 
 /**
@@ -35,11 +36,11 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-white p-3"
           >
             <div className="min-w-0 flex-1">
-              <p className="break-words">
-                <span aria-hidden="true">🔔 </span>
-                {reminderMessage(r.activity, now, timeZone)}
+              <p className="flex items-start gap-2 break-words">
+                <BellIcon className="mt-0.5 size-4 shrink-0 text-warning-ink" />
+                <span className="min-w-0">{reminderMessage(r.activity, now, timeZone)}</span>
               </p>
-              <p className="text-sm break-words text-slate-700">
+              <p className="pl-6 text-sm break-words text-slate-700">
                 {r.subject?.name ?? 'Sin asignatura'}
               </p>
             </div>
