@@ -21,9 +21,12 @@ import {
 } from './captureDraft';
 import {
   buildConfirmRequest,
+  createdMessage,
   createReview,
   reconcileSubjects,
+  recurrenceOfBlock,
   removeAll,
+  removeRecurrences,
   setError,
   type ReviewState,
 } from './reviewModel';
@@ -98,7 +101,7 @@ function CaptureFlowFor({
   );
   const [inputError, setInputError] = useState<string>();
   const [confirmError, setConfirmError] = useState<{ message: string; copies: boolean }>();
-  const [done, setDone] = useState<string>();
+  const [done, setDone] = useState<{ message: string; blocks: boolean }>();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const focusReview = useRef(false);
@@ -154,21 +157,29 @@ function CaptureFlowFor({
     confirm.mutate(request, {
       onSuccess: (result) => {
         // What was created leaves the review; what the student left unticked stays (and stays kept) to be dealt with.
-        const rest = removeAll(review, new Set(result.createdActivities.map((c) => c.clientId)));
-        const created =
-          result.count === 1 ? '1 actividad creada.' : `${result.count} actividades creadas.`;
+        const doneBlocks = [...result.createdBlocks, ...result.reusedBlocks].map((b) =>
+          recurrenceOfBlock(b.clientId),
+        );
+        const rest = removeRecurrences(
+          removeAll(review, new Set(result.createdActivities.map((c) => c.clientId))),
+          new Set(doneBlocks),
+        );
+        const created = createdMessage(result);
+        const blocks = doneBlocks.length > 0;
+        const left = rest.items.length + rest.recurrences.length;
         setRestored(false);
-        if (rest.items.length === 0) {
+        if (left === 0) {
           writer.clear();
           setReview(null);
           setText('');
-          setDone(created);
+          setDone({ message: created, blocks });
           requestAnimationFrame(() => inputRef.current?.focus());
         } else {
           commit(text, rest);
-          setDone(
-            `${created} Quedan ${rest.items.length} sin crear: complétalas, márcalas o descártalas.`,
-          );
+          setDone({
+            message: `${created} Quedan ${left} sin crear: complétalas, márcalas o descártalas.`,
+            blocks,
+          });
         }
       },
       onError: (err) => {
@@ -213,10 +224,18 @@ function CaptureFlowFor({
     <div className="flex flex-col gap-3">
       {done && (
         <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success-ink">
-          {done}{' '}
+          {done.message}{' '}
           <Link to="/activities" className="font-medium underline">
             Ver actividades
           </Link>
+          {done.blocks && (
+            <>
+              {' · '}
+              <Link to="/calendar" className="font-medium underline">
+                Ver agenda
+              </Link>
+            </>
+          )}
         </p>
       )}
 

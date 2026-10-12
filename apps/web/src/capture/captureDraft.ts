@@ -42,7 +42,24 @@ const reviewSchema = z.object({
   groupTime: z.record(z.string(), z.string()),
   groupSubject: z.record(z.string(), subjectChoice),
   corrections: z.array(captureCorrectionSchema),
-  suggestions: z.array(recurrenceSuggestionSchema),
+  recurrences: z.array(
+    z.object({
+      suggestion: recurrenceSuggestionSchema,
+      selected: z.boolean(),
+      selectionTouched: z.boolean(),
+      title: z.string().max(500).optional(),
+      subject: subjectChoice.optional(),
+      days: z.array(z.number().int().min(1).max(7)).max(7).optional(),
+      times: z
+        .record(
+          z.string(),
+          z.object({ start: z.string().max(5).optional(), end: z.string().max(5).optional() }),
+        )
+        .optional(),
+      sharedEnd: z.string().max(5).optional(),
+      sharedStart: z.string().max(5).optional(),
+    }),
+  ),
   notice: z.string().nullable().optional(),
 });
 
@@ -66,7 +83,7 @@ export function toCaptureDraft(text: string, review: ReviewState | null): Captur
       groupTime: review.groupTime,
       groupSubject: review.groupSubject,
       corrections: review.corrections,
-      suggestions: review.suggestions,
+      recurrences: review.recurrences.map(({ error: _error, ...r }) => r),
       notice: review.notice ?? null,
     },
   };

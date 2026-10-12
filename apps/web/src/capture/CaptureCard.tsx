@@ -56,7 +56,7 @@ interface Props {
 const NEW_SUBJECT = '__new__';
 const NO_SUBJECT = '__none__';
 
-const askClass =
+export const askClass =
   'flex flex-col gap-2 rounded-control border border-warning-line bg-warning-soft/60 p-3 text-sm';
 
 /** A heading whose level the place decides (a card sits one level below the review that holds it). */
@@ -430,12 +430,15 @@ export function SubjectQuestion({
   subjects,
   onPick,
   title,
+  allowNone = true,
 }: {
   id: string;
   subject: ReviewItem['proposal']['subject'];
   subjects: readonly Subject[];
   onPick: (c: SubjectChoice) => void;
   title: string | null;
+  /** A weekly class cannot have "sin asignatura": its question does not offer it. */
+  allowNone?: boolean;
 }) {
   const [other, setOther] = useState(false);
   if (subject.kind !== 'UNRESOLVED') return null;
@@ -481,9 +484,11 @@ export function SubjectQuestion({
             Elegir otra
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={() => onPick({ kind: 'NONE' })}>
-          Sin asignatura
-        </Button>
+        {allowNone && (
+          <Button size="sm" variant="ghost" onClick={() => onPick({ kind: 'NONE' })}>
+            Sin asignatura
+          </Button>
+        )}
       </div>
       {other && (
         <SelectField
@@ -503,16 +508,18 @@ export function SubjectQuestion({
 }
 
 /** The always-available way to set the subject of ONE proposal: none, one of theirs, or a new one by name. */
-function SubjectPicker({
+export function SubjectPicker({
   id,
   value,
   subjects,
   onPick,
+  allowNone = true,
 }: {
   id: string;
   value: SubjectChoice | undefined;
   subjects: readonly Subject[];
   onPick: (c: SubjectChoice) => void;
+  allowNone?: boolean;
 }) {
   const [newName, setNewName] = useState(value?.kind === 'NEW' ? value.name : '');
   const [creating, setCreating] = useState(value?.kind === 'NEW');
@@ -544,7 +551,7 @@ function SubjectPicker({
           }
         }}
         options={[
-          { value: NO_SUBJECT, label: 'Sin asignatura' },
+          ...(allowNone ? [{ value: NO_SUBJECT, label: 'Sin asignatura' }] : []),
           ...subjects.map((s) => ({ value: s.id, label: s.name })),
           { value: NEW_SUBJECT, label: 'Crear asignatura nueva…' },
         ]}

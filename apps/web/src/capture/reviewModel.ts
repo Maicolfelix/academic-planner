@@ -45,13 +45,37 @@ export interface ReviewItem {
   error?: string;
 }
 
+export type RecurrencePending = 'title' | 'subject' | 'days' | 'start' | 'end';
+
+/**
+ * A weekly schedule the engine understood ("Ciberseguridad todos los martes y jueves de 6 a 8") and what the student
+ * decided about it. One card = one subject and its weekdays; each weekday becomes one weekly block when confirmed.
+ */
+export interface ReviewRecurrence {
+  suggestion: RecurrenceSuggestion;
+  selected: boolean;
+  selectionTouched: boolean;
+  title?: string;
+  subject?: SubjectChoice;
+  /** The weekdays (1 = Monday) chosen by hand; undefined = the ones the engine read. */
+  days?: number[];
+  /** Times typed for ONE weekday ('HH:mm'). */
+  times?: Record<string, { start?: string; end?: string }>;
+  /** "¿Hasta qué hora?" answered once: the end of every day that has none (the start, the same way). */
+  sharedEnd?: string;
+  sharedStart?: string;
+  /** A message from the last attempt to create it. */
+  error?: string;
+}
+
 export interface ReviewState {
   items: ReviewItem[];
+  /** The weekly schedules found (also the ones that cannot be created yet: they are only shown). */
+  recurrences: ReviewRecurrence[];
   /** The answers to shared questions: the hour of a time group ('' = no time), the subject of a subject group. */
   groupTime: Record<string, string>;
   groupSubject: Record<string, SubjectChoice>;
   corrections: CaptureCorrection[];
-  suggestions: RecurrenceSuggestion[];
   /** Something to read before ticking anything ("Dijiste que eran 3 actividades, pero solo pude identificar 2."). */
   notice?: string | null;
 }
@@ -75,7 +99,11 @@ export function createReview(
     groupTime: {},
     groupSubject: {},
     corrections: result.corrections,
-    suggestions: result.suggestions,
+    recurrences: result.suggestions.map((suggestion) => ({
+      suggestion,
+      selected: suggestion.selected && suggestion.kind === 'WEEKLY_SCHEDULE',
+      selectionTouched: false,
+    })),
   };
 }
 
@@ -177,6 +205,11 @@ function settle(state: ReviewState): ReviewState {
       const wanted = isComplete(state, item) && item.proposal.duplicateOf === null;
       return item.selected === wanted ? item : { ...item, selected: wanted };
     }),
+    recurrences: state.recurrences.map((r) => {
+      if (r.selectionTouched || !isCreatable(r)) return r;
+      const wanted = isRecurrenceComplete(r);
+      return r.selected === wanted ? r : { ...r, selected: wanted };
+    }),
   };
 }
 
@@ -237,9 +270,138 @@ export const removeAll = (state: ReviewState, clientIds: ReadonlySet<string>): R
 export const remove = (state: ReviewState, clientId: string): ReviewState =>
   removeAll(state, new Set([clientId]));
 
+// ───────────────────────── Weekly schedules ─────────────────────────
+
+/** A schedule the app can create. A repeating ACTIVITY ("un quiz todos los viernes") is only shown. */
+export const isCreatable = (r: ReviewRecurrence) => r.suggestion.kind === 'WEEKLY_SCHEDULE';
+
+export const effectiveRecurrenceTitle = (r: ReviewRecurrence): string =>
+  r.title ?? r.suggestion.title.value ?? '';
+
+/** The subject chosen, or undefined while the student still has to decide. */
+export function effectiveRecurrenceSubject(r: ReviewRecurrence): SubjectChoice | undefined {
+  if (r.subject) return r.subject;
+  const s = r.suggestion.subject;
+  if (s.kind === 'EXISTING') return { kind: 'EXISTING', id: s.id, name: s.name };
+  if (s.kind === 'NONE') return { kind: 'NONE' };
+  return undefined;
+}
+
+export interface EffectiveSlot {
+  weekday: number;
+  /** 'HH:mm', or '' while it is a question. */
+  start: string;
+  end: string;
+}
+
+/** The weekdays and their two times as they would be created. An added weekday starts like the first one. */
+export function effectiveSlots(r: ReviewRecurrence): EffectiveSlot[] {
+  const read = r.suggestion.slots;
+  const days = [...new Set(r.days ?? read.map((x) => x.weekday))].sort((a, b) => a - b);
+  const first = read[0];
+  return days.map((weekday) => {
+    const own = r.times?.[String(weekday)];
+    const base = read.find((x) => x.weekday === weekday) ?? first;
+    return {
+      weekday,
+      start: own?.start ?? base?.time.value ?? r.sharedStart ?? '',
+      end: own?.end ?? base?.endTime.value ?? r.sharedEnd ?? '',
+    };
+  });
+}
+
+/** What the student still has to settle before this schedule can be created. */
+export function recurrencePendingOf(r: ReviewRecurrence): RecurrencePending[] {
+  const out: RecurrencePending[] = [];
+  if (effectiveRecurrenceTitle(r).trim() === '') out.push('title');
+  const subject = effectiveRecurrenceSubject(r);
+  // A class belongs to a subject; a study session may have none.
+  if (subject === undefined || (r.suggestion.blockType === 'CLASS' && subject.kind === 'NONE')) {
+    out.push('subject');
+  }
+  const slots = effectiveSlots(r);
+  if (slots.length === 0) out.push('days');
+  if (slots.some((x) => x.start === '')) out.push('start');
+  if (slots.some((x) => x.end === '' || (x.start !== '' && x.end <= x.start))) out.push('end');
+  return out;
+}
+
+export const isRecurrenceComplete = (r: ReviewRecurrence) =>
+  isCreatable(r) && recurrencePendingOf(r).length === 0;
+
+const patchRecurrence = (
+  state: ReviewState,
+  clientId: string,
+  patch: (r: ReviewRecurrence) => Partial<ReviewRecurrence>,
+): ReviewState =>
+  settle({
+    ...state,
+    recurrences: state.recurrences.map((r) =>
+      r.suggestion.clientId === clientId ? { ...r, error: undefined, ...patch(r) } : r,
+    ),
+  });
+
+export const setRecurrenceTitle = (s: ReviewState, id: string, title: string) =>
+  patchRecurrence(s, id, () => ({ title }));
+export const setRecurrenceSubject = (s: ReviewState, id: string, subject: SubjectChoice) =>
+  patchRecurrence(s, id, () => ({ subject }));
+export const setRecurrenceSharedEnd = (s: ReviewState, id: string, sharedEnd: string) =>
+  patchRecurrence(s, id, () => ({ sharedEnd }));
+export const setRecurrenceSharedStart = (s: ReviewState, id: string, sharedStart: string) =>
+  patchRecurrence(s, id, () => ({ sharedStart }));
+/** A time typed for ONE weekday. */
+export const setRecurrenceTime = (
+  s: ReviewState,
+  id: string,
+  weekday: number,
+  which: 'start' | 'end',
+  value: string,
+) =>
+  patchRecurrence(s, id, (r) => ({
+    times: {
+      ...r.times,
+      [String(weekday)]: { ...r.times?.[String(weekday)], [which]: value },
+    },
+  }));
+/** Adds or takes out a weekday. */
+export const toggleRecurrenceDay = (s: ReviewState, id: string, weekday: number) =>
+  patchRecurrence(s, id, (r) => {
+    const now = effectiveSlots(r).map((x) => x.weekday);
+    return {
+      days: now.includes(weekday) ? now.filter((d) => d !== weekday) : [...now, weekday],
+    };
+  });
+
+export const toggleRecurrence = (state: ReviewState, clientId: string, selected: boolean) => ({
+  ...state,
+  recurrences: state.recurrences.map((r) =>
+    r.suggestion.clientId === clientId ? { ...r, selected, selectionTouched: true } : r,
+  ),
+});
+
+/** Takes schedules out of the review (the ones created, or the one the student does not want). */
+export const removeRecurrences = (
+  state: ReviewState,
+  clientIds: ReadonlySet<string>,
+): ReviewState => ({
+  ...state,
+  recurrences: state.recurrences.filter((r) => !clientIds.has(r.suggestion.clientId)),
+});
+
+/** The client id one weekday of a schedule is sent with, and back: "s1:2" is the Tuesday of "s1". */
+export const blockClientId = (recurrenceId: string, weekday: number) =>
+  `${recurrenceId}:${weekday}`;
+export const recurrenceOfBlock = (blockId: string) => blockId.split(':')[0]!;
+
 export const setError = (state: ReviewState, errors: Record<string, string>): ReviewState => ({
   ...state,
   items: state.items.map((i) => ({ ...i, error: errors[i.proposal.clientId] })),
+  recurrences: state.recurrences.map((r) => ({
+    ...r,
+    error: Object.entries(errors).find(
+      ([id]) => recurrenceOfBlock(id) === r.suggestion.clientId,
+    )?.[1],
+  })),
 });
 
 /** Subjects the student chose that no longer exist (deleted meanwhile) go back to being a question. */
@@ -256,13 +418,23 @@ export function reconcileSubjects(state: ReviewState, subjects: readonly Subject
     items: state.items.map((i) =>
       keep(i.subject) === i.subject ? i : { ...i, subject: undefined },
     ),
+    recurrences: state.recurrences.map((r) =>
+      keep(r.subject) === r.subject ? r : { ...r, subject: undefined },
+    ),
   });
 }
 
 // ───────────────────────── Reading the whole review ─────────────────────────
 
 export interface ReviewSummary {
+  /** The activities found. */
   total: number;
+  /** The weekly schedules found that can be created. */
+  schedules: number;
+  /** Repeating activities understood but not creatable yet. */
+  unsupported: number;
+  /** Weekly blocks that confirming will create (one per weekday of a ticked, complete schedule). */
+  blocksToCreate: number;
   /** Missing something the student has to decide, ticked or not. */
   needsReview: number;
   /** Ticked and complete: what "Crear N" creates. */
@@ -281,6 +453,22 @@ export function summarize(state: ReviewState): ReviewSummary {
   let skipped = 0;
   let needsReview = 0;
   const names = new Map<string, string>();
+  let blocksToCreate = 0;
+  const creatable = state.recurrences.filter(isCreatable);
+  for (const r of creatable) {
+    if (!isRecurrenceComplete(r)) needsReview++;
+    if (!r.selected) {
+      skipped++;
+      continue;
+    }
+    if (!isRecurrenceComplete(r)) {
+      incomplete++;
+      continue;
+    }
+    blocksToCreate += effectiveSlots(r).length;
+    const subject = effectiveRecurrenceSubject(r);
+    if (subject?.kind === 'NEW') names.set(normalizeNameKey(subject.name), subject.name.trim());
+  }
   for (const item of state.items) {
     if (!isComplete(state, item)) needsReview++;
     if (!item.selected) {
@@ -297,6 +485,9 @@ export function summarize(state: ReviewState): ReviewSummary {
   }
   return {
     total: state.items.length,
+    schedules: creatable.length,
+    unsupported: state.recurrences.length - creatable.length,
+    blocksToCreate,
     needsReview,
     toCreate,
     incomplete,
@@ -305,9 +496,68 @@ export function summarize(state: ReviewState): ReviewSummary {
   };
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** What the button says it will do: "Crear 2 actividades", "Crear horario", "Crear 1 actividad y 2 bloques". */
+export function confirmLabel(summary: ReviewSummary, busy = false): string {
+  const { toCreate, blocksToCreate } = summary;
+  if (busy) return 'Creando…';
+  if (blocksToCreate === 0) return `Crear ${plural(toCreate, 'actividad', 'actividades')}`;
+  if (toCreate === 0) return 'Crear horario';
+  return `Crear ${plural(toCreate, 'actividad', 'actividades')} y ${plural(blocksToCreate, 'bloque', 'bloques')}`;
+}
+
+/** The sentence after a confirmation: what was created and what was already there. */
+export function createdMessage(result: {
+  count: number;
+  createdBlocks: readonly unknown[];
+  reusedBlocks: readonly unknown[];
+}): string {
+  const parts: string[] = [];
+  if (result.count > 0) {
+    parts.push(result.count === 1 ? '1 actividad creada' : `${result.count} actividades creadas`);
+  }
+  const blocks = result.createdBlocks.length;
+  if (blocks > 0) {
+    parts.push(
+      blocks === 1 ? '1 bloque de horario creado' : `${blocks} bloques de horario creados`,
+    );
+  }
+  const reused = result.reusedBlocks.length;
+  if (reused > 0) {
+    parts.push(
+      reused === 1
+        ? '1 bloque ya estaba en tu horario'
+        : `${reused} bloques ya estaban en tu horario`,
+    );
+  }
+  return `${parts.join(' y ')}.`;
+}
+
 /** The request that creates what is ticked. Only complete ones go: the button never offers more than that. */
 export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
   const items: CaptureConfirmRequest['items'] = [];
+  const blocks: CaptureConfirmRequest['blocks'] = [];
+  for (const r of state.recurrences) {
+    if (!r.selected || !isRecurrenceComplete(r)) continue;
+    const subject = effectiveRecurrenceSubject(r)!;
+    for (const slot of effectiveSlots(r)) {
+      blocks.push({
+        clientId: blockClientId(r.suggestion.clientId, slot.weekday),
+        type: r.suggestion.blockType,
+        title: effectiveRecurrenceTitle(r).trim(),
+        weekday: slot.weekday,
+        startTime: slot.start,
+        endTime: slot.end,
+        subject:
+          subject.kind === 'EXISTING'
+            ? { kind: 'EXISTING', subjectId: subject.id }
+            : subject.kind === 'NEW'
+              ? { kind: 'NEW', name: subject.name.trim() }
+              : { kind: 'NONE' },
+      });
+    }
+  }
   for (const item of state.items) {
     if (!item.selected || !isComplete(state, item)) continue;
     const subject = effectiveSubject(state, item)!;
@@ -329,5 +579,5 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
       ...(item.allowDuplicate ? { allowDuplicate: true } : {}),
     });
   }
-  return { items };
+  return { items, blocks };
 }
