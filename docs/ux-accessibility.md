@@ -228,6 +228,8 @@ Cierra la deuda visual que quedaba tras UX1-3. **Solo presentación:** mismas re
 
 ## Iconografía de recordatorios
 
+**DONE: fusionado (PR #33, merge `3e30c81`) con QA real en iPhone aprobada por el mantenedor** (contador con 1, 9 y 12, tarjetas de recordatorios, toques y rotación; PWA y HTTPS sin probar).
+
 Sin emoji: `BellIcon` (SVG del conjunto, `aria-hidden`). El contador del enlace «Inicio» (`ReminderBadge`) es un círculo pequeño con un anillo del color de la barra, anclado a la esquina del icono (desde 1024 px, junto a la etiqueta y con la campana pequeña); el número es el resumen visual y el nombre accesible del enlace lo dice con palabras («Inicio 2 recordatorios»). Cada recordatorio de la tarjeta lleva una campana de 16 px alineada con su texto. Medido a 320, 390, 430, 768 y 1366 px con 1, 9 y 12 sin desborde, con el enlace ≥ 44 px y axe limpio (`e2e/notification-polish.spec.ts`).
 
 ## Horario semanal en la revisión de captura (F1-2e)
