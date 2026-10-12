@@ -92,6 +92,10 @@ Sin `periodId` se usa el periodo actual (`NO_CURRENT_PERIOD` si no hay).
 - **Dashboard:** `classesToday` = bloques `CLASS` del día local actual y del periodo actual, por hora, máximo 5 (se expande solo "hoy"; +1 consulta). Los `Activity` **no** se mezclan en la agenda.
 - **Rendimiento:** una consulta semanal usa 2 consultas (sesión + bloques candidatos) y solo expande el rango pedido. Medido: 15 ocurrencias de 72 bloques, ~20 ms.
 
+## Creación desde la Captura inteligente (F1-2e)
+
+`POST /api/capture/confirm` también crea bloques semanales (`blocks[]`: `CLASS`/`STUDY`, día de la semana, inicio, fin, asignatura): uno por día de la semana, con la primera fecha que cae en ese día desde el inicio del periodo y la repetición hasta el fin del periodo, todo decidido por el servidor y en la **misma transacción** que las actividades y las asignaturas nuevas. Pasa por `ScheduleService.create` (mismas reglas que `POST /api/schedule`); un bloque con mismo tipo, asignatura, día y horas que ya está en la agenda se reutiliza. Ver [capture-proposals.md](capture-proposals.md#recurrencia-semanal-f1-2e).
+
 ## UX
 
 - **Escritorio (≥ 768 px):** semana completa lunes→domingo, bloques posicionados por hora; los que se solapan se reparten el ancho y muestran una versión compacta (⚠ + título + hora).
