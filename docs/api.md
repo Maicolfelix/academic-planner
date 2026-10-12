@@ -59,13 +59,13 @@ Sin id en la URL: el dueño sale solo de la sesión (nunca `userId`, correo ni z
 
 ## Periodos académicos (`/api/periods`) — [academic.md](academic.md)
 
-| Método y ruta             | Para qué                             | Entrada                                    | Éxito             | Errores importantes                           |
-| ------------------------- | ------------------------------------ | ------------------------------------------ | ----------------- | --------------------------------------------- |
-| `GET /api/periods`        | Listar los periodos del usuario      | —                                          | `200 { periods }` | —                                             |
-| `POST /api/periods`       | Crear (el primero queda como actual) | `{ name, startDate, endDate, isCurrent? }` | `201 { period }`  | 400 (`endDate` ≤ `startDate`), 409 `CONFLICT` |
-| `GET /api/periods/:id`    | Leer uno                             | —                                          | `200 { period }`  | 404                                           |
-| `PATCH /api/periods/:id`  | Editar / marcar como actual          | campos opcionales                          | `200 { period }`  | 400, 404, 409 `CONFLICT`                      |
-| `DELETE /api/periods/:id` | Eliminar                             | —                                          | `204`             | 404, 409 `PERIOD_NOT_EMPTY`                   |
+| Método y ruta             | Para qué                             | Entrada                                                                  | Éxito             | Errores importantes                                                                    |
+| ------------------------- | ------------------------------------ | ------------------------------------------------------------------------ | ----------------- | -------------------------------------------------------------------------------------- |
+| `GET /api/periods`        | Listar los periodos del usuario      | —                                                                        | `200 { periods }` | —                                                                                      |
+| `POST /api/periods`       | Crear (el primero queda como actual) | `{ name, startDate, endDate, isCurrent?, studyLevel?, studyLevelNote? }` | `201 { period }`  | 400 (`endDate` ≤ `startDate`, nivel inválido o número y nota a la vez), 409 `CONFLICT` |
+| `GET /api/periods/:id`    | Leer uno                             | —                                                                        | `200 { period }`  | 404                                                                                    |
+| `PATCH /api/periods/:id`  | Editar / marcar como actual / nivel  | campos opcionales (incluye `studyLevel`, `studyLevelNote`)               | `200 { period }`  | 400, 404, 409 `CONFLICT`                                                               |
+| `DELETE /api/periods/:id` | Eliminar                             | —                                                                        | `204`             | 404, 409 `PERIOD_NOT_EMPTY`                                                            |
 
 Hay un único periodo actual por usuario. La interfaz hoy solo crea el periodo en el onboarding (ver [limitations.md](limitations.md)).
 

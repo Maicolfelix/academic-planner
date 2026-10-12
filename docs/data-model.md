@@ -52,7 +52,7 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 ### AcademicPeriod
 
-`name`, `startDate`, `endDate` (**fechas de calendario** `DATE`, sin hora ni zona: «2026-08-03» no puede correrse al día 2 por una conversión), `isCurrent`. Restricciones a mano en la migración: **un solo periodo actual por usuario** (índice único parcial) y `endDate > startDate`.
+`name`, `startDate`, `endDate` (**fechas de calendario** `DATE`, sin hora ni zona: «2026-08-03» no puede correrse al día 2 por una conversión), `isCurrent`, y el **nivel de estudio durante el periodo**: `studyLevel` (entero nullable, 1–99) **o** `studyLevelNote` (texto corto nullable, 1–40 caracteres, para «Otro» o una estructura que un número no describe), nunca los dos. Vive en el periodo y no en el perfil porque cambia con cada periodo («2026-2, semestre 4» y luego «2027-1, semestre 5»); es genérico a propósito (el dominio no sabe si es semestre, grado o año de un curso, ni si el estudiante es universitario). Restricciones a mano en la migración: **un solo periodo actual por usuario** (índice único parcial), `endDate > startDate` y los tres `CHECK` del nivel (rango 1–99, nota de 1 a 40 caracteres, a lo sumo uno de los dos). Los periodos que ya existían quedan con ambos campos en `NULL`. Decisión [D27](decisions.md#d27-el-nivel-de-estudio-vive-en-el-periodo-académico).
 
 ### Subject
 
@@ -123,4 +123,4 @@ Se calculan en cada lectura con un reloj inyectable; guardarlos obligaría a man
 
 ## Migraciones
 
-Ocho migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`, `activity_period_optional_subject`, `user_profile`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.
+Nueve migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`, `activity_period_optional_subject`, `user_profile`, `period_study_level`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.

@@ -180,3 +180,14 @@ D15–D22 pertenecen al ciclo de producto posterior a `v1.0.0-rc.2` ([roadmap-po
 - **A cambio:** una tabla más y una segunda petición cuando haga falta el perfil; el catálogo es pequeño a propósito (lo demás es texto libre); el estado no se adelanta solo al responder (quien lo use lo pide explícitamente).
 - **No incluye (P0 posterior, con su aprobación):** interfaz de onboarding, semestre/grado, `Subject.educationContext`, creación de asignaturas en lote, ajustes, notas, avatar.
 - Detalle: [data-model.md](data-model.md#userprofile), [api.md](api.md).
+
+## D27. El nivel de estudio vive en el periodo académico
+
+- **Decisión (P0-2):** el nivel actual de estudio (semestre, grado, año de un curso) se guarda en `AcademicPeriod` (`studyLevel` entero nullable **o** `studyLevelNote` texto corto nullable), no en `UserProfile`. Se extienden los contratos que ya existen (`POST` y `PATCH /api/periods`); no hay endpoint nuevo.
+- **Por qué en el periodo:** el nivel cambia con cada periodo («2026-2, semestre 4» y después «2027-1, semestre 5»; «Año escolar 2026, grado 10»). En el perfil quedaría desactualizado y habría que mantenerlo a mano; en el periodo es parte de lo que ese periodo fue.
+- **Genérico, sin columnas por tipo:** no hay `semester`, `grade` ni `schoolYear`: un solo dato de dominio; la interfaz decide la palabra según `primaryUse`. El dominio no consulta el perfil ni impone «universidad = 1–10»: el rango técnico 1–99 solo evita basura, y 11 o 12 niveles son válidos.
+- **Número o nota, nunca los dos:** `studyLevelNote` (1–40 caracteres, recortado, sin NUL; en blanco = ninguno) cubre «Otro» y estructuras que un número no describe. Un `CHECK` de base de datos refuerza el rango, el largo de la nota y la exclusividad. Al editar: un número fija el nivel y borra la nota, una nota fija la nota y borra el nivel, `null` borra ese campo; el cliente no tiene que mandar dos `null`.
+- **Compatibilidad:** los periodos existentes quedan con ambos campos en `NULL` (no se infiere nada ni se toca otra tabla); la respuesta del periodo (también la que viaja en Inicio, Progreso, Atención, Captura e Importación) siempre incluye los dos campos. El flujo actual de onboarding (nombre y fechas) no cambia.
+- **Siguiente periodo (solo documentado):** una interfaz futura podrá **sugerir** `studyLevel + 1` al crear el periodo siguiente; el backend nunca lo calcula ni lo copia automáticamente.
+- **A cambio:** el número no dice qué es (la etiqueta depende de quien lo muestre); sin interfaz todavía, nadie lo escribe desde la web.
+- Detalle: [academic.md](academic.md#nivel-de-estudio-del-periodo-p0-2), [data-model.md](data-model.md).
