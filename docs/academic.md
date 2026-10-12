@@ -6,10 +6,10 @@
 User 1──* AcademicPeriod 1──* Subject *──1 User
 ```
 
-| Entidad          | Campos                                                                                                  | Reglas en la BD                                                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `AcademicPeriod` | `id` (UUID), `userId`, `name`, `startDate` y `endDate` (`DATE`), `isCurrent`, `createdAt`, `updatedAt`  | índice único parcial: **un solo `isCurrent = true` por usuario**; `CHECK (endDate > startDate)`; `ON DELETE CASCADE` desde `User` |
-| `Subject`        | `id` (UUID), `userId`, `periodId`, `name`, `nameKey`, `professor?`, `color`, `description?`, timestamps | único `(periodId, nameKey)`; `periodId` con `ON DELETE NO ACTION`; `ON DELETE CASCADE` desde `User`                               |
+| Entidad          | Campos                                                                                                                                   | Reglas en la BD                                                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AcademicPeriod` | `id` (UUID), `userId`, `name`, `startDate` y `endDate` (`DATE`), `isCurrent`, `studyLevel?`, `studyLevelNote?`, `createdAt`, `updatedAt` | índice único parcial: **un solo `isCurrent = true` por usuario**; `CHECK (endDate > startDate)`; `CHECK` del nivel de estudio (ver abajo); `ON DELETE CASCADE` desde `User` |
+| `Subject`        | `id` (UUID), `userId`, `periodId`, `name`, `nameKey`, `professor?`, `color`, `description?`, timestamps                                  | único `(periodId, nameKey)`; `periodId` con `ON DELETE NO ACTION`; `ON DELETE CASCADE` desde `User`                                                                         |
 
 Los IDs siguen siendo UUID v4 (misma estrategia que `User` y `Session`).
 
@@ -53,20 +53,24 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 
 ## Endpoints (todos requieren sesión)
 
-| Método y ruta                 | Notas                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                   |
-| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent? }` → 201 `{ period }`                                      |
-| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                  |
-| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true }`; una fecha suelta se valida contra la guardada |
-| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                        |
-| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                               |
-| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description? }` → 201 `{ subject }`                         |
-| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                  |
-| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description? }`; `''` o `null` borran un campo opcional              |
-| `DELETE /api/subjects/:id`    | 204                                                                                                |
+| Método y ruta                 | Notas                                                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                 |
+| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
+| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                |
+| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
+| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                      |
+| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                             |
+| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description? }` → 201 `{ subject }`                                                       |
+| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                |
+| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description? }`; `''` o `null` borran un campo opcional                                            |
+| `DELETE /api/subjects/:id`    | 204                                                                                                                              |
 
 Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripción ≤ 500, fechas reales entre 2000 y 2100.
+
+### Nivel de estudio del periodo (P0-2)
+
+`studyLevel` (entero 1–99) **o** `studyLevelNote` (texto recortado de 1 a 40 caracteres, sin NUL): son alternativas, nunca los dos (400 si llegan ambos con valor; la base lo refuerza con `CHECK`). Ambos son opcionales al crear (el onboarding actual no los envía) y vienen siempre en la respuesta (`null` si no hay). Al editar se mandan de uno en uno: un número fija el nivel y borra la nota; una nota fija la nota y borra el nivel; `null` (o una nota en blanco) borra solo ese campo; no mencionarlos los deja igual. El dominio **no consulta `UserProfile.primaryUse`** ni impone un máximo de 10: guardar 11 o 12 niveles es válido para cualquiera; qué rango ofrecer («semestre» 1–10, «grado» 1–11, «Otro») es decisión futura de la interfaz. Cuando exista un periodo siguiente, la interfaz **podrá sugerir** `studyLevel + 1`; el servidor nunca lo calcula ni lo copia solo.
 
 ## Arquitectura
 
