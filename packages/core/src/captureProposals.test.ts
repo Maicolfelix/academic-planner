@@ -509,19 +509,34 @@ describe('recurrence: detected, shown, never persisted or assumed', () => {
     expect(s!.subject).toMatchObject({ kind: 'EXISTING', name: 'Ciberseguridad' });
     expect(s!.slots.map((x) => x.weekday)).toEqual([2, 4]);
     expect(s!.evidence).toEqual(['todos los']);
-    // What a weekly block needs and the text did not say stays missing: never invented.
-    expect(s!.until.value).toBeNull();
-    expect(s!.missing).toEqual(['startTime', 'endTime', 'until']);
+    // What a weekly block needs and the text did not say stays missing: never invented. The end of the repetition is the
+    // period's (the server decides it), so it is not a question.
+    expect(s!.until).toMatchObject({ value: '2026-11-28', certainty: 'LIKELY', origin: 'DEFAULT' });
+    expect(s!.missing).toEqual(['startTime', 'endTime']);
+    expect(s!.kind).toBe('WEEKLY_SCHEDULE');
   });
 
   it('"este semestre" gives the end of the repetition: the period\'s last day', () => {
     const [s] = run(
       'Tengo ciberseguridad todos los martes y jueves a las 8 am este semestre',
     ).suggestions;
-    expect(s!.until).toMatchObject({ value: '2026-11-28', certainty: 'LIKELY' });
+    expect(s!.until).toMatchObject({
+      value: '2026-11-28',
+      certainty: 'LIKELY',
+      origin: 'INHERITED',
+    });
+    const missingEnd = { value: null, certainty: 'MISSING', alternatives: [] };
     expect(s!.slots).toEqual([
-      { weekday: 2, time: { value: '08:00', certainty: 'EXACT', alternatives: [] } },
-      { weekday: 4, time: { value: '08:00', certainty: 'EXACT', alternatives: [] } },
+      {
+        weekday: 2,
+        time: { value: '08:00', certainty: 'EXACT', alternatives: [] },
+        endTime: missingEnd,
+      },
+      {
+        weekday: 4,
+        time: { value: '08:00', certainty: 'EXACT', alternatives: [] },
+        endTime: missingEnd,
+      },
     ]);
     expect(s!.missing).toEqual(['endTime']);
   });
@@ -532,9 +547,10 @@ describe('recurrence: detected, shown, never persisted or assumed', () => {
   });
 
   it('only a subject that was named and cannot be resolved is missing from a suggestion', () => {
+    // a class has a subject: with none said it is a question (a general ACTIVITY would not be)
     const [none] = run('Todos los martes y jueves a las 8 am', [REDES]).suggestions;
-    expect(none!.subject.kind).toBe('NONE');
-    expect(none!.missing).not.toContain('subject');
+    expect(none!.subject.kind).toBe('UNRESOLVED');
+    expect(none!.missing).toContain('subject');
     const [unknown] = run('Parcial de ciberseguridad todos los martes', [REDES]).suggestions;
     expect(unknown!.missing).toContain('subject');
   });

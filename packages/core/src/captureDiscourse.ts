@@ -5,6 +5,7 @@ import {
   PLURAL_TYPE_WORDS,
   QUICK_CAPTURE_TYPE_ALIASES,
   STOPWORDS,
+  WEEKDAY_BY_NAME,
   buildSubjectEntries,
   findDateExpressions,
   matchSubject,
@@ -66,6 +67,11 @@ export interface DiscourseSpan {
   targets: number[];
   /** REFER that could have been several activities and no word chose one. */
   ambiguous: boolean;
+  /**
+   * The span names something that happens in the student's WEEK ("clase", "Ciberseguridad todos los martes", "veo Redes"),
+   * not a thing due on a day: it is read as a weekly schedule, not as an activity (see `scheduleAnchors`).
+   */
+  schedule: boolean;
 }
 
 // ───────────────────────── Small dictionaries ─────────────────────────
@@ -169,7 +175,12 @@ const NOUN_IMPLICIT = new Set([
 
 // ───────────────────────── Anchors and noun phrases ─────────────────────────
 
-type DiscourseAnchor = Anchor & { kind: SpanKind; count: number | null; headStart: number };
+type DiscourseAnchor = Anchor & {
+  kind: SpanKind;
+  count: number | null;
+  headStart: number;
+  schedule?: boolean;
+};
 
 /** The type word of an anchor: "parcial" -> EXAM; "ensayo" -> itself (singular); others by their own key. */
 function typeKeyOf(tokens: readonly Token[], anchor: Anchor): string {
@@ -345,6 +356,94 @@ function cutBetween(
   return best >= 0 ? best : limit;
 }
 
+// ───────────────────────── Weekly schedule ─────────────────────────
+
+/** Words that say the thing is part of the student's weekly timetable. */
+const SCHEDULE_NOUNS = new Set(['clase', 'clases', 'horario', 'horarios']);
+/** "Veo Redes todos los lunes": what the student SEES in the week. */
+const SCHEDULE_VERBS = new Set(['veo', 'vemos']);
+/** Words before the thing that are only how the sentence starts. */
+const LEAD_FILLERS = new Set([
+  'tengo',
+  'tenemos',
+  'veo',
+  'vemos',
+  'hay',
+  'ademas',
+  'tambien',
+  'luego',
+  'despues',
+  'y',
+  'e',
+]);
+const EVERY = new Set(['todos', 'todas', 'cada']);
+
+/**
+ * The anchors of a weekly schedule (Quick Capture). "Tengo fisiología todos los lunes de 7 a 9 y redes todos los jueves de
+ * 2 a 4" has no activity word, yet it names two things: the noun before each "todos los <día>". So:
+ *  - "clase(s)" / "horario" are anchors when the sentence talks about weekdays;
+ *  - "veo" + a word, too;
+ *  - every "todos/todas/cada <día>" that no earlier anchor of its own clause owns gets one at the noun right before it
+ *    (the first word that is not a filler after the last "y" or comma), so two schedules in one sentence stay two.
+ * Nothing here decides WHAT it is (a class or a repeating activity): that is read with the words, in the engine.
+ */
+function scheduleAnchors(tokens: Token[], found: readonly DiscourseAnchor[]): DiscourseAnchor[] {
+  const isDay = (norm: string | undefined) =>
+    norm !== undefined && WEEKDAY_BY_NAME[norm] !== undefined;
+  const hasWeekday = tokens.some((t) => isDay(t.norm));
+  if (!hasWeekday) return [];
+  const out: DiscourseAnchor[] = [];
+  const make = (start: number): DiscourseAnchor => ({
+    start,
+    length: 1,
+    implicitType: 'OTHER',
+    kind: 'IMPLICIT',
+    count: null,
+    headStart: start,
+    schedule: true,
+  });
+  const taken = (i: number) => found.some((a) => i >= a.headStart && i < a.start + a.length);
+
+  tokens.forEach((t, i) => {
+    if (taken(i)) return;
+    if (SCHEDULE_NOUNS.has(t.norm)) out.push(make(i));
+    else if (
+      SCHEDULE_VERBS.has(t.norm) &&
+      tokens[i + 1] &&
+      !SCHEDULE_NOUNS.has(tokens[i + 1]!.norm)
+    ) {
+      // "veo Redes": the anchor is the noun, not the verb, so the title is not "Veo"
+      if (!taken(i + 1)) out.push(make(i + 1));
+    }
+  });
+
+  const anchorsNow = () => [...found, ...out].sort((a, b) => a.start - b.start);
+  tokens.forEach((t, m) => {
+    if (!EVERY.has(t.norm)) return;
+    const day = [1, 2].find((k) => isDay(tokens[m + k]?.norm));
+    if (day === undefined) return;
+    const previous = anchorsNow()
+      .filter((a) => a.start < m)
+      .at(-1);
+    // the last clause boundary between the previous anchor and this marker
+    let from = previous ? previous.start + previous.length : 0;
+    for (let k = m - 1; k >= from; k--) {
+      if (CLAUSE_SPLITTERS.has(tokens[k]!.norm) || tokens[k]!.afterBreak) {
+        from = k + 1;
+        break;
+      }
+    }
+    if (previous && from === previous.start + previous.length) {
+      // no boundary: the marker belongs to the anchor in front of it, unless that anchor is after a boundary-less stretch
+      return;
+    }
+    let s = from;
+    while (s < m && (LEAD_FILLERS.has(tokens[s]!.norm) || STOPWORDS.has(tokens[s]!.norm))) s++;
+    if (s < m && !taken(s) && !out.some((a) => a.start === s)) out.push(make(s));
+  });
+  return out.sort((a, b) => a.start - b.start);
+}
+
 // ───────────────────────── Segmentation ─────────────────────────
 
 interface RawSpan extends Omit<DiscourseSpan, 'index' | 'role' | 'targets' | 'ambiguous'> {
@@ -360,7 +459,7 @@ function subjectOfText(text: string, entries: SubjectEntry[]): string | null {
 export function segmentDiscourse(
   text: string,
   context: Pick<QuickCaptureContext, 'subjects'>,
-  options: { splitLeading?: boolean; implicitDetails?: boolean } = {},
+  options: { splitLeading?: boolean; implicitDetails?: boolean; scheduleAnchors?: boolean } = {},
 ): DiscourseSpan[] {
   const entries = buildSubjectEntries(context.subjects);
   const raws: RawSpan[] = [];
@@ -391,6 +490,7 @@ export function segmentDiscourse(
       anchorIndex: -1,
       headIndex: 0,
       anchorLength: 0,
+      schedule: false,
       subjectId: subjectOfText(sentence, entries),
     });
   };
@@ -407,11 +507,16 @@ export function segmentDiscourse(
       const { count } = nounPhrase(tokens, headStart, a.start, plural);
       return { ...a, kind, count, headStart };
     });
-    if (base.length === 0 && !tokens.some((t) => numberOf(t.norm) !== null)) {
+    const timetable = options.scheduleAnchors ? scheduleAnchors(tokens, base) : [];
+    if (
+      base.length === 0 &&
+      timetable.length === 0 &&
+      !tokens.some((t) => numberOf(t.norm) !== null)
+    ) {
       pushDetail(sentence, tokens, sentenceIndex);
       return;
     }
-    let anchors: DiscourseAnchor[] = [...base, ...extraAnchors(tokens, base)];
+    let anchors: DiscourseAnchor[] = [...base, ...timetable, ...extraAnchors(tokens, base)];
     anchors.sort((a, b) => a.start - b.start);
     anchors = [...anchors, ...ellipticalAnchors(tokens, anchors)].sort((a, b) => a.start - b.start);
     // "Reunión el viernes, LLEVAR el portátil": a verb of preparing right after another activity, with no day or hour
@@ -485,6 +590,7 @@ export function segmentDiscourse(
           anchorIndex: -1,
           headIndex: 0,
           anchorLength: 0,
+          schedule: false,
           subjectId: subjectOfText(own, entries),
         });
         starts[0] = anchors[0]!.headStart;
@@ -568,6 +674,7 @@ export function segmentDiscourse(
         anchorIndex,
         headIndex,
         anchorLength: anchor.kind === 'ELLIPTICAL' ? 1 : anchor.length,
+        schedule: anchor.schedule === true,
         subjectId: subjectMatch.kind === 'match' ? subjectMatch.subject.id : null,
       });
     });
@@ -604,6 +711,7 @@ function resolveReferences(raws: RawSpan[]): DiscourseSpan[] {
     anchorLength: r.anchorLength,
     targets: [],
     ambiguous: false,
+    schedule: r.schedule,
   }));
   const intros: { span: DiscourseSpan; subjectId: string | null }[] = [];
 

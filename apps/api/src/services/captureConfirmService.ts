@@ -1,32 +1,43 @@
 import {
   CAPTURE_CONFIRM_MESSAGES,
+  createScheduleBlockSchema,
   dueFromLocal,
   fieldErrorsOf,
+  findDuplicateBlock,
+  firstWeekdayOnOrAfter,
   normalizeNameKey,
   pickSubjectColor,
   createActivitySchema,
   type CaptureConfirmInput,
   type CaptureConfirmItemError,
   type CaptureConfirmResponse,
+  type ExistingClass,
+  type Weekday,
 } from '@planner/core';
 import type { RunInTransaction } from '../db/prisma.js';
 import { AppError } from '../errors/AppError.js';
-import { toSubjectDto } from '../mappers.js';
+import { toDateOnly, toSubjectDto } from '../mappers.js';
 import { createActivityRepository } from '../repositories/activityRepository.js';
 import { createPeriodLookup } from '../repositories/periodRepository.js';
+import { createScheduleRepository } from '../repositories/scheduleRepository.js';
 import { createSubjectRepository } from '../repositories/subjectRepository.js';
 import { createActivityService, type Actor } from './activityService.js';
+import { windowOf } from './scheduleOccurrences.js';
+import { createScheduleService } from './scheduleService.js';
 
 /** Ten activities and their reminders are a few dozen queries: well within this, even on a remote database. */
 const TRANSACTION = { maxWait: 5_000, timeout: 30_000 };
 
 /**
- * Confirmation of the proposals of one capture: the NEW subjects and every activity, in ONE database transaction. Either
- * all of it is saved or none of it is.
+ * Confirmation of the proposals of one capture: the NEW subjects, every activity AND every weekly schedule block, in ONE
+ * database transaction. Either all of it is saved or none of it is.
  *
  * The rules are not rewritten here: each activity goes through the very same Activity service as `POST /api/activities`
  * (ownership of the subject, the period derived from it or from the current one, the instant, the automatic reminders),
- * bound to the transaction's connection. What this service adds is only what a batch needs: resolving which subjects
+ * and each block through the very same Schedule service as `POST /api/schedule` (period limits, subject ownership and
+ * period, conflicts), both bound to the transaction's connection. The first date of a series, its last day and the
+ * period are the SERVER's: a block with the same type, subject, weekday and times that is already in the agenda is reused,
+ * not duplicated. What this service adds is only what a batch needs: resolving which subjects
  * exist, creating the missing ones (name key, color and period come from the server), refusing an exact copy of an
  * existing activity and reporting every refused item at once, by the `clientId` the card was shown under.
  *
@@ -69,6 +80,8 @@ export function createCaptureConfirmService(opts: {
           clock,
           (fn) => fn(tx),
         );
+        const scheduleRepo = createScheduleRepository(tx);
+        const scheduleService = createScheduleService(scheduleRepo, periods, subjects, clock);
 
         // The period is the user's CURRENT one, read after the lock: the client never says which.
         const period = await periods.findCurrent(actor.id);
@@ -89,7 +102,7 @@ export function createCaptureConfirmService(opts: {
         const reused = new Set<string>();
         const resolvedNew = new Map<string, string>(); // name key -> subject id
 
-        for (const item of input.items) {
+        for (const item of [...input.items, ...input.blocks]) {
           if (item.subject.kind !== 'NEW') continue;
           const key = normalizeNameKey(item.subject.name);
           if (resolvedNew.has(key)) continue;
@@ -124,7 +137,10 @@ export function createCaptureConfirmService(opts: {
         );
         const from = new Date(Math.min(...dueAts.map((d) => d.getTime())));
         const to = new Date(Math.max(...dueAts.map((d) => d.getTime())));
-        const present = await activityRepo.list(actor.id, { dueFrom: from, dueTo: to });
+        const present =
+          dueAts.length === 0
+            ? []
+            : await activityRepo.list(actor.id, { dueFrom: from, dueTo: to });
         const isCopy = (
           i: number,
           subjectId: string | null,
@@ -211,6 +227,110 @@ export function createCaptureConfirmService(opts: {
           }
         }
 
+        // 4. The weekly blocks. A block already in the agenda is reused; one the rules refuse is recorded like an activity.
+        const createdBlocks: CaptureConfirmResponse['createdBlocks'] = [];
+        const reusedBlocks: CaptureConfirmResponse['reusedBlocks'] = [];
+        if (input.blocks.length > 0) {
+          const days = { from: toDateOnly(period.startDate), to: toDateOnly(period.endDate) };
+          const rows = await scheduleRepo.candidates(actor.id, {
+            ...windowOf(days, actor.timezone),
+            types: ['CLASS', 'STUDY'],
+            periodId: period.id,
+          });
+          const inAgenda: ExistingClass[] = rows.map((r) => ({
+            id: r.id,
+            title: r.title,
+            type: r.type,
+            subjectId: r.subjectId,
+            startAt: r.startAt,
+            endAt: r.endAt,
+            recurring: r.recurrenceType === 'WEEKLY' && r.recurrenceUntil !== null,
+            until: r.recurrenceUntil ? toDateOnly(r.recurrenceUntil) : null,
+          }));
+
+          for (const b of input.blocks) {
+            let subjectId: string | null = null;
+            if (b.subject.kind === 'EXISTING') {
+              if (!known.has(b.subject.subjectId)) {
+                refused.push({
+                  clientId: b.clientId,
+                  code: 'SUBJECT_NOT_FOUND',
+                  message: 'Asignatura no encontrada.',
+                  fields: { subject: ['Asignatura no encontrada.'] },
+                });
+                continue;
+              }
+              subjectId = b.subject.subjectId;
+              reused.add(subjectId);
+            } else if (b.subject.kind === 'NEW') {
+              subjectId = resolvedNew.get(normalizeNameKey(b.subject.name)) ?? null;
+            }
+
+            const until = b.until ?? days.to;
+            const parsed = createScheduleBlockSchema.safeParse({
+              type: b.type,
+              subjectId,
+              title: b.title,
+              date: firstWeekdayOnOrAfter(days.from, b.weekday as Weekday),
+              startTime: b.startTime,
+              endTime: b.endTime,
+              recurrence: { frequency: 'WEEKLY', until },
+            });
+            if (!parsed.success) {
+              refused.push({
+                clientId: b.clientId,
+                code: 'VALIDATION_ERROR',
+                message: 'Revisa los campos marcados.',
+                fields: fieldErrorsOf(parsed.error),
+              });
+              continue;
+            }
+            const duplicate = findDuplicateBlock(
+              {
+                type: b.type,
+                subjectId,
+                weekday: b.weekday,
+                startTime: b.startTime,
+                endTime: b.endTime,
+                range: { from: firstWeekdayOnOrAfter(days.from, b.weekday as Weekday), until },
+              },
+              inAgenda,
+              actor.timezone,
+            );
+            if (duplicate) {
+              reusedBlocks.push({ clientId: b.clientId, id: duplicate.id, title: duplicate.title });
+              continue;
+            }
+            try {
+              const { block } = await scheduleService.create(actor, parsed.data);
+              createdBlocks.push({ clientId: b.clientId, block: block! });
+              inAgenda.push({
+                id: block!.id,
+                title: block!.title,
+                type: b.type,
+                subjectId,
+                startAt: block!.startAt,
+                endAt: block!.endAt,
+                recurring: true,
+                until,
+              });
+            } catch (err) {
+              if (err instanceof AppError && err.code === 'VALIDATION_ERROR') {
+                refused.push({
+                  clientId: b.clientId,
+                  code: 'VALIDATION_ERROR',
+                  message: err.message,
+                  fields:
+                    (err.details as { fields?: Record<string, string[]> } | undefined)?.fields ??
+                    {},
+                });
+                continue;
+              }
+              throw err;
+            }
+          }
+        }
+
         if (refused.length > 0) {
           const copiesOnly = refused.every((r) => r.code === 'DUPLICATE_ACTIVITY');
           throw new AppError(
@@ -228,6 +348,8 @@ export function createCaptureConfirmService(opts: {
           createdSubjects: createdRows.map(toSubjectDto),
           reusedSubjects: [...reused].map((id) => ({ id, name: known.get(id) ?? '' })),
           count: createdActivities.length,
+          createdBlocks,
+          reusedBlocks,
         };
       }, TRANSACTION);
     },

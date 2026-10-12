@@ -50,11 +50,13 @@ import { dueFromLocal, toLocalParts } from './time.js';
  */
 
 export const CAPTURE_MAX_PROPOSALS = 50;
+/** A weekly class or study session per weekday: more than this in one capture is not a normal text. */
+export const CAPTURE_MAX_BLOCKS = 21;
 /**
  * The shape and meaning of a result. A review the student left half done is kept as a draft; a draft written by another
  * version of the engine is not trusted (it is dropped, never repaired). Bump it when the proposals change.
  */
-export const CAPTURE_ENGINE_VERSION = 2;
+export const CAPTURE_ENGINE_VERSION = 3;
 export const CAPTURE_MODES = ['QUICK', 'INBOX'] as const;
 export type CaptureMode = (typeof CAPTURE_MODES)[number];
 /** Characters a text of each mode may have (a quick phrase vs a pasted message). */
@@ -100,6 +102,8 @@ export const CAPTURE_ISSUE_CODES = [
   'UNRESOLVED_DATE_REFERENCE',
   'UNRESOLVED_DESCRIPTION_REFERENCE',
   'COUNT_MISMATCH',
+  'START_TIME_MISSING',
+  'END_TIME_MISSING',
 ] as const;
 export type CaptureIssueCode = (typeof CAPTURE_ISSUE_CODES)[number];
 
@@ -120,7 +124,7 @@ export type CaptureWarningCode = (typeof CAPTURE_WARNING_CODES)[number];
 
 const issue = z.object({
   code: z.enum(CAPTURE_ISSUE_CODES),
-  field: z.enum(['title', 'subject', 'date', 'time', 'description', 'count']),
+  field: z.enum(['title', 'subject', 'date', 'time', 'endTime', 'description', 'count']),
   message: z.string(),
 });
 const warning = z.object({ code: z.enum(CAPTURE_WARNING_CODES), message: z.string() });
@@ -217,29 +221,47 @@ export const captureProposalSchema = z.object({
 });
 export type CaptureProposal = z.infer<typeof captureProposalSchema>;
 
-/** "Todos los martes y jueves": it repeats. Detected and shown; nothing here creates a ScheduleBlock (F1-2e). */
+/**
+ * What a repeating thing the student said becomes. A weekly CLASS (or study session) belongs to the timetable: it is one
+ * ScheduleBlock per weekday, never a pile of future activities. "Todos los martes y jueves de 6 a 8" is two slots.
+ *  - WEEKLY_SCHEDULE: a class or study session that repeats every week; it can be created as ScheduleBlocks;
+ *  - RECURRING_ACTIVITY_UNSUPPORTED: something that is due ("un quiz todos los viernes") and repeats: the intention is kept
+ *    and shown, but a repeating activity is NOT something the app can create yet (and it is never turned into a class).
+ */
+const slotTime = z.object({
+  value: z.string().nullable(),
+  certainty,
+  alternatives: z.array(z.string()),
+});
+export const RECURRENCE_KINDS = ['WEEKLY_SCHEDULE', 'RECURRING_ACTIVITY_UNSUPPORTED'] as const;
 export const recurrenceSuggestionSchema = z.object({
   clientId: z.string(),
   groupId: z.string(),
   rawSegment: z.string(),
+  kind: z.enum(RECURRENCE_KINDS),
+  /** The block it would create. A CLASS needs a subject; a STUDY session may have none. */
+  blockType: z.enum(['CLASS', 'STUDY']),
   title: stringField,
   subject: captureSubjectSchema,
   slots: z.array(
     z.object({
       weekday: z.number().int().min(1).max(7),
-      time: z.object({
-        value: z.string().nullable(),
-        certainty,
-        alternatives: z.array(z.string()),
-      }),
+      /** Start. */
+      time: slotTime,
+      /** End: never invented. Missing until the student says it (or it was written as a range: "de 6 a 8"). */
+      endTime: slotTime,
     }),
   ),
-  /** The period's last day when the text says "este semestre" / "todo el periodo"; null otherwise (never guessed). */
+  /** The last day of the repetition: the period's end, which the server decides (it is never the client's). */
   until: z.object({ value: z.string().nullable(), certainty, origin }),
   /** The words that say it repeats. */
   evidence: z.array(z.string()),
-  /** What a weekly block still needs: the end time and the end date are never inferred. */
+  /** What a weekly block still needs. */
   missing: z.array(z.enum(['subject', 'startTime', 'endTime', 'until'])),
+  /** READY: can be created as it is. NEEDS_REVIEW: a question is open. UNSUPPORTED: understood, not creatable yet. */
+  status: z.enum(['READY', 'NEEDS_REVIEW', 'UNSUPPORTED']),
+  selected: z.boolean(),
+  blockingIssues: z.array(issue),
 });
 export type RecurrenceSuggestion = z.infer<typeof recurrenceSuggestionSchema>;
 
@@ -313,6 +335,8 @@ const ISSUE_MESSAGES: Record<CaptureIssueCode, string> = {
   UNRESOLVED_DESCRIPTION_REFERENCE:
     'Mencionaste un detalle, pero no pude saber a qué actividad corresponde.',
   COUNT_MISMATCH: 'La cantidad de actividades no coincide con la que dijiste.',
+  START_TIME_MISSING: '¿A qué hora empieza?',
+  END_TIME_MISSING: '¿Hasta qué hora?',
 };
 const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][number]['field']> = {
   TITLE_MISSING: 'title',
@@ -332,6 +356,8 @@ const ISSUE_FIELD: Record<CaptureIssueCode, CaptureProposal['blockingIssues'][nu
   UNRESOLVED_DATE_REFERENCE: 'date',
   UNRESOLVED_DESCRIPTION_REFERENCE: 'description',
   COUNT_MISMATCH: 'count',
+  START_TIME_MISSING: 'time',
+  END_TIME_MISSING: 'endTime',
 };
 const makeIssue = (
   code: CaptureIssueCode,
@@ -651,7 +677,9 @@ interface Mention {
   descriptionFromReference: boolean;
   /** The subject came from a later reference. */
   subjectFromReference: boolean;
+  /** It repeats every week (a class, or a repeating activity that cannot be created yet): a suggestion, not a proposal. */
   suggested: boolean;
+  recurrence: (typeof RECURRENCE_KINDS)[number] | null;
 }
 
 /** The words a noun phrase puts before the activity word ("un", "las dos") and enumerators are not part of the title. */
@@ -716,7 +744,6 @@ function applyReference(
   ctx: QuickCaptureContext,
 ): void {
   for (const m of targets) {
-    if (m.suggested) continue;
     if (description) {
       // Context adds up: what was said before and what a later clause adds are both the student's words.
       if (m.description === null) m.description = description;
@@ -763,6 +790,163 @@ function applyReference(
   }
 }
 
+// ───────────────────────── Weekly schedule ─────────────────────────
+
+/** Words that only start a sentence about the timetable: never a title or a subject name. */
+const SCHEDULE_TITLE_FILLERS = new Set([
+  'tengo',
+  'tenemos',
+  'veo',
+  'vemos',
+  'hay',
+  'clase',
+  'clases',
+  'horario',
+  'horarios',
+  'todos',
+  'todas',
+  'cada',
+  'semanal',
+  'semanales',
+  'semanalmente',
+  'sesion',
+  'sesiones',
+  'estudio',
+]);
+
+/**
+ * The weekly schedule (or repeating activity) a mention became, read AFTER every reference has added its details (the
+ * hours of "la del martes es de 8 a 10"). One slot per weekday; the end of each is only what the student wrote ("de 6 a 8")
+ * or a question: a duration is never invented. A class needs a subject (an existing one, a name to create, or a choice);
+ * a study session may have none.
+ */
+function buildRecurrence(
+  mention: Mention,
+  ctx: QuickCaptureContext,
+): Omit<RecurrenceSuggestion, 'clientId'> {
+  const { reading, plan, span } = mention;
+  const kind = mention.recurrence!;
+  const norms = tokenize(span.text).map((t) => t.norm);
+  const studies = norms.some(
+    (n, i) =>
+      (n === 'sesion' || n === 'sesiones') &&
+      norms[i + 1] === 'de' &&
+      (norms[i + 2] === 'estudio' || norms[i + 2] === 'estudios'),
+  );
+  const blockType: 'CLASS' | 'STUDY' = studies ? 'STUDY' : 'CLASS';
+
+  const name = reading.tokens
+    .filter((t) => !t.used && !STOPWORDS.has(t.norm) && !SCHEDULE_TITLE_FILLERS.has(t.norm))
+    .map((t) => t.raw);
+  const cleanName = name.length > 0 && name.length <= 4 ? capitalize(name.join(' ')) : '';
+
+  // The subject. A class always has one: a missing one is a question, not a general class.
+  let subject: CaptureSubject = reading.subject;
+  if (subject.kind === 'NONE' && kind === 'WEEKLY_SCHEDULE') {
+    subject =
+      blockType === 'STUDY'
+        ? subject
+        : {
+            kind: 'UNRESOLVED',
+            reason: 'UNKNOWN_NAME',
+            candidates: [],
+            suggestedName: cleanName === '' ? null : cleanName,
+            certainty: 'LIKELY',
+            origin: 'PARSED',
+          };
+  }
+  const label = blockType === 'STUDY' ? 'Estudio' : 'Clase';
+  const title =
+    kind === 'RECURRING_ACTIVITY_UNSUPPORTED'
+      ? reading.title.value
+      : subject.kind === 'EXISTING'
+        ? subject.name
+        : subject.kind === 'UNRESOLVED' && subject.suggestedName
+          ? subject.suggestedName
+          : cleanName || label;
+
+  const blocking: CaptureProposal['blockingIssues'] = [];
+  if (kind === 'WEEKLY_SCHEDULE') {
+    if (subject.kind === 'UNRESOLVED') {
+      blocking.push(
+        subject.reason === 'AMBIGUOUS'
+          ? makeIssue('SUBJECT_AMBIGUOUS')
+          : makeIssue(
+              'SUBJECT_UNKNOWN',
+              subject.suggestedName
+                ? `La asignatura «${subject.suggestedName}» no existe todavía.`
+                : 'Falta la asignatura de esta clase.',
+            ),
+      );
+    }
+  }
+
+  // One slot per weekday, in the order written.
+  const slots: RecurrenceSuggestion['slots'] = [];
+  for (const d of mention.days.filter((x) => x.expr.kind === 'weekday')) {
+    const weekday = (d.expr as { weekday: Weekday }).weekday;
+    if (slots.some((x) => x.weekday === weekday)) continue;
+    const start = d.timeConflict ? null : (d.time ?? mention.sharedTime);
+    slots.push({
+      weekday,
+      time: {
+        value: start?.value ?? null,
+        certainty: start === null ? 'MISSING' : start.certainty,
+        alternatives: start?.alternatives ?? [],
+      },
+      endTime: {
+        value: start?.end?.value ?? null,
+        certainty: start?.end ? start.end.certainty : 'MISSING',
+        alternatives: [],
+      },
+    });
+  }
+  if (kind === 'WEEKLY_SCHEDULE') {
+    if (slots.some((x) => x.time.certainty === 'AMBIGUOUS'))
+      blocking.push(makeIssue('TIME_AMBIGUOUS'));
+    else if (slots.some((x) => x.time.value === null))
+      blocking.push(makeIssue('START_TIME_MISSING'));
+    if (slots.some((x) => x.endTime.value === null)) blocking.push(makeIssue('END_TIME_MISSING'));
+  }
+
+  const missing: RecurrenceSuggestion['missing'] = [];
+  if (subject.kind === 'UNRESOLVED') missing.push('subject');
+  if (slots.some((x) => x.time.value === null)) missing.push('startTime');
+  if (slots.some((x) => x.endTime.value === null)) missing.push('endTime');
+  const until = ctx.period?.endDate ?? null;
+  if (until === null) missing.push('until');
+
+  const status: RecurrenceSuggestion['status'] =
+    kind === 'RECURRING_ACTIVITY_UNSUPPORTED'
+      ? 'UNSUPPORTED'
+      : blocking.length === 0
+        ? 'READY'
+        : 'NEEDS_REVIEW';
+  return {
+    groupId: mention.groupId,
+    rawSegment: span.rawSegment,
+    kind,
+    blockType,
+    title: {
+      value: title,
+      certainty: subject.kind === 'EXISTING' ? 'EXACT' : 'LIKELY',
+      origin: 'PARSED',
+    },
+    subject,
+    slots,
+    until: {
+      value: until,
+      certainty: until === null ? 'MISSING' : 'LIKELY',
+      origin: plan.recurrence.untilPeriod ? 'INHERITED' : 'DEFAULT',
+    },
+    evidence: plan.recurrence.evidence,
+    missing,
+    status,
+    selected: status === 'READY',
+    blockingIssues: blocking,
+  };
+}
+
 // ───────────────────────── Engine ─────────────────────────
 
 /**
@@ -796,6 +980,7 @@ export function parseCaptureProposals(
   let spans = segmentDiscourse(meta.text, context, {
     splitLeading: mode === 'QUICK',
     implicitDetails: mode === 'QUICK',
+    scheduleAnchors: mode === 'QUICK',
   });
   // "Tengo 3 actividades para el martes" and nothing else says nothing about WHICH ones: no activity is made up.
   if (spans.length === 0 && mode === 'QUICK' && meta.expected === null) {
@@ -818,6 +1003,7 @@ export function parseCaptureProposals(
         anchorLength: 0,
         targets: [],
         ambiguous: false,
+        schedule: false,
       },
     ];
   }
@@ -878,44 +1064,26 @@ export function parseCaptureProposals(
       descriptionFromReference: false,
       subjectFromReference: false,
       suggested: false,
+      recurrence: null,
     };
 
-    // It repeats: a suggestion, not a pile of one-off activities.
+    // It repeats every week: a suggestion, not a pile of one-off activities. Which kind depends on the WORDS: a class (or a
+    // plain subject with its days) is a weekly schedule; something that is DUE ("un quiz todos los viernes") repeats but is
+    // never turned into a class. Weak evidence ("Redes martes y jueves") stays a plain possibility on the proposals.
     const weekdayDays = days.filter((d) => d.expr.kind === 'weekday');
-    if (plan.recurrence.strong && weekdayDays.length > 0) {
-      const slots = new Map<Weekday, PlannedTime | null>();
-      for (const d of weekdayDays) {
-        slots.set((d.expr as { weekday: Weekday }).weekday, d.time);
+    if (weekdayDays.length > 0 && !span.kind.startsWith('DETAIL')) {
+      const typedActivity = reading.words.typeCertainty === 'EXACT';
+      const talksSchedule = span.schedule;
+      if (plan.recurrence.strong && typedActivity) {
+        mention.recurrence = 'RECURRING_ACTIVITY_UNSUPPORTED';
+      } else if (
+        !typedActivity &&
+        (plan.recurrence.strong ||
+          (talksSchedule && (plan.recurrence.plural || weekdayDays.length >= 2)))
+      ) {
+        mention.recurrence = 'WEEKLY_SCHEDULE';
       }
-      const until = plan.recurrence.untilPeriod ? (context.period?.endDate ?? null) : null;
-      const missing: RecurrenceSuggestion['missing'] = [];
-      if (reading.subject.kind === 'UNRESOLVED') missing.push('subject');
-      if ([...slots.values()].some((t) => t === null || t.value === null))
-        missing.push('startTime');
-      missing.push('endTime');
-      if (until === null) missing.push('until');
-      suggestions.push({
-        groupId,
-        rawSegment: span.rawSegment,
-        title: reading.title,
-        subject: reading.subject,
-        slots: [...slots.entries()].map(([weekday, t]) => ({
-          weekday,
-          time: {
-            value: t?.value ?? null,
-            certainty: t === null ? 'MISSING' : t.certainty,
-            alternatives: t?.alternatives ?? [],
-          },
-        })),
-        until: {
-          value: until,
-          certainty: until === null ? 'MISSING' : 'LIKELY',
-          origin: until === null ? 'DEFAULT' : 'INHERITED',
-        },
-        evidence: plan.recurrence.evidence,
-        missing,
-      });
-      mention.suggested = true;
+      mention.suggested = mention.recurrence !== null;
     }
     mentions.push(mention);
     bySpan.set(span.index, mention);
@@ -978,7 +1146,10 @@ export function parseCaptureProposals(
   // 3. Proposals.
   const drafts: { key: string; draft: Draft }[] = [];
   for (const mention of mentions) {
-    if (mention.suggested) continue;
+    if (mention.suggested) {
+      suggestions.push(buildRecurrence(mention, context));
+      continue;
+    }
     const { reading, plan, span } = mention;
     const { words } = reading;
     let days = mention.days;
@@ -1253,7 +1424,10 @@ export function parseCaptureProposals(
   const found = unique.length;
   const characters = trimmed.length;
 
-  if (unique.length > CAPTURE_MAX_PROPOSALS) {
+  const weeklyBlocks = suggestions
+    .filter((x) => x.kind === 'WEEKLY_SCHEDULE')
+    .reduce((n, x) => n + x.slots.length, 0);
+  if (unique.length > CAPTURE_MAX_PROPOSALS || weeklyBlocks > CAPTURE_MAX_BLOCKS) {
     return {
       status: 'TOO_MANY_PROPOSALS',
       proposals: [],

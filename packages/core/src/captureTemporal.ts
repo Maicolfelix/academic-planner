@@ -1,5 +1,6 @@
 import type { Weekday } from './calendar.js';
 import {
+  MONTH_BY_NAME,
   WEEKDAY_BY_NAME,
   bareTimeAlternatives,
   findDateExpressions,
@@ -43,6 +44,11 @@ export interface PlannedTime {
   item: number;
   /** Overrides the group key (a time that came from a later reference clause is shared across mentions). */
   key?: string;
+  /**
+   * "de 6 a 8", "de 6 pm a 8 pm": when the time was written as a RANGE, its end. Never invented: a lone start has none.
+   * An activity only uses the start; a weekly schedule block needs both.
+   */
+  end?: { value: string; certainty: 'EXACT' | 'LIKELY'; text: string };
 }
 
 /** How the time reached its day: written next to it, by position ("los dos primeros"), or "respectivamente". */
@@ -223,6 +229,190 @@ function meridiemWords(
   return { value: null, length: 3 };
 }
 
+// ───────────────────────── Ranges of time ─────────────────────────
+
+interface Clock {
+  hour: number;
+  minute: number;
+  /** 'am' / 'pm' as written ("pm", "de la tarde"), null when the hour was written bare. */
+  meridiem: 'am' | 'pm' | null;
+  /** 18:00, 18:30: the 24-hour form needs no meridiem. */
+  h24: boolean;
+  length: number;
+  text: string;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** One clock time at `at`: "6", "6:30", "6pm", "6 pm", "6 de la tarde", "18:00". */
+function readClock(tokens: readonly Token[], at: number): Clock | null {
+  const t = tokens[at];
+  if (!isFree(t)) return null;
+  let m = /^(\d{1,2})(?::(\d{2}))?(am|pm)$/.exec(t.norm);
+  let meridiem: 'am' | 'pm' | null = null;
+  let length = 1;
+  let hour: number;
+  let minute: number;
+  if (m) {
+    hour = Number(m[1]);
+    minute = m[2] === undefined ? 0 : Number(m[2]);
+    meridiem = m[3] as 'am' | 'pm';
+  } else {
+    m = /^(\d{1,2})(?::(\d{2}))?$/.exec(t.norm);
+    if (!m) return null;
+    hour = Number(m[1]);
+    minute = m[2] === undefined ? 0 : Number(m[2]);
+    const next = tokens[at + 1]?.norm;
+    if (isFree(tokens[at + 1]) && (next === 'am' || next === 'pm')) {
+      meridiem = next;
+      length = 2;
+    } else if (
+      isFree(tokens[at + 1]) &&
+      isFree(tokens[at + 2]) &&
+      isFree(tokens[at + 3]) &&
+      next === 'de' &&
+      tokens[at + 2]!.norm === 'la' &&
+      ['manana', 'madrugada', 'tarde', 'noche'].includes(tokens[at + 3]!.norm)
+    ) {
+      meridiem = ['tarde', 'noche'].includes(tokens[at + 3]!.norm) ? 'pm' : 'am';
+      length = 4;
+    }
+  }
+  if (minute > 59 || hour > 23) return null;
+  const h24 = hour > 12 || hour === 0;
+  if (meridiem !== null && (hour < 1 || hour > 12)) return null;
+  if (meridiem === null && !h24 && hour < 1) return null;
+  return {
+    hour,
+    minute,
+    meridiem,
+    h24,
+    length,
+    text: tokens
+      .slice(at, at + length)
+      .map((x) => x.raw)
+      .join(' '),
+  };
+}
+
+const RANGE_UNITS = new Set([
+  'pagina',
+  'paginas',
+  'ejercicio',
+  'ejercicios',
+  'punto',
+  'puntos',
+  'capitulo',
+  'capitulos',
+  'pregunta',
+  'preguntas',
+  'hora',
+  'horas',
+  'minutos',
+  'dias',
+  'semanas',
+]);
+
+/**
+ * "de 6 a 8", "de 6 pm a 8 pm", "de 7:30 a 9:00", "desde las 7 hasta las 9": a time written as a RANGE. Both ends are
+ * needed to say it is one. The meridiem is shared the way people write it ("de 6 a 8 pm": both pm; "de 10 am a 2": the 2
+ * is pm because it must come after). With NO meridiem on either end a class-hours reading is used, because a range of two
+ * bare hours has one plausible reading and the student sees it written out (and can change it): 7 to 11 is morning,
+ * 12 and 1 to 6 are afternoon/evening (so "de 7 a 9" is 07:00–09:00 and "de 6 a 8" is 18:00–20:00). It is LIKELY, never
+ * EXACT. Two bare numbers alone ("de 3 a 5 páginas") are only a range when the text talks about weekdays.
+ */
+function matchTimeRangeAt(
+  tokens: readonly Token[],
+  i: number,
+  weekdayContext: boolean,
+): {
+  start: number;
+  length: number;
+  startValue: string;
+  endValue: string;
+  likely: boolean;
+  text: string;
+  endText: string;
+} | null {
+  let j = i;
+  let hadPrefix = false;
+  if (isFree(tokens[j]) && ['de', 'desde'].includes(tokens[j]!.norm)) {
+    hadPrefix = true;
+    j += 1;
+  }
+  if (isFree(tokens[j]) && ['las', 'la'].includes(tokens[j]!.norm)) j += 1;
+  const first = readClock(tokens, j);
+  if (!first) return null;
+  j += first.length;
+  const connector = tokens[j]?.norm;
+  if (!isFree(tokens[j]) || !['a', 'hasta'].includes(connector ?? '')) return null;
+  j += 1;
+  if (isFree(tokens[j]) && ['las', 'la'].includes(tokens[j]!.norm)) j += 1;
+  const second = readClock(tokens, j);
+  if (!second) return null;
+  const end = j + second.length;
+  const bareBoth =
+    first.meridiem === null &&
+    second.meridiem === null &&
+    !first.h24 &&
+    !second.h24 &&
+    !/:/.test(first.text + second.text);
+  if (!hadPrefix && bareBoth) return null; // "6 a 8" alone could be anything
+  if (bareBoth && !weekdayContext) return null;
+  const after = tokens[end]?.norm ?? '';
+  if (after in MONTH_BY_NAME || RANGE_UNITS.has(after)) return null;
+  if (after === 'de' && (tokens[end + 1]?.norm ?? '') in MONTH_BY_NAME) return null;
+  if (after === 'de' && ['de'].includes(after) && RANGE_UNITS.has(tokens[end + 1]?.norm ?? ''))
+    return null;
+
+  // To minutes since midnight.
+  const to24 = (c: Clock, meridiem: 'am' | 'pm' | null) => {
+    if (c.h24) return c.hour * 60 + c.minute;
+    const base = (c.hour % 12) * 60 + c.minute;
+    return meridiem === 'pm' ? base + 12 * 60 : base;
+  };
+  let likely = false;
+  let a: number;
+  let b: number;
+  if (first.meridiem !== null && second.meridiem !== null) {
+    a = to24(first, first.meridiem);
+    b = to24(second, second.meridiem);
+  } else if (second.meridiem !== null) {
+    // "de 6 a 8 pm": the start takes the end's meridiem unless that would put it after the end.
+    a = to24(first, second.meridiem);
+    b = to24(second, second.meridiem);
+    if (!first.h24 && a >= b) a = to24(first, second.meridiem === 'pm' ? 'am' : 'pm');
+  } else if (first.meridiem !== null) {
+    // "de 10 am a 2": the end follows the start's meridiem unless that would put it before the start.
+    a = to24(first, first.meridiem);
+    b = to24(second, first.meridiem);
+    if (!second.h24 && b <= a) b = to24(second, first.meridiem === 'am' ? 'pm' : 'am');
+  } else if (first.h24 || second.h24) {
+    a = to24(first, null);
+    b = to24(second, null);
+  } else {
+    // Bare hours: class hours. 7-11 morning; 12 and 1-6 afternoon or evening.
+    const morning = first.hour >= 7 && first.hour <= 11;
+    a = to24(first, morning ? 'am' : 'pm');
+    // the end is the next time the clock shows that hour after the start
+    b = (second.hour % 12) * 60 + second.minute;
+    while (b <= a) b += 12 * 60;
+    likely = true;
+  }
+  if (b <= a || b - a > 12 * 60 || b >= 24 * 60 + 1) return null;
+  if (b === 24 * 60) b = 24 * 60 - 1;
+  const hhmm = (min: number) => `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
+  return {
+    start: i,
+    length: end - i,
+    startValue: hhmm(a),
+    endValue: hhmm(b),
+    likely: likely || first.meridiem === null || second.meridiem === null,
+    text: first.text,
+    endText: second.text,
+  };
+}
+
 // ───────────────────────── The plan ─────────────────────────
 
 interface TimeItem {
@@ -256,7 +446,32 @@ export function planTemporal(tokens: Token[]): TemporalPlan {
   // 1. Times, with their connector ("a las 10am"). An hour with no am/pm is ambiguous, never 06:00.
   const timeItems: TimeItem[] = [];
   const timeStarts = new Set<number>();
+  const weekdayContext = tokens.some((t) => WEEKDAY_BY_NAME[t.norm] !== undefined);
   for (let i = 0; i < tokens.length; i++) {
+    // A RANGE ("de 6 a 8") is one time item with an end, read before the single times so its parts are not.
+    const range = matchTimeRangeAt(tokens, i, weekdayContext);
+    if (range) {
+      const item = timeItems.length;
+      timeItems.push({
+        pos: range.start,
+        time: {
+          value: range.startValue,
+          alternatives: [],
+          certainty: range.likely ? 'LIKELY' : 'EXACT',
+          text: range.text,
+          item,
+          end: {
+            value: range.endValue,
+            certainty: range.likely ? 'LIKELY' : 'EXACT',
+            text: range.endText,
+          },
+        },
+      });
+      timeStarts.add(range.start);
+      use(tokens, range.start, range.length);
+      i = range.start + range.length - 1;
+      continue;
+    }
     const match = matchTimeAt(tokens, i, { ambiguousBareHours: true });
     if (!match) continue;
     let start = match.start;
