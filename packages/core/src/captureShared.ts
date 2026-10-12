@@ -152,7 +152,7 @@ export const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
   domingo: 7,
 };
 
-const MONTH_BY_NAME: Readonly<Record<string, number>> = {
+export const MONTH_BY_NAME: Readonly<Record<string, number>> = {
   enero: 1,
   febrero: 2,
   marzo: 3,

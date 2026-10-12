@@ -10,7 +10,7 @@ const app = buildApp({ clock: () => NOW });
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
 
-type Item = CaptureConfirmRequest['items'][number];
+type Item = NonNullable<CaptureConfirmRequest['items']>[number];
 const item = (clientId: string, over: Partial<Item> = {}): Item => ({
   clientId,
   title: 'Ensayo',

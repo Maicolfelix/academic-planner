@@ -4,15 +4,15 @@ Lo que el estudiante escribe o decide y todavía no guardó **no se pierde**: so
 
 ## Qué se conserva
 
-| Borrador                               | Clave (`scope`)                  | Contenido                                                                                                                                         |
-| -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Captura rápida / Bandeja               | `capture-quick`, `capture-inbox` | el texto; y, ya interpretado, las propuestas con lo decidido: marcas, respuestas compartidas, cambios individuales, asignaturas nuevas por crear  |
-| Formulario de **crear** actividad      | `activity-create:<periodo>`      | título, asignatura (o «sin asignatura»), fecha, hora, tipo, prioridad, descripción y, si estaba abierto, el nombre tecleado en «Nueva asignatura» |
-| Formulario de **editar** una actividad | `activity-edit:<actividad>`      | los mismos campos y el `updatedAt` de la actividad cuando empezó la edición                                                                       |
+| Borrador                               | Clave (`scope`)                  | Contenido                                                                                                                                                                                                                                              |
+| -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Captura rápida / Bandeja               | `capture-quick`, `capture-inbox` | el texto; y, ya interpretado, las propuestas **y las sugerencias de horario semanal** con lo decidido: marcas, respuestas compartidas (también la hora final de un horario), días y horas editados, cambios individuales, asignaturas nuevas por crear |
+| Formulario de **crear** actividad      | `activity-create:<periodo>`      | título, asignatura (o «sin asignatura»), fecha, hora, tipo, prioridad, descripción y, si estaba abierto, el nombre tecleado en «Nueva asignatura»                                                                                                      |
+| Formulario de **editar** una actividad | `activity-edit:<actividad>`      | los mismos campos y el `updatedAt` de la actividad cuando empezó la edición                                                                                                                                                                            |
 
 No se conserva lo transitorio (cargando, errores, foco, animaciones). Crear y editar son borradores **distintos**: el de crear es por usuario y periodo, el de editar por actividad.
 
-Volver a la captura **no reinterpreta** el texto: muestra las mismas propuestas con las respuestas ya dadas («Retomé lo que tenías sin terminar»). Una asignatura nueva escrita en el creador inline o elegida en la revisión se guarda **solo como nombre**: no se crea hasta guardar la actividad o confirmar el lote.
+Un borrador **mixto** (actividades + horario semanal) se guarda entero (`review.recurrences`; antes `suggestions`) y sobrevive a cambiar de página y recargar. `CAPTURE_ENGINE_VERSION = 3` descarta los de la versión anterior (otra forma de la revisión). Volver a la captura **no reinterpreta** el texto: muestra las mismas propuestas con las respuestas ya dadas («Retomé lo que tenías sin terminar»). Una asignatura nueva escrita en el creador inline o elegida en la revisión se guarda **solo como nombre**: no se crea hasta guardar la actividad o confirmar el lote.
 
 ## Cuándo se elimina
 

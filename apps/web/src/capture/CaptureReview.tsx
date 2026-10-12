@@ -1,25 +1,36 @@
 import { type Subject } from '@planner/core';
-import { Link } from 'react-router';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { AlertIcon } from '../components/ui/icons';
 import { CaptureCard, Heading, SubjectQuestion, TimeAsk, type CardActions } from './CaptureCard';
-import { clockLabel, shortDate } from './format';
+import { RecurrenceCard, type RecurrenceActions } from './RecurrenceCard';
+import { shortDate } from './format';
 import {
   chooseGroupSubject,
   chooseGroupTime,
+  confirmLabel,
   effectiveDate,
   effectiveTitle,
+  isCreatable,
   pendingOf,
+  recurrencePendingOf,
   remove,
+  removeRecurrences,
   setDate,
   setDescription,
+  setRecurrenceSharedEnd,
+  setRecurrenceSharedStart,
+  setRecurrenceSubject,
+  setRecurrenceTime,
+  setRecurrenceTitle,
   setSubject,
   setTime,
   setTitle,
   setType,
   summarize,
   toggle,
+  toggleRecurrence,
+  toggleRecurrenceDay,
   type ReviewState,
 } from './reviewModel';
 
@@ -69,6 +80,17 @@ export function CaptureReview({
     remove: () => onChange(remove(state, clientId)),
   });
 
+  const recurrenceActions = (clientId: string): RecurrenceActions => ({
+    setTitle: (v) => onChange(setRecurrenceTitle(state, clientId, v)),
+    setSubject: (v) => onChange(setRecurrenceSubject(state, clientId, v)),
+    toggleDay: (d) => onChange(toggleRecurrenceDay(state, clientId, d)),
+    setTime: (d, which, v) => onChange(setRecurrenceTime(state, clientId, d, which, v)),
+    setSharedStart: (v) => onChange(setRecurrenceSharedStart(state, clientId, v)),
+    setSharedEnd: (v) => onChange(setRecurrenceSharedEnd(state, clientId, v)),
+    toggle: (v) => onChange(toggleRecurrence(state, clientId, v)),
+    remove: () => onChange(removeRecurrences(state, new Set([clientId]))),
+  });
+
   // Shared questions still open: the hour of a group, the subject of a group.
   const stillOpen = (c: ReviewState['corrections'][number]) =>
     state.items.filter(
@@ -92,17 +114,29 @@ export function CaptureReview({
       .join(', ');
 
   const goToFirstToReview = () => {
-    const first = state.items.find((i) => pendingOf(state, i).length > 0);
+    const first =
+      state.items.find((i) => pendingOf(state, i).length > 0)?.proposal.clientId ??
+      state.recurrences.find((r) => isCreatable(r) && recurrencePendingOf(r).length > 0)?.suggestion
+        .clientId;
     if (!first) return;
-    const target = document.getElementById(`capture-${first.proposal.clientId}-title`);
+    const target = document.getElementById(`capture-${first}-title`);
     target?.scrollIntoView({ block: 'center' });
     target?.setAttribute('tabindex', '-1');
     target?.focus({ preventScroll: true });
   };
 
-  const count = summary.toCreate;
-  const label = `Crear ${count} ${count === 1 ? 'actividad' : 'actividades'}`;
+  const count = summary.toCreate + summary.blocksToCreate;
+  const label = confirmLabel(summary);
   const waiting = summary.incomplete;
+  const found = summary.total + summary.schedules;
+  const headingParts = [
+    summary.total > 0 &&
+      `${summary.total} ${summary.total === 1 ? 'actividad encontrada' : 'actividades encontradas'}`,
+    summary.schedules > 0 &&
+      `${summary.schedules} ${summary.schedules === 1 ? 'horario semanal' : 'horarios semanales'}`,
+    summary.unsupported > 0 &&
+      `${summary.unsupported} ${summary.unsupported === 1 ? 'actividad que se repite' : 'actividades que se repiten'}`,
+  ].filter(Boolean);
 
   return (
     <section aria-labelledby="capture-review-title" className="flex flex-col gap-4">
@@ -113,14 +147,15 @@ export function CaptureReview({
           tabIndex={-1}
           className="text-lg font-semibold outline-none"
         >
-          {summary.total === 0
+          {headingParts.length === 0
             ? 'Sin actividades'
-            : `${summary.total} ${summary.total === 1 ? 'actividad encontrada' : 'actividades encontradas'}`}
+            : [headingParts.slice(0, -1).join(', '), headingParts.at(-1)]
+                .filter(Boolean)
+                .join(' y ')}
         </Heading>
-        {summary.total > 1 && (
+        {found > 1 && (
           <p className="text-sm font-medium">
-            {summary.total - summary.needsReview}{' '}
-            {summary.total - summary.needsReview === 1 ? 'lista' : 'listas'}
+            {found - summary.needsReview} {found - summary.needsReview === 1 ? 'lista' : 'listas'}
             {summary.needsReview > 0 &&
               `, ${summary.needsReview} ${summary.needsReview === 1 ? 'necesita' : 'necesitan'} revisión`}
           </p>
@@ -137,7 +172,7 @@ export function CaptureReview({
         <p className="text-sm text-muted-foreground">
           Nada se guarda hasta que pulses «{label}». Lo que no tiene dudas ya está listo.
         </p>
-        {summary.needsReview > 0 && summary.total > 4 && (
+        {summary.needsReview > 0 && found > 4 && (
           <div>
             <Button size="sm" onClick={goToFirstToReview}>
               Ir a la primera que necesita revisión
@@ -211,35 +246,17 @@ export function CaptureReview({
             disabled={pending}
           />
         ))}
+        {state.recurrences.map((r) => (
+          <RecurrenceCard
+            key={r.suggestion.clientId}
+            recurrence={r}
+            subjects={subjects}
+            actions={recurrenceActions(r.suggestion.clientId)}
+            level={(level + 1) as 3 | 4}
+            disabled={pending}
+          />
+        ))}
       </ul>
-
-      {state.suggestions.length > 0 && (
-        <Card variant="soft" className="flex flex-col gap-2 p-4 text-sm">
-          {state.suggestions.map((s) => (
-            <p key={s.clientId}>
-              <span className="font-medium">«{s.title.value}» parece repetirse cada semana</span>
-              {s.slots.length > 0 && (
-                <>
-                  {' '}
-                  (
-                  {s.slots
-                    .map(
-                      (x) =>
-                        `${WEEKDAYS[x.weekday - 1]}${x.time.value ? ` ${clockLabel(x.time.value)}` : ''}`,
-                    )
-                    .join(', ')}
-                  )
-                </>
-              )}
-              . No la creé como actividades: si es una clase, agrégala a tu{' '}
-              <Link to="/calendar" className="font-medium underline">
-                horario
-              </Link>
-              .
-            </p>
-          ))}
-        </Card>
-      )}
 
       <div className="flex flex-col gap-3">
         {summary.newSubjects.length > 0 && (
@@ -251,9 +268,13 @@ export function CaptureReview({
         )}
         {waiting > 0 && (
           <p role="status" className="text-sm text-warning-ink">
-            {waiting === 1
-              ? 'Falta resolver 1 actividad marcada.'
-              : `Faltan por resolver ${waiting} actividades marcadas.`}{' '}
+            {summary.schedules === 0
+              ? waiting === 1
+                ? 'Falta resolver 1 actividad marcada.'
+                : `Faltan por resolver ${waiting} actividades marcadas.`
+              : waiting === 1
+                ? 'Falta resolver 1 elemento marcado.'
+                : `Faltan por resolver ${waiting} elementos marcados.`}{' '}
             Complétalas o desmárcalas para continuar.
           </p>
         )}
@@ -264,7 +285,7 @@ export function CaptureReview({
             disabled={pending || count === 0 || waiting > 0}
             aria-busy={pending || undefined}
           >
-            {pending ? `Creando ${count} ${count === 1 ? 'actividad' : 'actividades'}…` : label}
+            {pending ? confirmLabel(summary, true) : label}
           </Button>
           <Button onClick={onBack} disabled={pending}>
             Volver al texto
@@ -277,5 +298,3 @@ export function CaptureReview({
     </section>
   );
 }
-
-const WEEKDAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
