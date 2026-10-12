@@ -7,6 +7,7 @@ Fuente de verdad: [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.pr
 ```mermaid
 erDiagram
   User ||--o{ Session : tiene
+  User ||--|| UserProfile : describe
   User ||--o{ AcademicPeriod : posee
   User ||--o{ Subject : posee
   User ||--o{ Activity : posee
@@ -40,6 +41,10 @@ Una `Activity` **guarda su periodo** (`periodId`, obligatorio, inmutable) y su a
 ### User
 
 `name`, `email` (único, siempre recortado y en minúsculas), `passwordHash` (Argon2id), `timezone` (por defecto `America/Bogota`). La zona horaria es la **autoridad** para «hoy», el saludo, la semana y el día en que vence una actividad sin hora. No hay pantalla para cambiarla (ver [limitations.md](limitations.md)).
+
+### UserProfile
+
+El perfil educativo, **1:1 con `User`** (`userId` es la clave primaria y la FK, `ON DELETE CASCADE`): `primaryUse` (nullable: `UNIVERSITY_STUDENT`, `SCHOOL_STUDENT`, `OTHER_STUDENT`, `TEACHER`, `PERSONAL`; qué dice la persona que hace con la app, **no un rol de autorización**), `programName` (nullable, 1–80 caracteres, **la autoridad**: lo que la persona escribió o el nombre canónico del catálogo), `programKey` (nullable; referencia opcional al catálogo pequeño de `@planner/core`, nunca gobierna reglas y exige `programName`) y `onboardingStatus` (`NOT_STARTED` por omisión, `IN_PROGRESS`, `COMPLETED`, `SKIPPED`: es solo un dato, ningún estado bloquea iniciar sesión ni usar la app). Toda cuenta tiene exactamente una fila: la crea el registro en la misma sentencia que el usuario (una transacción) y la migración la creó para los usuarios que ya existían. `User` sigue siendo solo identidad y autenticación. Detalle: [decisión D26](decisions.md#d26-perfil-educativo-separado-del-usuario).
 
 ### Session
 
@@ -118,4 +123,4 @@ Se calculan en cada lectura con un reloj inyectable; guardarlos obligaría a man
 
 ## Migraciones
 
-Seis migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.
+Ocho migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`, `activity_period_optional_subject`, `user_profile`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.

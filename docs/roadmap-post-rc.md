@@ -116,6 +116,20 @@ Problemas observados que UX1-2 y UX1-3 deben atender (UX1-1 no los toca): exceso
 
 UX1-2 explorará: nueva paleta y acento, hero de Home, jerarquía de superficies, menos bordes, sombras sutiles, movimiento y respuesta al toque, animación del progreso, resumen visual del Radar y compactación de Home.
 
+### P0 — Perfil educativo y onboarding (discovery aprobado; diseño en la conversación del 12 de octubre de 2026)
+
+Objetivo: conocer al usuario desde el registro, de forma **corta, opcional, progresiva y editable** (30–90 s, siempre «Omitir por ahora»), para personalizar después materias, horario, notas, cortes, promedio, Radar e importaciones. Reparto aprobado en PR pequeños:
+
+| PR     | Contenido                                                                                                                                                                                      | Estado                                                                                                |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| P0-PRE | Quitar un byte NUL accidental de `academic.ts`                                                                                                                                                 | **hecho** (PR de P0-1, commit independiente)                                                          |
+| P0-1   | `UserProfile` 1:1 (`primaryUse`, `programName`, `programKey`, `onboardingStatus`), catálogo pequeño, `GET`/`PATCH /api/profile`, [D26](decisions.md#d26-perfil-educativo-separado-del-usuario) | **implementado en el PR «feat: add educational user profile foundation», sin fusionar; sin interfaz** |
+| P0-2   | `Subject.educationContext` y `POST /api/subjects/batch`                                                                                                                                        | sin iniciar                                                                                           |
+| P0-3   | Semestre/grado en el periodo (`AcademicPeriod.studyLevel`)                                                                                                                                     | sin iniciar                                                                                           |
+| P0-4   | Asistente web de onboarding (uso, periodo precargado, carrera, materias, importación) y aviso «Completa tu perfil»                                                                             | sin iniciar                                                                                           |
+
+Cada paso necesita aprobación explícita. Nada de la interfaz de onboarding está implementado.
+
 ### Etapa B — Contexto universitario (`1.2.x`)
 
 | Id    | Objetivo                                                                    |

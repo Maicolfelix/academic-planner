@@ -33,7 +33,7 @@ JavaScript no puede leerla (HttpOnly) y el frontend no guarda nada en `localStor
 | `POST /api/auth/logout`   | 204, revoca la sesión y limpia la cookie (idempotente)                                        |
 | `GET /api/auth/me`        | 200 `{user}` o 401 `UNAUTHENTICATED`                                                          |
 
-`user` = `{id, name, email, timezone, createdAt}`. Nunca se devuelve `passwordHash`.
+`user` = `{id, name, email, timezone, createdAt}`. Nunca se devuelve `passwordHash`. El registro crea el usuario **y su `UserProfile`** en la misma transacción; el perfil no viaja en estas respuestas (ver `GET /api/profile`).
 El login no distingue "correo inexistente" de "contraseña incorrecta" (mismo código, mensaje y tiempo aproximado: para un correo
 desconocido se ejecuta una verificación Argon2 contra un hash ficticio).
 
