@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, credentials, prisma, resetDb, setupUser, signUp } from '../../test/helpers.js';
 
 const app = buildApp();
@@ -133,13 +133,66 @@ describe('GET /api/profile', () => {
     }
   });
 
-  it('a missing row (it should never happen) is created empty, not answered with a 500', async () => {
+  it('a missing profile is an invariant failure (generic 500, logged) and GET does not create one', async () => {
     const { agent } = await setupUser(app, 'ana@example.com');
     await prisma.userProfile.deleteMany();
-    const res = await agent.get('/api/profile');
-    expect(res.status).toBe(200);
-    expect(res.body.profile).toEqual(EMPTY);
-    expect(await prisma.userProfile.count()).toBe(1);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const res = await agent.get('/api/profile');
+      expect(res.status).toBe(500);
+      expect(res.body.error.code).toBe('PROFILE_INVARIANT_BROKEN');
+      // generic and safe: no user id, no table name, no stack, no details
+      expect(res.body.error.message).toBe(
+        'Ocurrió un error interno. Inténtalo de nuevo más tarde.',
+      );
+      expect(res.body.error.details).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toMatch(/UserProfile|userId|prisma|at /i);
+      expect(res.headers['cache-control']).toBe('no-store');
+      expect(log).toHaveBeenCalledTimes(1); // the server keeps the error
+    } finally {
+      log.mockRestore();
+    }
+    expect(await prisma.userProfile.count()).toBe(0); // the read wrote nothing
+    // the account itself is fine: only the profile is missing
+    expect((await agent.get('/api/auth/me')).status).toBe(200);
+  });
+
+  it('PATCH of a missing profile is the same failure, and creates nothing', async () => {
+    const { agent } = await setupUser(app, 'ana@example.com');
+    await prisma.userProfile.deleteMany();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      for (const body of [{ primaryUse: 'PERSONAL' }, { onboardingStatus: 'IN_PROGRESS' }]) {
+        const res = await patch(agent, body);
+        expect(res.status, JSON.stringify(body)).toBe(500);
+        expect(res.body.error.code).toBe('PROFILE_INVARIANT_BROKEN');
+      }
+    } finally {
+      log.mockRestore();
+    }
+    expect(await prisma.userProfile.count()).toBe(0);
+  });
+
+  it('GET never changes the number of profile rows: valid profile or missing one', async () => {
+    const ana = await setupUser(app, 'ana@example.com');
+    await setupUser(app, 'beto@example.com');
+    const rows = () => prisma.userProfile.count();
+    const snapshot = async () =>
+      JSON.stringify(await prisma.userProfile.findMany({ orderBy: { userId: 'asc' } }));
+    const before = [await rows(), await snapshot()];
+    for (let i = 0; i < 3; i++) expect((await ana.agent.get('/api/profile')).status).toBe(200);
+    expect([await rows(), await snapshot()]).toEqual(before); // not a row, not even updatedAt
+
+    await prisma.userProfile.deleteMany({ where: { user: { email: 'ana@example.com' } } });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const countBefore = await rows();
+      expect(countBefore).toBe(1);
+      for (let i = 0; i < 3; i++) await ana.agent.get('/api/profile');
+      expect(await rows()).toBe(countBefore);
+    } finally {
+      log.mockRestore();
+    }
   });
 });
 

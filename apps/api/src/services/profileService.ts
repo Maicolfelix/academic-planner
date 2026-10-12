@@ -12,7 +12,7 @@ import {
   type ProfileRepository,
 } from '../repositories/profileRepository.js';
 
-type ProfileRow = Awaited<ReturnType<ProfileRepository['ensure']>>;
+type ProfileRow = NonNullable<Awaited<ReturnType<ProfileRepository['find']>>>;
 
 export const toProfileDto = (p: ProfileRow): Profile => ({
   primaryUse: p.primaryUse,
@@ -20,6 +20,18 @@ export const toProfileDto = (p: ProfileRow): Profile => ({
   programKey: p.programKey,
   onboardingStatus: p.onboardingStatus,
 });
+
+/**
+ * Every account has exactly one profile (created with it, and by the migration for the older ones), so a signed-in user
+ * WITHOUT one means the invariant is broken somewhere else. It is an internal failure, not a 404 (the user exists) and not
+ * something to quietly repair on a read: the client gets a generic message and the server logs the error.
+ */
+export const profileInvariantBroken = () =>
+  new AppError(
+    500,
+    'PROFILE_INVARIANT_BROKEN',
+    'Ocurrió un error interno. Inténtalo de nuevo más tarde.',
+  );
 
 const invalidTransition = (from: string, to: string) =>
   new AppError(
@@ -36,19 +48,21 @@ const invalidTransition = (from: string, to: string) =>
 export function createProfileService(profiles: ProfileRepository, inTransaction: RunInTransaction) {
   return {
     async get(userId: string): Promise<Profile> {
-      return toProfileDto((await profiles.find(userId)) ?? (await profiles.ensure(userId)));
+      const profile = await profiles.find(userId); // a read: it never writes
+      if (!profile) throw profileInvariantBroken();
+      return toProfileDto(profile);
     },
 
     /**
-     * A partial update. One transaction with the row locked: the program pair is resolved against what is stored (the name
+     * A partial update of the EXISTING profile (never created here). One transaction with the row locked: the program pair is resolved against what is stored (the name
      * is the authority; a catalog key brings its canonical name) and a status change must be one of the allowed steps.
      */
     async update(userId: string, input: UpdateProfileInput): Promise<Profile> {
       return inTransaction(async (tx) => {
         const repo = createProfileRepository(tx);
-        await repo.ensure(userId);
-        await repo.lock(userId);
-        const current = (await repo.find(userId))!;
+        await repo.lock(userId); // a missing row locks nothing: it is checked right after, never created
+        const current = await repo.find(userId);
+        if (!current) throw profileInvariantBroken();
 
         const data: ProfileData = {};
         if (input.primaryUse !== undefined) data.primaryUse = input.primaryUse;

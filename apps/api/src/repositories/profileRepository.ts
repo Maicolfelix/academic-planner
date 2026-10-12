@@ -16,14 +16,13 @@ export function createProfileRepository(db: Db) {
   return {
     find: (userId: string) => db.userProfile.findUnique({ where: { userId } }),
 
-    /**
-     * The row, created empty when it does not exist. It always exists (registration and the migration create it), so this
-     * only guards against a hole instead of answering 500 for it; the primary key makes a race harmless.
-     */
-    ensure: (userId: string) =>
-      db.userProfile.upsert({ where: { userId }, create: { userId }, update: {} }),
+    // There is deliberately no "create" here: a profile is created only WITH its account (registration, and the migration
+    // for the accounts that already existed). Nothing in a request path may create or repair one.
 
-    /** Locks the row until the surrounding transaction ends, so two simultaneous status changes run one after the other. */
+    /**
+     * Locks the row until the surrounding transaction ends, so two simultaneous status changes run one after the other.
+     * A row that does not exist locks nothing (and is NOT created): the caller reads it afterwards and decides.
+     */
     async lock(userId: string): Promise<void> {
       await db.$queryRaw`SELECT "userId" FROM "UserProfile" WHERE "userId" = ${userId}::uuid FOR UPDATE`;
     },
