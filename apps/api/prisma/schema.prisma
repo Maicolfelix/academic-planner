@@ -24,6 +24,41 @@ model User {
   activities     Activity[]
   scheduleBlocks ScheduleBlock[]
   reminders      Reminder[]
+  // Exactly one per user, created with the account (and by the migration for the ones that already existed).
+  profile        UserProfile?
+}
+
+// What the person says they use the app for. A description to personalise labels, NEVER an authorization role.
+enum PrimaryUse {
+  UNIVERSITY_STUDENT
+  SCHOOL_STUDENT
+  OTHER_STUDENT
+  TEACHER
+  PERSONAL
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+/// The educational profile of a user (1:1). `User` stays identity/authentication; nothing here grants or denies anything.
+model UserProfile {
+  userId           String           @id @db.Uuid
+  primaryUse       PrimaryUse?
+  // The authority: what the person (or the catalog's canonical entry) says the program is. 1..80 characters.
+  programName      String?
+  // Optional reference to the small catalog in @planner/core. Never drives behaviour; NOT NULL name when set.
+  programKey       String?
+  onboardingStatus OnboardingStatus @default(NOT_STARTED)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Also in the migration SQL (Prisma cannot express them):
+  //  - CHECK (programName has 1..80 characters)
+  //  - CHECK (a programKey implies a programName)
 }
 
 // Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so

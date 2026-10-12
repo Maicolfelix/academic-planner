@@ -34,6 +34,7 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ],
   ['post', '/api/auth/login', { email: credentials.email, password: credentials.password }],
   ['post', '/api/auth/logout'],
+  ['patch', '/api/profile', { primaryUse: 'PERSONAL' }],
   ['post', '/api/periods', { name: 'P', startDate: '2026-08-03', endDate: '2026-11-28' }],
   ['patch', `/api/periods/${uuid()}`, { name: 'P' }],
   ['delete', `/api/periods/${uuid()}`],
@@ -282,6 +283,7 @@ describe('private responses are never stored by a browser or proxy', () => {
     const { agent } = await setupUser(app, 'cache@example.com');
     const paths = [
       '/api/auth/me',
+      '/api/profile',
       '/api/periods',
       '/api/subjects',
       '/api/activities',
