@@ -78,6 +78,7 @@ describe('main navigation', () => {
 
   it('shows no reminder badge until there are reminders (nothing is faked)', () => {
     expect(shell('/dashboard')).not.toContain('🔔');
+    expect(shell('/dashboard')).not.toContain('data-reminder-badge');
   });
 });
 

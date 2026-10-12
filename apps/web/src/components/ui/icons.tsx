@@ -62,7 +62,7 @@ export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (
 
 /*
  * UX1-3 added the action icons (check, pencil, calendar+, trash, more, chevron, user, sliders) and UX1-4 the alert
- * triangle of the form errors: 14 small shapes in all.
+ * triangle of the form errors and the notification polish the bell: 15 small shapes in all.
  * Still cheaper to keep as eight lines of path each than a dependency (see docs/ux-accessibility.md, "Iconos").
  */
 type IconProps = { className?: string };
@@ -126,6 +126,14 @@ export const AlertIcon = ({ className = 'size-4' }: IconProps) => (
   <Icon className={className}>
     <path d="M12 4 3 20h18z" />
     <path d="M12 10v4M12 17.2v.1" />
+  </Icon>
+);
+
+/** A bell (reminders). Same stroke as the navigation icons; decoration only, whatever it sits in carries the text. */
+export const BellIcon = ({ className = 'size-4' }: IconProps) => (
+  <Icon className={className}>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
   </Icon>
 );
 
