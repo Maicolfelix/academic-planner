@@ -1,6 +1,7 @@
 import {
   END_AFTER_START_ERROR,
   isEndAfterStart,
+  resolveStudyLevel,
   type CreatePeriodInput,
   type UpdatePeriodInput,
 } from '@planner/core';
@@ -37,8 +38,14 @@ export function createPeriodService(periods: PeriodRepository) {
     async create(userId: string, input: CreatePeriodInput) {
       const makeCurrent = input.isCurrent === true || !(await periods.hasCurrent(userId));
       try {
-        const { name, startDate, endDate } = input;
-        return toPeriodDto(await periods.create(userId, { name, startDate, endDate }, makeCurrent));
+        const { name, startDate, endDate, studyLevel, studyLevelNote } = input;
+        return toPeriodDto(
+          await periods.create(
+            userId,
+            { name, startDate, endDate, studyLevel, studyLevelNote },
+            makeCurrent,
+          ),
+        );
       } catch (err) {
         // Two simultaneous "make current" requests: the partial unique index lets only one win.
         if (isPrismaError(err, 'P2002')) throw conflictingCurrent();
@@ -59,10 +66,15 @@ export function createPeriodService(periods: PeriodRepository) {
 
       try {
         const { name, startDate: s, endDate: e } = input;
+        // The level is only touched when the request mentions it; a number or a note replaces the other (never both).
+        const level =
+          input.studyLevel !== undefined || input.studyLevelNote !== undefined
+            ? resolveStudyLevel(existing, input)
+            : {};
         const updated = await periods.update(
           userId,
           id,
-          { name, startDate: s, endDate: e },
+          { name, startDate: s, endDate: e, ...level },
           input.isCurrent === true,
         );
         return toPeriodDto(updated);

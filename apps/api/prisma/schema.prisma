@@ -70,6 +70,9 @@ model AcademicPeriod {
   startDate      DateTime        @db.Date
   endDate        DateTime        @db.Date
   isCurrent      Boolean         @default(false)
+  // The level during THIS period (a semester, a school grade...): generic on purpose, a number OR a free-text note, never both.
+  studyLevel     Int?
+  studyLevelNote String?
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -79,6 +82,7 @@ model AcademicPeriod {
   // Also in the migration SQL (Prisma cannot express them):
   //  - partial unique index: at most one isCurrent = true per user
   //  - CHECK ("endDate" > "startDate")
+  //  - CHECK (studyLevel between 1 and 99; studyLevelNote has 1..40 characters; at most one of the two is set)
 
   @@index([userId])
 }

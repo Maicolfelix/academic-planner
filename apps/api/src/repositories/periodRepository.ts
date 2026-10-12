@@ -5,12 +5,17 @@ export interface PeriodData {
   name?: string;
   startDate?: string;
   endDate?: string;
+  /** Already resolved by the service (a number or a note, never both); undefined = unchanged. */
+  studyLevel?: number | null;
+  studyLevelNote?: string | null;
 }
 
 const dates = (d: PeriodData) => ({
   ...(d.name !== undefined && { name: d.name }),
   ...(d.startDate !== undefined && { startDate: fromDateOnly(d.startDate) }),
   ...(d.endDate !== undefined && { endDate: fromDateOnly(d.endDate) }),
+  ...(d.studyLevel !== undefined && { studyLevel: d.studyLevel }),
+  ...(d.studyLevelNote !== undefined && { studyLevelNote: d.studyLevelNote }),
 });
 
 /**
@@ -44,7 +49,11 @@ export function createPeriodRepository(prisma: PrismaClient) {
       (await prisma.academicPeriod.count({ where: { userId, isCurrent: true } })) > 0,
 
     /** Un-marking the previous current period and creating the new one happen in one transaction. */
-    create: (userId: string, data: Required<PeriodData>, makeCurrent: boolean) =>
+    create: (
+      userId: string,
+      data: Required<Pick<PeriodData, 'name' | 'startDate' | 'endDate'>> & PeriodData,
+      makeCurrent: boolean,
+    ) =>
       prisma.$transaction(async (tx) => {
         if (makeCurrent) {
           await tx.academicPeriod.updateMany({
@@ -58,6 +67,8 @@ export function createPeriodRepository(prisma: PrismaClient) {
             name: data.name,
             startDate: fromDateOnly(data.startDate),
             endDate: fromDateOnly(data.endDate),
+            studyLevel: data.studyLevel ?? null,
+            studyLevelNote: data.studyLevelNote ?? null,
             isCurrent: makeCurrent,
           },
         });

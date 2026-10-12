@@ -77,6 +77,31 @@ const requiredName = (max: number) =>
 
 export const PERIOD_NAME_MAX = 100;
 
+/**
+ * The level the student is at DURING this period: a semester, a school grade, a year of a course. It lives on the period
+ * (not on the profile) because it changes with every period: "2026-2, semester 4" then "2027-1, semester 5". The domain only
+ * stores it, generically: it never asks what kind of student this is (no "university means 1..10"), so the bounds are only
+ * a guard against garbage. The screens will say "semestre" or "grado" and offer 1-10 or "Otro" as they see fit.
+ */
+export const STUDY_LEVEL_MIN = 1;
+export const STUDY_LEVEL_MAX = 99;
+export const STUDY_LEVEL_NOTE_MAX = 40;
+
+export const studyLevelSchema = z
+  .number({ error: 'Ingresa un nivel válido.' })
+  .int('El nivel debe ser un número entero.')
+  .min(STUDY_LEVEL_MIN, `El nivel debe estar entre ${STUDY_LEVEL_MIN} y ${STUDY_LEVEL_MAX}.`)
+  .max(STUDY_LEVEL_MAX, `El nivel debe estar entre ${STUDY_LEVEL_MIN} y ${STUDY_LEVEL_MAX}.`);
+
+/** Free text for "Otro" (a structure a number does not describe): trimmed; '' and null both mean none. */
+const studyLevelNoteSchema = optionalText(STUDY_LEVEL_NOTE_MAX, 'La nota del nivel');
+
+const BOTH_LEVELS_MESSAGE = 'Indica el nivel como número o como texto, no los dos a la vez.';
+
+/** A level is a number OR a note, never both. */
+const levelAlternatives = (v: { studyLevel?: number | null; studyLevelNote?: string | null }) =>
+  !(v.studyLevel != null && v.studyLevelNote != null);
+
 const periodFields = {
   name: requiredName(PERIOD_NAME_MAX),
   startDate: dateOnlySchema,
@@ -85,11 +110,17 @@ const periodFields = {
 
 /** `strict`: unknown keys (e.g. a client-sent `userId`) are rejected, never trusted or silently used. */
 export const createPeriodSchema = z
-  .strictObject({ ...periodFields, isCurrent: z.boolean().optional() })
+  .strictObject({
+    ...periodFields,
+    isCurrent: z.boolean().optional(),
+    studyLevel: studyLevelSchema.nullish(),
+    studyLevelNote: studyLevelNoteSchema.optional(),
+  })
   .refine((v) => isEndAfterStart(v.startDate, v.endDate), {
     path: ['endDate'],
     message: END_AFTER_START_MESSAGE,
-  });
+  })
+  .refine(levelAlternatives, { path: ['studyLevelNote'], message: BOTH_LEVELS_MESSAGE });
 
 /**
  * `isCurrent` can only be set to `true` (to un-mark a period, mark another one): a user never ends up
@@ -104,11 +135,38 @@ export const updatePeriodSchema = z
     isCurrent: z
       .literal(true, { error: 'Solo se puede marcar un periodo como actual.' })
       .optional(),
+    // `null` clears that field; a value sets it and clears the other one (see `resolveStudyLevel`).
+    studyLevel: studyLevelSchema.nullish(),
+    studyLevelNote: studyLevelNoteSchema.optional(),
   })
   .refine((v) => !v.startDate || !v.endDate || isEndAfterStart(v.startDate, v.endDate), {
     path: ['endDate'],
     message: END_AFTER_START_MESSAGE,
-  });
+  })
+  .refine(levelAlternatives, { path: ['studyLevelNote'], message: BOTH_LEVELS_MESSAGE });
+
+/**
+ * The level a period ends up with after an update. Ergonomic, so a client never has to send two nulls:
+ *  - a number sets the level and clears the note; a note sets the note and clears the level;
+ *  - `null` clears only that field (clearing the active one leaves both empty);
+ *  - not mentioned: unchanged.
+ * (The schema already refused a request that carries both a number and a note.)
+ */
+export function resolveStudyLevel(
+  current: { studyLevel: number | null; studyLevelNote: string | null },
+  patch: { studyLevel?: number | null; studyLevelNote?: string | null },
+): { studyLevel: number | null; studyLevelNote: string | null } {
+  let { studyLevel, studyLevelNote } = current;
+  if (patch.studyLevel !== undefined) {
+    studyLevel = patch.studyLevel;
+    if (patch.studyLevel !== null) studyLevelNote = null;
+  }
+  if (patch.studyLevelNote !== undefined) {
+    studyLevelNote = patch.studyLevelNote;
+    if (patch.studyLevelNote !== null) studyLevel = null;
+  }
+  return { studyLevel, studyLevelNote };
+}
 
 export const END_AFTER_START_ERROR = END_AFTER_START_MESSAGE;
 
@@ -118,6 +176,10 @@ export const periodSchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   isCurrent: z.boolean(),
+  /** The level during this period, as a number; null when not given (or when `studyLevelNote` is). */
+  studyLevel: z.number().int().nullable(),
+  /** The level as free text ("Otro"); null when not given (or when `studyLevel` is). */
+  studyLevelNote: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
