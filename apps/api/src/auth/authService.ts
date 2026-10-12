@@ -24,8 +24,10 @@ export function createAuthService(prisma: PrismaClient, sessions: SessionService
       const passwordHash = await hashPassword(input.password);
       let user;
       try {
+        // The educational profile is created WITH the account, in the same statement (one transaction): an account
+        // never exists without its profile, and a failed profile never leaves a profile-less account behind.
         user = await prisma.user.create({
-          data: { name: input.name, email: input.email, passwordHash },
+          data: { name: input.name, email: input.email, passwordHash, profile: { create: {} } },
         });
       } catch (err) {
         // The unique index is the source of truth, so concurrent duplicates are also caught.

@@ -117,8 +117,20 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const user = await prisma.user.upsert({
     where: { email },
-    create: { email, name: DEMO_NAME, passwordHash, timezone: DEMO_TIMEZONE },
-    update: { name: DEMO_NAME, passwordHash, timezone: DEMO_TIMEZONE },
+    // like every account, the demo student has exactly one profile (empty: the seed infers nothing about education)
+    create: {
+      email,
+      name: DEMO_NAME,
+      passwordHash,
+      timezone: DEMO_TIMEZONE,
+      profile: { create: {} },
+    },
+    update: {
+      name: DEMO_NAME,
+      passwordHash,
+      timezone: DEMO_TIMEZONE,
+      profile: { upsert: { create: {}, update: {} } },
+    },
   });
   await clearDemoData(prisma, user.id);
 

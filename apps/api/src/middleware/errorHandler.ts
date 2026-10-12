@@ -26,6 +26,8 @@ export function createErrorHandler(
     if (err instanceof AppError) {
       status = err.status;
       body = { error: { code: err.code, message: err.message, details: err.details } };
+      // a rule answering 5xx is a server fault (e.g. a broken invariant): the client gets the code, the server keeps the error
+      if (status >= 500) log(err);
     } else if (err instanceof ZodError) {
       status = 400;
       body = {

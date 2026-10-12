@@ -48,6 +48,15 @@ Misma envoltura siempre: `{ "error": { "code": "…", "message": "…", "details
 
 Contraseña: 8 a 128 caracteres. Iniciar sesión revoca el token anterior de ese navegador.
 
+## Perfil (`/api/profile`) — [decisión D26](decisions.md#d26-perfil-educativo-separado-del-usuario)
+
+| Método y ruta        | Sesión | Para qué                                  | Entrada                                                                               | Éxito                                                                        | Errores importantes                                                                                                                         |
+| -------------------- | :----: | ----------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/profile`   |   sí   | El perfil educativo del usuario de sesión | —                                                                                     | `200 { profile: { primaryUse, programName, programKey, onboardingStatus } }` | 401                                                                                                                                         |
+| `PATCH /api/profile` |   sí   | Actualizar parcialmente ese perfil        | `{ primaryUse?, programKey?, programName?, onboardingStatus? }` (estricto, ≥ 1 campo) | `200 { profile }`                                                            | 400 validación (campo desconocido, `programKey` fuera del catálogo, nombre ≠ canónico, > 80, NUL), 409 `INVALID_ONBOARDING_TRANSITION`, 401 |
+
+Sin id en la URL: el dueño sale solo de la sesión (nunca `userId`, correo ni zona horaria en el cuerpo). Un programa del catálogo (`programKey`) trae su nombre canónico (el servidor lo deriva); un `programName` solo es un programa propio (sin clave); ambos `null` lo borran. `onboardingStatus` pide `IN_PROGRESS`, `COMPLETED` o `SKIPPED` (nunca `NOT_STARTED`) y debe ser un paso válido (`NOT_STARTED → IN_PROGRESS | SKIPPED`, `IN_PROGRESS → COMPLETED | SKIPPED`, `SKIPPED | COMPLETED → IN_PROGRESS`; pedir el estado actual es inocuo). `register`, `login` y `me` **no** incluyen el perfil. El perfil es obligatorio por invariante y la petición **nunca lo crea ni lo repara**: si un usuario autenticado no lo tuviera, `GET` y `PATCH` responden `500 PROFILE_INVARIANT_BROKEN` (mensaje genérico, error registrado en el servidor) y no escriben nada.
+
 ## Periodos académicos (`/api/periods`) — [academic.md](academic.md)
 
 | Método y ruta             | Para qué                             | Entrada                                    | Éxito             | Errores importantes                           |

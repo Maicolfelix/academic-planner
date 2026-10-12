@@ -20,6 +20,7 @@ import {
   createWorkloadController,
 } from './controllers/insightsController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createProfileController } from './controllers/profileController.js';
 import { createCaptureController } from './controllers/captureController.js';
 import { createQuickCaptureController } from './controllers/quickCaptureController.js';
 import { createRadarController } from './controllers/radarController.js';
@@ -31,6 +32,7 @@ import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
 import { createInsightsRepository } from './repositories/insightsRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
+import { createProfileRepository } from './repositories/profileRepository.js';
 import { createRadarRepository } from './repositories/radarRepository.js';
 import { createReminderRepository } from './repositories/reminderRepository.js';
 import { createScheduleRepository } from './repositories/scheduleRepository.js';
@@ -45,6 +47,7 @@ import { progressRouter, workloadRouter } from './routes/insights.js';
 import { captureRouter } from './routes/capture.js';
 import { quickCaptureRouter } from './routes/quickCapture.js';
 import { periodsRouter } from './routes/periods.js';
+import { profileRouter } from './routes/profile.js';
 import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
@@ -55,6 +58,7 @@ import { createActivityService } from './services/activityService.js';
 import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
+import { createProfileService } from './services/profileService.js';
 import { createProgressService } from './services/progressService.js';
 import { createCaptureConfirmService } from './services/captureConfirmService.js';
 import { createCaptureService } from './services/captureService.js';
@@ -187,6 +191,9 @@ export function createApp(deps: AppDeps): Express {
     limit: importOptions.limit ?? 10,
   });
   const periodController = createPeriodController(createPeriodService(periodRepository));
+  const profileController = createProfileController(
+    createProfileService(createProfileRepository(prisma), runInTransaction),
+  );
   const subjectController = createSubjectController(
     createSubjectService(subjectRepository, periodRepository),
   );
@@ -206,6 +213,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/health', healthRouter(checkDatabase));
   app.use('/api/auth', authRouter({ auth, sessions, requireAuth, secureCookies, rateLimits }));
 
+  app.use('/api/profile', profileRouter(profileController, requireAuth));
   app.use('/api/periods', periodsRouter(periodController, requireAuth));
   app.use('/api/subjects', subjectsRouter(subjectController, requireAuth));
   app.use('/api/activities', activitiesRouter(activityController, requireAuth));
