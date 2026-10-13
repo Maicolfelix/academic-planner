@@ -4,7 +4,7 @@ import { Navigate } from 'react-router';
 import {
   useCreatePeriod,
   useCreateSubjectsBatch,
-  usePeriods,
+  useHomePeriod,
   useSubjects,
   useUpdatePeriod,
 } from '../academic/useAcademic';
@@ -55,13 +55,14 @@ export function OnboardingPage() {
  */
 function Onboarding({ userId }: { userId: string }) {
   const profile = useProfile();
-  const periods = usePeriods();
+  const home = useHomePeriod();
   const updateProfile = useUpdateProfile();
   const createPeriod = useCreatePeriod();
   const updatePeriod = useUpdatePeriod();
   const createSubjects = useCreateSubjectsBatch();
 
-  const currentPeriod = periods.data?.find((p) => p.isCurrent) ?? null;
+  // "Is there already the period that lets the app be used?" is the server's HOME period (never "any current one").
+  const currentPeriod = home.data ?? null;
   const subjects = useSubjects(currentPeriod?.id);
 
   // What was decided here, and the subject names still to create: the local draft (read once, when the wizard opens).
@@ -96,10 +97,10 @@ function Onboarding({ userId }: { userId: string }) {
 
   const facts = useMemo(
     () =>
-      profile.data && periods.data
+      profile.data && home.data !== undefined
         ? { profile: profile.data, period: currentPeriod, decided }
         : null,
-    [profile.data, periods.data, currentPeriod, decided],
+    [profile.data, home.data, currentPeriod, decided],
   );
   const derived = facts ? onboardingStep(facts) : null;
   const derivedOrView = view ?? derived;
@@ -115,21 +116,21 @@ function Onboarding({ userId }: { userId: string }) {
     previous.current = step;
   }, [step]);
 
-  if (profile.isPending || periods.isPending) return <FullPageMessage>Cargando…</FullPageMessage>;
-  if ((profile.isError && !profile.data) || (periods.isError && !periods.data)) {
-    const failed = profile.isError && !profile.data ? profile : periods;
+  if (profile.isPending || home.isPending) return <FullPageMessage>Cargando…</FullPageMessage>;
+  if ((profile.isError && !profile.data) || (home.isError && home.data === undefined)) {
+    const failed = profile.isError && !profile.data ? profile : home;
     return (
       <RetryMessage
         text={`No se pudo cargar: ${failed.error!.message}`}
         error={failed.error!}
         onRetry={() => {
           void profile.refetch();
-          void periods.refetch();
+          void home.refetch();
         }}
       />
     );
   }
-  if (!profile.data || !periods.data || !facts || !step) return null;
+  if (!profile.data || home.data === undefined || !facts || !step) return null;
   if (leavingTo) return <Navigate to={leavingTo} replace />;
   if (step === 'DONE') return <Navigate to="/dashboard" replace />; // finished before: nothing to chase
 

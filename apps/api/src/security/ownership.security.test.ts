@@ -321,6 +321,7 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
       '/api/subjects',
       '/api/activities',
       '/api/periods',
+      '/api/periods/home',
       '/api/study-tracks',
       '/api/schedule?from=2026-10-05&to=2026-10-11',
       '/api/reminders',
@@ -562,6 +563,7 @@ describe('every protected route refuses an anonymous caller', () => {
   const routes: [string, string][] = [
     ['get', '/api/auth/me'],
     ['get', '/api/periods'],
+    ['get', '/api/periods/home'],
     ['post', '/api/periods'],
     ['patch', `/api/periods/${randomUUID()}`],
     ['get', '/api/study-tracks'],

@@ -1,4 +1,4 @@
-import { createPeriodSchema, updatePeriodSchema } from '@planner/core';
+import { createPeriodSchema, updatePeriodSchema, type HomePeriodResponse } from '@planner/core';
 import type { RequestHandler } from 'express';
 import { parseIdParam } from '../http/params.js';
 import { authOf } from '../middleware/requireAuth.js';
@@ -13,6 +13,10 @@ export function createPeriodController(service: PeriodService) {
   return {
     list: (async (req, res) => {
       res.json({ periods: await service.list(owner(req)) });
+    }) satisfies RequestHandler,
+
+    home: (async (req, res) => {
+      res.json({ period: await service.home(owner(req)) } satisfies HomePeriodResponse);
     }) satisfies RequestHandler,
 
     create: (async (req, res) => {

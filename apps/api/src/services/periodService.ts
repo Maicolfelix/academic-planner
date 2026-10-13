@@ -81,6 +81,12 @@ export function createPeriodService(periods: PeriodRepository, inTransaction: Ru
       return (await periods.list(userId)).map(toPeriodDto);
     },
 
+    /** The HOME current period of the session's user (see `findHomeCurrent`), or null. A read: it never writes or infers. */
+    async home(userId: string) {
+      const period = await periods.findHomeCurrent(userId);
+      return period ? toPeriodDto(period) : null;
+    },
+
     async get(userId: string, id: string) {
       const period = await periods.findOwned(userId, id);
       if (!period) throw periodNotFound();

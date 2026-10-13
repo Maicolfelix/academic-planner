@@ -142,11 +142,31 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(schema.match(/enum \w+ \{\s*UNIVERSITY\b/g)).toHaveLength(1);
   });
 
-  it('the web and the onboarding do not know about studies yet (no production file mentions one)', () => {
-    const web = files.filter((f) =>
-      f.includes(`${path.sep}apps${path.sep}web${path.sep}src${path.sep}`),
-    );
+  const web = files.filter((f) =>
+    f.includes(`${path.sep}apps${path.sep}web${path.sep}src${path.sep}`),
+  );
+
+  it('the web knows about studies only through the few actions that can move HOME (no screen, no onboarding)', () => {
     expect(web.length).toBeGreaterThan(50);
-    expect(web.filter((f) => /studyTrack/i.test(read(f))).map(rel)).toEqual([]);
+    expect(
+      web
+        .filter((f) => /studyTrack/i.test(read(f)))
+        .map(rel)
+        .sort(),
+    ).toEqual(['apps/web/src/api/studyTracks.ts', 'apps/web/src/studyTracks/useStudyTracks.ts']);
+  });
+
+  it('the web never derives HOME (or the gate of the app) from the list of periods: no "find/some current" in production', () => {
+    const offenders = web.filter((f) =>
+      /\.(find|some|filter)\(\s*\(?\s*\w+\s*\)?\s*=>\s*\w+\.isCurrent\b/.test(
+        withoutTypeChecks(read(f)),
+      ),
+    );
+    expect(offenders.map(rel)).toEqual([]);
+    // and the files that decide it say HOME explicitly (a guard against the pattern matching nothing)
+    const read2 = (p: string) => read(path.join(ROOT, p));
+    expect(read2('apps/web/src/auth/guards.tsx')).toMatch(/useHomePeriod\(\)/);
+    expect(read2('apps/web/src/academic/useAcademic.ts')).toMatch(/fetchHomePeriod/);
+    expect(read2('apps/web/src/pages/OnboardingPage.tsx')).toMatch(/useHomePeriod\(\)/);
   });
 });

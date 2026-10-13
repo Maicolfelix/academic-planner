@@ -1,4 +1,5 @@
 import {
+  homePeriodResponseSchema,
   periodListResponseSchema,
   subjectBatchResponseSchema,
   type CreateSubjectBatchInput,
@@ -17,6 +18,11 @@ import { apiFetch } from './client';
 
 export async function fetchPeriods(): Promise<AcademicPeriod[]> {
   return (await apiFetch('/api/periods', { schema: periodListResponseSchema })).periods;
+}
+
+/** The HOME current period as the server decides it (never derived from the list), or null when there is none. */
+export async function fetchHomePeriod(): Promise<AcademicPeriod | null> {
+  return (await apiFetch('/api/periods/home', { schema: homePeriodResponseSchema })).period;
 }
 
 export async function createPeriodRequest(input: CreatePeriodInput): Promise<AcademicPeriod> {

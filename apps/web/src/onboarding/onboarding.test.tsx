@@ -10,7 +10,7 @@ import type {
   PublicUser,
   Subject,
 } from '@planner/core';
-import { periodsKey, subjectsKey } from '../academic/useAcademic';
+import { homePeriodKey, subjectsKey } from '../academic/useAcademic';
 import { ME_KEY } from '../auth/useAuth';
 import { OnboardingPage } from '../pages/OnboardingPage';
 import { PROFILE_KEY } from '../profile/useProfile';
@@ -92,7 +92,8 @@ function page(p: Profile | undefined, periods: AcademicPeriod[] | undefined, sub
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(ME_KEY, USER);
   if (p) client.setQueryData(PROFILE_KEY, p);
-  if (periods) client.setQueryData(periodsKey, periods);
+  // the page reads the HOME period, which the server answers (here: the one current period of these accounts, or none)
+  if (periods) client.setQueryData(homePeriodKey, periods.find((x) => x.isCurrent) ?? null);
   if (subjects) client.setQueryData(subjectsKey(PERIOD_ID), subjects);
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>

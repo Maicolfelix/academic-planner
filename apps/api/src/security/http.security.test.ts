@@ -292,6 +292,7 @@ describe('private responses are never stored by a browser or proxy', () => {
       '/api/profile',
       '/api/study-tracks',
       '/api/periods',
+      '/api/periods/home',
       '/api/subjects',
       '/api/activities',
       '/api/schedule',

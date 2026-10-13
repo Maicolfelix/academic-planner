@@ -194,9 +194,15 @@ export const periodSchema = z.object({
 });
 
 export const periodResponseSchema = z.object({ period: periodSchema });
+/**
+ * `GET /api/periods/home`: the HOME current period (the general current one; else the primary active study's; else none),
+ * decided by the server so no client ever re-implements which study is the primary one. `null` when there is none.
+ */
+export const homePeriodResponseSchema = z.object({ period: periodSchema.nullable() });
 export const periodListResponseSchema = z.object({ periods: z.array(periodSchema) });
 
 export type AcademicPeriod = z.infer<typeof periodSchema>;
+export type HomePeriodResponse = z.infer<typeof homePeriodResponseSchema>;
 export type CreatePeriodInput = z.infer<typeof createPeriodSchema>;
 export type UpdatePeriodInput = z.infer<typeof updatePeriodSchema>;
 /** What a client may send on update: every field optional. */
