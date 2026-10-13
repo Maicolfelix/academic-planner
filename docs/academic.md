@@ -89,7 +89,7 @@ El frontend nunca habla con Prisma: usa TanStack Query (`useAcademic.ts`) y no d
 
 ## UX
 
-- Un usuario sin periodo actual es llevado a `/onboarding` (nombre prellenado según la fecha, inicio y fin) y después a `/subjects`.
+- Una cuenta nueva va directo de «Crear cuenta» a `/onboarding` (D29): primero una pregunta omitible («¿Para qué quieres usar Academic Planner?») y después el periodo (nombre prellenado según la fecha, inicio y fin, que nunca se adivinan); al terminar va a `/subjects`. Un usuario sin periodo actual sigue siendo llevado a `/onboarding` por la guarda (omitir la pregunta no omite el periodo); quien ya tiene periodo nunca es redirigido allí.
 - `/subjects` muestra las asignaturas del periodo actual. Formulario rápido: nombre + color; profesor y descripción en "Más opciones".
 - Estado vacío con una sola llamada a la acción. La importación de horario no se ofrece aquí sino en la Agenda («Importar horario», [schedule-import.md](schedule-import.md)).
 - Diálogos con `<dialog>` nativo (foco atrapado, Esc cierra, el foco vuelve al botón que lo abrió). Eliminar pide confirmación y enfoca "Cancelar" por defecto.
