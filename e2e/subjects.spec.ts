@@ -48,7 +48,9 @@ test('academic flow: onboarding, create, edit, color, persistence, delete, logou
   // 1-2. New user -> onboarding (3 fields) -> subjects.
   await register(page, email);
   await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByRole('heading', { name: 'Configuremos tu semestre' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: '¿Para qué quieres usar Academic Planner?' }),
+  ).toBeVisible();
   await completeOnboarding(page);
 
   // Empty state: guidance and a single call to action, no empty table.
@@ -167,6 +169,10 @@ test('onboarding validates dates and requires a period before using the app', as
   await page.goto('/subjects');
   await expect(page).toHaveURL(/\/onboarding$/);
 
+  // The profile question can be skipped, but the period cannot: skipping leads straight to it.
+  await page.getByRole('button', { name: 'Omitir por ahora' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Tu periodo actual' })).toBeVisible();
+
   // Empty dates.
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.getByText('Ingresa una fecha válida.').first()).toBeVisible();
@@ -178,13 +184,22 @@ test('onboarding validates dates and requires a period before using the app', as
   await expect(page.getByText('La fecha de fin debe ser posterior a la de inicio.')).toBeVisible();
   await expect(page).toHaveURL(/\/onboarding$/);
 
-  // Fix it and continue; onboarding is not reachable again afterwards.
+  // Fix it and continue. The period is never created twice: reopening the onboarding only offers the question that is
+  // still unanswered (it was skipped), and skipping it again leaves for the dashboard.
   await page.getByLabel('Inicio', { exact: true }).fill('2026-08-03');
   await page.getByLabel('Fin', { exact: true }).fill('2026-11-28');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page).toHaveURL(/\/subjects$/);
   await page.goto('/onboarding');
-  await expect(page).toHaveURL(/\/subjects$/);
+  await expect(
+    page.getByRole('heading', { level: 1, name: '¿Para qué quieres usar Academic Planner?' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Nombre del periodo')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Omitir por ahora' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  expect(
+    ((await (await page.request.get('/api/periods')).json()).periods as unknown[]).length,
+  ).toBe(1);
 
   assertClean();
 });

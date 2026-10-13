@@ -20,9 +20,10 @@ export function FullPageMessage({ children }: { children: ReactNode }) {
 }
 
 /** The API is unreachable (offline or down): say so plainly instead of a raw error. */
-const isUnreachable = (error: Error) => error instanceof ApiRequestError && error.status === 0;
+export const isUnreachable = (error: Error) =>
+  error instanceof ApiRequestError && error.status === 0;
 
-function RetryMessage({
+export function RetryMessage({
   text,
   error,
   onRetry,

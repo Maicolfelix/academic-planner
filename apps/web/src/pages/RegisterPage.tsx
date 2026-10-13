@@ -24,7 +24,8 @@ export function RegisterPage() {
     setFieldErrors({});
 
     register.mutate(parsed.data, {
-      onSuccess: () => navigate('/dashboard', { replace: true }),
+      // A new account goes straight to its onboarding (not to the dashboard and then bounced there by the missing period).
+      onSuccess: () => navigate('/onboarding', { replace: true }),
       onError: (err) => {
         if (err instanceof ApiRequestError && err.code === 'EMAIL_ALREADY_EXISTS') {
           setFieldErrors({ email: [err.message] });

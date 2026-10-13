@@ -57,14 +57,18 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await page.getByRole('button', { name: 'Entrar' }).click();
 }
 
-/** First-run screen: a new user must create an academic period before using the app. */
+/**
+ * First-run: a new user answers (here: skips) the profile question and creates the academic period the app needs. The
+ * onboarding steps are known HERE only: every spec that just needs a user with a period calls this.
+ */
 export async function completeOnboarding(
   page: Page,
   periodName = 'Segundo semestre 2026',
   dates: { start: string; end: string } = { start: '2026-08-03', end: '2026-11-28' },
 ) {
   await expect(page).toHaveURL(/\/onboarding$/);
-  await page.getByLabel('Nombre del periodo').fill(periodName);
+  await page.getByRole('button', { name: 'Omitir por ahora' }).click(); // step 1: what the app is for
+  await page.getByLabel('Nombre del periodo').fill(periodName); // step 2: the period
   await page.getByLabel('Inicio', { exact: true }).fill(dates.start);
   await page.getByLabel('Fin', { exact: true }).fill(dates.end);
   await page.getByRole('button', { name: 'Continuar' }).click();
