@@ -56,7 +56,7 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 ### Subject
 
-`name` (como lo escribió el usuario), `nameKey` (normalizado: minúsculas, sin acentos, espacios colapsados), `professor?`, `color` (uno de los 10 hex de la paleta fija, validado en `core`), `description?`. Único `(periodId, nameKey)`: no se repiten asignaturas «iguales» dentro de un periodo.
+`name` (como lo escribió el usuario), `nameKey` (normalizado: minúsculas, sin acentos, espacios colapsados), `professor?`, `color` (uno de los 10 hex de la paleta fija, validado en `core`), `description?`, `educationContext?` (`UNIVERSITY`, `SCHOOL` u `OTHER_ACADEMIC`: de qué tipo de estudio viene la asignatura; **no existe `PERSONAL`**, lo personal son actividades sin asignatura). `NULL` significa «no especificado» y **no** equivale a ninguno de los tres: las asignaturas que ya existían quedaron en `NULL` y nada las infiere. **No** dice si la asignatura se califica (eso será una configuración propia de B1/B2: `UNIVERSITY` no implica notas). Único `(periodId, nameKey)`: no se repiten asignaturas «iguales» dentro de un periodo. Decisión [D28](decisions.md#d28-el-contexto-educativo-de-una-asignatura).
 
 ### Activity
 
@@ -123,4 +123,4 @@ Se calculan en cada lectura con un reloj inyectable; guardarlos obligaría a man
 
 ## Migraciones
 
-Nueve migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`, `activity_period_optional_subject`, `user_profile`, `period_study_level`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.
+Diez migraciones aplicadas en orden (`init`, `auth_user_session_drop_app_metadata`, `academic_periods_and_subjects`, `activities`, `schedule_blocks`, `reminders`, `activity_period_optional_subject`, `user_profile`, `period_study_level`, `subject_education_context`). Las invariantes que Prisma no sabe expresar (índices únicos parciales, `CHECK`) están escritas a mano al final de cada migración. **Nunca se edita una migración ya aplicada**: se crea otra.

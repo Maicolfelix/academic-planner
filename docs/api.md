@@ -71,13 +71,14 @@ Hay un único periodo actual por usuario. La interfaz hoy solo crea el periodo e
 
 ## Asignaturas (`/api/subjects`) — [academic.md](academic.md)
 
-| Método y ruta              | Para qué              | Entrada                                                | Éxito              | Errores importantes                                        |
-| -------------------------- | --------------------- | ------------------------------------------------------ | ------------------ | ---------------------------------------------------------- |
-| `GET /api/subjects`        | Listar (`?periodId=`) | —                                                      | `200 { subjects }` | —                                                          |
-| `POST /api/subjects`       | Crear                 | `{ periodId, name, color?, professor?, description? }` | `201 { subject }`  | 400, 404 (periodo ajeno), 409 `SUBJECT_ALREADY_EXISTS`     |
-| `GET /api/subjects/:id`    | Leer una              | —                                                      | `200 { subject }`  | 404                                                        |
-| `PATCH /api/subjects/:id`  | Editar                | campos opcionales                                      | `200 { subject }`  | 400, 404, 409                                              |
-| `DELETE /api/subjects/:id` | Eliminar              | —                                                      | `204`              | 404, 409 `SUBJECT_NOT_EMPTY` (tiene actividades o bloques) |
+| Método y ruta              | Para qué                      | Entrada                                                                   | Éxito                                               | Errores importantes                                                   |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /api/subjects`        | Listar (`?periodId=`)         | —                                                                         | `200 { subjects }`                                  | —                                                                     |
+| `POST /api/subjects`       | Crear                         | `{ periodId, name, color?, professor?, description?, educationContext? }` | `201 { subject }`                                   | 400, 404 (periodo ajeno), 409 `SUBJECT_ALREADY_EXISTS`                |
+| `POST /api/subjects/batch` | Crear varias (periodo actual) | `{ names: string[1..30], educationContext? }`                             | `201 { subjects, createdSubjects, reusedSubjects }` | 400 (`NO_CURRENT_PERIOD`, validación), 500 `PROFILE_INVARIANT_BROKEN` |
+| `GET /api/subjects/:id`    | Leer una                      | —                                                                         | `200 { subject }`                                   | 404                                                                   |
+| `PATCH /api/subjects/:id`  | Editar                        | campos opcionales                                                         | `200 { subject }`                                   | 400, 404, 409                                                         |
+| `DELETE /api/subjects/:id` | Eliminar                      | —                                                                         | `204`                                               | 404, 409 `SUBJECT_NOT_EMPTY` (tiene actividades o bloques)            |
 
 ## Actividades (`/api/activities`) — [activities.md](activities.md)
 
