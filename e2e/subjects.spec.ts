@@ -189,13 +189,15 @@ test('onboarding validates dates and requires a period before using the app', as
   await page.getByLabel('Inicio', { exact: true }).fill('2026-08-03');
   await page.getByLabel('Fin', { exact: true }).fill('2026-11-28');
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page).toHaveURL(/\/subjects$/);
+  await page.getByRole('button', { name: 'Ir al Inicio' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto('/onboarding');
   await expect(
     page.getByRole('heading', { level: 1, name: '¿Para qué quieres usar Academic Planner?' }),
   ).toBeVisible();
   await expect(page.getByLabel('Nombre del periodo')).toHaveCount(0);
   await page.getByRole('button', { name: 'Omitir por ahora' }).click();
+  await page.getByRole('button', { name: 'Ir al Inicio' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   expect(
     ((await (await page.request.get('/api/periods')).json()).periods as unknown[]).length,

@@ -1,5 +1,9 @@
 import {
   periodListResponseSchema,
+  subjectBatchResponseSchema,
+  type CreateSubjectBatchInput,
+  type SubjectBatchResponse,
+  type UpdatePeriodRequest,
   periodResponseSchema,
   subjectListResponseSchema,
   subjectResponseSchema,
@@ -19,6 +23,31 @@ export async function createPeriodRequest(input: CreatePeriodInput): Promise<Aca
   return (
     await apiFetch('/api/periods', { method: 'POST', body: input, schema: periodResponseSchema })
   ).period;
+}
+
+/** Changes the period the server finds by id (here: its study level). The answer is the period as it is now. */
+export async function updatePeriodRequest(
+  id: string,
+  input: UpdatePeriodRequest,
+): Promise<AcademicPeriod> {
+  return (
+    await apiFetch(`/api/periods/${id}`, {
+      method: 'PATCH',
+      body: input,
+      schema: periodResponseSchema,
+    })
+  ).period;
+}
+
+/** Several subjects in the current period in ONE request (quick setup): existing ones are reused, never an error. */
+export async function createSubjectsBatchRequest(
+  input: CreateSubjectBatchInput,
+): Promise<SubjectBatchResponse> {
+  return apiFetch('/api/subjects/batch', {
+    method: 'POST',
+    body: input,
+    schema: subjectBatchResponseSchema,
+  });
 }
 
 export async function fetchSubjects(periodId: string): Promise<Subject[]> {
