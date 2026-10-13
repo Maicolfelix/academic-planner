@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, hasNoNul } from './academic.js';
+import { INVALID_CHARACTERS, hasNoNul, type EducationContext } from './academic.js';
 
 /**
  * The educational PROFILE of a user: what the product may personalise later (labels, suggestions). It is a description,
@@ -25,6 +25,29 @@ export const PRIMARY_USE_LABELS: Record<PrimaryUse, string> = {
   TEACHER: 'Soy docente',
   PERSONAL: 'Organización personal',
 };
+
+/**
+ * The education context a NEW subject gets when nobody says one: a DEFAULT derived from what the person said they use the
+ * app for, never an authority. Teachers and personal use study structured things elsewhere, so they get OTHER_ACADEMIC; `null`
+ * (nothing answered, which is every older account) gives `null`: no context is invented. Changing `primaryUse` later never
+ * touches subjects that already exist: it only changes this default.
+ */
+export function primaryUseToEducationContext(
+  primaryUse: PrimaryUse | null | undefined,
+): EducationContext | null {
+  switch (primaryUse) {
+    case 'UNIVERSITY_STUDENT':
+      return 'UNIVERSITY';
+    case 'SCHOOL_STUDENT':
+      return 'SCHOOL';
+    case 'OTHER_STUDENT':
+    case 'TEACHER':
+    case 'PERSONAL':
+      return 'OTHER_ACADEMIC';
+    default:
+      return null;
+  }
+}
 
 // ───────────────────────── Onboarding status ─────────────────────────
 

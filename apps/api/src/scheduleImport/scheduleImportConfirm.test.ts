@@ -598,6 +598,7 @@ describe('confirm: concurrency (real simultaneous requests)', () => {
         color: '#EF4444',
         professor: null,
         description: null,
+        educationContext: null,
       });
       // a plain INSERT would have raised a unique violation and every query from here on would fail
       return { created: r.created, name: r.subject.name, after: await tx.subject.count() };

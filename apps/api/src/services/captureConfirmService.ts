@@ -20,7 +20,9 @@ import { toDateOnly, toSubjectDto } from '../mappers.js';
 import { createActivityRepository } from '../repositories/activityRepository.js';
 import { createPeriodLookup } from '../repositories/periodRepository.js';
 import { createScheduleRepository } from '../repositories/scheduleRepository.js';
+import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createSubjectRepository } from '../repositories/subjectRepository.js';
+import { createSubjectMaterializer } from './subjectMaterializer.js';
 import { createActivityService, type Actor } from './activityService.js';
 import { windowOf } from './scheduleOccurrences.js';
 import { createScheduleService } from './scheduleService.js';
@@ -71,6 +73,9 @@ export function createCaptureConfirmService(opts: {
 
         const periods = createPeriodLookup(tx);
         const subjects = createSubjectRepository(tx);
+        const materializer = createSubjectMaterializer(subjects, createProfileRepository(tx), {
+          readOnce: true,
+        });
         const activityRepo = createActivityRepository(tx);
         // The Activity service, bound to this transaction: its own "run in a transaction" simply runs in this one.
         const activityService = createActivityService(
@@ -112,7 +117,7 @@ export function createCaptureConfirmService(opts: {
             reused.add(already.id);
             continue;
           }
-          const { subject, created } = await subjects.createIfAbsent({
+          const { subject, created } = await materializer.createIfAbsent({
             userId: actor.id,
             periodId: period.id,
             name: item.subject.name,

@@ -163,6 +163,7 @@ export const toSubjectDto = (s: SubjectRow): Subject => ({
   professor: s.professor,
   color: s.color,
   description: s.description,
+  educationContext: s.educationContext,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
 });

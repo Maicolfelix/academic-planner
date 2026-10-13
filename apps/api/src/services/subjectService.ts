@@ -4,6 +4,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { toSubjectDto } from '../mappers.js';
 import type { PeriodRepository } from '../repositories/periodRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
+import type { SubjectMaterializer } from './subjectMaterializer.js';
 
 const subjectNotFound = () => notFound('Asignatura no encontrada.');
 
@@ -27,7 +28,11 @@ const duplicate = () =>
     { fields: { name: ['Ya tienes una asignatura con ese nombre en este periodo.'] } },
   );
 
-export function createSubjectService(subjects: SubjectRepository, periods: PeriodRepository) {
+export function createSubjectService(
+  subjects: SubjectRepository,
+  periods: PeriodRepository,
+  materializer: SubjectMaterializer,
+) {
   return {
     list: async (userId: string, periodId?: string) =>
       (await subjects.list(userId, periodId)).map(toSubjectDto),
@@ -45,6 +50,8 @@ export function createSubjectService(subjects: SubjectRepository, periods: Perio
     async create(userId: string, input: CreateSubjectInput) {
       if (!(await periods.findOwned(userId, input.periodId)))
         throw notFound('Periodo no encontrado.');
+      // An explicit context (even null) is used as given; omitted, it is the default of the profile primary use.
+      const educationContext = await materializer.contextFor(userId, input.educationContext);
       try {
         const created = await subjects.create({
           userId,
@@ -54,6 +61,7 @@ export function createSubjectService(subjects: SubjectRepository, periods: Perio
           color: input.color,
           professor: input.professor ?? null,
           description: input.description ?? null,
+          educationContext,
         });
         return toSubjectDto(created);
       } catch (err) {

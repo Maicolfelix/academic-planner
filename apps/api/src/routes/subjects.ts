@@ -9,6 +9,7 @@ export function subjectsRouter(
   router.use(requireAuth); // every subject route needs a session
   router.get('/', controller.list);
   router.post('/', controller.create);
+  router.post('/batch', controller.createBatch);
   router.get('/:id', controller.get);
   router.patch('/:id', controller.update);
   router.delete('/:id', controller.remove);

@@ -253,6 +253,23 @@ export const subjectColorSchema = z
 /** The one rule for a subject's name (create, edit and the schedule-import confirmation all use it). */
 export const subjectNameSchema = requiredName(SUBJECT_NAME_MAX);
 
+/**
+ * What kind of study a subject is: a university course, a school subject, or another structured course (languages, a
+ * technical program...). There is NO personal value: a subject is structured study, and personal things are activities
+ * without a subject. It describes where the subject comes from; it does NOT say whether it is graded (that will be its own
+ * setting): UNIVERSITY does not imply grades. `null` means "not specified" and is never read as one of the three.
+ */
+export const EDUCATION_CONTEXTS = ['UNIVERSITY', 'SCHOOL', 'OTHER_ACADEMIC'] as const;
+export type EducationContext = (typeof EDUCATION_CONTEXTS)[number];
+export const EDUCATION_CONTEXT_LABELS: Record<EducationContext, string> = {
+  UNIVERSITY: 'Universidad',
+  SCHOOL: 'Colegio',
+  OTHER_ACADEMIC: 'Otro estudio',
+};
+export const educationContextSchema = z.enum(EDUCATION_CONTEXTS, {
+  error: 'Elige un tipo de estudio válido.',
+});
+
 const subjectFields = {
   name: subjectNameSchema,
   color: subjectColorSchema,
@@ -267,6 +284,8 @@ export const createSubjectSchema = z.strictObject({
   color: subjectFields.color.default(DEFAULT_SUBJECT_COLOR),
   professor: subjectFields.professor,
   description: subjectFields.description,
+  /** Omitted: the server uses the default of the user's primary use. `null` says "not specified" on purpose. */
+  educationContext: educationContextSchema.nullable().optional(),
 });
 
 /** `periodId` is deliberately absent: moving subjects between periods is out of scope (strict rejects it). */
@@ -275,7 +294,40 @@ export const updateSubjectSchema = z.strictObject({
   color: subjectFields.color.optional(),
   professor: subjectFields.professor,
   description: subjectFields.description,
+  /** A value sets it, `null` clears it (back to "not specified"), omitted leaves it. */
+  educationContext: educationContextSchema.nullable().optional(),
 });
+
+export const SUBJECT_BATCH_MAX = 30;
+
+/**
+ * Several subjects at once (quick setup): names only. The period is always the user's CURRENT one, colors are assigned by the
+ * server and the education context is one for the whole batch (omitted: the default of the primary use).
+ */
+export const createSubjectBatchSchema = z.strictObject({
+  names: z
+    .array(subjectNameSchema, { error: 'Indica las asignaturas.' })
+    .min(1, 'Agrega al menos una asignatura.')
+    .max(SUBJECT_BATCH_MAX, `Máximo ${SUBJECT_BATCH_MAX} asignaturas a la vez.`),
+  educationContext: educationContextSchema.nullable().optional(),
+});
+
+/**
+ * The distinct subjects a batch names, in the order they first appear: names that normalize to the same key
+ * ("Farmacología", "farmacologia", " FARMACOLOGÍA ") are ONE subject, spelled as first written.
+ */
+export function dedupeSubjectNames(names: readonly string[]): { name: string; key: string }[] {
+  const seen = new Set<string>();
+  const out: { name: string; key: string }[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    const key = normalizeNameKey(name);
+    if (key === '' || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, key });
+  }
+  return out;
+}
 
 export const subjectSchema = z.object({
   id: z.uuid(),
@@ -284,12 +336,24 @@ export const subjectSchema = z.object({
   professor: z.string().nullable(),
   color: z.string(),
   description: z.string().nullable(),
+  /** Where the subject comes from; null = not specified (never inferred for older subjects). */
+  educationContext: educationContextSchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
 
 export const subjectResponseSchema = z.object({ subject: subjectSchema });
 export const subjectListResponseSchema = z.object({ subjects: z.array(subjectSchema) });
+export const subjectBatchResponseSchema = z.object({
+  /** Every subject the batch names, in the order of the (de-duplicated) input. */
+  subjects: z.array(subjectSchema),
+  /** The ones this request created. */
+  createdSubjects: z.array(subjectSchema),
+  /** The ones that already existed in the period and were reused as they are. */
+  reusedSubjects: z.array(z.object({ id: z.uuid(), name: z.string() })),
+});
+export type SubjectBatchResponse = z.infer<typeof subjectBatchResponseSchema>;
+export type CreateSubjectBatchInput = z.infer<typeof createSubjectBatchSchema>;
 
 export type Subject = z.infer<typeof subjectSchema>;
 export type CreateSubjectInput = z.infer<typeof createSubjectSchema>;

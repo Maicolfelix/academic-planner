@@ -29,6 +29,13 @@ model User {
 }
 
 // What the person says they use the app for. A description to personalise labels, NEVER an authorization role.
+// The kind of study a SUBJECT is. There is no PERSONAL: personal things are activities without a subject.
+enum EducationContext {
+  UNIVERSITY
+  SCHOOL
+  OTHER_ACADEMIC
+}
+
 enum PrimaryUse {
   UNIVERSITY_STUDENT
   SCHOOL_STUDENT
@@ -88,25 +95,28 @@ model AcademicPeriod {
 }
 
 model Subject {
-  id             String          @id @default(uuid()) @db.Uuid
-  userId         String          @db.Uuid
-  periodId       String          @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @db.Uuid
+  periodId         String            @db.Uuid
   // As typed by the user (trimmed).
-  name           String
+  name             String
   // Normalised name (lowercase, no accents, collapsed spaces): duplicates are compared on this.
-  nameKey        String
-  professor      String?
+  nameKey          String
+  professor        String?
   // One of the fixed palette hex values (validated in @planner/core).
-  color          String
-  description    String?
-  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  color            String
+  description      String?
+  // Where the subject comes from (university, school, other structured study). NULL = not specified: never inferred for older
+  // subjects and never read as one of the three. It does NOT say whether the subject is graded.
+  educationContext EducationContext?
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   // NoAction (checked at end of statement): a period with subjects cannot be deleted silently,
   // yet deleting a whole user still cascades cleanly.
-  period         AcademicPeriod  @relation(fields: [periodId], references: [id], onDelete: NoAction)
-  activities     Activity[]
-  scheduleBlocks ScheduleBlock[]
+  period           AcademicPeriod    @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  activities       Activity[]
+  scheduleBlocks   ScheduleBlock[]
 
   @@unique([periodId, nameKey])
   // Redundant as a key (id is already unique) but required: it is the target of Activity's composite foreign key,

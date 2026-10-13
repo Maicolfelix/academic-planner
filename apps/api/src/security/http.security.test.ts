@@ -39,6 +39,7 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ['patch', `/api/periods/${uuid()}`, { name: 'P' }],
   ['delete', `/api/periods/${uuid()}`],
   ['post', '/api/subjects', { name: 'S' }],
+  ['post', '/api/subjects/batch', { names: ['S'] }],
   ['patch', `/api/subjects/${uuid()}`, { name: 'S' }],
   ['delete', `/api/subjects/${uuid()}`],
   ['post', '/api/activities', { title: 'A' }],
