@@ -57,6 +57,19 @@ Contraseña: 8 a 128 caracteres. Iniciar sesión revoca el token anterior de ese
 
 Sin id en la URL: el dueño sale solo de la sesión (nunca `userId`, correo ni zona horaria en el cuerpo). Un programa del catálogo (`programKey`) trae su nombre canónico (el servidor lo deriva); un `programName` solo es un programa propio (sin clave); ambos `null` lo borran. `onboardingStatus` pide `IN_PROGRESS`, `COMPLETED` o `SKIPPED` (nunca `NOT_STARTED`) y debe ser un paso válido (`NOT_STARTED → IN_PROGRESS | SKIPPED`, `IN_PROGRESS → COMPLETED | SKIPPED`, `SKIPPED | COMPLETED → IN_PROGRESS`; pedir el estado actual es inocuo). `register`, `login` y `me` **no** incluyen el perfil. El perfil es obligatorio por invariante y la petición **nunca lo crea ni lo repara**: si un usuario autenticado no lo tuviera, `GET` y `PATCH` responden `500 PROFILE_INVARIANT_BROKEN` (mensaje genérico, error registrado en el servidor) y no escriben nada.
 
+## Estudios (`/api/study-tracks`) — [decisión D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)
+
+| Método y ruta                             | Sesión | Para qué                                                        | Entrada (estricta)              | Éxito                 |
+| ----------------------------------------- | :----: | --------------------------------------------------------------- | ------------------------------- | --------------------- |
+| `GET /api/study-tracks`                   |   sí   | Todos los estudios del usuario (principal, activos, archivados) | —                               | `200 { studyTracks }` |
+| `POST /api/study-tracks`                  |   sí   | Crear un estudio (el primero activo queda como principal)       | `{ name?, type, programKey? }`  | `201 { studyTrack }`  |
+| `PATCH /api/study-tracks/:id`             |   sí   | Cambiar nombre, tipo o clave (≥ 1 campo)                        | `{ name?, type?, programKey? }` | `200 { studyTrack }`  |
+| `POST /api/study-tracks/:id/make-primary` |   sí   | Mover el principal (transaccional; no uno archivado)            | sin cuerpo                      | `200 { studyTracks }` |
+| `POST /api/study-tracks/:id/archive`      |   sí   | Archivar (no el principal si hay otros activos)                 | sin cuerpo                      | `200 { studyTracks }` |
+| `POST /api/study-tracks/:id/restore`      |   sí   | Volver a `ACTIVE` (principal solo si no hay otro activo)        | sin cuerpo                      | `200 { studyTracks }` |
+
+No hay `DELETE`. El dueño sale solo de la sesión; un estudio ajeno, inexistente o con un id mal formado da el mismo `404`. Nunca se acepta `userId`, `id`, `isPrimary`, `status`, `periodId` ni `primaryUse`. Errores propios: `409 PRIMARY_TRACK_REQUIRES_REPLACEMENT`, `409 STUDY_TRACK_ARCHIVED`. Un estudio todavía no se enlaza a periodos, asignaturas ni al perfil.
+
 ## Periodos académicos (`/api/periods`) — [academic.md](academic.md)
 
 | Método y ruta             | Para qué                             | Entrada                                                                  | Éxito             | Errores importantes                                                                    |

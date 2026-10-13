@@ -73,6 +73,7 @@ Existe para que **una regla tenga una sola definición**. Si la interfaz y la AP
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `time.ts`, `calendar.ts`                                               | Zona horaria, instantes UTC ↔ hora local, semanas lunes–domingo, aritmética de fechas  |
 | `academic.ts`, `activity.ts`, `schedule.ts`, `auth.ts`, `reminders.ts` | Esquemas Zod de entrada/salida y reglas puras de cada entidad                          |
+| `profile.ts`, `studyTrack.ts`                                          | Perfil educativo y catálogo de programas; estudios (`StudyTrack`: nombre, tipo, clave) |
 | `radar.ts`, `attention.ts`, `insights.ts`, `dashboard.ts`              | Radar académico, «¿Qué hago ahora?», progreso y carga semanal, resumen                 |
 | `captureShared.ts`, `quickCapture.ts`, `academicInbox.ts`              | Interpretación determinística de frases y mensajes                                     |
 | `scheduleImport.ts`                                                    | Interpretación de horarios sobre una representación intermedia (palabras con posición) |

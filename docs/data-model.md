@@ -8,6 +8,7 @@ Fuente de verdad: [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.pr
 erDiagram
   User ||--o{ Session : tiene
   User ||--|| UserProfile : describe
+  User ||--o{ StudyTrack : cursa
   User ||--o{ AcademicPeriod : posee
   User ||--o{ Subject : posee
   User ||--o{ Activity : posee
@@ -45,6 +46,10 @@ Una `Activity` **guarda su periodo** (`periodId`, obligatorio, inmutable) y su a
 ### UserProfile
 
 El perfil educativo, **1:1 con `User`** (`userId` es la clave primaria y la FK, `ON DELETE CASCADE`): `primaryUse` (nullable: `UNIVERSITY_STUDENT`, `SCHOOL_STUDENT`, `OTHER_STUDENT`, `TEACHER`, `PERSONAL`; qué dice la persona que hace con la app, **no un rol de autorización**), `programName` (nullable, 1–80 caracteres, **la autoridad**: lo que la persona escribió o el nombre canónico del catálogo), `programKey` (nullable; referencia opcional al catálogo pequeño de `@planner/core`, nunca gobierna reglas y exige `programName`) y `onboardingStatus` (`NOT_STARTED` por omisión, `IN_PROGRESS`, `COMPLETED`, `SKIPPED`: es solo un dato, ningún estado bloquea iniciar sesión ni usar la app). Toda cuenta tiene exactamente una fila: la crea el registro en la misma sentencia que el usuario (una transacción) y la migración la creó para los usuarios que ya existían; **ninguna petición la crea ni la repara** (si faltara, `500 PROFILE_INVARIANT_BROKEN`). `User` sigue siendo solo identidad y autenticación. Detalle: [decisión D26](decisions.md#d26-perfil-educativo-separado-del-usuario).
+
+### StudyTrack
+
+Una **formación que el usuario cursa** (P0.5-1, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)): `userId` (FK, `ON DELETE CASCADE`), `name` (el nombre visible: obligatorio, recortado, 1–80, no necesariamente una carrera), `type` (`EducationContext`: `UNIVERSITY` | `SCHOOL` | `OTHER_ACADEMIC`, **editable**; descriptivo, no una autorización; cambiarlo no toca `Subject.educationContext`), `programKey` (nullable, del catálogo; con clave el nombre es el canónico), `isPrimary`, `status` (`ACTIVE` | `ARCHIVED`; un estudio se archiva, no se borra). Un usuario tiene **0..n**; **a lo sumo un principal**, hecho cumplir por la BD (índice único parcial `(userId) WHERE isPrimary` y `CHECK (isPrimary → ACTIVE)`; hay `CHECK` de nombre recortado de 1–80 y de clave de 1–60). `@@unique([id, userId])` es el destino de la futura clave foránea compuesta de un periodo. **Todavía no está enlazada** a `AcademicPeriod`, `Subject`, `Activity`, `ScheduleBlock` ni `UserProfile`, y la migración **no crea ninguno** (todas las cuentas tienen cero).
 
 ### Session
 
