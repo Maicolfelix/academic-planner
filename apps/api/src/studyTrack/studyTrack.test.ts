@@ -511,7 +511,7 @@ describe('concurrency: the database, not luck, keeps at most one primary', () =>
   });
 });
 
-describe('everything else stays exactly as it was (the study is linked to nothing)', () => {
+describe('creating and editing studies never links or changes anything else by itself', () => {
   it('creating, editing, archiving studies leaves the profile, periods, subjects and /me untouched', async () => {
     const { agent, period } = await setupUser(app, 'a@example.com');
     await agent
@@ -536,7 +536,8 @@ describe('everything else stays exactly as it was (the study is linked to nothin
 
     expect(await snapshot()).toEqual(before);
     expect(before.me.user).not.toHaveProperty('studyTracks');
-    expect(before.periods.periods[0]).not.toHaveProperty('studyTrackId');
+    // a period is only linked to a study when somebody says so: here it stays a general one
+    expect(before.periods.periods[0]).toHaveProperty('studyTrackId', null);
     expect(period.id).toBeTruthy();
   });
 

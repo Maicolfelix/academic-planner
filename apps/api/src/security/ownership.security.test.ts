@@ -247,6 +247,28 @@ describe('foreign keys in a request body or query', () => {
             .send({ periodId: k === 'real' ? w.b.period.id : ghost(), name: 'X' }),
       ],
       [
+        'period created in a foreign study',
+        (k) =>
+          w.a.agent.post('/api/periods').send({
+            ...periodInput,
+            studyTrackId: k === 'real' ? w.studyTrack.id : ghost(),
+          }),
+      ],
+      [
+        'own period moved to a foreign study',
+        (k) =>
+          w.a.agent
+            .patch(`/api/periods/${w.a.period.id}`)
+            .send({ studyTrackId: k === 'real' ? w.studyTrack.id : ghost() }),
+      ],
+      [
+        'a foreign period moved to an own study',
+        (k) =>
+          w.a.agent
+            .patch(`/api/periods/${k === 'real' ? w.b.period.id : ghost()}`)
+            .send({ studyTrackId: null }),
+      ],
+      [
         'reminders of a foreign activity',
         (k) => w.a.agent.get(`/api/reminders?activityId=${k === 'real' ? w.activity.id : ghost()}`),
       ],

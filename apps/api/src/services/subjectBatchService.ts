@@ -13,7 +13,8 @@ import { createSubjectRepository } from '../repositories/subjectRepository.js';
 import { createSubjectMaterializer } from './subjectMaterializer.js';
 
 /**
- * Quick setup: several subjects in ONE transaction, in the user's CURRENT period (the client never says which). A name the
+ * Quick setup: several subjects in ONE transaction, in the user's HOME current period (a general one, else the primary study's; the client never says which). Transitional: it cannot yet
+ * target another study's period (a later step gives that its own flow). A name the
  * period already has is REUSED as it is (never an error), names that normalize to the same key are one subject, and the
  * answer keeps the order in which the names first appear. Colors are assigned by the server, one after another, from the ones
  * the period does not use yet. The (periodId, nameKey) unique index stays the source of truth for concurrent requests.
@@ -24,15 +25,20 @@ export function createSubjectBatchService(opts: { runInTransaction: RunInTransac
       return opts.runInTransaction(async (tx) => {
         const periods = createPeriodLookup(tx);
         const subjects = createSubjectRepository(tx);
-        const materializer = createSubjectMaterializer(subjects, createProfileRepository(tx), {
-          readOnce: true,
-        });
+        const materializer = createSubjectMaterializer(
+          subjects,
+          createProfileRepository(tx),
+          periods,
+          {
+            readOnce: true,
+          },
+        );
 
         // One batch of a user at a time: two requests naming the same subjects in another order would otherwise wait on
         // each other's inserts.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`subject-batch:${userId}`}, 0))`;
 
-        const period = await periods.findCurrent(userId);
+        const period = await periods.findHomeCurrent(userId);
         if (!period) {
           throw new AppError(
             400,

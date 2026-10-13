@@ -17,7 +17,7 @@ export function createQuickCaptureService(
 ) {
   return {
     async parse(actor: Actor, text: string): Promise<QuickCaptureResponse> {
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       const rows = period ? await subjects.list(actor.id, period.id) : [];
       const dto = period ? toPeriodDto(period) : null;
       const capture = parseQuickCapture(text, {

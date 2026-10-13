@@ -25,7 +25,7 @@ export function createAcademicInboxService(
 ) {
   return {
     async parse(actor: Actor, text: string): Promise<AcademicInboxResponse> {
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       const rows = period ? await subjects.list(actor.id, period.id) : [];
       const dto = period ? toPeriodDto(period) : null;
       const inbox = parseAcademicInbox(text, {

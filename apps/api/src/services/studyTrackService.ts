@@ -126,7 +126,8 @@ export function createStudyTrackService(
     /**
      * Marks a study as finished or paused; it keeps all its history. The primary one cannot leave while other active ones
      * exist: the student chooses the replacement (nothing is picked silently). The only active study may be archived, which
-     * leaves no primary (zero is a valid state). Archiving an archived one changes nothing.
+     * leaves no primary (zero is a valid state). Its current period stops being current in the same transaction (the periods
+     * and everything in them stay). Archiving an archived one changes nothing.
      */
     async archive(userId: string, id: string): Promise<StudyTrack[]> {
       return write(userId, async (repo) => {
@@ -136,6 +137,8 @@ export function createStudyTrackService(
             throw primaryNeedsReplacement();
           }
           await repo.update(userId, id, { status: 'ARCHIVED', isPrimary: false });
+          // Same transaction: the study stops being the home or a current one. Nothing is deleted.
+          await repo.clearCurrentPeriods(userId, id);
         }
         return dtos(await repo.list(userId));
       });
@@ -143,7 +146,8 @@ export function createStudyTrackService(
 
     /**
      * ARCHIVED -> ACTIVE. It becomes the primary one only if it is the only active study (the same rule as the first one
-     * created): it never takes the place of an existing primary. Restoring an active one changes nothing.
+     * created): it never takes the place of an existing primary. It does NOT make any of its periods current again (there may
+     * be several and the server does not guess which): the student marks one. Restoring an active one changes nothing.
      */
     async restore(userId: string, id: string): Promise<StudyTrack[]> {
       return write(userId, async (repo) => {

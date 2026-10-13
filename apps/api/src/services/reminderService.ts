@@ -71,7 +71,7 @@ export function createReminderService(
      * Reading never changes anything: a reminder only becomes SHOWN when the client confirms it displayed it.
      */
     async due(actor: Actor) {
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       if (!period) return { reminders: [], total: 0 };
       const now = clock();
       const [rows, total] = await Promise.all([

@@ -67,6 +67,7 @@ const period = (over: Partial<AcademicPeriod> = {}): AcademicPeriod => ({
   startDate: '2026-08-03',
   endDate: '2026-11-28',
   isCurrent: true,
+  studyTrackId: null,
   studyLevel: null,
   studyLevelNote: null,
   createdAt: '2026-10-01T00:00:00.000Z',

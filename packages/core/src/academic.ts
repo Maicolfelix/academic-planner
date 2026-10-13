@@ -102,6 +102,9 @@ const BOTH_LEVELS_MESSAGE = 'Indica el nivel como número o como texto, no los d
 const levelAlternatives = (v: { studyLevel?: number | null; studyLevelNote?: string | null }) =>
   !(v.studyLevel != null && v.studyLevelNote != null);
 
+/** A study (StudyTrack) id: the owner is checked by the server (a foreign or unknown one is the same 404). */
+const studyTrackIdSchema = z.uuid('Estudio inválido.');
+
 const periodFields = {
   name: requiredName(PERIOD_NAME_MAX),
   startDate: dateOnlySchema,
@@ -113,6 +116,8 @@ export const createPeriodSchema = z
   .strictObject({
     ...periodFields,
     isCurrent: z.boolean().optional(),
+    // The study this period belongs to. Omitted or null: a general period (no study), a permanent and valid state.
+    studyTrackId: studyTrackIdSchema.nullish(),
     studyLevel: studyLevelSchema.nullish(),
     studyLevelNote: studyLevelNoteSchema.optional(),
   })
@@ -135,6 +140,8 @@ export const updatePeriodSchema = z
     isCurrent: z
       .literal(true, { error: 'Solo se puede marcar un periodo como actual.' })
       .optional(),
+    // Moves the period to a study (a uuid) or leaves it general (`null`); not mentioned: unchanged.
+    studyTrackId: studyTrackIdSchema.nullish(),
     // `null` clears that field; a value sets it and clears the other one (see `resolveStudyLevel`).
     studyLevel: studyLevelSchema.nullish(),
     studyLevelNote: studyLevelNoteSchema.optional(),
@@ -176,6 +183,8 @@ export const periodSchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   isCurrent: z.boolean(),
+  /** The study (formation) this period belongs to; null = a general period, a permanent and valid state. */
+  studyTrackId: z.uuid().nullable(),
   /** The level during this period, as a number; null when not given (or when `studyLevelNote` is). */
   studyLevel: z.number().int().nullable(),
   /** The level as free text ("Otro"); null when not given (or when `studyLevel` is). */

@@ -184,6 +184,7 @@ describe('the period as the API answers it', () => {
     startDate: '2026-08-03',
     endDate: '2026-11-28',
     isCurrent: true,
+    studyTrackId: null,
     createdAt: '2026-10-01T00:00:00.000Z',
     updatedAt: '2026-10-01T00:00:00.000Z',
   };

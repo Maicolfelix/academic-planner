@@ -25,7 +25,7 @@ export function createAttentionService(
     async get(actor: Actor): Promise<Attention> {
       const now = clock();
       const generatedAt = now.toISOString();
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       if (!period) {
         return { generatedAt, period: null, recommendation: null, alternatives: [], upcoming: [] };
       }

@@ -151,11 +151,11 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
   const periodRepo = createPeriodRepository(prisma);
   const subjectRepo = createSubjectRepository(prisma);
   const activityRepo = createActivityRepository(prisma);
-  const periods = createPeriodService(periodRepo);
+  const periods = createPeriodService(periodRepo, runInTransaction);
   const subjects = createSubjectService(
     subjectRepo,
     periodRepo,
-    createSubjectMaterializer(subjectRepo, createProfileRepository(prisma)),
+    createSubjectMaterializer(subjectRepo, createProfileRepository(prisma), periodRepo),
   );
   const schedule = createScheduleService(
     createScheduleRepository(prisma),

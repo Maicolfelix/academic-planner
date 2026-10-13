@@ -87,7 +87,7 @@ export function createScheduleImportService(opts: {
         const file = validateFile(upload);
         kind = file.kind === 'pdf' ? 'PDF' : 'IMAGE';
 
-        const period = await periods.findCurrent(actor.id);
+        const period = await periods.findHomeCurrent(actor.id);
         if (!period) {
           throw new AppError(
             400,

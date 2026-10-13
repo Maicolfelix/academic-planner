@@ -45,7 +45,7 @@ export function createActivityService(
   activities: ActivityRepository,
   subjects: SubjectRepository,
   /** Only the current-period lookup: a general activity (no subject) is anchored to the user's current period. */
-  periods: Pick<PeriodLookup, 'findCurrent'>,
+  periods: Pick<PeriodLookup, 'findHomeCurrent'>,
   /** Injected so tests (and future jobs) control "now"; production passes the real clock. */
   clock: () => Date,
   /** Writes that also touch reminders run in ONE transaction: both change, or neither does. */
@@ -115,7 +115,7 @@ export function createActivityService(
         if (!subject) throw subjectNotFound();
         periodId = subject.periodId;
       } else {
-        const period = await periods.findCurrent(actor.id);
+        const period = await periods.findHomeCurrent(actor.id);
         if (!period) throw noCurrentPeriod();
         periodId = period.id;
       }
