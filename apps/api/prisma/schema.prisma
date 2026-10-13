@@ -26,6 +26,8 @@ model User {
   reminders      Reminder[]
   // Exactly one per user, created with the account (and by the migration for the ones that already existed).
   profile        UserProfile?
+  // The formations the user takes (0..n; none is valid: personal-only, teacher-only, older accounts).
+  studyTracks    StudyTrack[]
 }
 
 // What the person says they use the app for. A description to personalise labels, NEVER an authorization role.
@@ -42,6 +44,11 @@ enum PrimaryUse {
   OTHER_STUDENT
   TEACHER
   PERSONAL
+}
+
+enum StudyTrackStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 enum OnboardingStatus {
@@ -66,6 +73,35 @@ model UserProfile {
   // Also in the migration SQL (Prisma cannot express them):
   //  - CHECK (programName has 1..80 characters)
   //  - CHECK (a programKey implies a programName)
+}
+
+/// A formation the user takes (a degree, school, a technical program, a diploma, a language course): "an estudio".
+/// It DESCRIBES; nothing here grants or denies anything and no behaviour reads `type` or `name` to decide. There is no
+/// PERSONAL type (personal things are not a formation). Not linked to a period, a subject or the profile yet.
+model StudyTrack {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @db.Uuid
+  // The VISIBLE name of the study ("Medicina", "Colegio", "Inglés B2"): 1..80, trimmed. Not necessarily a career.
+  name       String
+  // Descriptive and correctable at any time. Changing it never touches `Subject.educationContext` (each subject keeps its snapshot).
+  type       EducationContext
+  // Optional reference to the small catalog in @planner/core: when set, `name` is the catalog's canonical name.
+  programKey String?
+  isPrimary  Boolean          @default(false)
+  // ARCHIVED = finished or paused: it is kept with its history, never deleted to "end" a study.
+  status     StudyTrackStatus @default(ACTIVE)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(3)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Also in the migration SQL (Prisma cannot express them):
+  //  - partial unique index: at most one isPrimary = true per user
+  //  - CHECK (name has 1..80 characters and is trimmed; programKey has 1..60)
+  //  - CHECK (isPrimary implies status = ACTIVE)
+
+  // The target of the composite foreign key a period will use later (the database will refuse a period of one user pointing
+  // at a track of another). `userId` is the leading column of `@@index([userId, status])`, which also serves the plain list.
+  @@unique([id, userId])
+  @@index([userId, status])
 }
 
 // Academic dates are calendar days, not instants: @db.Date has no time and no timezone, so
