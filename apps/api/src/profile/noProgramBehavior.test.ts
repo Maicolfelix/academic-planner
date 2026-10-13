@@ -59,6 +59,8 @@ describe('no behaviour depends on a particular program or on the primary use', (
       .filter((f) => /primaryUse/.test(read(f)))
       .map((f) => path.relative(ROOT, f).replaceAll('\\', '/'));
     expect(readers.sort()).toEqual([
+      // the demo seed WRITES the demo student's answer (a university student who finished the onboarding); it reads nothing
+      'apps/api/src/demo/seedDemo.ts',
       'apps/api/src/repositories/profileRepository.ts',
       'apps/api/src/services/profileService.ts',
       // the only other reader: the DEFAULT education context of a NEW subject (primaryUseToEducationContext), never a permission

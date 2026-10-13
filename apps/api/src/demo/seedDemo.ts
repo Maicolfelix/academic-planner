@@ -104,6 +104,11 @@ export async function deleteDemoUser(prisma: PrismaClient, email = DEMO_EMAIL) {
   await prisma.user.deleteMany({ where: { email } });
 }
 
+const DEMO_PROFILE = {
+  primaryUse: 'UNIVERSITY_STUDENT',
+  onboardingStatus: 'COMPLETED',
+} as const;
+
 /**
  * Creates (or regenerates) the demo student. Idempotent: the user is found by its fixed e-mail and keeps the same id;
  * its previous data is cleared and rebuilt, so running it twice gives the same dataset. Everything is created through
@@ -119,19 +124,21 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const user = await prisma.user.upsert({
     where: { email },
-    // like every account, the demo student has exactly one profile (empty: the seed infers nothing about education)
+    // The demo is a university student who finished the onboarding (so it opens straight into the app, with no notice to
+    // complete the profile, and the subjects it creates below take the UNIVERSITY default). Deterministic and only for this
+    // user: it never touches a real account. No program or level: the seed invents nothing else.
     create: {
       email,
       name: DEMO_NAME,
       passwordHash,
       timezone: DEMO_TIMEZONE,
-      profile: { create: {} },
+      profile: { create: DEMO_PROFILE },
     },
     update: {
       name: DEMO_NAME,
       passwordHash,
       timezone: DEMO_TIMEZONE,
-      profile: { upsert: { create: {}, update: {} } },
+      profile: { upsert: { create: DEMO_PROFILE, update: DEMO_PROFILE } },
     },
   });
   await clearDemoData(prisma, user.id);

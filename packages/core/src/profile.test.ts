@@ -9,6 +9,7 @@ import {
   isOnboardingTransitionAllowed,
   profileSchema,
   resolveProgram,
+  searchPrograms,
   updateProfileSchema,
   type OnboardingStatus,
 } from './profile.js';
@@ -227,5 +228,43 @@ describe('resolveProgram: the name is the authority', () => {
 
   it('nothing about the program leaves it as it is', () => {
     expect(resolveProgram(medicine, {})).toBe(medicine);
+  });
+});
+
+describe('searchPrograms: the offline search of the catalog', () => {
+  const names = (q: string, limit?: number) => searchPrograms(q, limit).map((p) => p.name);
+
+  it('finds by any part of a name, ignoring case and accents', () => {
+    expect(names('medicina')).toEqual(['Medicina', 'Medicina Veterinaria']);
+    expect(names('MEDICINA')).toEqual(names('medicina'));
+    expect(names('psicologia')).toEqual(['Psicología']);
+    expect(names('PSICOLOGÍA')).toEqual(['Psicología']);
+    expect(names('contaduria')).toEqual(['Contaduría Pública']);
+    expect(names('  ingenieria  de   sistemas ')).toEqual(['Ingeniería de Sistemas']);
+  });
+
+  it('every typed word must be in the name; the order of the words does not matter', () => {
+    expect(names('sistemas ingenieria')).toEqual(['Ingeniería de Sistemas']);
+    expect(names('ingenieria zzz')).toEqual([]);
+  });
+
+  it('puts the names that START with what was typed before the ones that only contain it', () => {
+    const out = names('ing');
+    expect(out.length).toBeGreaterThan(3);
+    expect(out.every((n) => /^Ingenier/.test(n))).toBe(true);
+    // "quimica" starts "Química" and "Química Farmacéutica" before anything that merely has the word inside
+    expect(names('quimica')[0]).toBe('Química');
+  });
+
+  it('typing nothing finds nothing (the catalog is not a dropdown), and the limit is honoured', () => {
+    expect(names('')).toEqual([]);
+    expect(names('   ')).toEqual([]);
+    expect(names('i', 2)).toHaveLength(2);
+    expect(searchPrograms('a').length).toBeLessThanOrEqual(6);
+  });
+
+  it('a program the catalog does not have finds nothing: it is written by the student', () => {
+    expect(names('Curso de inglés Cambridge')).toEqual([]);
+    expect(names('astrologia')).toEqual([]);
   });
 });
