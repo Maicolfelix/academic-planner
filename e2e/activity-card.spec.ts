@@ -32,6 +32,10 @@ async function withCards(page: Page, titles: string[]) {
   }
   await page.goto('/activities');
   await expect(page.getByRole('heading', { name: 'Actividades', level: 1 })).toBeVisible();
+  // the cards arrive after the header: measuring before they are there (evaluateAll does not wait) counted 0 once under load
+  await expect(
+    page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: titles[0]! }) }),
+  ).toBeVisible();
 }
 
 const card = (page: Page, title: string) =>

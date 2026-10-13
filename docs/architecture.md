@@ -103,7 +103,7 @@ No se guardan: «vencida», categoría del Radar, puntaje de Atención, progreso
 
 ## Frontend
 
-- **Rutas** (`apps/web/src/App.tsx`): públicas `/login`, `/register`, `/status`; protegidas `/onboarding` y, con periodo actual, `/dashboard`, `/subjects`, `/activities`, `/calendar`, `/calendar/import`, `/radar`, `/progress`, `/inbox`; cualquier otra ruta muestra la pantalla 404. Las pantallas secundarias se cargan con `React.lazy`.
+- **Rutas** (`apps/web/src/App.tsx`): públicas `/login`, `/register`, `/status`; protegidas `/onboarding` (fuera de `RequirePeriod`; a donde va el registro) y, con periodo actual, `/dashboard`, `/subjects`, `/activities`, `/calendar`, `/calendar/import`, `/radar`, `/progress`, `/inbox`; cualquier otra ruta muestra la pantalla 404. Las pantallas secundarias se cargan con `React.lazy`.
 - **Datos del servidor:** TanStack Query; las mutaciones de actividades invalidan `['activities']`, el Dashboard y `['reminders']`. Un refresco fallido no reemplaza datos ya mostrados.
 - **Hora:** la interfaz no hace matemática de zonas; usa los ayudantes de `packages/core` y siempre muestra 12 h con a. m./p. m.
 - **PWA:** service worker que precachea solo el shell; `/api/*` siempre por red (ver [pwa.md](pwa.md)).
