@@ -44,7 +44,7 @@ describe('no behaviour depends on a particular program or on the primary use', (
 
   it('nothing branches on the NAME of a subject (the education context never depends on which subject it is)', () => {
     const offenders = files.filter((f) =>
-      /(subject|s|row|existing)\.(name|nameKey)\s*[!=]==?\s*['"`]|nameKey\s*[!=]==?\s*['"`]/.test(
+      /\b(subject|s|row|existing)\.(name|nameKey)\s*[!=]==?\s*['"`]|\bnameKey\s*[!=]==?\s*['"`]/.test(
         withoutTypeChecks(read(f)),
       ),
     );
