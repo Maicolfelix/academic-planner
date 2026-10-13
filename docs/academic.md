@@ -6,10 +6,10 @@
 User 1──* AcademicPeriod 1──* Subject *──1 User
 ```
 
-| Entidad          | Campos                                                                                                                                   | Reglas en la BD                                                                                                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AcademicPeriod` | `id` (UUID), `userId`, `name`, `startDate` y `endDate` (`DATE`), `isCurrent`, `studyLevel?`, `studyLevelNote?`, `createdAt`, `updatedAt` | índice único parcial: **un solo `isCurrent = true` por usuario**; `CHECK (endDate > startDate)`; `CHECK` del nivel de estudio (ver abajo); `ON DELETE CASCADE` desde `User` |
-| `Subject`        | `id` (UUID), `userId`, `periodId`, `name`, `nameKey`, `professor?`, `color`, `description?`, timestamps                                  | único `(periodId, nameKey)`; `periodId` con `ON DELETE NO ACTION`; `ON DELETE CASCADE` desde `User`                                                                         |
+| Entidad          | Campos                                                                                                                                                    | Reglas en la BD                                                                                                                                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AcademicPeriod` | `id` (UUID), `userId`, `name`, `startDate` y `endDate` (`DATE`), `isCurrent`, `studyTrackId?`, `studyLevel?`, `studyLevelNote?`, `createdAt`, `updatedAt` | índices únicos parciales: **un solo `isCurrent = true` sin estudio por usuario y uno por estudio**; clave foránea compuesta `(studyTrackId, userId)` hacia `StudyTrack`; `CHECK (endDate > startDate)`; `CHECK` del nivel de estudio (ver abajo); `ON DELETE CASCADE` desde `User` |
+| `Subject`        | `id` (UUID), `userId`, `periodId`, `name`, `nameKey`, `professor?`, `color`, `description?`, timestamps                                                   | único `(periodId, nameKey)`; `periodId` con `ON DELETE NO ACTION`; `ON DELETE CASCADE` desde `User`                                                                                                                                                                                |
 
 Los IDs siguen siendo UUID v4 (misma estrategia que `User` y `Session`).
 
@@ -22,7 +22,7 @@ La API intercambia strings `YYYY-MM-DD`; el servidor convierte con UTC explícit
 y `America/Bogota`, y comprueba el valor con `::text` en la BD.
 
 **Periodo actual.** Máximo uno por usuario, garantizado por la BD. Marcar otro como actual desmarca el anterior en la misma transacción.
-El primer periodo de un usuario es actual automáticamente. `PATCH { isCurrent }` solo acepta `true`: para dejar de ser actual se marca otro
+El primer periodo **de su ámbito** (sin estudio, o de un estudio) es actual automáticamente. `PATCH { isCurrent }` solo acepta `true`: para dejar de ser actual se marca otro
 (así nunca queda un usuario con periodos y ninguno actual por accidente). Dos peticiones simultáneas "hazlo actual": la BD deja pasar una y la otra recibe `409 CONFLICT`.
 
 **Color = paleta fija de 10 hex** (`#3B82F6`, …), validada en el servidor y normalizada a mayúsculas. Un clic en la UI, nada de texto libre
@@ -53,19 +53,19 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 
 ## Endpoints (todos requieren sesión)
 
-| Método y ruta                 | Notas                                                                                                                            |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                 |
-| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
-| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                |
-| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
-| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                      |
-| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                             |
-| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                    |
-| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                  |
-| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                |
-| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                         |
-| `DELETE /api/subjects/:id`    | 204                                                                                                                              |
+| Método y ruta                 | Notas                                                                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                |
+| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
+| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                               |
+| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyTrackId?, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
+| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                                     |
+| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                                            |
+| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                                   |
+| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                                 |
+| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                               |
+| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                                        |
+| `DELETE /api/subjects/:id`    | 204                                                                                                                                             |
 
 Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripción ≤ 500, fechas reales entre 2000 y 2100.
 
@@ -77,9 +77,13 @@ Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripci
 
 `educationContext` (`UNIVERSITY` | `SCHOOL` | `OTHER_ACADEMIC` | `null`) siempre viene en la respuesta. Al **crear**, si el cuerpo lo trae (incluso `null`) se usa tal cual; si no, el servidor deriva un **valor por omisión** de `UserProfile.primaryUse` (`UNIVERSITY_STUDENT` → `UNIVERSITY`, `SCHOOL_STUDENT` → `SCHOOL`, `OTHER_STUDENT`/`TEACHER`/`PERSONAL` → `OTHER_ACADEMIC`, sin `primaryUse` → `null`: nada se inventa). **Todo camino que crea una asignatura usa esa misma regla** (un único `subjectMaterializer`): el formulario (`POST /api/subjects`, también el inline), Captura rápida y Bandeja, la importación de horario y el lote. Cambiar `primaryUse` **nunca** cambia asignaturas existentes: solo cambia el valor por omisión de las nuevas. `PATCH` fija, cambia o borra (`null`) el contexto de una asignatura sin tocar su periodo. No equivale a calificable: `UNIVERSITY` no implica notas.
 
+### Periodo y estudio (P0.5-2)
+
+Un periodo pertenece a un estudio (`studyTrackId`, uuid) o a ninguno (`null`, válido para siempre: [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)). «Actual» es **por ámbito**: un periodo general y uno por estudio pueden ser actuales a la vez; dos en el mismo ámbito, nunca (índices únicos parciales). `POST` con `studyTrackId` crea el periodo de ese estudio (propio y activo; si no, `404` indistinguible o `409 STUDY_TRACK_ARCHIVED`); `PATCH` con `studyTrackId` lo **mueve** (uuid) o lo deja general (`null`): un periodo que no es actual se mueve libremente y uno actual solo si el destino no tiene actual (si no, `409 CURRENT_PERIOD_CONFLICT`: nadie se degrada en silencio). Archivar un estudio apaga sus periodos actuales; restaurarlo no los reactiva. Las funciones que todavía leen un solo periodo usan el **periodo hogar**: el actual sin estudio; si no, el del estudio principal activo; si no, ninguno.
+
 ### Estudios (P0.5-1)
 
-Un **estudio** (`StudyTrack`, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)) es una formación que el usuario cursa; todavía **no está enlazado** al periodo ni a la asignatura (el periodo sigue sin saber de estudios, y `Subject.educationContext` sigue siendo la foto que cada asignatura recibió al crearse: cambiar el `type` de un estudio no la modifica).
+Un **estudio** (`StudyTrack`, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)) es una formación que el usuario cursa; un **periodo** puede pertenecer a uno (`studyTrackId`); la asignatura llega a él **por su periodo**, nunca directamente. Una asignatura **nueva** toma por omisión el `type` del estudio de su periodo (si no, el de `primaryUse`), y `Subject.educationContext` sigue siendo la foto que cada asignatura recibió al crearse: cambiar el `type` de un estudio no la modifica).
 
 ### Creación rápida en lote (`POST /api/subjects/batch`, P0-3)
 

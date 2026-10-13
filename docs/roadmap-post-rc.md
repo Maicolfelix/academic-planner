@@ -135,13 +135,13 @@ Objetivo: conocer al usuario desde el registro, de forma **corta, opcional, prog
 
 Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, colegio + técnico…). `primaryUse` **no** se convierte en lista: la entidad es `StudyTrack` ([D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)). El _discovery_ recomendó hacerlo **antes de Notas** (la escala, la nota mínima y el promedio pertenecen a un estudio). Orden propuesto, un PR cada uno y **cada uno con aprobación explícita**:
 
-| PR     | Contenido                                                                                                                        | Estado                                                                           |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| P0.5-1 | Fundación invisible: `StudyTrack` (tabla, núcleo, API, seguridad, migración sin respaldo), sin enlazar nada                      | **implementado en el PR «feat: add multi-study track foundation», sin fusionar** |
-| P0.5-2 | Vincular periodos (`AcademicPeriod.studyTrackId?`, un periodo actual **por estudio**), periodo «hogar», regla del `materializer` | no iniciado                                                                      |
-| P0.5-3 | Lectura multi-periodo (Inicio, Radar, Atención, Progreso, Carga, recordatorios), etiqueta de origen en la Agenda                 | no iniciado                                                                      |
-| P0.5-4 | «Mis estudios» (con UX2a): listar, agregar, archivar                                                                             | no iniciado                                                                      |
-| P0.5-5 | Integración con el onboarding y la autoridad de `programName`/`programKey`                                                       | no iniciado                                                                      |
+| PR     | Contenido                                                                                                                        | Estado                                                                                |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| P0.5-1 | Fundación invisible: `StudyTrack` (tabla, núcleo, API, seguridad, migración sin respaldo), sin enlazar nada                      | **DONE: fusionado (PR #39, merge `de6af89`)**                                         |
+| P0.5-2 | Vincular periodos (`AcademicPeriod.studyTrackId?`, un periodo actual **por estudio**), periodo «hogar», regla del `materializer` | **implementado en el PR «feat: scope academic periods by study track», sin fusionar** |
+| P0.5-3 | Lectura multi-periodo (Inicio, Radar, Atención, Progreso, Carga, recordatorios), etiqueta de origen en la Agenda                 | no iniciado                                                                           |
+| P0.5-4 | «Mis estudios» (con UX2a): listar, agregar, archivar                                                                             | no iniciado                                                                           |
+| P0.5-5 | Integración con el onboarding y la autoridad de `programName`/`programKey`                                                       | no iniciado                                                                           |
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 

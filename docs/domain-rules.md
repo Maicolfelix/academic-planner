@@ -89,7 +89,7 @@ Ciclo de vida: `PENDING` → `SHOWN` (la app lo mostró) o `CANCELLED` (la activ
 
 ## Datos y propiedad
 
-- **Un periodo actual por usuario** (índice único parcial); el primero que se crea queda como actual.
+- **Un periodo actual por ámbito** (índices únicos parciales): uno **sin estudio** por usuario y uno **por estudio** ([D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)); el primero de su ámbito que se crea queda como actual. Las funciones que todavía leen un solo periodo usan el **periodo hogar** (el actual sin estudio; si no, el del estudio principal activo).
 - **Borrado:** una asignatura con actividades o bloques no se elimina (409 `SUBJECT_NOT_EMPTY`); un periodo con asignaturas o bloques tampoco (409 `PERIOD_NOT_EMPTY`); eliminar una actividad elimina sus recordatorios; eliminar un usuario elimina todo lo suyo.
 - **Finalización:** `completedAt` lo fija el servidor: pasar a `COMPLETED` estampa «ahora», seguir finalizada conserva la marca y reabrir la borra.
 - **Propiedad:** un recurso ajeno responde **404, igual que uno inexistente**, y no cambia ningún dato; el dueño sale siempre de la sesión.
