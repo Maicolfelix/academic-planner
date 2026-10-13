@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, hasNoNul, type EducationContext } from './academic.js';
+import {
+  INVALID_CHARACTERS,
+  hasNoNul,
+  normalizeNameKey,
+  type EducationContext,
+} from './academic.js';
 
 /**
  * The educational PROFILE of a user: what the product may personalise later (labels, suggestions). It is a description,
@@ -120,6 +125,30 @@ export const PROGRAM_CATALOG: readonly ProgramEntry[] = [
 const PROGRAM_BY_KEY: ReadonlyMap<string, ProgramEntry> = new Map(
   PROGRAM_CATALOG.map((p) => [p.key, p]),
 );
+
+/**
+ * The catalog entries that match what the student typed, best first: case and accent insensitive (`normalizeNameKey`),
+ * every typed word must appear (as the start of a word first, anywhere after). Nothing typed matches nothing: the catalog is
+ * never dumped as a list. Pure and offline: a program the catalog does not have is simply written by the student.
+ */
+export function searchPrograms(query: string, limit = 6): ProgramEntry[] {
+  const words = normalizeNameKey(query).split(' ').filter(Boolean);
+  if (words.length === 0) return [];
+  const scored: { entry: ProgramEntry; score: number }[] = [];
+  for (const entry of PROGRAM_CATALOG) {
+    const name = normalizeNameKey(entry.name);
+    const nameWords = name.split(' ');
+    if (!words.every((w) => name.includes(w))) continue;
+    // 0: every typed word starts a word of the name (and the name starts with the first one); 1: starts words; 2: inside
+    const startsWords = words.every((w) => nameWords.some((nw) => nw.startsWith(w)));
+    const score = startsWords ? (name.startsWith(words[0]!) ? 0 : 1) : 2;
+    scored.push({ entry, score });
+  }
+  return scored
+    .sort((a, b) => a.score - b.score || a.entry.name.localeCompare(b.entry.name, 'es'))
+    .slice(0, limit)
+    .map((s) => s.entry);
+}
 
 export const findProgramByKey = (key: string): ProgramEntry | undefined => PROGRAM_BY_KEY.get(key);
 

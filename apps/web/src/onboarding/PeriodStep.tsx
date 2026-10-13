@@ -78,7 +78,7 @@ export function PeriodStep({ primaryUse, pending, error, serverFieldErrors, onSu
       </p>
       <div>
         <Button type="submit" variant="primary" disabled={pending} aria-busy={pending || undefined}>
-          {pending ? 'Guardando…' : 'Continuar'}
+          {pending ? 'Guardando…' : 'Siguiente'}
         </Button>
       </div>
     </form>

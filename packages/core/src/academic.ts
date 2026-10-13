@@ -190,6 +190,8 @@ export const periodListResponseSchema = z.object({ periods: z.array(periodSchema
 export type AcademicPeriod = z.infer<typeof periodSchema>;
 export type CreatePeriodInput = z.infer<typeof createPeriodSchema>;
 export type UpdatePeriodInput = z.infer<typeof updatePeriodSchema>;
+/** What a client may send on update: every field optional. */
+export type UpdatePeriodRequest = z.input<typeof updatePeriodSchema>;
 
 // ───────────────────────── Subject ─────────────────────────
 

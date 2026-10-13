@@ -8,6 +8,8 @@ interface FormFieldProps {
   /** Renders a textarea instead of an input. */
   multiline?: boolean;
   autoComplete?: string;
+  /** The keyboard a phone shows (numbers only, for instance). */
+  inputMode?: 'numeric' | 'text' | 'search';
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -31,6 +33,7 @@ export function FormField({
   type = 'text',
   multiline = false,
   autoComplete,
+  inputMode,
   value,
   onChange,
   placeholder,
@@ -66,6 +69,7 @@ export function FormField({
           {...shared}
           type={type}
           autoComplete={autoComplete}
+          inputMode={inputMode}
           onChange={(e) => onChange(e.target.value)}
         />
       )}

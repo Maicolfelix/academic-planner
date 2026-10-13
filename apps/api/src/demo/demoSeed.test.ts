@@ -217,6 +217,56 @@ describe('the dataset', () => {
   });
 });
 
+describe('the demo student has a finished university profile', () => {
+  it('seeds primaryUse UNIVERSITY_STUDENT and COMPLETED (so no "Completa tu perfil"), with nothing else invented', async () => {
+    await seedDemo(prisma, { now: NOW });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: DEMO_EMAIL },
+      include: { profile: true },
+    });
+    expect(user.profile).toMatchObject({
+      primaryUse: 'UNIVERSITY_STUDENT',
+      onboardingStatus: 'COMPLETED',
+      programName: null,
+      programKey: null,
+    });
+    expect(await prisma.userProfile.count({ where: { userId: user.id } })).toBe(1);
+  });
+
+  it('its subjects take the UNIVERSITY default, through the same rule as every other subject', async () => {
+    await seedDemo(prisma, { now: NOW });
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_EMAIL } });
+    const contexts = await prisma.subject.findMany({ where: { userId: user.id } });
+    expect(contexts).toHaveLength(6);
+    expect(new Set(contexts.map((s) => s.educationContext))).toEqual(new Set(['UNIVERSITY']));
+  });
+
+  it('running it again restores the profile, and never touches the profile of anybody else', async () => {
+    const other = await setupUser(app, 'real@example.com');
+    await other.agent.patch('/api/profile').send({ primaryUse: 'PERSONAL' }).expect(200);
+    const before = JSON.stringify(
+      await prisma.userProfile.findFirstOrThrow({ where: { user: { email: 'real@example.com' } } }),
+    );
+    await seedDemo(prisma, { now: NOW });
+    await prisma.userProfile.updateMany({
+      where: { user: { email: DEMO_EMAIL } },
+      data: { primaryUse: null, onboardingStatus: 'NOT_STARTED' },
+    });
+    await seedDemo(prisma, { now: NOW });
+    const demo = await prisma.userProfile.findFirstOrThrow({
+      where: { user: { email: DEMO_EMAIL } },
+    });
+    expect(demo).toMatchObject({ primaryUse: 'UNIVERSITY_STUDENT', onboardingStatus: 'COMPLETED' });
+    expect(
+      JSON.stringify(
+        await prisma.userProfile.findFirstOrThrow({
+          where: { user: { email: 'real@example.com' } },
+        }),
+      ),
+    ).toBe(before);
+  });
+});
+
 describe('idempotency and reset', () => {
   it('a second run does not duplicate anything and keeps the same user id', async () => {
     const first = await seedDemo(prisma, { now: NOW });

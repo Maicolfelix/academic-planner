@@ -20,6 +20,7 @@ import { WeekCard } from './dashboard/WeekCard';
 import { RadarCard } from './radar/RadarCard';
 import { InstallPrompt } from '../pwa/InstallPrompt';
 import { QuickCapture } from './quickCapture/QuickCapture';
+import { ProfileNotice } from '../profile/ProfileNotice';
 import { RemindersPanel } from './reminders/RemindersPanel';
 
 /**
@@ -80,6 +81,8 @@ export function DashboardPage() {
       <QueryError query={dashboard} title="No se pudo cargar tu panel" />
 
       <RemindersPanel timeZone={timeZone} now={now} />
+
+      <ProfileNotice />
 
       <div className={`flex flex-col gap-5 ${columns}`}>
         {/* NOW */}

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { UpdateSubjectInput } from '@planner/core';
+import type { UpdatePeriodRequest, UpdateSubjectInput } from '@planner/core';
 import {
   createPeriodRequest,
   createSubjectRequest,
+  createSubjectsBatchRequest,
+  updatePeriodRequest,
   deleteSubjectRequest,
   fetchPeriods,
   fetchSubjects,
@@ -29,6 +31,20 @@ export function useCreatePeriod() {
   return useMutation({
     mutationFn: createPeriodRequest,
     // Returning the promise makes the mutation wait for fresh data before callers navigate.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: periodsKey }),
+        qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      ]),
+  });
+}
+
+/** Changes one period (here: its study level). Everything that shows the period is refreshed. */
+export function useUpdatePeriod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdatePeriodRequest }) =>
+      updatePeriodRequest(id, input),
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: periodsKey }),
@@ -76,4 +92,10 @@ export function useUpdateSubject() {
 export function useDeleteSubject() {
   const invalidate = useInvalidateSubjects();
   return useMutation({ mutationFn: deleteSubjectRequest, onSuccess: invalidate });
+}
+
+/** The quick setup of subjects: one request for all of them; the lists, the Dashboard and the progress are refreshed. */
+export function useCreateSubjectsBatch() {
+  const invalidate = useInvalidateSubjects();
+  return useMutation({ mutationFn: createSubjectsBatchRequest, onSuccess: () => invalidate() });
 }

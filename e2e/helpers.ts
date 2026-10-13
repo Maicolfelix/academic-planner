@@ -71,7 +71,11 @@ export async function completeOnboarding(
   await page.getByLabel('Nombre del periodo').fill(periodName); // step 2: the period
   await page.getByLabel('Inicio', { exact: true }).fill(dates.start);
   await page.getByLabel('Fin', { exact: true }).fill(dates.end);
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  // a skipped profile has no optional steps: the period is followed by the last screen, which leaves for the Home
+  await page.getByRole('button', { name: 'Ir al Inicio' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/subjects'); // where this helper has always left the user
   await expect(page).toHaveURL(/\/subjects$/);
 }
 

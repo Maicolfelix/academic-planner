@@ -22,6 +22,8 @@ const ICONS: Record<UseIcon, () => React.ReactNode> = {
 interface Props {
   /** What the student tapped (kept visible if saving fails, so nothing seems lost). */
   selected: PrimaryUse | null;
+  /** What the server already has: with an answer, "skip" only goes on (it never un-answers). */
+  current?: PrimaryUse | null;
   /** A request is in flight: the options wait. */
   pending: boolean;
   /** Said when saving failed. */
@@ -35,7 +37,14 @@ interface Props {
  * radio, so moving with the keyboard never saves a choice by accident). The chosen one says so in words, not only in color
  * (`aria-pressed` and a check mark). Skipping is always there and never blocks anything.
  */
-export function PrimaryUseStep({ selected, pending, error, onPick, onSkip }: Props) {
+export function PrimaryUseStep({
+  selected,
+  current = null,
+  pending,
+  error,
+  onPick,
+  onSkip,
+}: Props) {
   return (
     <>
       <div role="group" aria-labelledby="onboarding-use-title" className="flex flex-col gap-3">
@@ -86,7 +95,7 @@ export function PrimaryUseStep({ selected, pending, error, onPick, onSkip }: Pro
 
       <div>
         <Button variant="ghost" onClick={onSkip} disabled={pending}>
-          Omitir por ahora
+          {current === null ? 'Omitir por ahora' : 'Seguir sin cambiar'}
         </Button>
       </div>
     </>
