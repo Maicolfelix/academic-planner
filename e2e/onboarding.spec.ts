@@ -52,7 +52,7 @@ const use = (page: Page, title: string) => page.getByRole('button', { name: new 
 const fillPeriod = async (page: Page, start = '2026-08-03', end = '2026-11-28') => {
   await page.getByLabel('Inicio', { exact: true }).fill(start);
   await page.getByLabel('Fin', { exact: true }).fill(end);
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
 };
 const addSubjects = async (page: Page, names: string[]) => {
   for (const name of names) {
@@ -131,15 +131,21 @@ test('UNIVERSITY, complete: program from the catalog, semester, three subjects, 
   await expect(page.getByRole('group', { name: 'Coincidencias' })).toHaveCount(0);
   await page.getByLabel('Carrera o programa').fill('PSICOLOGIA');
   await page.getByRole('button', { name: 'Psicología', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Psicología', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Siguiente' }).click();
 
   // semester
   await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
   await page.getByRole('button', { name: 'Semestre 4' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
 
   // quick subjects
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   await addSubjects(page, ['Farmacología', 'Semiología', 'Bioestadística']);
-  await page.getByRole('button', { name: 'Agregar 3 materias' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
 
   await expect(h1(page, FINAL)).toBeVisible();
   await expect(page.getByText('3 materias agregadas')).toBeVisible();
@@ -180,7 +186,7 @@ test('UNIVERSITY with a program the catalog does not have: written freely, with 
   await expect(page.getByLabel('Escribe tu carrera o programa')).toHaveValue(
     'Medicina del Deporte Extremo',
   );
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
   expect(await profile(page)).toMatchObject({
     programName: 'Medicina del Deporte Extremo',
@@ -193,11 +199,11 @@ test('a semester beyond ten and a described level are both possible ("Otro")', a
   const assertClean = watch(page);
   await START(page, 'Universidad');
   await fillPeriod(page);
-  await page.getByRole('button', { name: 'Omitir este paso' }).click(); // program
+  await page.getByRole('button', { name: 'Ahora no' }).click(); // program
   await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
   await page.getByRole('button', { name: 'Otro' }).click();
   await page.getByLabel(/^Número/).fill('12');
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   expect((await periods(page))[0]).toMatchObject({ studyLevel: 12, studyLevelNote: null });
 
@@ -205,9 +211,9 @@ test('a semester beyond ten and a described level are both possible ("Otro")', a
   await page.getByRole('button', { name: 'Atrás' }).click();
   await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
   await expect(page.getByLabel(/^Número/)).toHaveValue('12'); // what the server has
-  await page.getByLabel(/^Número/).fill('');
   await page.getByLabel('O descríbelo').fill('Internado');
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByLabel(/^Número/)).toHaveValue(''); // typing the description emptied the number
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   expect((await periods(page))[0]).toMatchObject({ studyLevel: null, studyLevelNote: 'Internado' });
   assertClean();
@@ -219,9 +225,10 @@ test('SCHOOL, complete: grade, subjects, home', async ({ page }) => {
   await fillPeriod(page);
   await expect(h1(page, '¿En qué grado estás?')).toBeVisible();
   await page.getByRole('button', { name: 'Grado 10' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿Qué materias ves?')).toBeVisible();
   await addSubjects(page, ['Matemáticas', 'Biología']);
-  await page.getByRole('button', { name: 'Agregar 2 materias' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await finishHome(page);
   expect(await profile(page)).toMatchObject({
     primaryUse: 'SCHOOL_STUDENT',
@@ -240,7 +247,7 @@ test('TEACHER, complete: no program, no level, straight to the subjects they tea
   await fillPeriod(page);
   await expect(h1(page, '¿Qué materias o cursos impartes?')).toBeVisible();
   await addSubjects(page, ['Álgebra Lineal']);
-  await page.getByRole('button', { name: 'Agregar 1 materia' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await finishHome(page);
   expect(await profile(page)).toMatchObject({
     primaryUse: 'TEACHER',
@@ -259,9 +266,12 @@ test('OTHER STUDY, complete: free text program, no level question, subjects skip
   await fillPeriod(page);
   await expect(h1(page, '¿Qué estás estudiando?')).toBeVisible();
   await page.getByLabel('Curso o programa').fill('Curso de inglés B2');
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿Qué materias o módulos tienes?')).toBeVisible(); // no level step in between
-  await page.getByRole('button', { name: 'Hacerlo después' }).click();
+  await expect(page.getByRole('button', { name: /Ahora no|Hacerlo después|Omitir/ })).toHaveCount(
+    0,
+  );
+  await page.getByRole('button', { name: 'Siguiente' }).click(); // no names: Siguiente just moves on
   await finishHome(page);
   expect(await profile(page)).toMatchObject({
     primaryUse: 'OTHER_STUDENT',
@@ -296,9 +306,9 @@ test('every optional step of the university can be skipped, and a finished wizar
   const assertClean = watch(page);
   await START(page, 'Universidad');
   await fillPeriod(page);
-  await page.getByRole('button', { name: 'Omitir este paso' }).click(); // program
-  await page.getByRole('button', { name: 'Omitir este paso' }).click(); // level
-  await page.getByRole('button', { name: 'Hacerlo después' }).click(); // subjects
+  await page.getByRole('button', { name: 'Ahora no' }).click(); // program
+  await page.getByRole('button', { name: 'Ahora no' }).click(); // level
+  await page.getByRole('button', { name: 'Siguiente' }).click(); // subjects: nothing typed, so it only moves on
   await finishHome(page);
   expect(await profile(page)).toMatchObject({
     primaryUse: 'UNIVERSITY_STUDENT',
@@ -323,8 +333,9 @@ test('closing the page at the program continues at the program; at the subjects,
   await page.reload();
   await expect(h1(page, '¿Qué estudias?')).toBeVisible(); // derived from the server, not a counter
 
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
   await page.getByRole('button', { name: 'Semestre 3' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   await addSubjects(page, ['Anatomía', 'Embriología']);
   await page.reload();
@@ -349,7 +360,9 @@ test('a repeated name is refused where it is typed, and "Atrás" keeps every sav
   await fillPeriod(page);
   await page.getByLabel('Carrera o programa').fill('derecho');
   await page.getByRole('button', { name: 'Derecho', exact: true }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await page.getByRole('button', { name: 'Semestre 2' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await addSubjects(page, ['Filosofía']);
   await page.locator('#subject-name').fill(' FILOSOFIA ');
   await page.locator('#subject-name').press('Enter');
@@ -362,6 +375,10 @@ test('a repeated name is refused where it is typed, and "Atrás" keeps every sav
     'aria-pressed',
     'true',
   );
+  await page.getByRole('button', { name: 'Siguiente' }).click(); // unchanged: it only moves on, and the typed name is still there
+  await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Quitar Filosofía' })).toBeVisible();
+  await page.getByRole('button', { name: 'Atrás' }).click();
   await page.getByRole('button', { name: 'Atrás' }).click();
   await expect(h1(page, '¿Qué estudias?')).toBeVisible();
   await expect(page.getByText('Ahora tienes:')).toContainText('Derecho');
@@ -401,8 +418,9 @@ test('an existing student completes the profile: nothing is recreated, the old s
   await use(page, 'Universidad').click();
   await expect(page.getByLabel('Nombre del periodo')).toHaveCount(0); // it has a period: not asked again
   await expect(h1(page, '¿Qué estudias?')).toBeVisible();
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
   await page.getByRole('button', { name: 'Semestre 5' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
 
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   await expect(page.getByRole('list', { name: 'Materias que ya tienes' })).toContainText(
@@ -413,7 +431,7 @@ test('an existing student completes the profile: nothing is recreated, the old s
   await page.locator('#subject-name').press('Enter');
   await expect(page.getByText('Ya tienes esa materia en este periodo.')).toBeVisible();
   await addSubjects(page, ['Neuroanatomía']);
-  await page.getByRole('button', { name: 'Agregar 1 materia' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await finishHome(page);
 
   const all = await subjects(page);
@@ -441,10 +459,10 @@ test('"Importar mi horario" completes the wizard and opens the import, which run
   const assertClean = watch(page);
   await START(page, 'Universidad');
   await fillPeriod(page);
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
   await addSubjects(page, ['Redes de Computadores']);
-  await page.getByRole('button', { name: 'Agregar 1 materia' }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, FINAL)).toBeVisible();
   await page.getByRole('button', { name: 'Importar mi horario' }).click();
   await expect(page).toHaveURL(/\/calendar\/import$/);
@@ -574,16 +592,37 @@ test.describe('when saving fails', () => {
         json: { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       }),
     );
-    await page.getByRole('button', { name: 'Agregar 2 materias' }).click();
+    await page.getByRole('button', { name: 'Siguiente' }).click();
     await expect(page.getByRole('alert')).toContainText('Tus materias siguen aquí');
     await expect(page.getByRole('button', { name: 'Quitar Cálculo' })).toBeVisible();
     await expect(h1(page, '¿Qué materias o cursos impartes?')).toBeVisible(); // did not move on
     expect(await subjects(page)).toEqual([]);
 
     await page.unroute('**/api/subjects/batch');
-    await page.getByRole('button', { name: 'Agregar 2 materias' }).click();
+    await page.getByRole('button', { name: 'Siguiente' }).click();
     await expect(h1(page, FINAL)).toBeVisible();
     expect((await subjects(page)).map((s) => s.name).sort()).toEqual(['Cálculo', 'Física']);
+  });
+
+  test('while Siguiente saves it says so and a second tap sends nothing', async ({ page }) => {
+    await START(page, 'Soy docente');
+    await fillPeriod(page);
+    await addSubjects(page, ['Cálculo']);
+    let posts = 0;
+    await page.route('**/api/subjects/batch', async (route) => {
+      posts += 1;
+      await new Promise((r) => setTimeout(r, 800));
+      await route.continue();
+    });
+    const next = page.getByRole('button', { name: 'Siguiente' });
+    await next.click();
+    await expect(page.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
+    await page
+      .getByRole('button', { name: 'Guardando…' })
+      .click({ force: true, timeout: 500 })
+      .catch(() => {});
+    await expect(h1(page, FINAL)).toBeVisible();
+    expect(posts).toBe(1);
   });
 
   test('without a connection the answer says so, what was typed stays, and it goes on when it is back', async ({
@@ -602,11 +641,11 @@ test.describe('when saving fails', () => {
     await page.getByLabel('Inicio', { exact: true }).fill('2026-08-03');
     await page.getByLabel('Fin', { exact: true }).fill('2026-11-28');
     await context.setOffline(true);
-    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Siguiente' }).click();
     await expect(page.getByRole('alert')).toContainText(/conexi/i);
     await expect(page.getByLabel('Inicio', { exact: true })).toHaveValue('2026-08-03');
     await context.setOffline(false);
-    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Siguiente' }).click();
     await expect(h1(page, '¿En qué grado estás?')).toBeVisible();
   });
 });
@@ -630,6 +669,112 @@ test('a student who already has a period is NOT sent to the onboarding when logg
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto('/calendar');
   await expect(page).toHaveURL(/\/calendar$/);
+  assertClean();
+});
+
+test('tapping a program or a level only MARKS it: nothing is saved until Siguiente, and a slip can be corrected', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await START(page, 'Universidad');
+  await fillPeriod(page);
+  await page.getByLabel('Carrera o programa').fill('derecho');
+  await page.getByRole('button', { name: 'Derecho', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Derecho', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(h1(page, '¿Qué estudias?')).toBeVisible(); // it did not move on by itself
+  expect((await profile(page)).programName).toBeNull(); // and nothing was saved
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
+  expect(await profile(page)).toMatchObject({ programKey: 'derecho', programName: 'Derecho' });
+
+  await page.getByRole('button', { name: 'Semestre 2' }).click();
+  await page.getByRole('button', { name: 'Semestre 3' }).click(); // the slip, corrected
+  await expect(page.getByRole('button', { name: 'Semestre 2' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.getByRole('button', { name: 'Semestre 3' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
+  expect((await periods(page))[0]).toMatchObject({ studyLevel: null });
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
+  expect((await periods(page))[0]).toMatchObject({ studyLevel: 3 });
+  assertClean();
+});
+
+test('program: Siguiente with nothing says what to do, asks to tap a match, and "Ahora no" moves on without saving', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await START(page, 'Universidad');
+  await fillPeriod(page);
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(page.getByText('toca «Ahora no»')).toBeVisible();
+  await expect(h1(page, '¿Qué estudias?')).toBeVisible();
+
+  await page.getByLabel('Carrera o programa').fill('psico'); // words that point at the catalog, none tapped
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(page.getByText('Toca tu carrera en la lista')).toBeVisible();
+  await expect(h1(page, '¿Qué estudias?')).toBeVisible();
+  expect((await profile(page)).programName).toBeNull();
+
+  await page.getByRole('button', { name: 'Ahora no' }).click(); // what was typed is not saved
+  await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
+  expect(await profile(page)).toMatchObject({ programName: null, programKey: null });
+  assertClean();
+});
+
+test('"Otro": the number and the description exclude each other as they are typed', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await START(page, 'Universidad');
+  await fillPeriod(page);
+  await page.getByRole('button', { name: 'Ahora no' }).click();
+  await page.getByRole('button', { name: 'Otro' }).click();
+  await expect(page.getByText('Usa una sola opción.')).toBeVisible();
+  await page.getByLabel('O descríbelo').fill('Internado');
+  await page.getByLabel(/^Número/).fill('12');
+  await expect(page.getByLabel('O descríbelo')).toHaveValue(''); // typing the number emptied the description
+  await page.getByLabel('O descríbelo').fill('Año rural');
+  await expect(page.getByLabel(/^Número/)).toHaveValue('');
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
+  expect((await periods(page))[0]).toMatchObject({ studyLevel: null, studyLevelNote: 'Año rural' });
+  assertClean();
+});
+
+test('subjects: Siguiente with nothing typed moves on without any request; a name typed but not entered goes with it', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  const batches: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/api/subjects/batch')) batches.push(r.method());
+  });
+  await START(page, 'Soy docente');
+  await fillPeriod(page);
+  await expect(h1(page, '¿Qué materias o cursos impartes?')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Ahora no|Hacerlo después|Omitir/ })).toHaveCount(
+    0,
+  );
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(h1(page, FINAL)).toBeVisible();
+  expect(batches).toEqual([]); // nothing to create: no request
+  expect(await subjects(page)).toEqual([]);
+
+  await page.getByRole('button', { name: 'Atrás' }).click();
+  await page.locator('#subject-name').fill('Lógica'); // typed, Enter never pressed
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(h1(page, FINAL)).toBeVisible();
+  expect(batches).toEqual(['POST']);
+  expect((await subjects(page)).map((x) => x.name)).toEqual(['Lógica']);
   assertClean();
 });
 
@@ -668,7 +813,7 @@ test('Enter adds a subject without submitting the step, and the chips are reacha
   await page.getByRole('button', { name: 'Quitar Química' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Quitar Química' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Agregar 1 materia' })).toBeVisible();
+  await expect(page.getByText('Al pulsar «Siguiente» se agregará 1 materia.')).toBeVisible();
   assertClean();
 });
 
@@ -717,12 +862,12 @@ test('every step fits every width: 44 px targets, one h1, no overflow and no axe
   await audit('program with results');
   await page.getByRole('button', { name: 'Mi carrera no aparece' }).click();
   await audit('custom program');
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
   await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
   await audit('level');
   await page.getByRole('button', { name: 'Otro' }).click();
   await audit('level other');
-  await page.getByRole('button', { name: 'Omitir este paso' }).click();
+  await page.getByRole('button', { name: 'Ahora no' }).click();
   await expect(h1(page, '¿Qué materias estás cursando?')).toBeVisible();
   await addSubjects(page, [
     'Farmacología',
@@ -731,7 +876,7 @@ test('every step fits every width: 44 px targets, one h1, no overflow and no axe
     'Una materia con un nombre bastante largo para comprobar el ajuste de la línea',
   ]);
   await audit('subjects with chips');
-  await page.getByRole('button', { name: /^Agregar 4 materias/ }).click();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(h1(page, FINAL)).toBeVisible();
   await audit('final');
   assertClean();

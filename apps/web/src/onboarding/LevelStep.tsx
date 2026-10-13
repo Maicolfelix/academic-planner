@@ -1,13 +1,8 @@
-import {
-  STUDY_LEVEL_MAX,
-  STUDY_LEVEL_NOTE_MAX,
-  studyLevelSchema,
-  type PrimaryUse,
-} from '@planner/core';
+import { STUDY_LEVEL_MAX, STUDY_LEVEL_NOTE_MAX, type PrimaryUse } from '@planner/core';
 import { useState, type FormEvent } from 'react';
 import { FormField } from '../components/FormField';
 import { Button } from '../components/ui/Button';
-import { levelCopy } from './onboardingModel';
+import { exclusiveLevelInput, levelCopy, levelNext } from './onboardingModel';
 
 interface Props {
   primaryUse: PrimaryUse | null;
@@ -17,13 +12,15 @@ interface Props {
   error?: string;
   onPickNumber: (n: number) => void;
   onSaveNote: (note: string) => void;
+  /** "Ahora no": decide this step without saving anything. */
   onSkip: () => void;
 }
 
 /**
- * The level the student is at during this period (a semester, a school grade): the quick numbers are one tap, and "Otro"
- * takes a bigger number (the domain accepts 1 to 99) or a short description. The words change with the use; the data is the
- * same. Always skippable.
+ * The level the student is at during this period (a semester, a school grade). Tapping a number only MARKS it; "Siguiente"
+ * saves and moves on, so a slip can be corrected. "Otro" takes a bigger number (the domain accepts 1 to 99) or a short
+ * description, and the two fields exclude each other as they are typed (the domain still refuses both, as a defence). The
+ * words change with the use; the data is the same. "Ahora no" is the only way to leave without saving.
  */
 export function LevelStep({
   primaryUse,
@@ -40,6 +37,9 @@ export function LevelStep({
     current.studyLevelNote !== null ||
     (current.studyLevel !== null && current.studyLevel > copy.options);
   const [other, setOther] = useState(beyondQuick);
+  const [picked, setPicked] = useState<number | null>(
+    current.studyLevel !== null && current.studyLevel <= copy.options ? current.studyLevel : null,
+  );
   const [number, setNumber] = useState(
     current.studyLevel !== null && current.studyLevel > copy.options
       ? String(current.studyLevel)
@@ -48,27 +48,29 @@ export function LevelStep({
   const [note, setNote] = useState(current.studyLevelNote ?? '');
   const [fieldError, setFieldError] = useState<string>();
 
-  function saveOther(e: FormEvent) {
+  function next(e: FormEvent) {
     e.preventDefault();
-    const n = number.trim();
-    const t = note.trim();
-    if (n !== '' && t !== '') return setFieldError('Escribe solo uno: el número o la descripción.');
-    if (n === '' && t === '') return setFieldError('Escribe un número o una descripción.');
-    if (n !== '') {
-      const parsed = studyLevelSchema.safeParse(/^\d+$/.test(n) ? Number(n) : Number.NaN);
-      if (!parsed.success) return setFieldError(parsed.error.issues[0]!.message);
-      setFieldError(undefined);
-      return onPickNumber(parsed.data);
-    }
+    if (pending) return;
+    const action = levelNext({
+      other,
+      picked,
+      number,
+      note,
+      currentLevel: current.studyLevel,
+      noun: copy.noun,
+    });
+    if (action.kind === 'error') return setFieldError(action.message);
     setFieldError(undefined);
-    onSaveNote(t);
+    if (action.kind === 'number') onPickNumber(action.value);
+    else if (action.kind === 'note') onSaveNote(action.note);
+    else onSkip();
   }
 
   return (
-    <>
+    <form onSubmit={next} noValidate className="flex flex-col gap-4">
       <div role="group" aria-label={copy.noun} className="grid grid-cols-5 gap-2">
         {quick.map((n) => {
-          const on = current.studyLevel === n;
+          const on = !other && picked === n;
           return (
             <button
               key={n}
@@ -76,7 +78,11 @@ export function LevelStep({
               aria-label={`${copy.noun} ${n}`}
               aria-pressed={on}
               disabled={pending}
-              onClick={() => onPickNumber(n)}
+              onClick={() => {
+                setPicked(n);
+                setOther(false);
+                setFieldError(undefined);
+              }}
               className={`min-h-12 rounded-control border text-lg font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
                 on
                   ? 'border-accent bg-accent-soft text-accent-ink'
@@ -90,11 +96,14 @@ export function LevelStep({
         <button
           type="button"
           aria-expanded={other}
-          aria-pressed={beyondQuick}
+          aria-pressed={other}
           disabled={pending}
-          onClick={() => setOther((v) => !v)}
+          onClick={() => {
+            setOther(true);
+            setFieldError(undefined);
+          }}
           className={`min-h-12 rounded-control border font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
-            beyondQuick || other
+            other
               ? 'border-accent bg-accent-soft text-accent-ink'
               : 'border-border bg-surface hover:bg-secondary'
           }`}
@@ -104,25 +113,30 @@ export function LevelStep({
       </div>
 
       {other && (
-        <form onSubmit={saveOther} noValidate className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <FormField
             id="level-number"
             label={`Número (hasta ${STUDY_LEVEL_MAX})`}
             value={number}
             onChange={(v) => {
-              setNumber(v);
+              const fields = exclusiveLevelInput('number', v, { number, note });
+              setNumber(fields.number);
+              setNote(fields.note);
               setFieldError(undefined);
             }}
             inputMode="numeric"
             autoComplete="off"
             maxLength={2}
+            hint="Usa una sola opción."
           />
           <FormField
             id="level-note"
             label="O descríbelo"
             value={note}
             onChange={(v) => {
-              setNote(v);
+              const fields = exclusiveLevelInput('note', v, { number, note });
+              setNumber(fields.number);
+              setNote(fields.note);
               setFieldError(undefined);
             }}
             maxLength={STUDY_LEVEL_NOTE_MAX}
@@ -130,12 +144,12 @@ export function LevelStep({
             autoComplete="off"
             error={fieldError}
           />
-          <div>
-            <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? 'Guardando…' : 'Guardar'}
-            </Button>
-          </div>
-        </form>
+        </div>
+      )}
+      {!other && fieldError && (
+        <p role="alert" className="text-sm text-danger-ink">
+          {fieldError}
+        </p>
       )}
 
       {error && (
@@ -147,11 +161,14 @@ export function LevelStep({
         </p>
       )}
 
-      <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" variant="primary" disabled={pending} aria-busy={pending || undefined}>
+          {pending ? 'Guardando…' : 'Siguiente'}
+        </Button>
         <Button variant="ghost" onClick={onSkip} disabled={pending}>
-          Omitir este paso
+          Ahora no
         </Button>
       </div>
-    </>
+    </form>
   );
 }

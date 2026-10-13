@@ -3,9 +3,11 @@ import {
   SUBJECT_NAME_MAX,
   hasNoNul,
   normalizeNameKey,
+  studyLevelSchema,
   type AcademicPeriod,
   type PrimaryUse,
   type Profile,
+  type ProgramEntry,
 } from '@planner/core';
 import { z } from 'zod';
 import { suggestPeriodName } from '../lib/periodName';
@@ -271,3 +273,82 @@ export const onboardingDraftSchema = z.object({
   subjects: z.array(z.string().max(SUBJECT_NAME_MAX)).max(SUBJECT_CHIPS_MAX),
 });
 export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
+
+// ── "Siguiente": what an optional step does with what is on the screen ──
+
+/** What "Siguiente" does on the program step. `skip` = nothing changed (or nothing to save): just move on. */
+export type ProgramNext =
+  | { kind: 'catalog'; entry: ProgramEntry }
+  | { kind: 'custom'; name: string }
+  | { kind: 'skip' }
+  | { kind: 'error'; message: string };
+
+export function programNext(input: {
+  picked: ProgramEntry | null;
+  query: string;
+  currentName: string | null;
+  /** The student is writing a program of their own ("Mi carrera no aparece", or "other study"). */
+  custom: boolean;
+  matches: number;
+}): ProgramNext {
+  if (input.picked) return { kind: 'catalog', entry: input.picked };
+  const name = input.query.trim();
+  if (name === '')
+    return { kind: 'error', message: 'Escribe o elige tu carrera, o toca «Ahora no».' };
+  if (name === input.currentName) return { kind: 'skip' }; // already saved
+  if (name.length > 80)
+    return { kind: 'error', message: 'El nombre es demasiado largo (máximo 80 caracteres).' };
+  // typed words that point at catalog entries: a tap on one (or on "Mi carrera no aparece") says what they mean
+  if (!input.custom && input.matches > 0)
+    return { kind: 'error', message: 'Toca tu carrera en la lista o «Mi carrera no aparece».' };
+  return { kind: 'custom', name };
+}
+
+/** What "Siguiente" does on the level step. */
+export type LevelNext =
+  | { kind: 'number'; value: number }
+  | { kind: 'note'; note: string }
+  | { kind: 'skip' }
+  | { kind: 'error'; message: string };
+
+export function levelNext(input: {
+  /** "Otro" is open: the number/description fields decide; otherwise the marked quick option does. */
+  other: boolean;
+  picked: number | null;
+  number: string;
+  note: string;
+  currentLevel: number | null;
+  noun: string;
+}): LevelNext {
+  if (!input.other) {
+    if (input.picked === null)
+      return { kind: 'error', message: `Elige un ${input.noun.toLowerCase()} o toca «Ahora no».` };
+    if (input.picked === input.currentLevel) return { kind: 'skip' }; // already saved
+    return { kind: 'number', value: input.picked };
+  }
+  const n = input.number.trim();
+  const t = input.note.trim();
+  // the screen never lets both be filled (see `exclusiveLevelInput`); the domain refuses both too, and so does this
+  if (n !== '' && t !== '')
+    return { kind: 'error', message: 'Escribe solo uno: el número o la descripción.' };
+  if (n === '' && t === '')
+    return { kind: 'error', message: 'Escribe un número o una descripción.' };
+  if (n !== '') {
+    const parsed = studyLevelSchema.safeParse(/^\d+$/.test(n) ? Number(n) : Number.NaN);
+    return parsed.success
+      ? { kind: 'number', value: parsed.data }
+      : { kind: 'error', message: parsed.error.issues[0]!.message };
+  }
+  return { kind: 'note', note: t };
+}
+
+/** Typing in one of the two "Otro" fields empties the other: one or the other, never both. */
+export function exclusiveLevelInput(
+  field: 'number' | 'note',
+  value: string,
+  other: { number: string; note: string },
+): { number: string; note: string } {
+  return field === 'number'
+    ? { number: value, note: value !== '' ? '' : other.note }
+    : { number: value !== '' ? '' : other.number, note: value };
+}

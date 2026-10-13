@@ -22,12 +22,15 @@ import {
   USE_OPTIONS,
   addChip,
   defaultPeriodName,
+  exclusiveLevelInput,
   flowFor,
   levelCopy,
+  levelNext,
   onboardingStep,
   periodHeading,
   previousStep,
   programCopy,
+  programNext,
   progressSteps,
   removeChip,
   subjectsTitle,
@@ -321,11 +324,13 @@ describe('the program step', () => {
       />,
     );
 
-  it('has a real label, the way out for a program that is not in the catalog, and the skip; no list until something is typed', () => {
+  it('has a real label, the way out for a program that is not in the catalog, "Siguiente" and "Ahora no"; no list until something is typed', () => {
     const out = html();
     expect(out).toMatch(/<label[^>]*for="program"[^>]*>Carrera o programa<\/label>/);
     expect(out).toContain('Mi carrera no aparece');
-    expect(out).toContain('Omitir este paso');
+    expect(out).toContain('>Siguiente<');
+    expect(out).toContain('Ahora no');
+    expect(out).not.toMatch(/Omitir este paso|>Guardar</);
     expect(out).not.toContain('Coincidencias'); // the catalog is never dumped
   });
 
@@ -340,16 +345,59 @@ describe('the program step', () => {
     expect(html({ currentName: 'Medicina' })).toContain('Ahora tienes:');
   });
 
-  it('other study: the free text is the main way (a save button from the start, no "my career is not here")', () => {
+  it('other study: the free text is the main way ("Siguiente" from the start, no "my career is not here")', () => {
     const out = html({ primaryUse: 'OTHER_STUDENT' });
     expect(out).toMatch(/Curso o programa/);
-    expect(out).toContain('>Guardar<');
+    expect(out).toContain('>Siguiente<');
     expect(out).not.toContain('Mi carrera no aparece');
   });
 
   it('a failure says so as an alert; while saving everything waits', () => {
     expect(html({ error: 'No se pudo guardar.' })).toContain('role="alert"');
     expect(html({ pending: true, currentName: 'Medicina' })).toMatch(/disabled=""/);
+  });
+});
+
+describe('the program step: what "Siguiente" does', () => {
+  const base = { picked: null, query: '', currentName: null, custom: false, matches: 0 };
+  const psico = { key: 'psicologia', name: 'Psicología' } as never;
+
+  it('a program of their own (custom) + Siguiente saves what was written, with no key', () => {
+    expect(programNext({ ...base, custom: true, query: '  Medicina del Deporte ' })).toEqual({
+      kind: 'custom',
+      name: 'Medicina del Deporte',
+    });
+  });
+
+  it('a marked catalog entry + Siguiente saves it (by key), whatever else is typed', () => {
+    expect(programNext({ ...base, picked: psico, query: 'psico', matches: 1 })).toEqual({
+      kind: 'catalog',
+      entry: psico,
+    });
+  });
+
+  it('typed words that match the catalog, with nothing marked, ask for a tap instead of guessing', () => {
+    expect(programNext({ ...base, query: 'psico', matches: 1 }).kind).toBe('error');
+  });
+
+  it('typed words the catalog does not know are saved as their own program', () => {
+    expect(programNext({ ...base, query: 'Cerámica', matches: 0 })).toEqual({
+      kind: 'custom',
+      name: 'Cerámica',
+    });
+  });
+
+  it('nothing written: an error that points to "Ahora no" (it never saves an empty name)', () => {
+    const r = programNext({ ...base, query: '   ' });
+    expect(r.kind).toBe('error');
+    expect((r as { message: string }).message).toContain('Ahora no');
+  });
+
+  it('what the server already has, left as it is: Siguiente only moves on; a too long name is refused', () => {
+    expect(programNext({ ...base, query: 'Psicología', currentName: 'Psicología' })).toEqual({
+      kind: 'skip',
+    });
+    expect(programNext({ ...base, custom: true, query: 'x'.repeat(81) }).kind).toBe('error');
   });
 });
 
@@ -373,7 +421,9 @@ describe('the level step', () => {
     expect(out).not.toContain('aria-label="Semestre 11"');
     expect(out).toContain('>Otro<');
     expect(out.match(/aria-pressed="true"/g)).toBeNull();
-    expect(out).toContain('Omitir este paso');
+    expect(out).toContain('>Siguiente<');
+    expect(out).toContain('Ahora no');
+    expect(out).not.toMatch(/Omitir este paso|>Guardar</);
   });
 
   it('school: 1 to 11, called grade', () => {
@@ -391,6 +441,7 @@ describe('the level step', () => {
   it('a level beyond the quick ones, or a note, opens "Otro" with its value (the domain is not limited to 10)', () => {
     const big = html({ current: { studyLevel: 12, studyLevelNote: null } });
     expect(big).toContain('id="level-number"');
+    expect(big).toContain('Usa una sola opción.');
     expect(big).toContain('value="12"');
     const note = html({ current: { studyLevel: null, studyLevelNote: 'Internado' } });
     expect(note).toContain('id="level-note"');
@@ -399,6 +450,72 @@ describe('the level step', () => {
 
   it('a failure is an alert', () => {
     expect(html({ error: 'No se pudo guardar.' })).toContain('role="alert"');
+  });
+});
+
+describe('the level step: what "Siguiente" does', () => {
+  const base = {
+    other: false,
+    picked: null,
+    number: '',
+    note: '',
+    currentLevel: null,
+    noun: 'Semestre',
+  };
+
+  it('a number is only MARKED when tapped: nothing is saved until Siguiente, which then saves that number', () => {
+    expect(levelNext({ ...base, picked: 4 })).toEqual({ kind: 'number', value: 4 });
+  });
+
+  it('nothing marked: an error that points to "Ahora no"', () => {
+    const r = levelNext(base);
+    expect(r.kind).toBe('error');
+    expect((r as { message: string }).message).toContain('Ahora no');
+  });
+
+  it('the level the period already has, left as it is, only moves on', () => {
+    expect(levelNext({ ...base, picked: 4, currentLevel: 4 })).toEqual({ kind: 'skip' });
+  });
+
+  it('"Otro": a number up to 99, or a description; each is saved by Siguiente', () => {
+    expect(levelNext({ ...base, other: true, number: ' 12 ' })).toEqual({
+      kind: 'number',
+      value: 12,
+    });
+    expect(levelNext({ ...base, other: true, note: ' Internado ' })).toEqual({
+      kind: 'note',
+      note: 'Internado',
+    });
+    expect(levelNext({ ...base, other: true, number: '100' }).kind).toBe('error');
+    expect(levelNext({ ...base, other: true, number: '1a' }).kind).toBe('error');
+    expect(levelNext({ ...base, other: true }).kind).toBe('error');
+  });
+
+  it('typing a number empties the description, and typing a description empties the number', () => {
+    expect(exclusiveLevelInput('number', '12', { number: '', note: 'Internado' })).toEqual({
+      number: '12',
+      note: '',
+    });
+    expect(exclusiveLevelInput('note', 'Internado', { number: '12', note: '' })).toEqual({
+      number: '',
+      note: 'Internado',
+    });
+  });
+
+  it('erasing a field does not bring the other one back or erase it', () => {
+    expect(exclusiveLevelInput('number', '', { number: '1', note: '' })).toEqual({
+      number: '',
+      note: '',
+    });
+    expect(exclusiveLevelInput('note', '', { number: '', note: 'x' })).toEqual({
+      number: '',
+      note: '',
+    });
+  });
+
+  it('if both ever arrive together the screen still refuses them (the domain refuses them as well)', () => {
+    const r = levelNext({ ...base, other: true, number: '12', note: 'Internado' });
+    expect(r).toEqual({ kind: 'error', message: 'Escribe solo uno: el número o la descripción.' });
   });
 });
 
@@ -456,16 +573,16 @@ describe('the subjects step', () => {
         onChips={() => {}}
         pending={false}
         onConfirm={() => {}}
-        onSkip={() => {}}
         {...over}
       />,
     );
 
-  it('an empty list: one field with a real label, an Agregar button, and "Hacerlo después"; nothing to confirm', () => {
+  it('an empty list: one field with a real label, an Agregar button and a single "Siguiente" (no second button that does the same)', () => {
     const out = html();
     expect(out).toMatch(/<label[^>]*for="subject-name"[^>]*>Escribe una materia<\/label>/);
     expect(out).toContain('Pulsa Enter para agregarla.');
-    expect(out).toContain('Hacerlo después');
+    expect(out).toContain('>Siguiente<');
+    expect(out).not.toMatch(/Hacerlo después|Ahora no|Omitir|Continuar/);
     expect(out).not.toMatch(/Agregar \d+ materia/);
     // no teacher, color, description or type: one field only
     expect(out.match(/<input/g)).toHaveLength(1);
@@ -473,13 +590,14 @@ describe('the subjects step', () => {
     expect(words).not.toMatch(/profesor|color|descripci[oó]n|tipo/i);
   });
 
-  it('every chip has its own named remove button, and the confirm button counts them', () => {
+  it('every chip has its own named remove button, and the page says how many "Siguiente" will add', () => {
     const out = html({ chips: ['Farmacología', 'Semiología', 'Bioestadística'] });
     for (const n of ['Farmacología', 'Semiología', 'Bioestadística']) {
       expect(out).toContain(`aria-label="Quitar ${n}"`);
     }
-    expect(out).toContain('Agregar 3 materias');
-    expect(html({ chips: ['Una'] })).toContain('Agregar 1 materia<');
+    expect(out).toContain('agregarán 3 materias');
+    expect(out).toContain('>Siguiente<');
+    expect(html({ chips: ['Una'] })).toContain('agregará 1 materia');
   });
 
   it('shows the subjects the period already has as already added, apart from the new ones', () => {
@@ -491,8 +609,10 @@ describe('the subjects step', () => {
     expect(out).toContain('Agregar otra materia');
   });
 
-  it('with existing subjects and nothing new, it offers to continue', () => {
-    expect(html({ existing: ['Anatomía'] })).toContain('>Continuar<');
+  it('with existing subjects and nothing new, it is the same single "Siguiente"', () => {
+    const out = html({ existing: ['Anatomía'] });
+    expect(out).toContain('>Siguiente<');
+    expect(out).not.toMatch(/agregar[áa]n? \d|Continuar/);
   });
 
   it('a failure keeps the names and says to try again; while saving everything waits', () => {

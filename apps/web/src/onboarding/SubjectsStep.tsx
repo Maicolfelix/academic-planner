@@ -13,25 +13,17 @@ interface Props {
   onChips: (next: string[]) => void;
   pending: boolean;
   error?: string;
-  /** One confirmation creates every chip (one request). With no chips it only moves on. */
-  onConfirm: () => void;
-  onSkip: () => void;
+  /** "Siguiente": one request creates every name (the chips and a name typed but not yet entered). With none, it only moves on. */
+  onConfirm: (names: string[]) => void;
 }
 
 /**
  * Quick subjects: type a name, Enter, and it becomes a chip; no teacher, no color, no description, no type (the server
  * assigns colors and derives the kind of study). The ones the period already has are shown, so nothing pretends they do
- * not exist. One button creates them all in one request.
+ * not exist. "Siguiente" creates them all in one request (a name typed and not yet entered is not lost: it goes too) and,
+ * with nothing to create, simply moves on; that is why there is no separate "skip" here.
  */
-export function SubjectsStep({
-  existing,
-  chips,
-  onChips,
-  pending,
-  error,
-  onConfirm,
-  onSkip,
-}: Props) {
+export function SubjectsStep({ existing, chips, onChips, pending, error, onConfirm }: Props) {
   const [text, setText] = useState('');
   const [fieldError, setFieldError] = useState<string>();
 
@@ -42,6 +34,18 @@ export function SubjectsStep({
     setFieldError(undefined);
     if (result.chips.length !== chips.length) onChips(result.chips);
     setText('');
+  }
+
+  function next() {
+    if (pending) return;
+    let names = [...chips];
+    if (text.trim() !== '') {
+      const result = addChip(chips, existing, text);
+      if (result.error) return setFieldError(result.error);
+      names = result.chips;
+      setText('');
+    }
+    onConfirm(names);
   }
 
   const n = chips.length;
@@ -122,23 +126,19 @@ export function SubjectsStep({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {(n > 0 || existing.length > 0) && (
-          <Button
-            variant="primary"
-            onClick={onConfirm}
-            disabled={pending}
-            aria-busy={pending || undefined}
-          >
-            {pending
-              ? 'Guardando…'
-              : n > 0
-                ? `Agregar ${n} ${n === 1 ? 'materia' : 'materias'}`
-                : 'Continuar'}
-          </Button>
-        )}
-        <Button variant="ghost" onClick={onSkip} disabled={pending}>
-          Hacerlo después
+      {n > 0 && !pending && (
+        <p className="text-sm text-muted-foreground">
+          Al pulsar «Siguiente» se {n === 1 ? 'agregará 1 materia' : `agregarán ${n} materias`}.
+        </p>
+      )}
+      <div>
+        <Button
+          variant="primary"
+          onClick={next}
+          disabled={pending}
+          aria-busy={pending || undefined}
+        >
+          {pending ? 'Guardando…' : 'Siguiente'}
         </Button>
       </div>
     </>

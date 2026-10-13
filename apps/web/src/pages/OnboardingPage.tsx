@@ -212,11 +212,12 @@ function Onboarding({ userId }: { userId: string }) {
   };
 
   // ── 5. subjects ──
-  function confirmSubjects() {
+  function confirmSubjects(names: string[]) {
     clearError('SUBJECTS');
-    if (chips.length === 0) return decide('SUBJECTS');
+    if (names.length === 0) return decide('SUBJECTS');
+    keep(decided, names); // what was typed is kept even if the save fails
     createSubjects.mutate(
-      { names: chips },
+      { names },
       {
         onSuccess: (res) => {
           setSummary({ created: res.createdSubjects.length, reused: res.reusedSubjects.length });
@@ -314,7 +315,6 @@ function Onboarding({ userId }: { userId: string }) {
           pending={createSubjects.isPending}
           error={errors.SUBJECTS}
           onConfirm={confirmSubjects}
-          onSkip={() => decide('SUBJECTS', [])}
         />,
       );
     }
