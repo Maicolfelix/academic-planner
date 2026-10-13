@@ -67,7 +67,13 @@ async function world() {
       recurrence: { frequency: 'WEEKLY', until: '2026-11-28' },
     })
   ).body.block as { id: string };
-  return { a, b, secondSubject, activity, generalActivity, reminder, block };
+  // A formation of B (a study): reachable only through its id, which is exactly what must not work for A.
+  const studyTrack = (
+    await b.agent
+      .post('/api/study-tracks')
+      .send({ name: 'Estudio secreto de B', type: 'OTHER_ACADEMIC' })
+  ).body.studyTrack as { id: string };
+  return { a, b, secondSubject, activity, generalActivity, reminder, block, studyTrack };
 }
 
 const snapshot = async () => ({
@@ -77,6 +83,7 @@ const snapshot = async () => ({
   activities: await prisma.activity.findMany({ orderBy: { id: 'asc' } }),
   reminders: await prisma.reminder.findMany({ orderBy: { id: 'asc' } }),
   blocks: await prisma.scheduleBlock.findMany({ orderBy: { id: 'asc' } }),
+  studyTracks: await prisma.studyTrack.findMany({ orderBy: { id: 'asc' } }),
 });
 
 const same = (r: request.Response) => ({ status: r.status, body: r.body });
@@ -123,20 +130,36 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
     ['DELETE /reminders/:id', (a, id) => a.delete(`/api/reminders/${id}`)],
     ['PATCH /periods/:id', (a, id) => a.patch(`/api/periods/${id}`).send({ name: 'Hackeado' })],
     ['DELETE /periods/:id', (a, id) => a.delete(`/api/periods/${id}`)],
+    [
+      'PATCH /study-tracks/:id',
+      (a, id) => a.patch(`/api/study-tracks/${id}`).send({ name: 'Hackeado' }),
+    ],
+    [
+      'PATCH /study-tracks/:id type',
+      (a, id) => a.patch(`/api/study-tracks/${id}`).send({ type: 'UNIVERSITY' }),
+    ],
+    [
+      'POST /study-tracks/:id/make-primary',
+      (a, id) => a.post(`/api/study-tracks/${id}/make-primary`),
+    ],
+    ['POST /study-tracks/:id/archive', (a, id) => a.post(`/api/study-tracks/${id}/archive`)],
+    ['POST /study-tracks/:id/restore', (a, id) => a.post(`/api/study-tracks/${id}/restore`)],
   ];
 
   const target = (label: string, w: Awaited<ReturnType<typeof world>>) =>
-    label.includes('/subjects')
-      ? w.b.subject.id
-      : label.includes('(general)')
-        ? w.generalActivity.id
-        : label.includes('/activities')
-          ? w.activity.id
-          : label.includes('/schedule')
-            ? w.block.id
-            : label.includes('/reminders')
-              ? w.reminder.id
-              : w.b.period.id;
+    label.includes('/study-tracks')
+      ? w.studyTrack.id
+      : label.includes('/subjects')
+        ? w.b.subject.id
+        : label.includes('(general)')
+          ? w.generalActivity.id
+          : label.includes('/activities')
+            ? w.activity.id
+            : label.includes('/schedule')
+              ? w.block.id
+              : label.includes('/reminders')
+                ? w.reminder.id
+                : w.b.period.id;
 
   it.each(byId.map(([label, call]) => [label, call] as const))(
     '%s: B’s id gets the exact answer of a random id, and nothing changes',
@@ -265,6 +288,8 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
       w.reminder.id,
       w.block.id,
       w.b.period.id,
+      w.studyTrack.id,
+      'Estudio secreto de B',
       'Tarea secreta de B',
       'Clase secreta de B',
       'Secreta de B',
@@ -274,6 +299,7 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
       '/api/subjects',
       '/api/activities',
       '/api/periods',
+      '/api/study-tracks',
       '/api/schedule?from=2026-10-05&to=2026-10-11',
       '/api/reminders',
       '/api/reminders/due',
@@ -423,14 +449,21 @@ describe('strict bodies: no mass assignment', () => {
     updatedAt: '2000-01-01T00:00:00.000Z',
     completedAt: '2000-01-01T00:00:00.000Z',
     kind: 'AUTO',
+    isPrimary: true,
+    status: 'ARCHIVED',
   };
 
   it.each(Object.entries(evil))('every write refuses the internal field %s', async (key, value) => {
     const w = await world();
     const mine = (await postActivity(w.a.agent, w.a.subject.id, { title: 'Mía' })).body
       .activity as { id: string };
+    const myTrack = (
+      await w.a.agent.post('/api/study-tracks').send({ name: 'Mío', type: 'SCHOOL' })
+    ).body.studyTrack as { id: string };
     const before = await snapshot();
     const attempts: request.Test[] = [
+      w.a.agent.post('/api/study-tracks').send({ name: 'Z', type: 'SCHOOL', [key]: value }),
+      w.a.agent.patch(`/api/study-tracks/${myTrack.id}`).send({ name: 'Z', [key]: value }),
       w.a.agent.post('/api/subjects').send({ periodId: w.a.period.id, name: 'Z', [key]: value }),
       w.a.agent.patch(`/api/subjects/${w.a.subject.id}`).send({ name: 'Z', [key]: value }),
       w.a.agent
@@ -509,6 +542,12 @@ describe('every protected route refuses an anonymous caller', () => {
     ['get', '/api/periods'],
     ['post', '/api/periods'],
     ['patch', `/api/periods/${randomUUID()}`],
+    ['get', '/api/study-tracks'],
+    ['post', '/api/study-tracks'],
+    ['patch', `/api/study-tracks/${randomUUID()}`],
+    ['post', `/api/study-tracks/${randomUUID()}/make-primary`],
+    ['post', `/api/study-tracks/${randomUUID()}/archive`],
+    ['post', `/api/study-tracks/${randomUUID()}/restore`],
     ['get', '/api/subjects'],
     ['post', '/api/subjects'],
     ['get', `/api/subjects/${randomUUID()}`],

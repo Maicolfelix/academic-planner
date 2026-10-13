@@ -75,3 +75,60 @@ describe('no behaviour depends on a particular program or on the primary use', (
     for (const m of models) expect(m).not.toMatch(/\b(role|isAdmin|permissions?)\b\s/i);
   });
 });
+
+/**
+ * A study (StudyTrack) DESCRIBES, exactly like the program: no behaviour may depend on its type or its name, nothing may
+ * authorize by it, and until a later step links it to something it is read by nothing but its own files.
+ */
+describe('a study track describes: it is linked to nothing and no behaviour depends on it', () => {
+  const api = files.filter((f) =>
+    f.includes(`${path.sep}apps${path.sep}api${path.sep}src${path.sep}`),
+  );
+  const rel = (f: string) => path.relative(ROOT, f).replaceAll('\\', '/');
+
+  it('only its own files (and the wiring) mention a study track in the API: nothing else reads one yet', () => {
+    const readers = api.filter((f) => /studyTrack/i.test(read(f))).map(rel);
+    expect(readers.sort()).toEqual([
+      'apps/api/src/app.ts', // wires the routes and the service
+      'apps/api/src/controllers/studyTrackController.ts',
+      'apps/api/src/mappers.ts', // the public shape
+      'apps/api/src/repositories/studyTrackRepository.ts',
+      'apps/api/src/routes/studyTracks.ts',
+      'apps/api/src/services/studyTrackService.ts',
+    ]);
+  });
+
+  it('nothing compares the type or the name of a study with a literal, or branches on a study type', () => {
+    const offenders = files.filter((f) =>
+      /\b(studyTrack|track|study)s?\??\.(type|name)\s*[!=]==?\s*['"`]|\bswitch\s*\(\s*(studyTrack|track)\w*\??\.(type|name)\b/i.test(
+        withoutTypeChecks(read(f)),
+      ),
+    );
+    expect(offenders.map(rel)).toEqual([]);
+  });
+
+  it('the schema links a study to no period, subject, activity, block or profile yet, and has no role-like column', () => {
+    const schema = fs.readFileSync(path.join(ROOT, 'apps/api/prisma/schema.prisma'), 'utf8');
+    const model = (name: string) => {
+      const start = schema.indexOf(`model ${name} {`);
+      return start < 0 ? '' : schema.slice(start, schema.indexOf('\n}', start) + 2);
+    };
+    for (const other of [
+      'AcademicPeriod',
+      'Subject',
+      'Activity',
+      'ScheduleBlock',
+      'Reminder',
+      'UserProfile',
+    ]) {
+      expect(model(other), `${other} model found`).toMatch(new RegExp('model ' + other));
+      expect(model(other), other).not.toMatch(/studyTrack/i);
+    }
+    const track = model('StudyTrack');
+    expect(track).toMatch(/model StudyTrack/);
+    expect(track).not.toMatch(/\b(role|isAdmin|permissions?)\b\s/i);
+    // the type reuses the existing vocabulary: there is no second, equivalent enum
+    expect(track).toMatch(/type\s+EducationContext\b/);
+    expect(schema.match(/enum \w+ \{\s*UNIVERSITY\b/g)).toHaveLength(1);
+  });
+});

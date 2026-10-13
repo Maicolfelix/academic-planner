@@ -10,6 +10,7 @@ import {
   type ScheduleBlock,
   type ScheduleBlockLike,
   type ScheduleOccurrence,
+  type StudyTrack,
   type Subject,
 } from '@planner/core';
 import type {
@@ -17,6 +18,7 @@ import type {
   Activity as ActivityRow,
   Reminder as ReminderRow,
   ScheduleBlock as ScheduleRow,
+  StudyTrack as StudyTrackRow,
   Subject as SubjectRow,
 } from './generated/prisma/client.js';
 
@@ -37,6 +39,18 @@ export const toPeriodDto = (p: PeriodRow): AcademicPeriod => ({
   studyLevelNote: p.studyLevelNote,
   createdAt: p.createdAt.toISOString(),
   updatedAt: p.updatedAt.toISOString(),
+});
+
+/** The owner (`userId`) is never part of the public shape. */
+export const toStudyTrackDto = (t: StudyTrackRow): StudyTrack => ({
+  id: t.id,
+  name: t.name,
+  type: t.type,
+  programKey: t.programKey,
+  isPrimary: t.isPrimary,
+  status: t.status,
+  createdAt: t.createdAt.toISOString(),
+  updatedAt: t.updatedAt.toISOString(),
 });
 
 export const toActivityDto = (a: ActivityRow): Activity => ({
