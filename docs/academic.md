@@ -55,6 +55,7 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 
 | Método y ruta                 | Notas                                                                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/periods/home`       | el periodo **hogar** (lo decide el servidor; solo lectura) → `{ period }` con `period: null` si no hay                                          |
 | `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                |
 | `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
 | `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                               |
