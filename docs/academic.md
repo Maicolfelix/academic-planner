@@ -61,9 +61,10 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 | `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
 | `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                      |
 | `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                             |
-| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description? }` → 201 `{ subject }`                                                       |
+| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                    |
+| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                  |
 | `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                |
-| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description? }`; `''` o `null` borran un campo opcional                                            |
+| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                         |
 | `DELETE /api/subjects/:id`    | 204                                                                                                                              |
 
 Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripción ≤ 500, fechas reales entre 2000 y 2100.
@@ -71,6 +72,14 @@ Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripci
 ### Nivel de estudio del periodo (P0-2)
 
 `studyLevel` (entero 1–99) **o** `studyLevelNote` (texto recortado de 1 a 40 caracteres, sin NUL): son alternativas, nunca los dos (400 si llegan ambos con valor; la base lo refuerza con `CHECK`). Ambos son opcionales al crear (el onboarding actual no los envía) y vienen siempre en la respuesta (`null` si no hay). Al editar se mandan de uno en uno: un número fija el nivel y borra la nota; una nota fija la nota y borra el nivel; `null` (o una nota en blanco) borra solo ese campo; no mencionarlos los deja igual. El dominio **no consulta `UserProfile.primaryUse`** ni impone un máximo de 10: guardar 11 o 12 niveles es válido para cualquiera; qué rango ofrecer («semestre» 1–10, «grado» 1–11, «Otro») es decisión futura de la interfaz. Cuando exista un periodo siguiente, la interfaz **podrá sugerir** `studyLevel + 1`; el servidor nunca lo calcula ni lo copia solo.
+
+### Contexto educativo de la asignatura (P0-3)
+
+`educationContext` (`UNIVERSITY` | `SCHOOL` | `OTHER_ACADEMIC` | `null`) siempre viene en la respuesta. Al **crear**, si el cuerpo lo trae (incluso `null`) se usa tal cual; si no, el servidor deriva un **valor por omisión** de `UserProfile.primaryUse` (`UNIVERSITY_STUDENT` → `UNIVERSITY`, `SCHOOL_STUDENT` → `SCHOOL`, `OTHER_STUDENT`/`TEACHER`/`PERSONAL` → `OTHER_ACADEMIC`, sin `primaryUse` → `null`: nada se inventa). **Todo camino que crea una asignatura usa esa misma regla** (un único `subjectMaterializer`): el formulario (`POST /api/subjects`, también el inline), Captura rápida y Bandeja, la importación de horario y el lote. Cambiar `primaryUse` **nunca** cambia asignaturas existentes: solo cambia el valor por omisión de las nuevas. `PATCH` fija, cambia o borra (`null`) el contexto de una asignatura sin tocar su periodo. No equivale a calificable: `UNIVERSITY` no implica notas.
+
+### Creación rápida en lote (`POST /api/subjects/batch`, P0-3)
+
+Pensado para el onboarding. Cuerpo estricto `{ names, educationContext? }` (1–30 nombres con la misma regla que una asignatura; nunca usuario, periodo, colores ni `primaryUse`). El periodo es **siempre el actual** del usuario (`400 NO_CURRENT_PERIOD` si no hay). Una sola transacción: los nombres que normalizan igual («Farmacología», «farmacologia», « FARMACOLOGÍA ») son **una** asignatura; las que ya existen se **reutilizan** tal cual (no hay 409, color y contexto intactos); las nuevas toman el contexto por omisión (o el único `educationContext` del lote) y el servidor les asigna colores **uno tras otro** (el primer color libre al primer nombre escrito; pasada la paleta, vuelve a empezar). La respuesta conserva el **orden de entrada** (primera aparición): `subjects` (todas), `createdSubjects` y `reusedSubjects` (`{ id, name }`). Reintentar o dos peticiones simultáneas con los mismos nombres no duplican nada (el índice único `(periodId, nameKey)` y `INSERT … ON CONFLICT DO NOTHING` mandan; un bloqueo por usuario evita esperas cruzadas).
 
 ## Arquitectura
 

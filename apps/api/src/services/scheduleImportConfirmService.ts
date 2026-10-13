@@ -19,7 +19,9 @@ import { AppError } from '../errors/AppError.js';
 import { toDateOnly, toSubjectDto } from '../mappers.js';
 import { createPeriodLookup } from '../repositories/periodRepository.js';
 import { createScheduleRepository } from '../repositories/scheduleRepository.js';
+import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createSubjectRepository } from '../repositories/subjectRepository.js';
+import { createSubjectMaterializer } from './subjectMaterializer.js';
 import type { Actor } from './activityService.js';
 import { windowOf } from './scheduleOccurrences.js';
 import { createScheduleService } from './scheduleService.js';
@@ -78,6 +80,9 @@ export function createScheduleImportConfirmService(opts: {
 
         const periods = createPeriodLookup(tx);
         const subjects = createSubjectRepository(tx);
+        const materializer = createSubjectMaterializer(subjects, createProfileRepository(tx), {
+          readOnce: true,
+        });
         const schedule = createScheduleRepository(tx);
         const scheduleService = createScheduleService(schedule, periods, subjects, clock);
 
@@ -99,7 +104,7 @@ export function createScheduleImportConfirmService(opts: {
         const createdRows: Parameters<typeof toSubjectDto>[0][] = [];
         const known = new Map(existing.map((s) => [s.id, s.name]));
         for (const n of plan.toCreate) {
-          const { subject, created } = await subjects.createIfAbsent({
+          const { subject, created } = await materializer.createIfAbsent({
             userId: actor.id,
             periodId: period.id,
             name: n.name,

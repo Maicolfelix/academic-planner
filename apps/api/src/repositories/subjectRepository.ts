@@ -1,4 +1,5 @@
 import type { Db } from '../db/prisma.js';
+import type { EducationContext } from '../generated/prisma/client.js';
 
 export interface SubjectCreateData {
   userId: string;
@@ -8,6 +9,8 @@ export interface SubjectCreateData {
   color: string;
   professor: string | null;
   description: string | null;
+  /** Required on purpose: every path that creates a subject must decide it (see the subject materializer). */
+  educationContext: EducationContext | null;
 }
 
 export interface SubjectUpdateData {
@@ -16,6 +19,7 @@ export interface SubjectUpdateData {
   color?: string;
   professor?: string | null;
   description?: string | null;
+  educationContext?: EducationContext | null;
 }
 
 /** Every query is scoped by userId: a subject id alone never reaches data. */

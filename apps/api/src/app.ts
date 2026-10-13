@@ -74,6 +74,8 @@ import { createScheduleService } from './services/scheduleService.js';
 import type { ExtractionDeps } from './scheduleImport/pipeline.js';
 import { createOcrProvider, createPdfProvider } from './scheduleImport/providers.js';
 import { createWorkloadService } from './services/workloadService.js';
+import { createSubjectBatchService } from './services/subjectBatchService.js';
+import { createSubjectMaterializer } from './services/subjectMaterializer.js';
 import { createSubjectService } from './services/subjectService.js';
 
 export interface AppDeps {
@@ -195,7 +197,12 @@ export function createApp(deps: AppDeps): Express {
     createProfileService(createProfileRepository(prisma), runInTransaction),
   );
   const subjectController = createSubjectController(
-    createSubjectService(subjectRepository, periodRepository),
+    createSubjectService(
+      subjectRepository,
+      periodRepository,
+      createSubjectMaterializer(subjectRepository, createProfileRepository(prisma)),
+    ),
+    createSubjectBatchService({ runInTransaction }),
   );
 
   const app = express();

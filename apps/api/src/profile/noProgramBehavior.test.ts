@@ -42,6 +42,15 @@ describe('no behaviour depends on a particular program or on the primary use', (
     expect(offenders.map((f) => path.relative(ROOT, f))).toEqual([]);
   });
 
+  it('nothing branches on the NAME of a subject (the education context never depends on which subject it is)', () => {
+    const offenders = files.filter((f) =>
+      /(subject|s|row|existing)\.(name|nameKey)\s*[!=]==?\s*['"`]|nameKey\s*[!=]==?\s*['"`]/.test(
+        withoutTypeChecks(read(f)),
+      ),
+    );
+    expect(offenders.map((f) => path.relative(ROOT, f))).toEqual([]);
+  });
+
   it('primaryUse is never read in the API outside the profile itself (no authorization by it)', () => {
     const api = files.filter((f) =>
       f.includes(`${path.sep}apps${path.sep}api${path.sep}src${path.sep}`),
@@ -52,6 +61,8 @@ describe('no behaviour depends on a particular program or on the primary use', (
     expect(readers.sort()).toEqual([
       'apps/api/src/repositories/profileRepository.ts',
       'apps/api/src/services/profileService.ts',
+      // the only other reader: the DEFAULT education context of a NEW subject (primaryUseToEducationContext), never a permission
+      'apps/api/src/services/subjectMaterializer.ts',
     ]);
   });
 

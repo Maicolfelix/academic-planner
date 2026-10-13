@@ -16,7 +16,9 @@ import { createActivityService, type Actor } from '../services/activityService.j
 import { createPeriodService } from '../services/periodService.js';
 import { createReminderService } from '../services/reminderService.js';
 import { createScheduleService } from '../services/scheduleService.js';
+import { createSubjectMaterializer } from '../services/subjectMaterializer.js';
 import { createSubjectService } from '../services/subjectService.js';
+import { createProfileRepository } from '../repositories/profileRepository.js';
 import {
   DEMO_EMAIL,
   DEMO_NAME,
@@ -143,7 +145,11 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
   const subjectRepo = createSubjectRepository(prisma);
   const activityRepo = createActivityRepository(prisma);
   const periods = createPeriodService(periodRepo);
-  const subjects = createSubjectService(subjectRepo, periodRepo);
+  const subjects = createSubjectService(
+    subjectRepo,
+    periodRepo,
+    createSubjectMaterializer(subjectRepo, createProfileRepository(prisma)),
+  );
   const schedule = createScheduleService(
     createScheduleRepository(prisma),
     periodRepo,
