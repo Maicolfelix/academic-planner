@@ -4,6 +4,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { toSubjectDto } from '../mappers.js';
 import type { PeriodRepository } from '../repositories/periodRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
+import { readCurrentPeriods } from './currentPeriods.js';
 import type { SubjectMaterializer } from './subjectMaterializer.js';
 
 const subjectNotFound = () => notFound('Asignatura no encontrada.');
@@ -36,6 +37,13 @@ export function createSubjectService(
   return {
     list: async (userId: string, periodId?: string) =>
       (await subjects.list(userId, periodId)).map(toSubjectDto),
+
+    /** The subjects of ALL the current, active periods (`scope=current`): one lookup of the periods, one query of subjects. */
+    async listCurrent(userId: string) {
+      const current = await readCurrentPeriods(periods, userId);
+      if (current.ids.length === 0) return [];
+      return (await subjects.listInPeriods(userId, current.ids)).map(toSubjectDto);
+    },
 
     async get(userId: string, id: string) {
       const subject = await subjects.findOwned(userId, id);

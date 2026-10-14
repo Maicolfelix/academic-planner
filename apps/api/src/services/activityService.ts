@@ -1,5 +1,6 @@
 import {
   activityToIcs,
+  CURRENT_SCOPE,
   NO_SUBJECT_FILTER,
   dueFromLocal,
   localDayBounds,
@@ -45,7 +46,7 @@ export function createActivityService(
   activities: ActivityRepository,
   subjects: SubjectRepository,
   /** Only the current-period lookup: a general activity (no subject) is anchored to the user's current period. */
-  periods: Pick<PeriodLookup, 'findHomeCurrent'>,
+  periods: Pick<PeriodLookup, 'findHomeCurrent' | 'listCurrent'>,
   /** Injected so tests (and future jobs) control "now"; production passes the real clock. */
   clock: () => Date,
   /** Writes that also touch reminders run in ONE transaction: both change, or neither does. */
@@ -53,7 +54,15 @@ export function createActivityService(
 ) {
   return {
     async list(actor: Actor, query: ListActivitiesQuery) {
+      // `scope=current`: every current, active period of the session's user (the same lookup the summaries use). With none,
+      // there is nothing to list. A `periodId` sent as well can only narrow it, never widen it.
+      let periodIds: string[] | undefined;
+      if (query.scope === CURRENT_SCOPE) {
+        periodIds = (await periods.listCurrent(actor.id)).map((p) => p.id);
+        if (periodIds.length === 0) return [];
+      }
       const rows = await activities.list(actor.id, {
+        ...(periodIds && { periodIds }),
         // `none` selects the general activities (no subject); anything else is a subject id.
         subjectId: query.subjectId === NO_SUBJECT_FILTER ? null : query.subjectId,
         periodId: query.periodId,

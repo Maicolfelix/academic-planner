@@ -12,6 +12,8 @@ export interface ActivityFilters {
   /** A subject id, or null for the general activities (no subject). */
   subjectId?: string | null;
   periodId?: string;
+  /** Several periods at once (the server's current, active ones): never a list that came from a client. */
+  periodIds?: readonly string[];
   status?: ActivityStatus;
   priority?: ActivityPriority;
   type?: ActivityType;
@@ -55,6 +57,8 @@ export function createActivityRepository(prisma: Db) {
   return {
     list(userId: string, f: ActivityFilters = {}) {
       const and: Prisma.ActivityWhereInput[] = [];
+      // a list of periods ANDs with a single `periodId`: naming one can only narrow the scope, never widen it
+      if (f.periodIds) and.push({ periodId: { in: [...f.periodIds] } });
       if (f.dueFrom) and.push({ dueAt: { gte: f.dueFrom } });
       if (f.dueTo) and.push({ dueAt: { lte: f.dueTo } });
       if (f.overdue) {

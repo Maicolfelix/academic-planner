@@ -21,7 +21,7 @@ import { useIsDesktop } from '../lib/useIsDesktop';
 import { useNow } from '../lib/useNow';
 import { useSchedule, useScheduleBlock } from '../schedule/useSchedule';
 import { agendaActivities } from './calendar/agendaActivities';
-import { ActivityFormDialog } from './activities/ActivityFormDialog';
+import { ActivityDialog } from './activities/ActivityDialog';
 import { BlockFormDialog } from './calendar/BlockFormDialog';
 import { DayList } from './calendar/DayList';
 import { DeleteBlockDialog } from './calendar/DeleteBlockDialog';
@@ -217,7 +217,7 @@ export function CalendarPage() {
         />
       )}
       {editingActivity && subjects.isSuccess && (
-        <ActivityFormDialog
+        <ActivityDialog
           subjects={subjects.data}
           activity={editingActivity}
           timeZone={timeZone}

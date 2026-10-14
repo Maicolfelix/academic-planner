@@ -4,17 +4,17 @@ import type { CurrentPeriodContext } from '@planner/core';
 export type OriginOf = (periodId: string | undefined) => string | null;
 
 /**
- * Where something comes from, as a short label: the NAME of its study. Shown only when it tells the student something: when
- * at least TWO different studies have a current period (with one study, or only a general period, every item would carry the
- * same label, so none is shown). A general period (no study) never gets a label ("Sin estudio" would only be noise), and a
- * period that is not among the current ones (a past one) has none either. The label is text, never a color on its own.
+ * Where something comes from, as a short label: the NAME of its study. It is shown whenever MORE THAN ONE current period is
+ * read (a general one and a study, or two studies): there the origin is genuinely ambiguous and tells the student something.
+ * With a single current period every item would carry the same label (or none), so none is shown. A general period (no study)
+ * never gets a label ("Sin estudio" would only be noise), and a period that is not among the current ones (a past one) has none
+ * either. The label is text, never a color on its own.
  */
 export function originLabelOf(
   contexts: readonly CurrentPeriodContext[],
   periodId: string,
 ): string | null {
-  const studies = new Set(contexts.flatMap((c) => (c.studyTrack ? [c.studyTrack.id] : [])));
-  if (studies.size < 2) return null;
+  if (contexts.length < 2) return null;
   return contexts.find((c) => c.period.id === periodId)?.studyTrack?.name ?? null;
 }
 

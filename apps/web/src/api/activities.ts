@@ -14,6 +14,8 @@ import { apiDownload, apiFetch } from './client';
 import { saveFile } from '../lib/saveFile';
 
 export interface ActivityQuery {
+  /** `current`: the activities of ALL the current, active periods (the server decides which). Never a list of ids. */
+  scope?: 'current';
   periodId?: string;
   subjectId?: string;
   status?: ActivityStatus;

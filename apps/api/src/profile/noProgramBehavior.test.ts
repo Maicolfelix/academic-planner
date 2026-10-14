@@ -210,6 +210,25 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(selectors.map(rel)).toEqual([]);
   });
 
+  it('the current scope is a NAME, never a list of ids: nothing sends or parses periodIds, and reading is current while creating is HOME', () => {
+    const noIds = [...web, ...api.filter((f) => /controllers|routes/.test(f))]
+      .filter((f) => /periodIds/.test(withoutTypeChecks(read(f))))
+      .map(rel);
+    expect(noIds).toEqual([]);
+    // (comments are stripped: a comment quoting the pattern must not satisfy the guard)
+    const read2 = (p: string) => withoutTypeChecks(read(path.join(ROOT, p)));
+    // READING the Activities list: all the current periods, named by the server's scope
+    expect(read2('apps/web/src/pages/activities/filterParams.ts')).toMatch(/scope:\s*'current'/);
+    expect(read2('apps/web/src/pages/ActivitiesPage.tsx')).toMatch(
+      /useActivities\(toApiQuery\(filters\)/,
+    );
+    // CREATING: the home period's subjects, and the service still anchors a general activity to HOME
+    expect(read2('apps/web/src/pages/ActivitiesPage.tsx')).toMatch(/useSubjects\(period\?\.id\)/);
+    expect(read2('apps/api/src/services/activityService.ts')).toMatch(
+      /periods\.findHomeCurrent\(actor\.id\)/,
+    );
+  });
+
   it('the web never derives HOME (or the gate of the app) from the list of periods: no "find/some current" in production', () => {
     const offenders = web.filter((f) =>
       /\.(find|some|filter)\(\s*\(?\s*\w+\s*\)?\s*=>\s*\w+\.isCurrent\b/.test(

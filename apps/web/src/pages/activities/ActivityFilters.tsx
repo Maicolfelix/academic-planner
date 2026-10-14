@@ -1,3 +1,4 @@
+import type { OriginOf } from '../../academic/origin';
 import {
   ACTIVITY_PRIORITIES,
   ACTIVITY_PRIORITY_LABELS,
@@ -34,6 +35,8 @@ interface Props {
   filters: Filters;
   subjects: Subject[];
   onChange: (filters: Filters) => void;
+  /** The study of a subject's period, to tell apart subjects of the same name in different studies. */
+  origin?: OriginOf;
 }
 
 /**
@@ -43,7 +46,7 @@ interface Props {
  * (subject, priority, type, Radar) are native `<select>`s (the best control on every phone, and the accessible one),
  * gathered in one soft panel: always shown on a wide screen, behind a "Más filtros" disclosure on a phone.
  */
-export function ActivityFilters({ filters, subjects, onChange }: Props) {
+export function ActivityFilters({ filters, subjects, onChange, origin }: Props) {
   const view = currentView(filters);
   const { setContainer, container, setItem, box, ready } = useSlidingIndicator(
     VIEWS.findIndex((v) => v.value === view),
@@ -83,7 +86,10 @@ export function ActivityFilters({ filters, subjects, onChange }: Props) {
         value={filters.subject ?? ''}
         onChange={(v) => onChange({ ...filters, subject: v || undefined })}
         options={[
-          ...subjects.map((s) => ({ value: s.id, label: s.name })),
+          ...subjects.map((s) => {
+            const study = origin?.(s.periodId);
+            return { value: s.id, label: study ? `${s.name} · ${study}` : s.name };
+          }),
           // Always offered: it does not depend on there being general activities right now.
           { value: NO_SUBJECT_FILTER, label: 'Sin asignatura' },
         ]}

@@ -83,13 +83,17 @@ const html = (node: React.ReactElement, client = new QueryClient()) =>
   );
 
 describe('which label says where an item comes from', () => {
-  it('none with a general period only, or with ONE study (every item would carry the same word)', () => {
+  it('none with ONE current period (every item would carry the same label, or none)', () => {
     expect(originLabelOf([GENERAL], GENERAL.period.id)).toBeNull();
     expect(originLabelOf([MEDICINA], MEDICINA.period.id)).toBeNull();
-    expect(originLabelOf([GENERAL, MEDICINA], MEDICINA.period.id)).toBeNull(); // general + ONE study: still one study
   });
 
-  it('the study’s name when two or more studies have a current period', () => {
+  it('a general period plus ONE study: the study’s items are labelled (the origin is genuinely ambiguous), the general ones are not', () => {
+    expect(originLabelOf([GENERAL, MEDICINA], MEDICINA.period.id)).toBe('Medicina');
+    expect(originLabelOf([GENERAL, MEDICINA], GENERAL.period.id)).toBeNull();
+  });
+
+  it('the study’s name when two or more studies have a current period (and the general one stays unlabelled)', () => {
     const all = [GENERAL, MEDICINA, DIPLOMADO];
     expect(originLabelOf(all, MEDICINA.period.id)).toBe('Medicina');
     expect(originLabelOf(all, DIPLOMADO.period.id)).toBe('Diplomado en Ciberseguridad');
@@ -101,9 +105,12 @@ describe('which label says where an item comes from', () => {
     expect(originLabelOf(all, uuid(999))).toBeNull(); // a past period
   });
 
-  it('an archived study disappears: with the other study left alone, the label goes away too', () => {
-    // the server stops listing the archived study's period, so only one study is left
-    expect(originLabelOf([GENERAL, MEDICINA], MEDICINA.period.id)).toBeNull();
+  it('an archived study disappears: with ONE current period left, the label goes away too', () => {
+    // the server stops listing the archived study's period, so a single current period is left
+    expect(originLabelOf([MEDICINA], MEDICINA.period.id)).toBeNull();
+    expect(originLabelOf([GENERAL, MEDICINA, DIPLOMADO], DIPLOMADO.period.id)).toBe(
+      'Diplomado en Ciberseguridad',
+    );
   });
 
   it('the summaries say "several" when they read more than one period, and name them (a study, or a general period)', () => {
@@ -307,9 +314,10 @@ describe('the progress by study', () => {
     { ...DIPLOMADO, general: summary(8, 4) },
   ];
 
-  it('one line per study with its own count (never one mixed semester), text first', () => {
+  it('one line per period (a study’s name, or the general period’s own) with its own count, text first', () => {
     const out = html(<ProgressByPeriod byPeriod={byPeriod} />);
-    expect(out).toContain('Por estudio');
+    expect(out).toContain('Por periodo');
+    expect(out).not.toContain('Por estudio');
     expect(out).toContain('Mi planificación');
     expect(out).toContain('8 de 12 completadas');
     expect(out).toContain('4 de 8 completadas');

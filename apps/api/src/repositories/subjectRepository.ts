@@ -31,6 +31,13 @@ export function createSubjectRepository(prisma: Db) {
         orderBy: [{ nameKey: 'asc' }, { createdAt: 'asc' }],
       }),
 
+    /** The subjects of several periods at once (the server's current, active ones), in the same order as `list`. */
+    listInPeriods: (userId: string, periodIds: readonly string[]) =>
+      prisma.subject.findMany({
+        where: { userId, periodId: { in: [...periodIds] } },
+        orderBy: [{ nameKey: 'asc' }, { createdAt: 'asc' }],
+      }),
+
     findOwned: (userId: string, id: string) => prisma.subject.findFirst({ where: { id, userId } }),
 
     create: (data: SubjectCreateData) => prisma.subject.create({ data }),

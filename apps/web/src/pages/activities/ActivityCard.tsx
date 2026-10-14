@@ -25,11 +25,14 @@ import {
   TrashIcon,
 } from '../../components/ui/icons';
 import { RadarBadge } from '../radar/RadarBadge';
+import { OriginLabel } from '../../components/OriginLabel';
 import { PriorityBadge } from './badges';
 
 interface Props {
   activity: Activity;
   subject: Subject | undefined;
+  /** The study the activity comes from, when it is worth saying (see `originLabelOf`). */
+  origin?: string | null;
   timeZone: string;
   now: Date;
   statusPending: boolean;
@@ -59,6 +62,7 @@ const URGENT: RadarStatus[] = ['OVERDUE', 'IMMEDIATE'];
 export function ActivityCard({
   activity,
   subject,
+  origin = null,
   timeZone,
   now,
   statusPending,
@@ -122,6 +126,7 @@ export function ActivityCard({
                 />
                 <span className="min-w-0 break-words">
                   {subject ? subject.name : 'Sin asignatura'}
+                  <OriginLabel label={origin} />
                 </span>
               </>
             )}

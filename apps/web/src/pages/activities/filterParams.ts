@@ -52,9 +52,13 @@ export function serializeFilters(filters: ActivityFilters): URLSearchParams {
 export const hasActiveFilters = (f: ActivityFilters) =>
   Boolean(f.status || f.overdue || f.subject || f.priority || f.type || f.radar);
 
-export function toApiQuery(filters: ActivityFilters, periodId: string | undefined): ActivityQuery {
+/**
+ * The Activities list reads ALL the current, active periods (`scope: 'current'`, decided by the server: the page never sends
+ * a list of periods), the same scope as the counters of the Home, and combines it with the filters above.
+ */
+export function toApiQuery(filters: ActivityFilters): ActivityQuery {
   return {
-    periodId,
+    scope: 'current',
     subjectId: filters.subject,
     status: filters.status,
     priority: filters.priority,

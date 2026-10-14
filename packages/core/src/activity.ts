@@ -170,9 +170,19 @@ const optionalBool = z
 
 const optionalDay = z.string().refine(isRealDateOnly, 'Ingresa una fecha válida.');
 
+/**
+ * The ONLY read scope a client can ask for besides one period: `current` = every current, ACTIVE period of the user (the
+ * general one and the one of each active study), exactly what the summaries read. The server decides which periods those are:
+ * a client can never send, add or remove one.
+ */
+export const CURRENT_SCOPE = 'current';
+export const currentScopeSchema = z.literal(CURRENT_SCOPE, { error: 'Alcance inválido.' });
+
 /** Query string of GET /api/activities. All filters are optional and combine with AND. */
 export const listActivitiesQuerySchema = z
   .object({
+    /** `current`: the activities of all the current, active periods (decided by the server). */
+    scope: currentScopeSchema.optional(),
     /** A subject id, or `none` for the general activities (no subject). */
     subjectId: z.union([z.literal(NO_SUBJECT_FILTER), uuid('Asignatura inválida.')]).optional(),
     periodId: uuid('Periodo inválido.').optional(),
@@ -193,7 +203,6 @@ export const listActivitiesQuerySchema = z
 
 // ───────────────────────── Response schemas ─────────────────────────
 
-/** The period is deliberately not part of the public contract: the client never sends it and nothing reads it. */
 export const activitySchema = z.object({
   id: z.uuid(),
   /**

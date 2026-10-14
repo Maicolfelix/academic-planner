@@ -63,6 +63,12 @@ export async function createSubjectsBatchRequest(
   });
 }
 
+/** The subjects of ALL the current, active periods in one request (the server decides which periods those are). */
+export async function fetchCurrentSubjects(): Promise<Subject[]> {
+  return (await apiFetch('/api/subjects?scope=current', { schema: subjectListResponseSchema }))
+    .subjects;
+}
+
 export async function fetchSubjects(periodId: string): Promise<Subject[]> {
   return (
     await apiFetch(`/api/subjects?periodId=${encodeURIComponent(periodId)}`, {

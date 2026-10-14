@@ -2,14 +2,15 @@ import type { Progress } from '@planner/core';
 import { ProgressBar } from './ProgressBar';
 
 /**
- * The progress of each current period, one line per study (or per general period), under the overall one: two studies are
+ * The progress of each current period, one line per period (named after its study, or after the general period itself: so the
+ * heading says "periodo", never "estudio"), under the overall one: two studies are
  * never shown as a single semester. It is a count of registered activities, not a grade; a period with none says so.
  */
 export function ProgressByPeriod({ byPeriod }: { byPeriod: Progress['byPeriod'] }) {
   return (
     <section aria-labelledby="progress-by-period-title" className="flex flex-col gap-2">
       <h3 id="progress-by-period-title" className="text-lg font-semibold">
-        Por estudio
+        Por periodo
       </h3>
       <ul className="flex flex-col gap-2">
         {byPeriod.map(({ period, studyTrack, general }) => {

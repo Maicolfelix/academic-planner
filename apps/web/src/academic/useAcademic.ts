@@ -8,6 +8,7 @@ import {
   updatePeriodRequest,
   deleteSubjectRequest,
   fetchCurrentPeriods,
+  fetchCurrentSubjects,
   fetchHomePeriod,
   fetchPeriods,
   fetchSubjects,
@@ -25,6 +26,8 @@ export const homePeriodKey = ['home-period'] as const;
 /** ALL the current, active periods with their study (the summaries read all of them; HOME is one of them, or none). */
 export const currentPeriodsKey = ['current-periods'] as const;
 export const subjectsKey = (periodId: string) => ['subjects', periodId] as const;
+/** Under the `subjects` prefix, so every subject mutation refreshes it too. */
+export const currentSubjectsKey = ['subjects', 'current'] as const;
 
 export function usePeriods() {
   return useQuery({ queryKey: periodsKey, queryFn: fetchPeriods, retry: false });
@@ -83,6 +86,18 @@ export function invalidateAfterPeriodChange(qc: QueryClient) {
 export function invalidateAfterHomeChange(qc: QueryClient) {
   return qc.invalidateQueries({
     predicate: (q) => q.queryKey[0] !== ME_KEY[0] && q.queryKey[0] !== PROFILE_KEY[0],
+  });
+}
+
+/**
+ * The subjects of ALL the current, active periods, one request (to READ: the Activities list and its filter). Creating things
+ * keeps using the HOME period's subjects (`useSubjects(period.id)`).
+ */
+export function useCurrentSubjects() {
+  return useQuery({
+    queryKey: [...currentSubjectsKey],
+    queryFn: fetchCurrentSubjects,
+    retry: false,
   });
 }
 

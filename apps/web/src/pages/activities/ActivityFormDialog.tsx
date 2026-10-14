@@ -355,7 +355,7 @@ export function ActivityFormDialog({
         {creating ? (
           <InlineSubjectCreator
             subjects={options}
-            periodId={period?.id ?? subjects[0]?.periodId}
+            periodId={activity?.periodId ?? period?.id ?? subjects[0]?.periodId}
             onCreated={subjectCreated}
             onCancel={cancelCreator}
             initialName={creatorName}

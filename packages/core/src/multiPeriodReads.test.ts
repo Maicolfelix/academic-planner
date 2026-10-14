@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createActivitySchema, activitySchema, updateActivitySchema } from './activity.js';
+import { listSubjectsQuerySchema } from './academic.js';
+import {
+  createActivitySchema,
+  activitySchema,
+  listActivitiesQuerySchema,
+  updateActivitySchema,
+} from './activity.js';
 import { attentionSchema } from './attention.js';
 import { dashboardSchema } from './dashboard.js';
 import { progressSchema, workloadSchema } from './insights.js';
@@ -94,6 +100,27 @@ describe('every summary keeps its HOME `period` and adds `periods`', () => {
         subjects: [{ id: U(3), name: 'Redes', color: '#3B82F6', ...summary }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('the read scope of a list is a name, not a list of ids', () => {
+  it('scope=current is the only scope; anything else is refused, and no list of periods exists', () => {
+    expect(listActivitiesQuerySchema.parse({ scope: 'current' }).scope).toBe('current');
+    expect(listActivitiesQuerySchema.safeParse({ scope: 'all' }).success).toBe(false);
+    expect(listActivitiesQuerySchema.safeParse({ scope: '' }).success).toBe(false);
+    expect(Object.keys(listActivitiesQuerySchema.parse({ periodIds: U(1), userId: U(2) }))).toEqual(
+      [],
+    ); // ignored, not read
+    expect(listSubjectsQuerySchema.parse({ scope: 'current' }).scope).toBe('current');
+    expect(listSubjectsQuerySchema.safeParse({ scope: 'all' }).success).toBe(false);
+    expect(listSubjectsQuerySchema.parse({ periodId: U(1) })).toEqual({ periodId: U(1) });
+  });
+
+  it('a scope and a period can be combined (the period only narrows: the server ANDs them)', () => {
+    expect(listActivitiesQuerySchema.parse({ scope: 'current', periodId: U(1) })).toEqual({
+      scope: 'current',
+      periodId: U(1),
+    });
   });
 });
 
