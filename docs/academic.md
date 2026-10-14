@@ -82,6 +82,10 @@ Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripci
 
 Un periodo pertenece a un estudio (`studyTrackId`, uuid) o a ninguno (`null`, válido para siempre: [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)). «Actual» es **por ámbito**: un periodo general y uno por estudio pueden ser actuales a la vez; dos en el mismo ámbito, nunca (índices únicos parciales). `POST` con `studyTrackId` crea el periodo de ese estudio (propio y activo; si no, `404` indistinguible o `409 STUDY_TRACK_ARCHIVED`); `PATCH` con `studyTrackId` lo **mueve** (uuid) o lo deja general (`null`): un periodo que no es actual se mueve libremente y uno actual solo si el destino no tiene actual (si no, `409 CURRENT_PERIOD_CONFLICT`: nadie se degrada en silencio). Archivar un estudio apaga sus periodos actuales; restaurarlo no los reactiva. Las funciones que todavía leen un solo periodo usan el **periodo hogar**: el actual sin estudio; si no, el del estudio principal activo; si no, ninguno.
 
+### Todos los periodos actuales (P0.5-3)
+
+Los resúmenes («qué requiere mi atención ahora») leen **todos** los periodos actuales y activos —el general y el de cada estudio activo— y no solo HOME ([D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)); `GET /api/periods/current` los lista con su estudio. Las escrituras sin destino siguen yendo a HOME.
+
 ### Estudios (P0.5-1)
 
 Un **estudio** (`StudyTrack`, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)) es una formación que el usuario cursa; un **periodo** puede pertenecer a uno (`studyTrackId`); la asignatura llega a él **por su periodo**, nunca directamente. Una asignatura **nueva** toma por omisión el `type` del estudio de su periodo (si no, el de `primaryUse`), y `Subject.educationContext` sigue siendo la foto que cada asignatura recibió al crearse: cambiar el `type` de un estudio no la modifica).

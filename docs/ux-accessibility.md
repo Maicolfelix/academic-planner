@@ -299,6 +299,10 @@ Sin emoji: `BellIcon` (SVG del conjunto, `aria-hidden`). El contador del enlace 
 - **Cambios sin guardar** (decisión): en cuanto el estudiante escribe o elige algo dentro de un diálogo, **Escape y el clic fuera NO cierran**: preguntan «Tienes cambios sin guardar. ¿Quieres descartarlos?» con «Seguir editando» (respuesta por defecto, con el foco) y «Descartar cambios». El botón «Cancelar» del formulario sí cierra directamente (es una decisión explícita) y un diálogo sin campos (confirmar eliminación) se cierra como antes; en ese «Cancelar» es el botón enfocado. «Cambió» = hubo un evento `input`/`change` dentro (simple y uniforme; escribir y deshacer también pregunta).
 - Foco: al abrir un diálogo va dentro; al cerrar vuelve a quien lo abrió (o al contenido de la página si ese botón ya no existe). Mientras hay un diálogo abierto la página de fondo no se desplaza; un diálogo más alto que la pantalla se desplaza por dentro.
 
+## Varios estudios con periodo actual (P0.5-3)
+
+Con **un solo** periodo (o un solo estudio) la interfaz no cambia. Con **≥ 2 estudios** distintos con periodo actual: la línea bajo el saludo dice «En tus estudios actuales: …» (texto, no un selector), los textos que decían «este periodo» dicen «tus estudios actuales», el Progreso añade «Por estudio» (una línea por estudio, con barra y texto) y cada actividad, clase, recordatorio y asignatura nombra su estudio con una **etiqueta de texto discreta** («Farmacología · Medicina») introducida por un «Estudio:» oculto para lectores de pantalla: **el color nunca es la única señal**. El periodo general no lleva etiqueta. La rejilla semanal de la Agenda no la lleva (celdas compactas). Probado a 360 y 1366 px con un nombre de estudio de 77 caracteres: sin desborde, un `h1` y axe sin violaciones en Inicio, Radar, Progreso y Agenda ([D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)).
+
 ## Estados: carga, vacío, error y actualización en segundo plano
 
 - Cada pantalla que espera al servidor muestra un texto de carga; las páginas secundarias se descargan al visitarlas (`Cargando…`).

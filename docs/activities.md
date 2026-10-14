@@ -29,7 +29,7 @@ Una actividad **siempre** pertenece a un periodo académico (`periodId NOT NULL`
 1. `periodId` siempre existe.
 2. Si `subjectId` no es nulo, `subject.periodId = activity.periodId`. **Lo garantiza la base de datos**: clave foránea compuesta `Activity(subjectId, periodId) → Subject(id, periodId)` (`MATCH SIMPLE`: no se comprueba mientras `subjectId` es nulo). Requiere un índice único `Subject(id, periodId)`, redundante como clave pero necesario como destino de la FK.
 3. El periodo **no cambia nunca** después de crear la actividad: no hay endpoint, ni campo en el DTO, ni efecto oculto al editar. Cambiar de asignatura dentro del mismo periodo, o quitarla, no mueve el periodo.
-4. El cliente **nunca envía** `periodId` (el esquema `strict` lo rechaza con 400) y la API **no lo expone** (nadie lo lee; exponerlo sugeriría que se puede editar). Lo deriva el servidor al crear: el periodo de la asignatura si hay una, o el **periodo actual** del usuario si no la hay (sin periodo actual: `400 NO_CURRENT_PERIOD`, el mismo código de la Agenda).
+4. El cliente **nunca envía** `periodId` (el esquema `strict` lo rechaza con 400) y la API lo **expone solo para leer** (`periodId` en la respuesta, desde P0.5-3: así una pantalla halla el estudio de la actividad; ninguna petición puede enviarlo ni cambiarlo). Lo deriva el servidor al crear: el periodo de la asignatura si hay una, o el **periodo actual** del usuario si no la hay (sin periodo actual: `400 NO_CURRENT_PERIOD`, el mismo código de la Agenda).
 
 **Quién impide que `Activity.userId = A` apunte a un periodo de B** (revisión de F1):
 
