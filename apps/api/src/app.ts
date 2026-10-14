@@ -196,7 +196,9 @@ export function createApp(deps: AppDeps): Express {
     windowMs: importOptions.windowMs ?? 10 * 60 * 1000,
     limit: importOptions.limit ?? 10,
   });
-  const periodController = createPeriodController(createPeriodService(periodRepository));
+  const periodController = createPeriodController(
+    createPeriodService(periodRepository, runInTransaction),
+  );
   const profileController = createProfileController(
     createProfileService(createProfileRepository(prisma), runInTransaction),
   );
@@ -207,7 +209,11 @@ export function createApp(deps: AppDeps): Express {
     createSubjectService(
       subjectRepository,
       periodRepository,
-      createSubjectMaterializer(subjectRepository, createProfileRepository(prisma)),
+      createSubjectMaterializer(
+        subjectRepository,
+        createProfileRepository(prisma),
+        periodRepository,
+      ),
     ),
     createSubjectBatchService({ runInTransaction }),
   );

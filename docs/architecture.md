@@ -79,6 +79,8 @@ Existe para que **una regla tenga una sola definición**. Si la interfaz y la AP
 | `scheduleImport.ts`                                                    | Interpretación de horarios sobre una representación intermedia (palabras con posición) |
 | `zodRuntime.ts`                                                        | Zod en modo `jitless` en el navegador (la CSP prohíbe `new Function`)                  |
 
+**Periodo actual por ámbito (P0.5-2, [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)).** Un periodo puede pertenecer a un estudio (`studyTrackId`, nullable) y «actual» es uno por ámbito. `periodRepository` ya no tiene «el» periodo actual: expone `findHomeCurrent` (el periodo **hogar**: el actual sin estudio; si no, el del estudio principal activo; si no, ninguno), `findCurrentUntracked`, `findCurrentForTrack` y `listCurrent` (para la lectura multi-periodo de P0.5-3). Todos los lectores singulares usan `findHomeCurrent` de forma explícita.
+
 ## Flujos «proponer, no crear»
 
 Captura rápida, Bandeja académica e Importación de horario **solo proponen**; nada se guarda hasta que el estudiante confirma, y confirmar usa los mismos endpoints de creación que los formularios manuales (no existe un camino de creación propio).

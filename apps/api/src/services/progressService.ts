@@ -26,7 +26,7 @@ export function createProgressService(
     async get(actor: Actor): Promise<Progress> {
       const now = clock();
       const generatedAt = now.toISOString();
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       if (!period) {
         return { generatedAt, period: null, ...buildProgress([]) };
       }

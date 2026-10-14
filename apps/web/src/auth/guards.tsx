@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet } from 'react-router';
-import { usePeriods } from '../academic/useAcademic';
+import { homeGate } from '../academic/homeGate';
+import { useHomePeriod } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
 import { sweepDrafts } from '../lib/drafts';
 import { OFFLINE_DETAIL, OFFLINE_MESSAGE } from '../pwa/pwaState';
@@ -95,19 +96,27 @@ export function PublicOnly() {
   return me.data ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
-/** The app needs a current academic period; a user without one is sent to onboarding first. */
+/**
+ * The app needs a HOME current academic period (the one the server decides, see `useHomePeriod`); a user without one is sent
+ * to onboarding first, even if another study of theirs has a current period.
+ */
 export function RequirePeriod() {
-  const periods = usePeriods();
+  const home = useHomePeriod();
 
-  if (periods.isPending) return <FullPageMessage>Cargando tu periodo académico…</FullPageMessage>;
-  if (periods.isError && !periods.data) {
-    return (
-      <RetryMessage
-        text={`No se pudo cargar tu periodo académico: ${periods.error.message}`}
-        error={periods.error}
-        onRetry={() => periods.refetch()}
-      />
-    );
+  switch (homeGate(home)) {
+    case 'LOADING':
+      return <FullPageMessage>Cargando tu periodo académico…</FullPageMessage>;
+    case 'ERROR':
+      return (
+        <RetryMessage
+          text={`No se pudo cargar tu periodo académico: ${home.error!.message}`}
+          error={home.error!}
+          onRetry={() => home.refetch()}
+        />
+      );
+    case 'ENTER':
+      return <Outlet />;
+    case 'ONBOARD':
+      return <Navigate to="/onboarding" replace />;
   }
-  return periods.data.some((p) => p.isCurrent) ? <Outlet /> : <Navigate to="/onboarding" replace />;
 }

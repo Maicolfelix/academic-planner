@@ -73,9 +73,14 @@ export function createCaptureConfirmService(opts: {
 
         const periods = createPeriodLookup(tx);
         const subjects = createSubjectRepository(tx);
-        const materializer = createSubjectMaterializer(subjects, createProfileRepository(tx), {
-          readOnce: true,
-        });
+        const materializer = createSubjectMaterializer(
+          subjects,
+          createProfileRepository(tx),
+          periods,
+          {
+            readOnce: true,
+          },
+        );
         const activityRepo = createActivityRepository(tx);
         // The Activity service, bound to this transaction: its own "run in a transaction" simply runs in this one.
         const activityService = createActivityService(
@@ -88,8 +93,8 @@ export function createCaptureConfirmService(opts: {
         const scheduleRepo = createScheduleRepository(tx);
         const scheduleService = createScheduleService(scheduleRepo, periods, subjects, clock);
 
-        // The period is the user's CURRENT one, read after the lock: the client never says which.
-        const period = await periods.findCurrent(actor.id);
+        // The HOME current period (a general one, else the primary study's), read after the lock: the client never says which.
+        const period = await periods.findHomeCurrent(actor.id);
         if (!period) {
           throw new AppError(
             400,

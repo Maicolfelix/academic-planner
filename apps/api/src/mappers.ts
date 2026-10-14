@@ -35,6 +35,7 @@ export const toPeriodDto = (p: PeriodRow): AcademicPeriod => ({
   startDate: toDateOnly(p.startDate),
   endDate: toDateOnly(p.endDate),
   isCurrent: p.isCurrent,
+  studyTrackId: p.studyTrackId,
   studyLevel: p.studyLevel,
   studyLevelNote: p.studyLevelNote,
   createdAt: p.createdAt.toISOString(),

@@ -50,8 +50,13 @@ export function createSubjectService(
     async create(userId: string, input: CreateSubjectInput) {
       if (!(await periods.findOwned(userId, input.periodId)))
         throw notFound('Periodo no encontrado.');
-      // An explicit context (even null) is used as given; omitted, it is the default of the profile primary use.
-      const educationContext = await materializer.contextFor(userId, input.educationContext);
+      // An explicit context (even null) is used as given; omitted, it is the type of the period's study or, for a general period, the
+      // default of the profile primary use.
+      const educationContext = await materializer.contextFor(
+        userId,
+        input.educationContext,
+        input.periodId,
+      );
       try {
         const created = await subjects.create({
           userId,

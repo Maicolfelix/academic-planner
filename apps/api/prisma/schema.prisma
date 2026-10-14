@@ -77,7 +77,8 @@ model UserProfile {
 
 /// A formation the user takes (a degree, school, a technical program, a diploma, a language course): "an estudio".
 /// It DESCRIBES; nothing here grants or denies anything and no behaviour reads `type` or `name` to decide. There is no
-/// PERSONAL type (personal things are not a formation). Not linked to a period, a subject or the profile yet.
+/// PERSONAL type (personal things are not a formation). A period may belong to one (`AcademicPeriod.studyTrackId`); a subject
+/// reaches it through its period, never directly; the profile is not linked.
 model StudyTrack {
   id         String           @id @default(uuid()) @db.Uuid
   userId     String           @db.Uuid
@@ -93,12 +94,14 @@ model StudyTrack {
   createdAt  DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime         @updatedAt @db.Timestamptz(3)
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The periods of this study (a period may also belong to none).
+  periods    AcademicPeriod[]
   // Also in the migration SQL (Prisma cannot express them):
   //  - partial unique index: at most one isPrimary = true per user
   //  - CHECK (name has 1..80 characters and is trimmed; programKey has 1..60)
   //  - CHECK (isPrimary implies status = ACTIVE)
 
-  // The target of the composite foreign key a period will use later (the database will refuse a period of one user pointing
+  // The target of the composite foreign key a period uses (the database refuses a period of one user pointing
   // at a track of another). `userId` is the leading column of `@@index([userId, status])`, which also serves the plain list.
   @@unique([id, userId])
   @@index([userId, status])
@@ -116,18 +119,25 @@ model AcademicPeriod {
   // The level during THIS period (a semester, a school grade...): generic on purpose, a number OR a free-text note, never both.
   studyLevel     Int?
   studyLevelNote String?
+  // The study (formation) this period belongs to. NULL is a PERMANENT, valid state (personal organization, teaching, older
+  // accounts, a general period): there is no "personal" study. Never derived from the profile, the subjects or the name.
+  studyTrackId   String?         @db.Uuid
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Composite (studyTrackId, userId): a period can never point at another user's study (MATCH SIMPLE: not checked while it is
+  // NULL). NoAction: studies are archived, never deleted, and one with periods cannot be deleted silently.
+  studyTrack     StudyTrack?     @relation(fields: [studyTrackId, userId], references: [id, userId], onDelete: NoAction)
   subjects       Subject[]
   scheduleBlocks ScheduleBlock[]
   activities     Activity[]
   // Also in the migration SQL (Prisma cannot express them):
-  //  - partial unique index: at most one isCurrent = true per user
+  //  - partial unique indexes: at most one isCurrent = true per user WITHOUT a study, and at most one per study
   //  - CHECK ("endDate" > "startDate")
   //  - CHECK (studyLevel between 1 and 99; studyLevelNote has 1..40 characters; at most one of the two is set)
 
   @@index([userId])
+  @@index([studyTrackId])
 }
 
 model Subject {

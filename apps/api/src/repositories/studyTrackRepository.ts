@@ -44,6 +44,16 @@ export function createStudyTrackRepository(db: Db) {
     update: (userId: string, id: string, data: StudyTrackData) =>
       db.studyTrack.update({ where: { id_userId: { id, userId } }, data }),
 
+    /**
+     * Un-marks every current period of one study (an archived study has no current period). The periods themselves, and their
+     * subjects, activities and schedule blocks, are not touched.
+     */
+    clearCurrentPeriods: (userId: string, studyTrackId: string) =>
+      db.academicPeriod.updateMany({
+        where: { userId, studyTrackId, isCurrent: true },
+        data: { isCurrent: false },
+      }),
+
     /** Takes the primary flag away from every track of the user except `exceptId`. */
     clearPrimary: (userId: string, exceptId: string) =>
       db.studyTrack.updateMany({

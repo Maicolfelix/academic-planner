@@ -32,7 +32,7 @@ export function createWorkloadService(
       const tz = actor.timezone;
       // Any date of the wanted week; without it, the user's LOCAL current week (never the UTC one).
       const week = weekRangeOf(query.week ?? toLocalParts(now, tz).date);
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
 
       const base = { generatedAt: now.toISOString(), period: period ? toPeriodDto(period) : null };
       if (!period) {

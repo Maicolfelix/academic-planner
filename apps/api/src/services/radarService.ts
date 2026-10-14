@@ -27,7 +27,7 @@ export function createRadarService(
     async get(actor: Actor): Promise<Radar> {
       const now = clock();
       const generatedAt = now.toISOString();
-      const period = await periods.findCurrent(actor.id);
+      const period = await periods.findHomeCurrent(actor.id);
       if (!period) {
         return { generatedAt, period: null, summary: zeroCounts(), groups: emptyGroups() };
       }

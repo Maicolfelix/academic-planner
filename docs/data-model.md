@@ -9,6 +9,7 @@ erDiagram
   User ||--o{ Session : tiene
   User ||--|| UserProfile : describe
   User ||--o{ StudyTrack : cursa
+  StudyTrack |o--o{ AcademicPeriod : "agrupa (opcional)"
   User ||--o{ AcademicPeriod : posee
   User ||--o{ Subject : posee
   User ||--o{ Activity : posee
@@ -49,7 +50,7 @@ El perfil educativo, **1:1 con `User`** (`userId` es la clave primaria y la FK, 
 
 ### StudyTrack
 
-Una **formación que el usuario cursa** (P0.5-1, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)): `userId` (FK, `ON DELETE CASCADE`), `name` (el nombre visible: obligatorio, recortado, 1–80, no necesariamente una carrera), `type` (`EducationContext`: `UNIVERSITY` | `SCHOOL` | `OTHER_ACADEMIC`, **editable**; descriptivo, no una autorización; cambiarlo no toca `Subject.educationContext`), `programKey` (nullable, del catálogo; con clave el nombre es el canónico), `isPrimary`, `status` (`ACTIVE` | `ARCHIVED`; un estudio se archiva, no se borra). Un usuario tiene **0..n**; **a lo sumo un principal**, hecho cumplir por la BD (índice único parcial `(userId) WHERE isPrimary` y `CHECK (isPrimary → ACTIVE)`; hay `CHECK` de nombre recortado de 1–80 y de clave de 1–60). `@@unique([id, userId])` es el destino de la futura clave foránea compuesta de un periodo. **Todavía no está enlazada** a `AcademicPeriod`, `Subject`, `Activity`, `ScheduleBlock` ni `UserProfile`, y la migración **no crea ninguno** (todas las cuentas tienen cero).
+Una **formación que el usuario cursa** (P0.5-1, [D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)): `userId` (FK, `ON DELETE CASCADE`), `name` (el nombre visible: obligatorio, recortado, 1–80, no necesariamente una carrera), `type` (`EducationContext`: `UNIVERSITY` | `SCHOOL` | `OTHER_ACADEMIC`, **editable**; descriptivo, no una autorización; cambiarlo no toca `Subject.educationContext`), `programKey` (nullable, del catálogo; con clave el nombre es el canónico), `isPrimary`, `status` (`ACTIVE` | `ARCHIVED`; un estudio se archiva, no se borra). Un usuario tiene **0..n**; **a lo sumo un principal**, hecho cumplir por la BD (índice único parcial `(userId) WHERE isPrimary` y `CHECK (isPrimary → ACTIVE)`; hay `CHECK` de nombre recortado de 1–80 y de clave de 1–60). `@@unique([id, userId])` es el destino de la futura clave foránea compuesta de un periodo. Un **periodo** puede pertenecer a uno (`AcademicPeriod.studyTrackId`, [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)); `Subject`, `Activity` y `ScheduleBlock` llegan al estudio **por su periodo** (no tienen `studyTrackId`) y `UserProfile` no está enlazado. Las migraciones **no crean ninguno** (todas las cuentas tienen cero hasta que alguien lo cree).
 
 ### Session
 
@@ -57,7 +58,7 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 ### AcademicPeriod
 
-`name`, `startDate`, `endDate` (**fechas de calendario** `DATE`, sin hora ni zona: «2026-08-03» no puede correrse al día 2 por una conversión), `isCurrent`, y el **nivel de estudio durante el periodo**: `studyLevel` (entero nullable, 1–99) **o** `studyLevelNote` (texto corto nullable, 1–40 caracteres, para «Otro» o una estructura que un número no describe), nunca los dos. Vive en el periodo y no en el perfil porque cambia con cada periodo («2026-2, semestre 4» y luego «2027-1, semestre 5»); es genérico a propósito (el dominio no sabe si es semestre, grado o año de un curso, ni si el estudiante es universitario). Restricciones a mano en la migración: **un solo periodo actual por usuario** (índice único parcial), `endDate > startDate` y los tres `CHECK` del nivel (rango 1–99, nota de 1 a 40 caracteres, a lo sumo uno de los dos). Los periodos que ya existían quedan con ambos campos en `NULL`. Decisión [D27](decisions.md#d27-el-nivel-de-estudio-vive-en-el-periodo-académico).
+`name`, `startDate`, `endDate` (**fechas de calendario** `DATE`, sin hora ni zona: «2026-08-03» no puede correrse al día 2 por una conversión), `isCurrent` (actual **dentro de su ámbito**: «sin estudio» o un estudio), `studyTrackId` (nullable: el estudio al que pertenece, [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2); `NULL` es un estado permanente y válido, no hay estudio «Personal») y el **nivel de estudio durante el periodo**: `studyLevel` (entero nullable, 1–99) **o** `studyLevelNote` (texto corto nullable, 1–40 caracteres, para «Otro» o una estructura que un número no describe), nunca los dos. Vive en el periodo y no en el perfil porque cambia con cada periodo («2026-2, semestre 4» y luego «2027-1, semestre 5»); es genérico a propósito (el dominio no sabe si es semestre, grado o año de un curso, ni si el estudiante es universitario). Restricciones a mano en la migración: **un solo periodo actual sin estudio por usuario y uno por estudio** (dos índices únicos parciales; un periodo general y los de varios estudios pueden ser actuales a la vez), la clave foránea compuesta `(studyTrackId, userId)` hacia `StudyTrack` (un periodo nunca apunta al estudio de otro usuario; `NO ACTION`), `endDate > startDate` y los tres `CHECK` del nivel (rango 1–99, nota de 1 a 40 caracteres, a lo sumo uno de los dos). Los periodos que ya existían quedan con ambos campos en `NULL`. Decisión [D27](decisions.md#d27-el-nivel-de-estudio-vive-en-el-periodo-académico).
 
 ### Subject
 
@@ -67,7 +68,7 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 | Campo         | Significado                                                                                                                                                                                     |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `periodId`    | Periodo al que pertenece. **Obligatorio e inmutable**; lo deriva el servidor (el de la asignatura, o el periodo actual si no hay asignatura). No forma parte del DTO público                    |
+| `periodId`    | Periodo al que pertenece. **Obligatorio e inmutable**; lo deriva el servidor (el de la asignatura, o el periodo hogar si no hay asignatura). No forma parte del DTO público                     |
 | `subjectId`   | Asignatura **opcional**. Nulo = actividad general (sin asignatura). Con valor, su periodo es el mismo `periodId` (clave foránea compuesta)                                                      |
 | `type`        | `TASK`, `EXAM`, `QUIZ`, `PROJECT`, `PRESENTATION`, `WORKSHOP`, `READING`, `OTHER` (por defecto `TASK`)                                                                                          |
 | `priority`    | `LOW`, `MEDIUM`, `HIGH` (por defecto `MEDIUM`)                                                                                                                                                  |

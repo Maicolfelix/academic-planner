@@ -171,7 +171,7 @@ export function createScheduleService(
     ): Promise<WriteResult> {
       const period = input.periodId
         ? await periods.findOwned(actor.id, input.periodId)
-        : await periods.findCurrent(actor.id);
+        : await periods.findHomeCurrent(actor.id);
       if (!period) {
         if (input.periodId) throw periodNotFound();
         throw new AppError(

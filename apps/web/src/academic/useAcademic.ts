@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { UpdatePeriodRequest, UpdateSubjectInput } from '@planner/core';
 import {
   createPeriodRequest,
@@ -6,24 +6,61 @@ import {
   createSubjectsBatchRequest,
   updatePeriodRequest,
   deleteSubjectRequest,
+  fetchHomePeriod,
   fetchPeriods,
   fetchSubjects,
   updateSubjectRequest,
 } from '../api/academic';
+import { ME_KEY } from '../auth/useAuth';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
 import { PROGRESS_KEY } from '../insights/useInsights';
+import { PROFILE_KEY } from '../profile/useProfile';
 
 export const periodsKey = ['periods'] as const;
+/** The HOME period (decided by the server). A key of its own: it is never derived from `periodsKey`. */
+export const homePeriodKey = ['home-period'] as const;
 export const subjectsKey = (periodId: string) => ['subjects', periodId] as const;
 
 export function usePeriods() {
   return useQuery({ queryKey: periodsKey, queryFn: fetchPeriods, retry: false });
 }
 
-/** The current period is derived from the periods query: one source of truth, no copy in state. */
+/**
+ * The HOME current period, exactly as the server decides it (the general current period; else the primary active study's;
+ * else none): `data` is the period, `null` when there is none, `undefined` while it loads. The web never re-implements which
+ * study is the primary one and never takes "any current period" from the list.
+ */
+export function useHomePeriod() {
+  return useQuery({ queryKey: homePeriodKey, queryFn: fetchHomePeriod, retry: false });
+}
+
+/**
+ * The period every page that works with ONE period uses. Here "current" means HOME CURRENT: the same period the API's
+ * singular endpoints use. (The name stays for the many callers; reading ALL the current periods is a later step.)
+ */
 export function useCurrentPeriod() {
-  const query = usePeriods();
-  return { ...query, period: query.data?.find((p) => p.isCurrent) };
+  const query = useHomePeriod();
+  return { ...query, period: query.data ?? undefined };
+}
+
+/** What changes when a period is created or edited: the list, the home period (it may be this one) and the Dashboard. */
+export function invalidateAfterPeriodChange(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: periodsKey }),
+    qc.invalidateQueries({ queryKey: homePeriodKey }),
+    qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+  ]);
+}
+
+/**
+ * The HOME period can change WITHOUT any period being touched (another study becomes the primary one, a study is archived or
+ * restored), and everything that is read from the home period (Dashboard, Radar, subjects, activities, progress...) changes
+ * with it: so everything cached is stale except who the user is and their profile.
+ */
+export function invalidateAfterHomeChange(qc: QueryClient) {
+  return qc.invalidateQueries({
+    predicate: (q) => q.queryKey[0] !== ME_KEY[0] && q.queryKey[0] !== PROFILE_KEY[0],
+  });
 }
 
 export function useCreatePeriod() {
@@ -31,11 +68,7 @@ export function useCreatePeriod() {
   return useMutation({
     mutationFn: createPeriodRequest,
     // Returning the promise makes the mutation wait for fresh data before callers navigate.
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: periodsKey }),
-        qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
-      ]),
+    onSuccess: () => invalidateAfterPeriodChange(qc),
   });
 }
 
@@ -45,11 +78,7 @@ export function useUpdatePeriod() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdatePeriodRequest }) =>
       updatePeriodRequest(id, input),
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: periodsKey }),
-        qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
-      ]),
+    onSuccess: () => invalidateAfterPeriodChange(qc),
   });
 }
 

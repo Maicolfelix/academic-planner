@@ -247,6 +247,28 @@ describe('foreign keys in a request body or query', () => {
             .send({ periodId: k === 'real' ? w.b.period.id : ghost(), name: 'X' }),
       ],
       [
+        'period created in a foreign study',
+        (k) =>
+          w.a.agent.post('/api/periods').send({
+            ...periodInput,
+            studyTrackId: k === 'real' ? w.studyTrack.id : ghost(),
+          }),
+      ],
+      [
+        'own period moved to a foreign study',
+        (k) =>
+          w.a.agent
+            .patch(`/api/periods/${w.a.period.id}`)
+            .send({ studyTrackId: k === 'real' ? w.studyTrack.id : ghost() }),
+      ],
+      [
+        'a foreign period moved to an own study',
+        (k) =>
+          w.a.agent
+            .patch(`/api/periods/${k === 'real' ? w.b.period.id : ghost()}`)
+            .send({ studyTrackId: null }),
+      ],
+      [
         'reminders of a foreign activity',
         (k) => w.a.agent.get(`/api/reminders?activityId=${k === 'real' ? w.activity.id : ghost()}`),
       ],
@@ -299,6 +321,7 @@ describe('nothing of B leaks through lists, aggregates or derived views', () => 
       '/api/subjects',
       '/api/activities',
       '/api/periods',
+      '/api/periods/home',
       '/api/study-tracks',
       '/api/schedule?from=2026-10-05&to=2026-10-11',
       '/api/reminders',
@@ -540,6 +563,7 @@ describe('every protected route refuses an anonymous caller', () => {
   const routes: [string, string][] = [
     ['get', '/api/auth/me'],
     ['get', '/api/periods'],
+    ['get', '/api/periods/home'],
     ['post', '/api/periods'],
     ['patch', `/api/periods/${randomUUID()}`],
     ['get', '/api/study-tracks'],

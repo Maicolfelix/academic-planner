@@ -1,5 +1,6 @@
 import type { ActivityStatus } from '@planner/core';
 import type { PrismaClient } from '../db/prisma.js';
+import { createPeriodLookup } from './periodRepository.js';
 
 // Always the same scope: this user's activities of the given period (stored on the activity: no join with the subject).
 const inPeriod = (userId: string, periodId: string) => ({ userId, periodId });
@@ -15,8 +16,8 @@ const byDeadline = [{ dueAt: 'asc' }, { createdAt: 'asc' }] as const;
  */
 export function createDashboardRepository(prisma: PrismaClient) {
   return {
-    currentPeriod: (userId: string) =>
-      prisma.academicPeriod.findFirst({ where: { userId, isCurrent: true } }),
+    // The HOME current period (see `createPeriodLookup`): the Dashboard still reads one period; reading all of them is P0.5-3.
+    currentPeriod: (userId: string) => createPeriodLookup(prisma).findHomeCurrent(userId),
 
     countSubjects: (userId: string, periodId: string) =>
       prisma.subject.count({ where: { userId, periodId } }),

@@ -8,6 +8,7 @@ export function periodsRouter(
   const router = Router();
   router.use(requireAuth); // every period route needs a session
   router.get('/', controller.list);
+  router.get('/home', controller.home); // BEFORE '/:id': "home" is not an id
   router.post('/', controller.create);
   router.get('/:id', controller.get);
   router.patch('/:id', controller.update);

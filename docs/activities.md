@@ -36,7 +36,7 @@ Una actividad **siempre** pertenece a un periodo académico (`periodId NOT NULL`
 | Capa          | Qué lo impide                                                                                                                                                                                        |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cliente       | No puede enviar `periodId` (400). Es la barrera principal: el valor nunca viene de fuera.                                                                                                            |
-| Servicio      | El periodo sale de `subjects.findOwned(actor.id, …)` (asignatura propia) o de `periods.findCurrent(actor.id)` (periodo actual **del actor**). No hay ninguna búsqueda sin `userId`.                  |
+| Servicio      | El periodo sale de `subjects.findOwned(actor.id, …)` (asignatura propia) o de `periods.findHomeCurrent(actor.id)` (periodo actual **del actor**). No hay ninguna búsqueda sin `userId`.              |
 | Repositorio   | Toda consulta lleva `userId`; `update` y `delete` usan `where: { id, userId }`; el filtro `periodId` de la lista es una condición más sobre actividades propias (el de otro usuario da lista vacía). |
 | Base de datos | `periodId` existe y es obligatorio; con asignatura, la FK compuesta fuerza el mismo periodo. **No** hay una FK `(periodId, userId) → AcademicPeriod(id, userId)`.                                    |
 
