@@ -84,7 +84,7 @@ Un periodo pertenece a un estudio (`studyTrackId`, uuid) o a ninguno (`null`, v�
 
 ### Todos los periodos actuales (P0.5-3)
 
-Los resúmenes («qué requiere mi atención ahora») leen **todos** los periodos actuales y activos —el general y el de cada estudio activo— y no solo HOME ([D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)); `GET /api/periods/current` los lista con su estudio. Las escrituras sin destino siguen yendo a HOME.
+Los resúmenes («qué requiere mi atención ahora») leen **todos** los periodos actuales y activos —el general y el de cada estudio activo— y no solo HOME ([D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)); `GET /api/periods/current` los lista con su estudio. Las escrituras sin destino siguen yendo a HOME. La lista de Actividades y el filtro por asignatura leen ese mismo alcance con `scope=current` (el servidor lo resuelve; el cliente no envía periodos).
 
 ### Estudios (P0.5-1)
 
