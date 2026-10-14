@@ -11,6 +11,8 @@ import {
   type ScheduleOccurrence,
   type Subject,
 } from '@planner/core';
+import type { OriginOf } from '../../academic/origin';
+import { OriginLabel } from '../../components/OriginLabel';
 import { agendaActivityLabel, type AgendaActivity } from './agendaActivities';
 import { dayNumber, timeRange } from './format';
 import { minutesOf } from './layoutDay';
@@ -26,6 +28,8 @@ interface Props {
   onSelect: (day: string) => void;
   onOpen: (occurrence: ScheduleOccurrence) => void;
   onOpenActivity: (activity: Activity) => void;
+  /** The study each item comes from, when it is worth saying (see `originLabelOf`). */
+  origin?: OriginOf;
 }
 
 type Row =
@@ -58,6 +62,7 @@ export function DayList({
   onSelect,
   onOpen,
   onOpenActivity,
+  origin,
 }: Props) {
   const blocksOf = (day: string) => occurrences.filter((o) => o.occurrenceDate === day);
   const activitiesOf = (day: string) => activities.filter((a) => a.date === day);
@@ -134,6 +139,7 @@ export function DayList({
                   subject={a.activity.subjectId ? subjects.get(a.activity.subjectId) : undefined}
                   timeZone={timeZone}
                   onOpen={onOpenActivity}
+                  origin={origin}
                 />
               </li>
             ))}
@@ -153,6 +159,7 @@ export function DayList({
                   }
                   timeZone={timeZone}
                   onOpen={onOpenActivity}
+                  origin={origin}
                 />
               </li>
             ) : (
@@ -177,6 +184,7 @@ export function DayList({
                     <span className="text-sm text-slate-700 break-words">
                       {SCHEDULE_BLOCK_TYPE_LABELS[row.o.type]}
                       {row.o.subject && ` · ${row.o.subject.name}`}
+                      <OriginLabel label={origin?.(row.o.periodId)} />
                       {row.o.isRecurring && ' · se repite cada semana'}
                     </span>
                     {row.o.hasConflict && (
@@ -201,11 +209,13 @@ function ActivityRow({
   subject,
   timeZone,
   onOpen,
+  origin,
 }: {
   item: AgendaActivity;
   subject: Subject | undefined;
   timeZone: string;
   onOpen: (activity: Activity) => void;
+  origin?: OriginOf;
 }) {
   const { activity } = item;
   return (
@@ -242,7 +252,9 @@ function ActivityRow({
         </span>
         <span className="text-sm text-slate-700 break-words">
           Actividad · {ACTIVITY_TYPE_LABELS[activity.type]}
-          {subject && ` · ${subject.name}`} · {ACTIVITY_STATUS_LABELS[activity.status]}
+          {subject && ` · ${subject.name}`}
+          <OriginLabel label={origin?.(activity.periodId)} /> ·{' '}
+          {ACTIVITY_STATUS_LABELS[activity.status]}
         </span>
         {item.overdue && <span className="text-sm font-semibold text-danger-ink">Vencida</span>}
       </span>

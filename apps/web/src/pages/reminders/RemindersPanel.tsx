@@ -1,5 +1,7 @@
 import { DUE_REMINDERS_LIMIT, reminderMessage } from '@planner/core';
+import { OriginLabel } from '../../components/OriginLabel';
 import { BellIcon } from '../../components/ui/icons';
+import { useOrigins } from '../../academic/useAcademic';
 import { useDueReminders, useMarkSeen } from '../../reminders/useReminders';
 
 /**
@@ -10,6 +12,7 @@ import { useDueReminders, useMarkSeen } from '../../reminders/useReminders';
 export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date }) {
   const due = useDueReminders();
   const markSeen = useMarkSeen();
+  const originOf = useOrigins();
   if (!due.data || due.data.total === 0) return null;
 
   const { reminders, total } = due.data;
@@ -42,6 +45,7 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
               </p>
               <p className="pl-6 text-sm break-words text-slate-700">
                 {r.subject?.name ?? 'Sin asignatura'}
+                <OriginLabel label={originOf(r.activity.periodId)} />
               </p>
             </div>
             <button

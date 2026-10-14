@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import type { UpdatePeriodRequest, UpdateSubjectInput } from '@planner/core';
 import {
   createPeriodRequest,
@@ -6,6 +7,7 @@ import {
   createSubjectsBatchRequest,
   updatePeriodRequest,
   deleteSubjectRequest,
+  fetchCurrentPeriods,
   fetchHomePeriod,
   fetchPeriods,
   fetchSubjects,
@@ -15,10 +17,13 @@ import { ME_KEY } from '../auth/useAuth';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
 import { PROGRESS_KEY } from '../insights/useInsights';
 import { PROFILE_KEY } from '../profile/useProfile';
+import { originLabelOf, type OriginOf } from './origin';
 
 export const periodsKey = ['periods'] as const;
 /** The HOME period (decided by the server). A key of its own: it is never derived from `periodsKey`. */
 export const homePeriodKey = ['home-period'] as const;
+/** ALL the current, active periods with their study (the summaries read all of them; HOME is one of them, or none). */
+export const currentPeriodsKey = ['current-periods'] as const;
 export const subjectsKey = (periodId: string) => ['subjects', periodId] as const;
 
 export function usePeriods() {
@@ -43,11 +48,29 @@ export function useCurrentPeriod() {
   return { ...query, period: query.data ?? undefined };
 }
 
+/** Every current, active period with its study, as the server lists them. */
+export function useCurrentPeriods() {
+  return useQuery({ queryKey: currentPeriodsKey, queryFn: fetchCurrentPeriods, retry: false });
+}
+
+/**
+ * The label of the study an item comes from (by its period), or null when none is useful (see `originLabelOf`). A screen asks
+ * once and hands the function to its lists, so the lists themselves need no data of their own.
+ */
+export function useOrigins(): OriginOf {
+  const { data } = useCurrentPeriods();
+  return useCallback(
+    (periodId) => (periodId && data ? originLabelOf(data, periodId) : null),
+    [data],
+  );
+}
+
 /** What changes when a period is created or edited: the list, the home period (it may be this one) and the Dashboard. */
 export function invalidateAfterPeriodChange(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: periodsKey }),
     qc.invalidateQueries({ queryKey: homePeriodKey }),
+    qc.invalidateQueries({ queryKey: currentPeriodsKey }),
     qc.invalidateQueries({ queryKey: DASHBOARD_KEY }),
   ]);
 }

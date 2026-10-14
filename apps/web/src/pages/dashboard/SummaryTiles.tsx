@@ -58,11 +58,17 @@ const METRICS: {
  * period's activities it is. Each cell is a link to the matching filtered list; the label is always text, and the bar
  * and the symbol are decoration.
  */
-export function SummaryTiles({ summary }: { summary: Summary }) {
+export function SummaryTiles({
+  summary,
+  several = false,
+}: {
+  summary: Summary;
+  several?: boolean;
+}) {
   return (
     <section aria-labelledby="summary-title">
       <h2 id="summary-title" className="sr-only">
-        Resumen del periodo
+        {several ? 'Resumen de tus estudios actuales' : 'Resumen del periodo'}
       </h2>
       <ul className="grid animate-rise grid-cols-2 gap-px overflow-hidden rounded-surface border border-border bg-border shadow-card [animation-delay:80ms] sm:grid-cols-4 lg:grid-cols-2">
         {METRICS.map(({ key, label, symbol, to, ink, bar, cell }, i) => {

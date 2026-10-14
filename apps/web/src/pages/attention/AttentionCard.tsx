@@ -2,6 +2,8 @@ import { QueryError } from '../../components/QueryError';
 import { RADAR_LABELS, formatDue, radarExplanation, type RadarStatus } from '@planner/core';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
+import type { OriginOf } from '../../academic/origin';
+import { useOrigins } from '../../academic/useAcademic';
 import { useAttention } from '../../attention/useAttention';
 import { Card } from '../../components/ui/Card';
 import { PriorityBadge, StatusBadge } from '../activities/badges';
@@ -52,6 +54,7 @@ type Item = NonNullable<ReturnType<typeof useAttention>['data']>['recommendation
  */
 export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }) {
   const attention = useAttention();
+  const originOf = useOrigins();
   const data = attention.data;
   const items: Item[] = data?.upcoming.length
     ? data.upcoming
@@ -75,7 +78,9 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
         </Card>
       )}
 
-      {items.length > 0 && <HeroCarousel items={items} timeZone={timeZone} now={now} />}
+      {items.length > 0 && (
+        <HeroCarousel items={items} timeZone={timeZone} now={now} origin={originOf} />
+      )}
     </section>
   );
 }
@@ -101,7 +106,17 @@ function scrollTargetOf(strip: HTMLElement, slide: HTMLElement): number {
  * `scrollLeft` by a width the CSS may not match. If the active activity disappears (completed, deleted) the first one is
  * shown; a resize puts the strip back on the active one.
  */
-function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: string; now: Date }) {
+function HeroCarousel({
+  items,
+  timeZone,
+  now,
+  origin,
+}: {
+  items: Item[];
+  timeZone: string;
+  now: Date;
+  origin: OriginOf;
+}) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
   const pending = useRef<{ index: number } | null>(null);
@@ -251,7 +266,12 @@ function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: strin
             inert={i !== active}
             className="w-full shrink-0 snap-center snap-always px-0.5"
           >
-            <Suggestion item={item} timeZone={timeZone} now={now} />
+            <Suggestion
+              item={item}
+              timeZone={timeZone}
+              now={now}
+              origin={origin(item.activity.periodId)}
+            />
           </div>
         ))}
       </div>
@@ -293,7 +313,18 @@ function HeroCarousel({ items, timeZone, now }: { items: Item[]; timeZone: strin
   );
 }
 
-export function Suggestion({ item, timeZone, now }: { item: Item; timeZone: string; now: Date }) {
+export function Suggestion({
+  item,
+  timeZone,
+  now,
+  origin = null,
+}: {
+  item: Item;
+  timeZone: string;
+  now: Date;
+  /** The study the activity comes from, when it is worth saying (see `originLabelOf`). */
+  origin?: string | null;
+}) {
   const { activity, radarStatus, reasons } = item;
   return (
     <article
@@ -337,6 +368,7 @@ export function Suggestion({ item, timeZone, now }: { item: Item; timeZone: stri
         </p>
         <p className="mt-0.5 text-primary-foreground/80 break-words">
           {activity.subject?.name ?? 'Sin asignatura'}
+          {origin && ` · ${origin}`}
         </p>
       </div>
 

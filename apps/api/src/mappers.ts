@@ -56,6 +56,7 @@ export const toStudyTrackDto = (t: StudyTrackRow): StudyTrack => ({
 
 export const toActivityDto = (a: ActivityRow): Activity => ({
   id: a.id,
+  periodId: a.periodId,
   subjectId: a.subjectId,
   title: a.title,
   description: a.description,
@@ -85,6 +86,7 @@ export const toDueReminderDto = (
   r: ReminderRow & {
     activity: {
       id: string;
+      periodId: string;
       title: string;
       type: ActivityRow['type'];
       dueAt: Date;
@@ -96,6 +98,7 @@ export const toDueReminderDto = (
   ...toReminderDto(r),
   activity: {
     id: r.activity.id,
+    periodId: r.activity.periodId,
     title: r.activity.title,
     type: r.activity.type,
     dueAt: r.activity.dueAt.toISOString(),

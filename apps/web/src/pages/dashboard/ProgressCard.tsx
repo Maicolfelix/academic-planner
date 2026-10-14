@@ -52,7 +52,13 @@ function Ring({ percent }: { percent: number }) {
  * it simply is at its value, with no delay. A screen reader gets the exact value at once (the progressbar's own
  * attributes). At 100 % the surface takes a done tint (derived from the same number, nothing stored).
  */
-export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) {
+export function ProgressCard({
+  progress,
+  several = false,
+}: {
+  progress: Dashboard['progress'];
+  several?: boolean;
+}) {
   const { percent, completed, total } = progress;
   const text = `${completed} de ${total} actividades finalizadas`;
   const done = percent === 100 && total > 0;
@@ -107,7 +113,9 @@ export function ProgressCard({ progress }: { progress: Dashboard['progress'] }) 
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4">
         <p className="text-xs text-muted-foreground">
-          Mide solo las actividades que has registrado en este periodo.
+          {several
+            ? 'Mide solo las actividades que has registrado en tus estudios actuales.'
+            : 'Mide solo las actividades que has registrado en este periodo.'}
         </p>
         <Link
           to="/progress"

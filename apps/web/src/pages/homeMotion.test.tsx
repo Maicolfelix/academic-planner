@@ -17,6 +17,7 @@ const html = (node: ReactElement) =>
 
 const activity = {
   id: '0b9e5c1a-7d3f-4c1e-9a52-3f1d2c4b6a70',
+  periodId: '5f0c3a4e-9a52-4c1e-8f6a-3f1d2c4b6a70',
   subjectId: '7c1d5f10-1b2e-4a38-8f6a-5b9c0d3e2a41',
   title: 'Parcial de Redes',
   description: null,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, educationContextSchema, hasNoNul } from './academic.js';
+import { INVALID_CHARACTERS, educationContextSchema, hasNoNul, periodSchema } from './academic.js';
 import { findProgramByKey } from './profile.js';
 
 /**
@@ -51,6 +51,35 @@ export type StudyTrackResponse = z.infer<typeof studyTrackResponseSchema>;
 /** The whole list, in the API's order: the primary first, then the active ones, then the archived, each by creation. */
 export const studyTrackListResponseSchema = z.object({ studyTracks: z.array(studyTrackSchema) });
 export type StudyTrackListResponse = z.infer<typeof studyTrackListResponseSchema>;
+
+/**
+ * Just enough of a study to say where something comes from ("Farmacología · Medicina"): never the owner or the status (a
+ * study that is listed here is always active). Derived on every request, never stored next to the thing it labels.
+ */
+export const studyTrackRefSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  type: educationContextSchema,
+  isPrimary: z.boolean(),
+});
+export type StudyTrackRef = z.infer<typeof studyTrackRefSchema>;
+
+/**
+ * One CURRENT, ACTIVE period with the study it belongs to (null for a general period). The summaries that answer "what needs my
+ * attention now" read ALL of them (ordered: the general one, the primary study's, then the rest by the study's creation); the
+ * HOME period is one of them, or none.
+ */
+export const currentPeriodContextSchema = z.object({
+  period: periodSchema,
+  studyTrack: studyTrackRefSchema.nullable(),
+});
+export type CurrentPeriodContext = z.infer<typeof currentPeriodContextSchema>;
+
+/** GET /api/periods/current: every current, active period with its study, in the order above (empty when there is none). */
+export const currentPeriodsResponseSchema = z.object({
+  periods: z.array(currentPeriodContextSchema),
+});
+export type CurrentPeriodsResponse = z.infer<typeof currentPeriodsResponseSchema>;
 
 type ProgramFields = { programKey?: string | null; name?: string };
 

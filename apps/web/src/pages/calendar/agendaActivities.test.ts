@@ -9,6 +9,7 @@ const NOW = new Date('2026-10-11T20:00:00.000Z');
 let n = 0;
 const activity = (over: Partial<Activity> & { dueAt: string }): Activity => ({
   id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+  periodId: '5f0c3a4e-9a52-4c1e-8f6a-3f1d2c4b6a70',
   subjectId: null,
   title: `Actividad ${n}`,
   description: null,

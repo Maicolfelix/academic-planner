@@ -14,7 +14,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useActivities } from '../activities/useActivities';
-import { usePeriods, useCurrentPeriod, useSubjects } from '../academic/useAcademic';
+import { usePeriods, useCurrentPeriod, useOrigins, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
 import { useIsDesktop } from '../lib/useIsDesktop';
@@ -43,6 +43,7 @@ export function CalendarPage() {
   const now = useNow();
   const isDesktop = useIsDesktop();
   const { period } = useCurrentPeriod();
+  const originOf = useOrigins();
   const periods = usePeriods().data ?? [];
 
   // "Today" and the week come from the user's profile timezone, never from the browser's.
@@ -171,6 +172,7 @@ export function CalendarPage() {
           />
         ) : (
           <DayList
+            origin={originOf}
             days={days}
             selected={selectedDay}
             today={today}

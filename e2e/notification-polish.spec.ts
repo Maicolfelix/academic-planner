@@ -30,6 +30,7 @@ const due = (total: number) => ({
     updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
     activity: {
       id: ID(100 + i),
+      periodId: ID(200),
       title: `Parcial número ${i + 1} con un nombre bastante largo para comprobar el ajuste`,
       type: 'EXAM',
       dueAt: new Date(Date.now() + 86_400_000).toISOString(),

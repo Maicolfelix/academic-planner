@@ -22,6 +22,7 @@ import {
   type ReminderRepository,
 } from '../repositories/reminderRepository.js';
 import type { Actor } from './activityService.js';
+import { readCurrentPeriods } from './currentPeriods.js';
 
 const reminderNotFound = () => notFound('Recordatorio no encontrado.');
 const activityNotFound = () => notFound('Actividad no encontrada.');
@@ -66,17 +67,19 @@ export function createReminderService(
     },
 
     /**
-     * Reminders ready to be shown: PENDING, `remindAt <= now`, activity not finished and in the user's CURRENT
-     * period (the Dashboard's scope). Oldest first, at most DUE_REMINDERS_LIMIT, with the real total.
+     * Reminders ready to be shown: PENDING, `remindAt <= now`, activity not finished and in ANY of the user's current, active
+     * periods (the Dashboard's scope: the general one and one per active study). A reminder belongs to an ACTIVITY (there are
+     * no free-standing reminders), so it follows the activity's period; the ones of past periods or of an archived study's
+     * periods are not shown (they are kept, not deleted). Oldest first, at most DUE_REMINDERS_LIMIT, with the real total.
      * Reading never changes anything: a reminder only becomes SHOWN when the client confirms it displayed it.
      */
     async due(actor: Actor) {
-      const period = await periods.findHomeCurrent(actor.id);
-      if (!period) return { reminders: [], total: 0 };
+      const current = await readCurrentPeriods(periods, actor.id);
+      if (current.ids.length === 0) return { reminders: [], total: 0 };
       const now = clock();
       const [rows, total] = await Promise.all([
-        reminders.listDue(actor.id, period.id, now, DUE_REMINDERS_LIMIT),
-        reminders.countDue(actor.id, period.id, now),
+        reminders.listDue(actor.id, current.ids, now, DUE_REMINDERS_LIMIT),
+        reminders.countDue(actor.id, current.ids, now),
       ]);
       return { reminders: rows.map(toDueReminderDto), total };
     },

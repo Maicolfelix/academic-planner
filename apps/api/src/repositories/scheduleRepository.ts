@@ -16,6 +16,8 @@ export interface BlockCandidateFilter {
   fromDay: string;
   types?: ScheduleBlockType[];
   periodId?: string;
+  /** Several periods at once (the summaries read all the current, active ones). */
+  periodIds?: readonly string[];
 }
 
 export interface ScheduleCreateData {
@@ -53,6 +55,7 @@ export function createScheduleRepository(prisma: Db) {
           userId,
           ...(f.types && { type: { in: f.types } }),
           ...(f.periodId && { periodId: f.periodId }),
+          ...(f.periodIds && { periodId: { in: [...f.periodIds] } }),
           startAt: { lt: f.rangeEnd },
           OR: [
             { recurrenceType: 'NONE', endAt: { gt: f.rangeStart } },

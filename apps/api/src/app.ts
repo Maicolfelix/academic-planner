@@ -138,7 +138,12 @@ export function createApp(deps: AppDeps): Express {
   );
   const scheduleRepository = createScheduleRepository(prisma);
   const dashboardController = createDashboardController(
-    createDashboardService(createDashboardRepository(prisma), scheduleRepository, clock),
+    createDashboardService(
+      createDashboardRepository(prisma),
+      scheduleRepository,
+      periodRepository,
+      clock,
+    ),
   );
   const academicInboxController = createAcademicInboxController(
     createAcademicInboxService(periodRepository, subjectRepository, activityRepository, clock),

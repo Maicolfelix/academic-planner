@@ -66,7 +66,9 @@ export function createPeriodLookup(db: Db) {
     /**
      * Every current period the user can read today: the general one (if any) and the one of each ACTIVE study. The current
      * period of an ARCHIVED study is never listed. Order: the general one first, then the primary study's, then the rest by
-     * the study's creation (the id breaks ties), so it is the same on every call.
+     * the study's creation (the id breaks ties), so it is the same on every call. Each row carries the study it belongs to
+     * (`studyTrack`: id, name, type and whether it is the primary one; null for the general period) from the SAME query: this
+     * is the ONE definition of "all the current, active periods", and every summary that reads them uses it.
      */
     async listCurrent(userId: string) {
       const rows = await db.academicPeriod.findMany({
@@ -75,7 +77,11 @@ export function createPeriodLookup(db: Db) {
           isCurrent: true,
           OR: [{ studyTrackId: null }, { studyTrack: { status: 'ACTIVE' } }],
         },
-        include: { studyTrack: { select: { id: true, isPrimary: true, createdAt: true } } },
+        include: {
+          studyTrack: {
+            select: { id: true, name: true, type: true, isPrimary: true, createdAt: true },
+          },
+        },
       });
       const rank = (t: (typeof rows)[number]['studyTrack']) =>
         t === null ? 0 : t.isPrimary ? 1 : 2;
@@ -86,7 +92,17 @@ export function createPeriodLookup(db: Db) {
           (a.studyTrack?.id ?? '').localeCompare(b.studyTrack?.id ?? '') ||
           a.id.localeCompare(b.id),
       );
-      return rows.map(({ studyTrack: _studyTrack, ...period }) => period);
+      return rows.map(({ studyTrack, ...period }) => ({
+        ...period,
+        studyTrack: studyTrack
+          ? {
+              id: studyTrack.id,
+              name: studyTrack.name,
+              type: studyTrack.type,
+              isPrimary: studyTrack.isPrimary,
+            }
+          : null,
+      }));
     },
 
     /**
@@ -104,6 +120,21 @@ export function createPeriodLookup(db: Db) {
 }
 
 export type PeriodLookup = ReturnType<typeof createPeriodLookup>;
+
+export type CurrentPeriodRow = Awaited<ReturnType<PeriodLookup['listCurrent']>>[number];
+
+/**
+ * The HOME period inside the list `listCurrent` returns, without asking again: the list is ordered general, primary, rest, and
+ * only active studies are in it, so the HOME period is the FIRST row when that row is the general one or the primary study's,
+ * and none otherwise (a secondary study's current period is never HOME). It is the same rule as `findHomeCurrent`; a test
+ * checks the two against each other.
+ */
+export function homeOfCurrents<T extends Pick<CurrentPeriodRow, 'studyTrack'>>(
+  rows: readonly T[],
+): T | null {
+  const first = rows[0];
+  return first && (first.studyTrack === null || first.studyTrack.isPrimary) ? first : null;
+}
 
 /**
  * Every query is scoped by userId: a period id alone never reaches data. Accepts a transaction client; the service decides

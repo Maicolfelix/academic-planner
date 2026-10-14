@@ -95,6 +95,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/api/src/repositories/periodRepository.ts', // a period belongs to a study or to none; the home and current lookups
       'apps/api/src/repositories/studyTrackRepository.ts',
       'apps/api/src/routes/studyTracks.ts',
+      'apps/api/src/services/currentPeriods.ts', // the one reader of all the current periods (with their study)
       'apps/api/src/services/periodService.ts', // create / move a period, one current per scope
       'apps/api/src/services/studyTrackService.ts',
       // the DEFAULT context of a NEW subject: the type of its period's study (never a name, never a permission)
@@ -111,15 +112,56 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(offenders.map(rel)).toEqual([]);
   });
 
-  it('no production file asks for "the" current period any more: the singular consumers say HOME explicitly', () => {
+  it('no production file asks for "the" current period (ambiguous): there is HOME, and there is ALL the current ones', () => {
     const offenders = api
       .filter((f) => /\b(findCurrent|hasCurrent)\b/.test(withoutTypeChecks(read(f))))
       .map(rel);
     expect(offenders).toEqual([]);
-    // and there are consumers of the explicit one (a guard against the pattern matching nothing)
-    expect(api.filter((f) => /\bfindHomeCurrent\(/.test(read(f))).length).toBeGreaterThanOrEqual(
-      12,
+  });
+
+  it('the flows that WRITE or have an implicit destination still use the HOME period, and only they do', () => {
+    const home = api.filter((f) => /\.findHomeCurrent\(/.test(read(f))).map(rel);
+    expect(home.sort()).toEqual([
+      'apps/api/src/services/academicInboxService.ts', // interprets a pasted message against the home period's subjects
+      'apps/api/src/services/activityService.ts', // a general activity without a destination
+      'apps/api/src/services/captureConfirmService.ts', // Smart Capture confirmation
+      'apps/api/src/services/captureService.ts',
+      'apps/api/src/services/periodService.ts', // GET /api/periods/home itself
+      'apps/api/src/services/quickCaptureService.ts',
+      'apps/api/src/services/scheduleImportConfirmService.ts',
+      'apps/api/src/services/scheduleImportService.ts',
+      'apps/api/src/services/scheduleService.ts', // a block without a period
+      'apps/api/src/services/subjectBatchService.ts', // the quick setup of subjects
+    ]);
+  });
+
+  it('every summary of "what needs my attention" reads ALL the current periods (one reader) and none of them is limited to HOME', () => {
+    const summaries = [
+      'dashboardService',
+      'radarService',
+      'attentionService',
+      'progressService',
+      'workloadService',
+      'reminderService',
+    ].map((n) => `apps/api/src/services/${n}.ts`);
+    for (const f of summaries) {
+      const code = read(path.join(ROOT, f));
+      expect(code, f).toMatch(/readCurrentPeriods\(/);
+      expect(code, f).not.toMatch(/findHomeCurrent/);
+    }
+    // the one definition of "all the current, active periods" is the lookup, and no service repeats its query
+    expect(read(path.join(ROOT, 'apps/api/src/services/currentPeriods.ts'))).toMatch(
+      /\.listCurrent\(/,
     );
+    const duplicates = api
+      .filter((f) => /isCurrent:\s*true/.test(withoutTypeChecks(read(f))))
+      .map(rel)
+      .sort();
+    expect(duplicates).toEqual([
+      'apps/api/src/demo/seedDemo.ts', // the demo asks for its period to be current
+      'apps/api/src/repositories/periodRepository.ts', // the lookups themselves
+      'apps/api/src/repositories/studyTrackRepository.ts', // archiving turns a study's current periods off
+    ]);
   });
 
   it('only the period carries a study: a subject, an activity, a block, a reminder or the profile never do', () => {
@@ -153,7 +195,19 @@ describe('a study track describes: only periods belong to one, and no behaviour 
         .filter((f) => /studyTrack/i.test(read(f)))
         .map(rel)
         .sort(),
-    ).toEqual(['apps/web/src/api/studyTracks.ts', 'apps/web/src/studyTracks/useStudyTracks.ts']);
+    ).toEqual([
+      'apps/web/src/academic/origin.ts', // the label of an item's study, read from the server's current periods
+      'apps/web/src/api/studyTracks.ts',
+      'apps/web/src/pages/progress/ProgressByPeriod.tsx', // one progress line per study
+      'apps/web/src/studyTracks/useStudyTracks.ts',
+    ]);
+    // and no workspace or study selector exists anywhere: the app stays one Home, one Agenda
+    const selectors = web.filter((f) =>
+      /(Cambiar|Elegir|Seleccionar)\s+(de\s+)?estudio|selectedStudy|activeStudy|setStudy|StudySwitcher|WorkspaceSwitcher/i.test(
+        read(f),
+      ),
+    );
+    expect(selectors.map(rel)).toEqual([]);
   });
 
   it('the web never derives HOME (or the gate of the app) from the list of periods: no "find/some current" in production', () => {

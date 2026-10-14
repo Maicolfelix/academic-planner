@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { activitySchema, type ActivityStatus, type RadarStatus } from './activity.js';
 import { dueRelativeLabel } from './dashboard.js';
 import { periodSchema } from './academic.js';
+import { currentPeriodContextSchema } from './studyTrack.js';
 
 /**
  * ACADEMIC RADAR: a deterministic reading of "how much time is left" for an open activity.
@@ -172,7 +173,9 @@ const perStatus = <T extends z.ZodType>(shape: T) =>
 export const radarSchema = z.object({
   generatedAt: z.iso.datetime(),
   /** null when the user has not set up a period yet. */
+  /** The HOME period (or null); the Radar reads ALL the periods in `periods`. */
   period: periodSchema.nullable(),
+  periods: z.array(currentPeriodContextSchema),
   summary: perStatus(count),
   groups: perStatus(z.array(radarActivitySchema)),
 });

@@ -7,10 +7,12 @@ interface Props {
   now: Date;
   /** The hero above already shows this very activity: say it in one quiet line instead of a second card. */
   quiet?: boolean;
+  /** The study the activity comes from, when it is worth saying (see `originLabelOf`). */
+  origin?: string | null;
 }
 
 /** The first open, not-yet-due activity by deadline. Date only: no scoring or recommendation. */
-export function NextDueCard({ activity, timeZone, now, quiet = false }: Props) {
+export function NextDueCard({ activity, timeZone, now, quiet = false, origin = null }: Props) {
   if (activity && quiet) {
     return (
       <section aria-labelledby="next-due-title" className="px-1 text-sm text-muted-foreground">
@@ -22,6 +24,7 @@ export function NextDueCard({ activity, timeZone, now, quiet = false }: Props) {
           {[
             activity.title,
             activity.subject?.name ?? 'Sin asignatura',
+            origin,
             formatDue(activity, timeZone),
             dueRelativeLabel(activity, now, timeZone),
           ]
@@ -45,6 +48,7 @@ export function NextDueCard({ activity, timeZone, now, quiet = false }: Props) {
           <p className="text-card-title break-words">{activity.title}</p>
           <p className="text-muted-foreground break-words">
             {activity.subject?.name ?? 'Sin asignatura'}
+            {origin && ` · ${origin}`}
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-foreground">
             <span>{formatDue(activity, timeZone)}</span>

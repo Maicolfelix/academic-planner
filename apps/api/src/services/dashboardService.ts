@@ -8,22 +8,28 @@ import {
   toLocalParts,
   type Dashboard,
 } from '@planner/core';
-import { toDashboardActivityDto, toPeriodDto } from '../mappers.js';
+import { toDashboardActivityDto } from '../mappers.js';
 import type { DashboardRepository } from '../repositories/dashboardRepository.js';
+import type { PeriodLookup } from '../repositories/periodRepository.js';
 import type { ScheduleRepository } from '../repositories/scheduleRepository.js';
 import type { Actor } from './activityService.js';
+import { readCurrentPeriods } from './currentPeriods.js';
 import { occurrencesInRange, windowOf } from './scheduleOccurrences.js';
 
 /**
- * Builds the Dashboard of the authenticated user for their current period.
+ * Builds the Dashboard of the authenticated user over ALL their current, active periods (the general one and the one of each
+ * active study; never past periods nor an archived study's). The HOME period is kept in `period` for the screens that work
+ * with one period; the numbers and lists are not limited to it.
  *
- * Main queries: 1 (current period) + 7 run in parallel (subject count, count by status, overdue count,
- * the overdue / today / upcoming lists and today's class candidates) = 8, whatever the amount of data. Nothing is stored:
- * everything is derived on each request. `clock` is injected so "now", "today" and the greeting are testable.
+ * Main queries: 1 (the current periods, with their study) + 7 run in parallel (subject count, count by status, overdue count,
+ * the overdue / today / upcoming lists and today's class candidates, each with `periodId IN (...)`) = 8, whatever the amount of
+ * data or of periods. Nothing is stored: everything is derived on each request. `clock` is injected so "now", "today" and the
+ * greeting are testable.
  */
 export function createDashboardService(
   dashboard: DashboardRepository,
   schedule: ScheduleRepository,
+  periods: Pick<PeriodLookup, 'listCurrent'>,
   clock: () => Date,
 ) {
   return {
@@ -38,11 +44,12 @@ export function createDashboardService(
         greeting: greetingForTime(now, tz),
       };
 
-      const period = await dashboard.currentPeriod(actor.id);
-      if (!period) {
+      const current = await readCurrentPeriods(periods, actor.id);
+      if (current.ids.length === 0) {
         return {
           ...base,
           period: null,
+          periods: [],
           subjectCount: 0,
           summary: { total: 0, pending: 0, inProgress: 0, completed: 0, overdue: 0 },
           progress: { completed: 0, total: 0, percent: 0 },
@@ -60,17 +67,17 @@ export function createDashboardService(
 
       const [subjectCount, counts, overdueCount, overdueRows, todayRows, upcomingRows, classRows] =
         await Promise.all([
-          dashboard.countSubjects(actor.id, period.id),
-          dashboard.countByStatus(actor.id, period.id),
-          dashboard.countOverdue(actor.id, period.id, now),
-          dashboard.listOverdue(actor.id, period.id, now, DASHBOARD_OVERDUE_LIMIT),
-          dashboard.listDueBetween(actor.id, period.id, now, endOfToday),
-          dashboard.listDueAfter(actor.id, period.id, endOfToday, DASHBOARD_UPCOMING_LIMIT),
+          dashboard.countSubjects(actor.id, current.ids),
+          dashboard.countByStatus(actor.id, current.ids),
+          dashboard.countOverdue(actor.id, current.ids, now),
+          dashboard.listOverdue(actor.id, current.ids, now, DASHBOARD_OVERDUE_LIMIT),
+          dashboard.listDueBetween(actor.id, current.ids, now, endOfToday),
+          dashboard.listDueAfter(actor.id, current.ids, endOfToday, DASHBOARD_UPCOMING_LIMIT),
           // Candidates only: the weekly rules are expanded in memory for today alone.
           schedule.candidates(actor.id, {
             ...windowOf({ from: localDate, to: localDate }, tz),
             types: ['CLASS'],
-            periodId: period.id,
+            periodIds: current.ids,
           }),
         ]);
 
@@ -80,7 +87,8 @@ export function createDashboardService(
 
       return {
         ...base,
-        period: toPeriodDto(period),
+        period: current.home,
+        periods: current.contexts,
         subjectCount,
         summary: {
           total,

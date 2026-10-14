@@ -196,6 +196,11 @@ export const listActivitiesQuerySchema = z
 /** The period is deliberately not part of the public contract: the client never sends it and nothing reads it. */
 export const activitySchema = z.object({
   id: z.uuid(),
+  /**
+   * The period the activity belongs to (set by the server, never by the client): it is how a screen finds the study an activity
+   * comes from. A study is never stored on the activity.
+   */
+  periodId: z.uuid(),
   subjectId: z.uuid().nullable(),
   title: z.string(),
   description: z.string().nullable(),
