@@ -267,6 +267,10 @@ describe('GET /api/subjects?scope=current: the subjects of every current period,
     expect(await names(`periodId=${w.H.id}`)).toEqual(['Vieja']);
     expect(await names('')).toHaveLength(5);
     expect((await a.agent.get('/api/subjects?scope=all')).status).toBe(400);
+    // a period OR the scope, never both: nothing valid is silently ignored (Activities, on purpose, do let a period narrow)
+    const both = await a.agent.get(`/api/subjects?scope=current&periodId=${w.H.id}`);
+    expect(both.status).toBe(400);
+    expect(both.body.error.code).toBe('VALIDATION_ERROR');
     expect((await signUp(app, 'c@example.com')).agent).toBeDefined();
   });
 });

@@ -53,20 +53,20 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 
 ## Endpoints (todos requieren sesión)
 
-| Método y ruta                 | Notas                                                                                                                                           |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/periods/home`       | el periodo **hogar** (lo decide el servidor; solo lectura) → `{ period }` con `period: null` si no hay                                          |
-| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                |
-| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
-| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                               |
-| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyTrackId?, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
-| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                                     |
-| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                                            |
-| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                                   |
-| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                                 |
-| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                               |
-| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                                        |
-| `DELETE /api/subjects/:id`    | 204                                                                                                                                             |
+| Método y ruta                 | Notas                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/periods/home`       | el periodo **hogar** (lo decide el servidor; solo lectura) → `{ period }` con `period: null` si no hay                                            |
+| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                  |
+| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                        |
+| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                                 |
+| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyTrackId?, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada   |
+| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                                       |
+| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`; `?scope=current` en su lugar lista las de todos los periodos actuales y activos; **ambos a la vez → `400`** |
+| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                                     |
+| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                                   |
+| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                                 |
+| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                                          |
+| `DELETE /api/subjects/:id`    | 204                                                                                                                                               |
 
 Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripción ≤ 500, fechas reales entre 2000 y 2100.
 

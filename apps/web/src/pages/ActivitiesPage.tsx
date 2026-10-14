@@ -202,8 +202,9 @@ export function ActivitiesPage() {
         />
       )}
 
-      {/* Wait for the subjects: the form decides its first mode (a subject to choose, or none) from them, once. */}
-      {current && subjects.isSuccess && (
+      {/* A NEW activity waits for the HOME subjects (the form decides its first mode, a subject to choose or none, from them,
+          once). EDITING does not: ActivityDialog loads the subjects of the activity's own period and shows its own error. */}
+      {current && (current !== 'new' || subjects.isSuccess) && (
         <ActivityDialog
           subjects={subjectList}
           activity={current === 'new' ? undefined : current}

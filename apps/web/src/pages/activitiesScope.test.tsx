@@ -227,6 +227,38 @@ describe('writing stays HOME; editing uses the activity’s own period', () => {
     expect(form(activity(1, 'Proyecto', DIP_P, secondary[0]!.id), new QueryClient())).toBe('');
   });
 
+  it('editing a secondary activity does NOT depend on the HOME subjects: it opens with none given, or with a failed home list', () => {
+    const client = new QueryClient();
+    client.setQueryData(subjectsKey(DIP_P), secondary);
+    const out = wrap(
+      <ActivityDialog
+        subjects={[]} // what the page holds when the HOME subjects did not load
+        activity={activity(1, 'Proyecto', DIP_P, secondary[0]!.id)}
+        timeZone={TZ}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      client,
+    );
+    expect(out).toContain('Seguridad de Redes');
+    expect(out).toContain('Proyecto');
+  });
+
+  it('if the activity’s OWN subjects fail, the dialog says so and offers a retry (nothing is hidden)', () => {
+    // a static render cannot fail a query (a mounted errored query is retried as pending), so the branch is pinned in the source
+    const src = readFileSync(new URL('./activities/ActivityDialog.tsx', import.meta.url), 'utf8');
+    expect(src).toMatch(
+      /own\.isError\) return <QueryError query=\{own\} title="No se pudieron cargar las asignaturas"/,
+    );
+    expect(src).toMatch(/useSubjects\(props\.activity\?\.periodId\)/); // its own period, never the home one
+  });
+
+  it('the page gates only a NEW activity on the HOME subjects; an edit opens without waiting for them', () => {
+    const page = readFileSync(new URL('./ActivitiesPage.tsx', import.meta.url), 'utf8');
+    expect(page).toMatch(/current && \(current !== 'new' \|\| subjects\.isSuccess\)/);
+    expect(page).not.toMatch(/current && subjects\.isSuccess/);
+  });
+
   it('an edit never sends a period: the payload of the form has no periodId and the schema refuses one', () => {
     const src = readFileSync(
       new URL('./activities/ActivityFormDialog.tsx', import.meta.url),

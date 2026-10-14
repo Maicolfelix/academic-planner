@@ -116,6 +116,15 @@ describe('the read scope of a list is a name, not a list of ids', () => {
     expect(listSubjectsQuerySchema.parse({ periodId: U(1) })).toEqual({ periodId: U(1) });
   });
 
+  it('subjects: a period OR the scope, never both (a valid parameter is not silently ignored); neither keeps working', () => {
+    expect(listSubjectsQuerySchema.safeParse({ scope: 'current', periodId: U(1) }).success).toBe(
+      false,
+    );
+    expect(listSubjectsQuerySchema.parse({})).toEqual({});
+    expect(listSubjectsQuerySchema.safeParse({ scope: 'current' }).success).toBe(true);
+    expect(listSubjectsQuerySchema.safeParse({ periodId: U(1) }).success).toBe(true);
+  });
+
   it('a scope and a period can be combined (the period only narrows: the server ANDs them)', () => {
     expect(listActivitiesQuerySchema.parse({ scope: 'current', periodId: U(1) })).toEqual({
       scope: 'current',
