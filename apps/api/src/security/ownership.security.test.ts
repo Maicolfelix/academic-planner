@@ -73,7 +73,55 @@ async function world() {
       .post('/api/study-tracks')
       .send({ name: 'Estudio secreto de B', type: 'OTHER_ACADEMIC' })
   ).body.studyTrack as { id: string };
-  return { a, b, secondSubject, activity, generalActivity, reminder, block, studyTrack };
+  // Grades (D36): B's and A's own graded period (a period of a study, with its scale, a cut, a subject and a scored evaluation).
+  const graded = async (who: typeof a, trackId: string, label: string) => {
+    const period = (
+      await who.agent
+        .post('/api/periods')
+        .send({ ...periodInput, name: `Notas de ${label}`, studyTrackId: trackId })
+    ).body.period as { id: string };
+    const subject = (
+      await who.agent.post('/api/subjects').send({ periodId: period.id, name: `Notas ${label}` })
+    ).body.subject as { id: string };
+    await who.agent
+      .post(`/api/periods/${period.id}/grading`)
+      .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 });
+    const cut = (
+      await who.agent
+        .post(`/api/periods/${period.id}/grading-periods`)
+        .send({ name: `Corte secreto de ${label}`, finalShareBp: 5000 })
+    ).body.gradingPeriod as { id: string };
+    const evaluation = (
+      await who.agent.post('/api/evaluations').send({
+        subjectId: subject.id,
+        gradingPeriodId: cut.id,
+        name: `Parcial secreto de ${label}`,
+        periodShareBp: 5000,
+        scoreMilli: 4300,
+      })
+    ).body.evaluation as { id: string };
+    return { period, subject, cut, evaluation };
+  };
+  const gradedB = await graded(b, studyTrack.id, 'B');
+  // A's own graded period is built on demand: a second current period of A would change what A's summaries show.
+  const gradeA = async () => {
+    const aTrack = (
+      await a.agent.post('/api/study-tracks').send({ name: 'Estudio de A', type: 'UNIVERSITY' })
+    ).body.studyTrack as { id: string };
+    return graded(a, aTrack.id, 'A');
+  };
+  return {
+    a,
+    b,
+    secondSubject,
+    activity,
+    generalActivity,
+    reminder,
+    block,
+    studyTrack,
+    gradeA,
+    gradedB,
+  };
 }
 
 const snapshot = async () => ({
@@ -84,6 +132,9 @@ const snapshot = async () => ({
   reminders: await prisma.reminder.findMany({ orderBy: { id: 'asc' } }),
   blocks: await prisma.scheduleBlock.findMany({ orderBy: { id: 'asc' } }),
   studyTracks: await prisma.studyTrack.findMany({ orderBy: { id: 'asc' } }),
+  gradingProfiles: await prisma.gradingProfile.findMany({ orderBy: { id: 'asc' } }),
+  gradingPeriods: await prisma.gradingPeriod.findMany({ orderBy: { id: 'asc' } }),
+  evaluations: await prisma.evaluation.findMany({ orderBy: { id: 'asc' } }),
 });
 
 const same = (r: request.Response) => ({ status: r.status, body: r.body });
@@ -144,22 +195,56 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
     ],
     ['POST /study-tracks/:id/archive', (a, id) => a.post(`/api/study-tracks/${id}/archive`)],
     ['POST /study-tracks/:id/restore', (a, id) => a.post(`/api/study-tracks/${id}/restore`)],
+    [
+      'POST /periods/:id/grading',
+      (a, id) =>
+        a
+          .post(`/api/periods/${id}/grading`)
+          .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 }),
+    ],
+    ['GET /periods/:id/grading', (a, id) => a.get(`/api/periods/${id}/grading`)],
+    [
+      'PATCH /periods/:id/grading',
+      (a, id) => a.patch(`/api/periods/${id}/grading`).send({ passMilli: 2000 }),
+    ],
+    [
+      'POST /periods/:id/grading-periods',
+      (a, id) =>
+        a.post(`/api/periods/${id}/grading-periods`).send({ name: 'Robado', finalShareBp: 100 }),
+    ],
+    [
+      'PATCH /grading-periods/:id',
+      (a, id) => a.patch(`/api/grading-periods/${id}`).send({ name: 'Hackeado' }),
+    ],
+    ['DELETE /grading-periods/:id', (a, id) => a.delete(`/api/grading-periods/${id}`)],
+    [
+      'PATCH /evaluations/:id',
+      (a, id) => a.patch(`/api/evaluations/${id}`).send({ scoreMilli: 5000 }),
+    ],
+    ['DELETE /evaluations/:id', (a, id) => a.delete(`/api/evaluations/${id}`)],
+    ['GET /subjects/:id/grades', (a, id) => a.get(`/api/subjects/${id}/grades`)],
   ];
 
   const target = (label: string, w: Awaited<ReturnType<typeof world>>) =>
-    label.includes('/study-tracks')
-      ? w.studyTrack.id
-      : label.includes('/subjects')
-        ? w.b.subject.id
-        : label.includes('(general)')
-          ? w.generalActivity.id
-          : label.includes('/activities')
-            ? w.activity.id
-            : label.includes('/schedule')
-              ? w.block.id
-              : label.includes('/reminders')
-                ? w.reminder.id
-                : w.b.period.id;
+    label.includes('/grading-periods/:id')
+      ? w.gradedB.cut.id
+      : label.includes('/evaluations/:id')
+        ? w.gradedB.evaluation.id
+        : label.includes('/grading')
+          ? w.gradedB.period.id
+          : label.includes('/study-tracks')
+            ? w.studyTrack.id
+            : label.includes('/subjects')
+              ? w.b.subject.id
+              : label.includes('(general)')
+                ? w.generalActivity.id
+                : label.includes('/activities')
+                  ? w.activity.id
+                  : label.includes('/schedule')
+                    ? w.block.id
+                    : label.includes('/reminders')
+                      ? w.reminder.id
+                      : w.b.period.id;
 
   it.each(byId.map(([label, call]) => [label, call] as const))(
     '%s: B’s id gets the exact answer of a random id, and nothing changes',
@@ -197,6 +282,62 @@ describe('foreign keys in a request body or query', () => {
     const missing = await adopt(ghost());
     expect(foreign.status).toBe(404);
     expect(same(foreign)).toEqual(same(missing));
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('grades: B’s subject, cut and activity can not be used by A in an evaluation (same answer as non-existent ones)', async () => {
+    const w = await world();
+    const gradedA = await w.gradeA();
+    const before = await snapshot();
+    const own = {
+      subjectId: gradedA.subject.id,
+      gradingPeriodId: gradedA.cut.id,
+      name: 'Robada',
+      periodShareBp: 1000,
+    };
+    const attacks: [string, (id: 'real' | 'ghost') => request.Test][] = [
+      [
+        'evaluation on a foreign subject',
+        (k) =>
+          w.a.agent
+            .post('/api/evaluations')
+            .send({ ...own, subjectId: k === 'real' ? w.gradedB.subject.id : ghost() }),
+      ],
+      [
+        'evaluation in a foreign cut',
+        (k) =>
+          w.a.agent
+            .post('/api/evaluations')
+            .send({ ...own, gradingPeriodId: k === 'real' ? w.gradedB.cut.id : ghost() }),
+      ],
+      [
+        'evaluation linked to a foreign activity',
+        (k) =>
+          w.a.agent
+            .post('/api/evaluations')
+            .send({ ...own, activityId: k === 'real' ? w.activity.id : ghost() }),
+      ],
+      [
+        'evaluation moved to a foreign cut',
+        (k) =>
+          w.a.agent
+            .patch(`/api/evaluations/${gradedA.evaluation.id}`)
+            .send({ gradingPeriodId: k === 'real' ? w.gradedB.cut.id : ghost() }),
+      ],
+      [
+        'evaluation linked to a foreign activity (patch)',
+        (k) =>
+          w.a.agent
+            .patch(`/api/evaluations/${gradedA.evaluation.id}`)
+            .send({ activityId: k === 'real' ? w.activity.id : ghost() }),
+      ],
+    ];
+    for (const [label, attack] of attacks) {
+      const foreign = await attack('real');
+      const missing = await attack('ghost');
+      expect(foreign.status, label).toBe(404);
+      expect(same(foreign), label).toEqual(same(missing));
+    }
     expect(await snapshot()).toEqual(before);
   });
 

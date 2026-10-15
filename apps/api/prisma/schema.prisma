@@ -10,24 +10,28 @@ datasource db {
 }
 
 model User {
-  id             String           @id @default(uuid()) @db.Uuid
-  name           String
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String
   // Always stored trimmed + lowercase (normalised in @planner/core), so the plain unique index is enough.
-  email          String           @unique
-  passwordHash   String
-  timezone       String           @default("America/Bogota")
-  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
-  sessions       Session[]
-  periods        AcademicPeriod[]
-  subjects       Subject[]
-  activities     Activity[]
-  scheduleBlocks ScheduleBlock[]
-  reminders      Reminder[]
+  email           String           @unique
+  passwordHash    String
+  timezone        String           @default("America/Bogota")
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+  sessions        Session[]
+  periods         AcademicPeriod[]
+  subjects        Subject[]
+  activities      Activity[]
+  scheduleBlocks  ScheduleBlock[]
+  reminders       Reminder[]
   // Exactly one per user, created with the account (and by the migration for the ones that already existed).
-  profile        UserProfile?
+  profile         UserProfile?
   // The formations the user takes (0..n; none is valid: personal-only, teacher-only, older accounts).
-  studyTracks    StudyTrack[]
+  studyTracks     StudyTrack[]
+  // Grades (D36). Every row repeats its owner so each repository query is scoped by `userId`.
+  gradingProfiles GradingProfile[]
+  gradingPeriods  GradingPeriod[]
+  evaluations     Evaluation[]
 }
 
 // What the person says they use the app for. A description to personalise labels, NEVER an authorization role.
@@ -131,6 +135,10 @@ model AcademicPeriod {
   subjects       Subject[]
   scheduleBlocks ScheduleBlock[]
   activities     Activity[]
+  // Grades (D36): the scale, the cuts and the evaluations hang from the period (never from a study or an activity).
+  gradingProfile GradingProfile?
+  gradingPeriods GradingPeriod[]
+  evaluations    Evaluation[]
   // Also in the migration SQL (Prisma cannot express them):
   //  - partial unique indexes: at most one isCurrent = true per user WITHOUT a study, and at most one per study
   //  - CHECK ("endDate" > "startDate")
@@ -163,6 +171,8 @@ model Subject {
   period           AcademicPeriod    @relation(fields: [periodId], references: [id], onDelete: NoAction)
   activities       Activity[]
   scheduleBlocks   ScheduleBlock[]
+  // NoAction: a subject with evaluations cannot be deleted silently (the API answers 409).
+  evaluations      Evaluation[]
 
   @@unique([periodId, nameKey])
   // Redundant as a key (id is already unique) but required: it is the target of Activity's composite foreign key,
@@ -222,6 +232,8 @@ model Activity {
 
   reminders Reminder[]
 
+  // The target of the composite foreign key an Evaluation uses to link an activity of the SAME subject (see Evaluation).
+  @@unique([id, subjectId])
   @@index([userId, dueAt])
   @@index([userId, status])
   @@index([userId, periodId, dueAt])
@@ -316,4 +328,88 @@ model ScheduleBlock {
   @@index([userId, startAt])
   @@index([periodId])
   @@index([subjectId])
+}
+
+// GRADES (D36). One numeric scale per period; scores are integers in thousandths so nothing drifts (4.3 = 4300). Only a period that
+// belongs to a study can be graded (the service checks it; a period cannot lose its study while it has this row).
+model GradingProfile {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  periodId  String         @unique @db.Uuid
+  minMilli  Int
+  maxMilli  Int
+  passMilli Int
+  // Digits shown (0..3). Presentation only: the stored scores and every comparison are exact.
+  decimals  Int
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(3)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Cascade: the configuration alone (no evaluations) goes with its period.
+  period    AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  // Also in the migration SQL (Prisma cannot express them):
+  //  - CHECK (minMilli >= 0, maxMilli <= 100000, minMilli < maxMilli, passMilli between them, decimals between 0 and 3)
+
+  @@index([userId])
+}
+
+// A "corte" / school evaluation period / stage, shared by every subject of the period. `finalShareBp` = its weight in the FINAL
+// grade (basis points: 3000 = 30 %); the sum over a period is at most 10000 (checked by the service under a lock).
+model GradingPeriod {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @db.Uuid
+  periodId     String         @db.Uuid
+  name         String
+  // Assigned by the server on creation (1, 2, 3…); the cuts are listed in this order.
+  position     Int
+  finalShareBp Int
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period       AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  // NoAction: a cut with evaluations cannot be deleted silently (the API answers 409).
+  evaluations  Evaluation[]
+  // Also in the migration SQL: CHECK (finalShareBp between 1 and 10000; position >= 1; name has 1..80 characters and is trimmed)
+
+  // The target of Evaluation's composite foreign key (a cut of another period is refused by the database).
+  @@unique([id, periodId])
+  @@unique([periodId, position])
+  @@index([userId, periodId])
+}
+
+// One graded piece of ONE subject. Its weight inside its cut is `periodShareBp`; the sum per (subject, cut) is at most 10000
+// (service, under the same lock). `scoreMilli` is ALWAYS in the profile's scale; `rawEarnedMilli`/`rawMaxMilli` keep what was
+// reported ("18 of 20") and never replace it. `activityId` links an activity of the SAME subject (0..N evaluations per activity):
+// the composite foreign key (activityId, subjectId) -> Activity(id, subjectId) is written by hand in the migration with
+// ON DELETE SET NULL ("activityId") — Prisma cannot express a column list there — so it is a plain column here, and deleting the
+// activity only unlinks the evaluation.
+model Evaluation {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @db.Uuid
+  periodId        String         @db.Uuid
+  subjectId       String         @db.Uuid
+  gradingPeriodId String         @db.Uuid
+  activityId      String?        @db.Uuid
+  name            String
+  periodShareBp   Int
+  scoreMilli      Int?
+  rawEarnedMilli  Int?
+  rawMaxMilli     Int?
+  scoredAt        DateTime?      @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period          AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction)
+  // Composite: the subject and the cut must both belong to this evaluation's period (the database refuses otherwise).
+  subject         Subject        @relation(fields: [subjectId, periodId], references: [id, periodId], onDelete: NoAction)
+  gradingPeriod   GradingPeriod  @relation(fields: [gradingPeriodId, periodId], references: [id, periodId], onDelete: NoAction)
+  // Also in the migration SQL (Prisma cannot express them):
+  //  - FOREIGN KEY ("activityId", "subjectId") -> "Activity"("id", "subjectId") ON DELETE SET NULL ("activityId")
+  //  - CHECK (periodShareBp between 1 and 10000; scoreMilli between 0 and 100000; name has 1..80 characters and is trimmed)
+  //  - CHECK (the raw pair is both-or-none, needs a score, rawMaxMilli > 0 and rawEarnedMilli between 0 and rawMaxMilli)
+  //  - CHECK (scoredAt is set exactly while scoreMilli is)
+
+  @@index([userId, periodId])
+  @@index([subjectId])
+  @@index([gradingPeriodId])
+  @@index([activityId])
 }

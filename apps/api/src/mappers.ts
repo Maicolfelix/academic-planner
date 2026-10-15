@@ -6,6 +6,9 @@ import {
   type BlockOccurrence,
   type DashboardActivity,
   type DueReminder,
+  type Evaluation,
+  type GradingPeriod,
+  type GradingProfile,
   type Reminder,
   type ScheduleBlock,
   type ScheduleBlockLike,
@@ -16,6 +19,9 @@ import {
 import type {
   AcademicPeriod as PeriodRow,
   Activity as ActivityRow,
+  Evaluation as EvaluationRow,
+  GradingPeriod as GradingPeriodRow,
+  GradingProfile as GradingProfileRow,
   Reminder as ReminderRow,
   ScheduleBlock as ScheduleRow,
   StudyTrack as StudyTrackRow,
@@ -184,4 +190,42 @@ export const toSubjectDto = (s: SubjectRow): Subject => ({
   educationContext: s.educationContext,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
+});
+
+// ── Grades (D36): the owner (`userId`) is never part of the public shape ──
+export const toGradingProfileDto = (p: GradingProfileRow): GradingProfile => ({
+  id: p.id,
+  periodId: p.periodId,
+  minMilli: p.minMilli,
+  maxMilli: p.maxMilli,
+  passMilli: p.passMilli,
+  decimals: p.decimals,
+  createdAt: p.createdAt.toISOString(),
+  updatedAt: p.updatedAt.toISOString(),
+});
+
+export const toGradingPeriodDto = (g: GradingPeriodRow): GradingPeriod => ({
+  id: g.id,
+  periodId: g.periodId,
+  name: g.name,
+  position: g.position,
+  finalShareBp: g.finalShareBp,
+  createdAt: g.createdAt.toISOString(),
+  updatedAt: g.updatedAt.toISOString(),
+});
+
+export const toEvaluationDto = (e: EvaluationRow): Evaluation => ({
+  id: e.id,
+  periodId: e.periodId,
+  subjectId: e.subjectId,
+  gradingPeriodId: e.gradingPeriodId,
+  activityId: e.activityId,
+  name: e.name,
+  periodShareBp: e.periodShareBp,
+  scoreMilli: e.scoreMilli,
+  rawEarnedMilli: e.rawEarnedMilli,
+  rawMaxMilli: e.rawMaxMilli,
+  scoredAt: e.scoredAt?.toISOString() ?? null,
+  createdAt: e.createdAt.toISOString(),
+  updatedAt: e.updatedAt.toISOString(),
 });

@@ -108,14 +108,17 @@ Recordatorio **interno** (dentro de la app). Solo guarda el _cuándo_; el mensaj
 
 Índice único parcial: una actividad no puede tener dos `AUTO` con el mismo offset. Reglas por tipo y ciclo de vida: [reminders.md](reminders.md).
 
-## Notas (propuesto: diseño aprobado, NO implementado)
+## Notas (D36, B1: base implementada, sin pantallas)
 
-**No hay migraciones ni cambios en el esquema de Prisma.** Diseño aprobado en [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones), validado con 3 sistemas reales documentados, GO provisional ([grades-validation.md](grades-validation.md)):
+Migración `20261015203000_grading_foundation`. Diseño en [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones), validado con 3 sistemas reales documentados ([grades-validation.md](grades-validation.md)). Todo cuelga del **periodo**; ninguna tabla lleva `studyTrackId` (el estudio se deriva por periodo). Las notas son enteros en milésimas (`4.3` = `4300`) y los pesos en puntos básicos (`3000` = 30 %).
 
-- `GradingProfile` (1:1 con `AcademicPeriod`, `UNIQUE(periodId)`): `minMilli`, `maxMilli`, `passMilli`, `decimals`; solo para periodos con estudio.
-- `GradingPeriod` (corte): `periodId`, `name`, `position`, `finalShareBp` (peso sobre la nota final, 1..10000; la suma del periodo ≤ 10000).
-- `Evaluation`: `subjectId`, `periodId`, `gradingPeriodId` (obligatorio), `activityId?`, `name`, `periodShareBp` (peso dentro del corte), `scoreMilli?` (siempre en la escala del perfil), `rawEarnedMilli?` y `rawMaxMilli?` (ambos o ninguno), `scoredAt?`. Claves compuestas que fuerzan mismo usuario y mismo periodo; **sin `studyTrackId`** (el estudio se deriva por materia → periodo → estudio).
-- Lo que **no** se guardaría: la nota actual, el acumulado, el peso restante, el «necesito sacar» ni «incompleto» (se derivan).
+- `GradingProfile` (1:1 con `AcademicPeriod`, `UNIQUE(periodId)`): `minMilli`, `maxMilli`, `passMilli`, `decimals` (0..3, solo presentación). `CHECK`: `0 ≤ min < max ≤ 100000`, `min ≤ pass ≤ max`.
+- `GradingPeriod` (corte): `periodId`, `name`, `position` (la asigna el servidor), `finalShareBp` (1..10000). `UNIQUE(periodId, position)` y `UNIQUE(id, periodId)` (destino de la clave compuesta de la evaluación).
+- `Evaluation`: `subjectId`, `periodId`, `gradingPeriodId` (obligatorio), `activityId?`, `name`, `periodShareBp` (1..10000), `scoreMilli?` (siempre en la escala del perfil), `rawEarnedMilli?`/`rawMaxMilli?` (ambos o ninguno), `scoredAt?`. Claves compuestas `(subjectId, periodId)` → `Subject` y `(gradingPeriodId, periodId)` → `GradingPeriod`: la BD rechaza una materia o un corte de otro periodo. `CHECK`: pesos, rango de la nota, `scoredAt` ⇔ `scoreMilli`, y el par crudo (ambos o ninguno, necesita nota, `rawMax > 0`, `0 ≤ earned ≤ max`).
+- **Vínculo con la actividad** (0..N evaluaciones por actividad): clave compuesta `(activityId, subjectId)` → `Activity(id, subjectId)` escrita **a mano** con `ON DELETE SET NULL ("activityId")` (PostgreSQL 15+; la `subjectId` es `NOT NULL` y se conserva) y `ON UPDATE NO ACTION`. Así una actividad solo puede vincularse a evaluaciones de **su misma materia** (una general no puede), borrar la actividad solo desvincula, y cambiar de materia una actividad vinculada se rechaza (409). Prisma no puede expresar esa FK: `prisma migrate diff` la muestra como diferencia conocida (no la borres).
+- **Borrados:** una materia con evaluaciones (409 `SUBJECT_HAS_EVALUATIONS`) y un corte con evaluaciones (409 `GRADING_PERIOD_NOT_EMPTY`) no se borran; una evaluación sí; un periodo sin materias se borra con su configuración (`ON DELETE CASCADE` de perfil y cortes); un periodo con configuración de notas no puede quedarse sin estudio (409 `PERIOD_HAS_GRADING`), pero sí cambiar de estudio; archivar un estudio no toca las notas.
+- **Sumas de pesos** (cortes de un periodo ≤ 100 %; evaluaciones de una materia dentro de un corte ≤ 100 %) y **mín/máx inmutables con notas**: las verifica el servicio bajo el _lock_ por usuario de los estudios (no hay `CHECK` posible entre filas).
+- Lo que **no** se guarda: la nota actual, el acumulado, el peso restante, el «necesito sacar» ni «incompleto» (se derivan en `packages/core/src/gradingMath.ts`).
 
 ## Datos derivados (no se almacenan)
 

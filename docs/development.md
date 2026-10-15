@@ -62,7 +62,7 @@ Docker Desktop puede no estar arrancado: ábrelo y espera a que `docker info` re
 ## Base de datos y migraciones
 
 - Dos bases en el mismo PostgreSQL: `academic_planner` (desarrollo) y `academic_planner_test` (pruebas, se crea y migra sola). Detalle en [testing.md](testing.md#base-de-datos-de-desarrollo-y-de-prueba).
-- **Nunca edites una migración ya aplicada**: crea otra (`npm run db:migrate`). Las invariantes que Prisma no expresa (índices únicos parciales, `CHECK`) se escriben a mano al final de la migración.
+- **Nunca edites una migración ya aplicada**: crea otra (`npm run db:migrate`). Las invariantes que Prisma no expresa (índices únicos parciales, `CHECK`) se escriben a mano al final de la migración. Una clave foránea compuesta con `ON DELETE SET NULL (columna)` (la de `Evaluation.activityId`, D36) tampoco la expresa Prisma: `prisma migrate diff` la propondrá borrar; **no** la incluyas en una migración nueva.
 - Reiniciar la base de desarrollo desde cero: `docker compose down -v`, luego `npm run db:up` y `npm run db:deploy`.
 - Para ver la base: `docker exec -it academic-planner-db psql -U planner -d academic_planner`.
 

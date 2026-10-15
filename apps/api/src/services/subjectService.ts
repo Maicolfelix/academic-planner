@@ -21,6 +21,13 @@ const notEmpty = (dependents?: { activities: number; scheduleBlocks: number }) =
     dependents,
   );
 
+const hasEvaluations = () =>
+  new AppError(
+    409,
+    'SUBJECT_HAS_EVALUATIONS',
+    'La asignatura tiene evaluaciones o notas registradas. Elimínalas primero.',
+  );
+
 const duplicate = () =>
   new AppError(
     409,
@@ -104,11 +111,13 @@ export function createSubjectService(
       if (!(await subjects.findOwned(userId, id))) throw subjectNotFound();
       const dependents = await subjects.countDependents(id);
       if (dependents.activities > 0 || dependents.scheduleBlocks > 0) throw notEmpty(dependents);
+      if ((await subjects.countEvaluations(userId, id)) > 0) throw hasEvaluations();
       try {
         if (!(await subjects.delete(userId, id))) throw subjectNotFound();
       } catch (err) {
         // An activity was added between the check and the delete: the foreign key still says no.
-        if (isPrismaError(err, 'P2003')) throw notEmpty();
+        if (isPrismaError(err, 'P2003'))
+          throw (await subjects.countEvaluations(userId, id)) > 0 ? hasEvaluations() : notEmpty();
         throw err;
       }
     },
