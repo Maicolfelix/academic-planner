@@ -174,7 +174,10 @@ export function AddStudyDialog({
               patch({ level: { studyLevel: null, studyLevelNote: note } });
               next();
             }}
-            onSkip={next}
+            onSkip={() => {
+              patch({ level: emptyWizard.level }); // nothing chosen: no level, even if one was given before going Back
+              next();
+            }}
             optional
           />
         )}

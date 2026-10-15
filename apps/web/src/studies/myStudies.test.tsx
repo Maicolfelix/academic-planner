@@ -748,7 +748,48 @@ describe('the level of a study, for every kind: a number OR a few words, always 
     expect(out).toContain('Módulo 3, Nivel B2, Etapa final');
     expect(out).not.toMatch(/Semestre|aria-label="Nivel \d/);
     expect(out).not.toContain('>Otro<'); // there is nothing to expand: the two fields are the answer
-    expect(out).toContain('Ahora no'); // and it can still be skipped
+    // ONE action: "Siguiente" with nothing is "no level", so "Ahora no" would say the same thing and is not drawn
+    expect(out).toContain('Siguiente');
+    expect(out).not.toContain('Ahora no');
+  });
+
+  it('an optional LevelStep (adding a study) draws no "Ahora no" for any kind of study; the default one (the onboarding) keeps it', () => {
+    for (const use of ['UNIVERSITY_STUDENT', 'SCHOOL_STUDENT', 'OTHER_STUDENT'] as const) {
+      const optional = step(use);
+      expect(optional, use).not.toContain('Ahora no');
+      expect(optional, use).toContain('Siguiente');
+      const standard = wrap(
+        <LevelStep
+          primaryUse={use}
+          current={none}
+          pending={false}
+          onPickNumber={() => {}}
+          onSaveNote={() => {}}
+          onSkip={() => {}}
+        />,
+        client({}),
+      );
+      expect(standard, use).toContain('Ahora no');
+      expect(standard, use).toContain('Siguiente');
+    }
+  });
+
+  it('the onboarding does not ask for the optional mode, and the study flow does (and an empty answer clears what was saved)', () => {
+    const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+    const onboarding = read('../pages/OnboardingPage.tsx');
+    const usage = onboarding.slice(
+      onboarding.indexOf('<LevelStep'),
+      onboarding.indexOf('/>', onboarding.indexOf('<LevelStep')),
+    );
+    expect(usage).toContain('onSkip='); // it still has its own "Ahora no"
+    expect(usage).not.toMatch(/\boptional\b/);
+    const dialog = read('../pages/studies/AddStudyDialog.tsx');
+    expect(dialog).toMatch(/optional\s*\n/);
+    expect(dialog).toMatch(/patch\(\{ level: emptyWizard\.level \}\)/); // Siguiente with nothing = no level, even after Atrás
+    // a marked number can be unmarked in the optional mode only, so a level can still be taken back
+    expect(read('../onboarding/LevelStep.tsx')).toMatch(
+      /setPicked\(optional && picked === n \? null : n\)/,
+    );
   });
 
   it('a university and a school keep their words and their quick numbers', () => {

@@ -12,9 +12,9 @@ interface Props {
   error?: string;
   onPickNumber: (n: number) => void;
   onSaveNote: (note: string) => void;
-  /** "Ahora no": decide this step without saving anything. */
+  /** "Ahora no": decide this step without saving anything. In `optional` mode it is what "Siguiente" does with nothing. */
   onSkip: () => void;
-  /** "Siguiente" with nothing chosen is "no level" instead of an error (adding a study). */
+  /** "Siguiente" with nothing chosen is "no level" instead of an error, and there is no "Ahora no" (adding a study). */
   optional?: boolean;
 }
 
@@ -23,6 +23,10 @@ interface Props {
  * saves and moves on, so a slip can be corrected. "Otro" takes a bigger number (the domain accepts 1 to 99) or a short
  * description, and the two fields exclude each other as they are typed (the domain still refuses both, as a defence). The
  * words change with the use; the data is the same. "Ahora no" is the only way to leave without saving.
+ *
+ * `optional` (adding a study, where nothing is saved until the last step) has ONE action: "Siguiente" with a level saves it in
+ * the flow, and with nothing it moves on without one, so "Ahora no" would be the very same thing and is not drawn. Tapping the
+ * marked number again unmarks it, so a level can still be taken back. The onboarding keeps its two actions.
  */
 export function LevelStep({
   primaryUse,
@@ -84,7 +88,7 @@ export function LevelStep({
                 aria-pressed={on}
                 disabled={pending}
                 onClick={() => {
-                  setPicked(n);
+                  setPicked(optional && picked === n ? null : n);
                   setOther(false);
                   setFieldError(undefined);
                 }}
@@ -171,9 +175,11 @@ export function LevelStep({
         <Button type="submit" variant="primary" disabled={pending} aria-busy={pending || undefined}>
           {pending ? 'Guardando…' : 'Siguiente'}
         </Button>
-        <Button variant="ghost" onClick={onSkip} disabled={pending}>
-          Ahora no
-        </Button>
+        {!optional && (
+          <Button variant="ghost" onClick={onSkip} disabled={pending}>
+            Ahora no
+          </Button>
+        )}
       </div>
     </form>
   );

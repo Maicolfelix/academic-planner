@@ -526,16 +526,22 @@ test('"otro estudio" may have a level: a number (Técnico), words (Inglés B2) o
   await expect(studyCard(page, 'Inglés')).toContainText('B2');
   expect(await levelOf('Inglés')).toEqual({ studyLevel: null, studyLevelNote: 'B2' });
 
-  // 3) a diploma with no level: "Ahora no" is valid, and so is Siguiente with nothing; the confirmation has no Nivel line
+  // 3) a diploma with no level: ONE action ("Siguiente"; there is no "Ahora no"), and an empty answer means no level
   dialog = await otherStudyUntilLevel(page, 'Diplomado');
-  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // nothing chosen: "no level", not an error
-  await expect(dialog.getByRole('alert')).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // subjects: none
-  await expect(dialog.getByText('Nivel', { exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Atrás' }).click();
-  await dialog.getByRole('button', { name: 'Atrás' }).click();
-  await dialog.getByRole('button', { name: 'Ahora no' }).click();
+  await expect(dialog.getByRole('button', { name: 'Ahora no' })).toHaveCount(0);
+  await dialog.getByLabel(/^Número/).fill('3'); // something was written first...
   await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // subjects: none
+  await expect(dialog.getByText('Nivel 3')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await expect(dialog.getByLabel(/^Número/)).toHaveValue('3'); // Atrás kept it
+  await dialog.getByLabel(/^Número/).fill(''); // ...and now it is emptied: Siguiente alone means "no level"
+  await expect(dialog.getByRole('button', { name: 'Ahora no' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(dialog.getByRole('alert')).toHaveCount(0); // not an error
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(dialog.getByText('Nivel', { exact: true })).toHaveCount(0); // the confirmation has no Nivel line
   await dialog.getByRole('button', { name: 'Crear estudio' }).click();
   await expect(studyCard(page, 'Diplomado')).toBeVisible();
   expect(await levelOf('Diplomado')).toEqual({ studyLevel: null, studyLevelNote: null });
