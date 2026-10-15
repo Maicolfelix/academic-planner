@@ -271,7 +271,13 @@ describe('schemas', () => {
   it('the Radar response must have the five summaries and the five groups', () => {
     const empty = { overdue: 0, immediate: 0, upcoming: 0, plannable: 0, underControl: 0 };
     const groups = { overdue: [], immediate: [], upcoming: [], plannable: [], underControl: [] };
-    const ok = { generatedAt: NOW.toISOString(), period: null, summary: empty, groups };
+    const ok = {
+      generatedAt: NOW.toISOString(),
+      period: null,
+      periods: [],
+      summary: empty,
+      groups,
+    };
     expect(radarSchema.safeParse(ok).success).toBe(true);
     expect(
       radarSchema.safeParse({ ...ok, summary: { ...empty, underControl: undefined } }).success,

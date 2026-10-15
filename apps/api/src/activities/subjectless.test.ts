@@ -75,16 +75,20 @@ describe('POST /api/activities — the period is derived by the server', () => {
     },
   );
 
-  it('the period is not part of the public contract (the client neither sends nor reads it)', async () => {
+  it('the period is READ-ONLY for the client: the answer says it (to tell which study the activity comes from), a request cannot send it', async () => {
     const a = await twoPeriods();
     const created = await general(a.agent);
-    expect(created.body.activity).not.toHaveProperty('periodId');
+    const home = (await a.agent.get('/api/periods/home')).body.period as { id: string };
+    expect(created.body.activity.periodId).toBe(home.id);
     expect(
-      (await a.agent.get(`/api/activities/${created.body.activity.id}`)).body.activity,
-    ).not.toHaveProperty('periodId');
-    expect((await a.agent.get('/api/activities')).body.activities[0]).not.toHaveProperty(
-      'periodId',
-    );
+      (await a.agent.get(`/api/activities/${created.body.activity.id}`)).body.activity.periodId,
+    ).toBe(home.id);
+    expect((await a.agent.get('/api/activities')).body.activities[0].periodId).toBe(home.id);
+    // ...but it is never the client's to say: the schema is strict and the period is derived by the server
+    const res = await a.agent
+      .post('/api/activities')
+      .send({ title: 'X', dueDate: '2026-12-01', periodId: home.id });
+    expect(res.status).toBe(400);
   });
 
   it('a general activity gets its automatic reminders in the same transaction, like any other', async () => {

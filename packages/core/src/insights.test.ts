@@ -523,7 +523,7 @@ describe('schemas', () => {
 
   it('a built workload and progress satisfy the response schemas', () => {
     const w = workload([activity('2026-10-05')], [occurrence('2026-10-05', '08:00', '10:00')]);
-    const ok = { generatedAt: new Date().toISOString(), period: null, ...w };
+    const ok = { generatedAt: new Date().toISOString(), period: null, periods: [], ...w };
     expect(workloadSchema.safeParse(ok).success).toBe(true);
     expect(workloadSchema.safeParse({ ...ok, days: ok.days.slice(0, 6) }).success).toBe(false);
 
@@ -533,6 +533,7 @@ describe('schemas', () => {
         generatedAt: new Date().toISOString(),
         period: null,
         general,
+        byPeriod: [],
         subjects,
       }).success,
     ).toBe(true);

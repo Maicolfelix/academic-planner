@@ -53,20 +53,20 @@ Hay que eliminar o mover sus actividades primero; ver [docs/activities.md](activ
 
 ## Endpoints (todos requieren sesión)
 
-| Método y ruta                 | Notas                                                                                                                                           |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/periods/home`       | el periodo **hogar** (lo decide el servidor; solo lectura) → `{ period }` con `period: null` si no hay                                          |
-| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                |
-| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                      |
-| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                               |
-| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyTrackId?, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada |
-| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                                     |
-| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`                                                                                                            |
-| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                                   |
-| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                                 |
-| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                               |
-| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                                        |
-| `DELETE /api/subjects/:id`    | 204                                                                                                                                             |
+| Método y ruta                 | Notas                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/periods/home`       | el periodo **hogar** (lo decide el servidor; solo lectura) → `{ period }` con `period: null` si no hay                                            |
+| `GET /api/periods`            | propios, el más reciente primero → `{ periods }`                                                                                                  |
+| `POST /api/periods`           | `{ name, startDate, endDate, isCurrent?, studyTrackId?, studyLevel?, studyLevelNote? }` → 201 `{ period }`                                        |
+| `GET /api/periods/:id`        | 404 si no es tuyo                                                                                                                                 |
+| `PATCH /api/periods/:id`      | `{ name?, startDate?, endDate?, isCurrent?: true, studyTrackId?, studyLevel?, studyLevelNote? }`; una fecha suelta se valida contra la guardada   |
+| `DELETE /api/periods/:id`     | 204; 409 `PERIOD_NOT_EMPTY`                                                                                                                       |
+| `GET /api/subjects?periodId=` | propias, por nombre → `{ subjects }`; `?scope=current` en su lugar lista las de todos los periodos actuales y activos; **ambos a la vez → `400`** |
+| `POST /api/subjects`          | `{ periodId, name, color?, professor?, description?, educationContext? }` → 201 `{ subject }`                                                     |
+| `POST /api/subjects/batch`    | `{ names: string[1..30], educationContext? }` → 201 `{ subjects, createdSubjects, reusedSubjects }` (ver abajo)                                   |
+| `GET /api/subjects/:id`       | 404 si no es tuya                                                                                                                                 |
+| `PATCH /api/subjects/:id`     | `{ name?, color?, professor?, description?, educationContext? }`; `''` o `null` borran un campo opcional                                          |
+| `DELETE /api/subjects/:id`    | 204                                                                                                                                               |
 
 Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripción ≤ 500, fechas reales entre 2000 y 2100.
 
@@ -81,6 +81,10 @@ Límites: nombre de periodo y de asignatura 1–100, profesor ≤ 100, descripci
 ### Periodo y estudio (P0.5-2)
 
 Un periodo pertenece a un estudio (`studyTrackId`, uuid) o a ninguno (`null`, válido para siempre: [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)). «Actual» es **por ámbito**: un periodo general y uno por estudio pueden ser actuales a la vez; dos en el mismo ámbito, nunca (índices únicos parciales). `POST` con `studyTrackId` crea el periodo de ese estudio (propio y activo; si no, `404` indistinguible o `409 STUDY_TRACK_ARCHIVED`); `PATCH` con `studyTrackId` lo **mueve** (uuid) o lo deja general (`null`): un periodo que no es actual se mueve libremente y uno actual solo si el destino no tiene actual (si no, `409 CURRENT_PERIOD_CONFLICT`: nadie se degrada en silencio). Archivar un estudio apaga sus periodos actuales; restaurarlo no los reactiva. Las funciones que todavía leen un solo periodo usan el **periodo hogar**: el actual sin estudio; si no, el del estudio principal activo; si no, ninguno.
+
+### Todos los periodos actuales (P0.5-3)
+
+Los resúmenes («qué requiere mi atención ahora») leen **todos** los periodos actuales y activos —el general y el de cada estudio activo— y no solo HOME ([D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)); `GET /api/periods/current` los lista con su estudio. Las escrituras sin destino siguen yendo a HOME. La lista de Actividades y el filtro por asignatura leen ese mismo alcance con `scope=current` (el servidor lo resuelve; el cliente no envía periodos).
 
 ### Estudios (P0.5-1)
 

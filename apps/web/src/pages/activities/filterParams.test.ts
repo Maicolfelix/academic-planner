@@ -49,7 +49,7 @@ describe('activity filters in the URL', () => {
     );
     expect(parseFilters(serializeFilters(filters))).toEqual(filters);
     expect(hasActiveFilters({ subject: 'none' })).toBe(true);
-    expect(toApiQuery({ subject: 'none' }, 'p1').subjectId).toBe('none');
+    expect(toApiQuery({ subject: 'none' }).subjectId).toBe('none');
   });
 
   it('clearing the filters leaves no `subject=none` behind', () => {
@@ -64,8 +64,8 @@ describe('activity filters in the URL', () => {
   });
 
   it('maps to the API query, always scoped to the period', () => {
-    expect(toApiQuery({ status: 'PENDING', subject: 's1', overdue: undefined }, 'p1')).toEqual({
-      periodId: 'p1',
+    expect(toApiQuery({ status: 'PENDING', subject: 's1', overdue: undefined })).toEqual({
+      scope: 'current',
       subjectId: 's1',
       status: 'PENDING',
       priority: undefined,
@@ -73,7 +73,7 @@ describe('activity filters in the URL', () => {
       overdue: undefined,
       radar: undefined,
     });
-    expect(toApiQuery({ overdue: true }, 'p1').overdue).toBe(true);
+    expect(toApiQuery({ overdue: true }).overdue).toBe(true);
   });
 
   it('keeps the Radar category in the URL and sends it to the API; unknown values are dropped', () => {
@@ -86,6 +86,6 @@ describe('activity filters in the URL', () => {
       subject: 's',
     });
     expect(hasActiveFilters({ radar: 'OVERDUE' })).toBe(true);
-    expect(toApiQuery({ radar: 'UNDER_CONTROL' }, 'p1').radar).toBe('UNDER_CONTROL');
+    expect(toApiQuery({ radar: 'UNDER_CONTROL' }).radar).toBe('UNDER_CONTROL');
   });
 });

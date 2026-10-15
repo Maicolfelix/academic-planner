@@ -1,10 +1,11 @@
 import { buildProgress, type Progress, type StatusCounts } from '@planner/core';
-import { toPeriodDto } from '../mappers.js';
 import type { InsightsRepository } from '../repositories/insightsRepository.js';
 import type { PeriodRepository } from '../repositories/periodRepository.js';
 import type { Actor } from './activityService.js';
+import { readCurrentPeriods } from './currentPeriods.js';
 
 const empty = (): StatusCounts => ({ pending: 0, inProgress: 0, completed: 0 });
+const noSubject = () => ({ counts: empty(), overdue: 0 });
 const STATUS_KEY = {
   PENDING: 'pending',
   IN_PROGRESS: 'inProgress',
@@ -12,10 +13,12 @@ const STATUS_KEY = {
 } as const;
 
 /**
- * Registered-activity progress of the authenticated user's CURRENT period, in general (every activity, with or without a
- * subject) and per subject (only the ones that have one).
- * 4 queries (current period, then subjects + counts by status + overdue counts in parallel), whatever the data.
- * The arithmetic is core's `buildProgress`; nothing is stored.
+ * Registered-activity progress over ALL the authenticated user's current, active periods: `general` counts every activity of
+ * all of them (with or without a subject), `byPeriod` splits it one entry per period with its study (so two studies are never
+ * shown as one mixed semester), and `subjects` lists every subject of those periods with the period it belongs to.
+ * 4 queries (the current periods, then subjects + counts by period/subject/status + overdue counts in parallel), whatever the
+ * data or the number of periods. The arithmetic is core's `buildProgress`, once per period and once overall; nothing is stored.
+ * A count of activities, never a grade or an average.
  */
 export function createProgressService(
   insights: InsightsRepository,
@@ -26,23 +29,30 @@ export function createProgressService(
     async get(actor: Actor): Promise<Progress> {
       const now = clock();
       const generatedAt = now.toISOString();
-      const period = await periods.findHomeCurrent(actor.id);
-      if (!period) {
-        return { generatedAt, period: null, ...buildProgress([]) };
+      const current = await readCurrentPeriods(periods, actor.id);
+      if (current.ids.length === 0) {
+        const { general } = buildProgress([]);
+        return { generatedAt, period: null, general, byPeriod: [], subjects: [] };
       }
 
       const [subjects, statusRows, overdueRows] = await Promise.all([
-        insights.subjects(actor.id, period.id),
-        insights.statusCounts(actor.id, period.id),
-        insights.overdueCounts(actor.id, period.id, now),
+        insights.subjects(actor.id, current.ids),
+        insights.statusCounts(actor.id, current.ids),
+        insights.overdueCounts(actor.id, current.ids, now),
       ]);
 
-      // The general activities (no subject) have no row of their own: they only weigh in the general progress.
+      // The general activities (no subject) have no row of their own: they only weigh in the general progress (overall and
+      // of their period). An activity is counted once: by the period it stores, in one grouped row per status.
       const counts = new Map<string, StatusCounts>();
-      const general = { counts: empty(), overdue: 0 };
+      const generalOf = new Map<string, ReturnType<typeof noSubject>>();
+      const general = (periodId: string) => {
+        const g = generalOf.get(periodId) ?? noSubject();
+        generalOf.set(periodId, g);
+        return g;
+      };
       for (const row of statusRows) {
         if (row.subjectId === null) {
-          general.counts[STATUS_KEY[row.status]] += row._count._all;
+          general(row.periodId).counts[STATUS_KEY[row.status]] += row._count._all;
           continue;
         }
         const c = counts.get(row.subjectId) ?? empty();
@@ -51,21 +61,40 @@ export function createProgressService(
       }
       const overdue = new Map<string, number>();
       for (const row of overdueRows) {
-        if (row.subjectId === null) general.overdue += row._count._all;
+        if (row.subjectId === null) general(row.periodId).overdue += row._count._all;
         else overdue.set(row.subjectId, row._count._all);
       }
 
+      const inputs = subjects.map((s) => ({
+        id: s.id,
+        periodId: s.periodId,
+        name: s.name,
+        color: s.color,
+        counts: counts.get(s.id) ?? empty(),
+        overdue: overdue.get(s.id) ?? 0,
+      }));
+      const allGeneral = noSubject();
+      for (const g of generalOf.values()) {
+        allGeneral.counts.pending += g.counts.pending;
+        allGeneral.counts.inProgress += g.counts.inProgress;
+        allGeneral.counts.completed += g.counts.completed;
+        allGeneral.overdue += g.overdue;
+      }
+
+      const overall = buildProgress(inputs, allGeneral);
+      const periodOf = new Map(inputs.map((s) => [s.id, s.periodId]));
       return {
         generatedAt,
-        period: toPeriodDto(period),
-        ...buildProgress(
-          subjects.map((s) => ({
-            ...s,
-            counts: counts.get(s.id) ?? empty(),
-            overdue: overdue.get(s.id) ?? 0,
-          })),
-          general,
-        ),
+        period: current.home,
+        general: overall.general,
+        byPeriod: current.contexts.map((context) => ({
+          ...context,
+          general: buildProgress(
+            inputs.filter((s) => s.periodId === context.period.id),
+            generalOf.get(context.period.id) ?? noSubject(),
+          ).general,
+        })),
+        subjects: overall.subjects.map((s) => ({ ...s, periodId: periodOf.get(s.id)! })),
       };
     },
   };

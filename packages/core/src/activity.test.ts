@@ -249,6 +249,7 @@ describe('listActivitiesQuerySchema', () => {
 describe('activitySchema (the DTO)', () => {
   const dto = {
     id: subjectId,
+    periodId: subjectId,
     subjectId,
     title: 'T',
     description: null,
@@ -268,7 +269,11 @@ describe('activitySchema (the DTO)', () => {
     expect(activitySchema.safeParse({ ...dto, subjectId: 'x' }).success).toBe(false);
   });
 
-  it('does not expose the period: it is not part of the public contract', () => {
-    expect(Object.keys(activitySchema.shape)).not.toContain('periodId');
+  it('exposes the period it belongs to (read-only: a request can never send it) and never a study', () => {
+    expect(Object.keys(activitySchema.shape)).toContain('periodId');
+    expect(Object.keys(activitySchema.shape)).not.toContain('studyTrackId');
+    const without: Partial<typeof dto> = { ...dto };
+    delete without.periodId;
+    expect(activitySchema.safeParse(without).success).toBe(false);
   });
 });

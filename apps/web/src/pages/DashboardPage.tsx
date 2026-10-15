@@ -1,10 +1,12 @@
-import { DEFAULT_TIMEZONE, formatDateOnly, type DashboardActivity } from '@planner/core';
+import { DEFAULT_TIMEZONE, type DashboardActivity } from '@planner/core';
 import { Link } from 'react-router';
 import { useAttention } from '../attention/useAttention';
 import { useMe } from '../auth/useAuth';
 import { QueryError } from '../components/QueryError';
 import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
+import { readsSeveralPeriods, type OriginOf } from '../academic/origin';
+import { useOrigins } from '../academic/useAcademic';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
 import { AmbientMood } from './dashboard/AmbientTone';
@@ -13,6 +15,7 @@ import { HomeSkeleton } from './dashboard/HomeSkeleton';
 import { NoActivities, NoSubjects } from './dashboard/EmptyStates';
 import { DueSection } from './dashboard/DueSection';
 import { NextDueCard } from './dashboard/NextDueCard';
+import { PeriodScopeLine } from './dashboard/PeriodScopeLine';
 import { ProgressCard } from './dashboard/ProgressCard';
 import { SummaryTiles } from './dashboard/SummaryTiles';
 import { AttentionCard } from './attention/AttentionCard';
@@ -33,6 +36,7 @@ import { RemindersPanel } from './reminders/RemindersPanel';
 export function DashboardPage() {
   const user = useMe().data;
   const dashboard = useDashboard();
+  const originOf = useOrigins();
   const now = useNow();
 
   if (dashboard.isPending) return <HomeSkeleton />;
@@ -43,6 +47,7 @@ export function DashboardPage() {
   const d = dashboard.data;
   const timeZone = user?.timezone ?? DEFAULT_TIMEZONE;
   const hasData = d.subjectCount > 0 && d.summary.total > 0;
+  const several = readsSeveralPeriods(d.periods);
 
   // The highlighted next activity is not repeated in the lists below it.
   const nextId = d.nextDue?.id;
@@ -70,12 +75,7 @@ export function DashboardPage() {
         <h1 className="text-display break-words lg:text-[2.5rem] lg:leading-[3rem]">
           {d.greeting}, {user?.name}
         </h1>
-        {d.period && (
-          <p className="mt-0.5 text-sm text-muted-foreground break-words">
-            {d.period.name} · {formatDateOnly(d.period.startDate)} –{' '}
-            {formatDateOnly(d.period.endDate)}
-          </p>
-        )}
+        <PeriodScopeLine period={d.period} periods={d.periods} />
       </header>
 
       <QueryError query={dashboard} title="No se pudo cargar tu panel" />
@@ -102,6 +102,7 @@ export function DashboardPage() {
               items={d.overdue}
               timeZone={timeZone}
               now={now}
+              origin={originOf}
               overdue
               footer={
                 d.summary.overdue > d.overdue.length && (
@@ -119,7 +120,13 @@ export function DashboardPage() {
             />
           )}
           {hasData && today.length > 0 && (
-            <DueSection title="Para hoy" items={today} timeZone={timeZone} now={now} />
+            <DueSection
+              title="Para hoy"
+              items={today}
+              timeZone={timeZone}
+              now={now}
+              origin={originOf}
+            />
           )}
         </div>
 
@@ -128,8 +135,8 @@ export function DashboardPage() {
           <div className="flex flex-col gap-5 lg:col-start-2 lg:row-span-2 lg:row-start-1">
             {hasData && (
               <>
-                <SummaryTiles summary={d.summary} />
-                <ProgressCard progress={d.progress} />
+                <SummaryTiles summary={d.summary} several={several} />
+                <ProgressCard progress={d.progress} several={several} />
               </>
             )}
 
@@ -155,13 +162,14 @@ export function DashboardPage() {
         {/* WHAT COMES NEXT */}
         {hasData && (
           <div className="flex flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:self-start">
-            <NextDue activity={d.nextDue} timeZone={timeZone} now={now} />
+            <NextDue activity={d.nextDue} timeZone={timeZone} now={now} origin={originOf} />
             {upcoming.length > 0 && (
               <DueSection
                 title="Próximas entregas"
                 items={upcoming}
                 timeZone={timeZone}
                 now={now}
+                origin={originOf}
               />
             )}
             <WeekCard />
@@ -188,10 +196,12 @@ function NextDue({
   activity,
   timeZone,
   now,
+  origin,
 }: {
   activity: DashboardActivity | null;
   timeZone: string;
   now: Date;
+  origin: OriginOf;
 }) {
   const attention = useAttention();
   // Until the hero is known the card would appear and then collapse into a line (a flash, and a node swapped under the
@@ -200,5 +210,13 @@ function NextDue({
   // The hero opens on the first of its activities (the one due soonest): that is the one it already shows.
   const heroId = (attention.data?.upcoming[0] ?? attention.data?.recommendation)?.activity.id;
   const quiet = activity !== null && activity.id === heroId;
-  return <NextDueCard activity={activity} timeZone={timeZone} now={now} quiet={quiet} />;
+  return (
+    <NextDueCard
+      activity={activity}
+      timeZone={timeZone}
+      now={now}
+      quiet={quiet}
+      origin={activity ? origin(activity.periodId) : null}
+    />
+  );
 }

@@ -6,6 +6,7 @@ const withActivity = {
   activity: {
     select: {
       id: true,
+      periodId: true,
       title: true,
       type: true,
       dueAt: true,
@@ -44,10 +45,10 @@ export function createReminderRepository(db: Db) {
         select: { id: true, activityId: true, kind: true },
       }),
 
-    /** Reminders that are due: PENDING, time reached, activity not finished, activity in the given period. */
-    listDue: (userId: string, periodId: string, now: Date, take: number) =>
+    /** Reminders that are due: PENDING, time reached, activity not finished, activity in one of the given periods. */
+    listDue: (userId: string, periodIds: readonly string[], now: Date, take: number) =>
       db.reminder.findMany({
-        where: dueWhere(userId, periodId, now),
+        where: dueWhere(userId, periodIds, now),
         include: withActivity,
         relationLoadStrategy: 'join',
         // The ones that have waited longest come first.
@@ -55,8 +56,8 @@ export function createReminderRepository(db: Db) {
         take,
       }),
 
-    countDue: (userId: string, periodId: string, now: Date) =>
-      db.reminder.count({ where: dueWhere(userId, periodId, now) }),
+    countDue: (userId: string, periodIds: readonly string[], now: Date) =>
+      db.reminder.count({ where: dueWhere(userId, periodIds, now) }),
 
     createManual: (data: { userId: string; activityId: string; remindAt: Date }) =>
       db.reminder.create({
@@ -122,13 +123,16 @@ export function createReminderRepository(db: Db) {
   };
 }
 
-const dueWhere = (userId: string, periodId: string, now: Date) =>
-  ({
+const dueWhere = (userId: string, periodIds: readonly string[], now: Date) => {
+  const ids: string[] = [...periodIds];
+  return {
     userId,
     status: 'PENDING',
     remindAt: { lte: now },
-    // A finished activity never shows reminders, even if an inconsistent row existed.
-    activity: { status: { not: 'COMPLETED' }, periodId },
-  }) as const;
+    // A finished activity never shows reminders, even if an inconsistent row existed; and only the activities of the periods
+    // the server says are current and active (a reminder belongs to an activity, so it follows the activity's period).
+    activity: { status: { not: 'COMPLETED' }, periodId: { in: ids } },
+  } as const;
+};
 
 export type ReminderRepository = ReturnType<typeof createReminderRepository>;

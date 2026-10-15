@@ -9,6 +9,7 @@ export function periodsRouter(
   router.use(requireAuth); // every period route needs a session
   router.get('/', controller.list);
   router.get('/home', controller.home); // BEFORE '/:id': "home" is not an id
+  router.get('/current', controller.current); // nor is "current"
   router.post('/', controller.create);
   router.get('/:id', controller.get);
   router.patch('/:id', controller.update);

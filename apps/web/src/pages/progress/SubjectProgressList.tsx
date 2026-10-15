@@ -1,4 +1,6 @@
 import type { Progress } from '@planner/core';
+import type { OriginOf } from '../../academic/origin';
+import { OriginLabel } from '../../components/OriginLabel';
 import { ProgressBar } from './ProgressBar';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -7,7 +9,14 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * Progress of the registered activities of each subject, in alphabetical order (stable and neutral: it does not
  * rank subjects by how well they are going). A subject with no activities says so instead of showing 0 %.
  */
-export function SubjectProgressList({ subjects }: { subjects: Progress['subjects'] }) {
+export function SubjectProgressList({
+  subjects,
+  origin,
+}: {
+  subjects: Progress['subjects'];
+  /** The study a subject's period belongs to, when it is worth saying (see `originLabelOf`). */
+  origin?: OriginOf;
+}) {
   return (
     <ul className="flex flex-col gap-2">
       {subjects.map((s) => (
@@ -21,7 +30,10 @@ export function SubjectProgressList({ subjects }: { subjects: Progress['subjects
             className="w-1.5 shrink-0"
           />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3">
-            <p className="font-medium break-words">{s.name}</p>
+            <p className="font-medium break-words">
+              {s.name}
+              <OriginLabel label={origin?.(s.periodId)} />
+            </p>
             {s.total === 0 ? (
               <p className="text-sm text-slate-700">Sin actividades registradas</p>
             ) : (

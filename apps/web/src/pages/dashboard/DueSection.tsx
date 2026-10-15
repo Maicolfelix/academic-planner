@@ -1,5 +1,7 @@
 import { dueRelativeLabel, formatDue, type DashboardActivity } from '@planner/core';
 import { useId, type ReactNode } from 'react';
+import type { OriginOf } from '../../academic/origin';
+import { OriginLabel } from '../../components/OriginLabel';
 import { Card } from '../../components/ui/Card';
 import { NO_SUBJECT_COLOR } from '../../lib/readableInk';
 import { OverdueBadge } from '../activities/badges';
@@ -13,6 +15,8 @@ interface Props {
   overdue?: boolean;
   /** Shown under the list, e.g. a link to the rest. */
   footer?: ReactNode;
+  /** The study each item comes from (only when it is worth saying: see `originLabelOf`). */
+  origin?: OriginOf;
   /** Wording of the time left; defaults to the calendar label ("Vence mañana"). */
   describe?: (a: DashboardActivity) => string;
 }
@@ -26,6 +30,7 @@ export function DueSection({
   overdue = false,
   footer,
   describe = (a) => dueRelativeLabel(a, now, timeZone),
+  origin,
 }: Props) {
   const headingId = useId();
   return (
@@ -44,7 +49,10 @@ export function DueSection({
             <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2.5">
               <p className="font-medium break-words">{a.title}</p>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                <span className="break-words">{a.subject?.name ?? 'Sin asignatura'}</span>
+                <span className="break-words">
+                  {a.subject?.name ?? 'Sin asignatura'}
+                  <OriginLabel label={origin?.(a.periodId)} />
+                </span>
                 <span aria-hidden="true">·</span>
                 <span>{formatDue(a, timeZone)}</span>
                 <span aria-hidden="true">·</span>

@@ -449,6 +449,7 @@ describe('response schema', () => {
   const item = {
     activity: {
       id: '0b0c2d5e-8f64-4c5f-9a43-7d7a3f1d2b11',
+      periodId: '2c1d3e6f-9a75-4d6a-8b54-8e8b4a2e3c22',
       subjectId: '1b0c2d5e-8f64-4c5f-9a43-7d7a3f1d2b11',
       title: 'Proyecto final',
       description: null,
@@ -472,6 +473,7 @@ describe('response schema', () => {
   const base = {
     generatedAt: NOW.toISOString(),
     period: null,
+    periods: [],
     recommendation: item,
     alternatives: [],
     upcoming: [item],

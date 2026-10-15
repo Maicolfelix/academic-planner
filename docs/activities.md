@@ -29,7 +29,7 @@ Una actividad **siempre** pertenece a un periodo académico (`periodId NOT NULL`
 1. `periodId` siempre existe.
 2. Si `subjectId` no es nulo, `subject.periodId = activity.periodId`. **Lo garantiza la base de datos**: clave foránea compuesta `Activity(subjectId, periodId) → Subject(id, periodId)` (`MATCH SIMPLE`: no se comprueba mientras `subjectId` es nulo). Requiere un índice único `Subject(id, periodId)`, redundante como clave pero necesario como destino de la FK.
 3. El periodo **no cambia nunca** después de crear la actividad: no hay endpoint, ni campo en el DTO, ni efecto oculto al editar. Cambiar de asignatura dentro del mismo periodo, o quitarla, no mueve el periodo.
-4. El cliente **nunca envía** `periodId` (el esquema `strict` lo rechaza con 400) y la API **no lo expone** (nadie lo lee; exponerlo sugeriría que se puede editar). Lo deriva el servidor al crear: el periodo de la asignatura si hay una, o el **periodo actual** del usuario si no la hay (sin periodo actual: `400 NO_CURRENT_PERIOD`, el mismo código de la Agenda).
+4. El cliente **nunca envía** `periodId` (el esquema `strict` lo rechaza con 400) y la API lo **expone solo para leer** (`periodId` en la respuesta, desde P0.5-3: así una pantalla halla el estudio de la actividad; ninguna petición puede enviarlo ni cambiarlo). Lo deriva el servidor al crear: el periodo de la asignatura si hay una, o el **periodo actual** del usuario si no la hay (sin periodo actual: `400 NO_CURRENT_PERIOD`, el mismo código de la Agenda).
 
 **Quién impide que `Activity.userId = A` apunte a un periodo de B** (revisión de F1):
 
@@ -106,7 +106,7 @@ cada consulta lleva `userId`; una actividad o asignatura ajena responde `404 NOT
 | un uuid propio de **otro periodo**                     | `400 VALIDATION_ERROR` en `subjectId`: «La asignatura debe pertenecer al mismo periodo.» (el mismo mecanismo que la Agenda); la FK compuesta lo respalda |
 | un uuid ajeno o inexistente                            | `404 NOT_FOUND` idéntico                                                                                                                                 |
 
-**Filtros** (se combinan con AND): `subjectId` (un uuid, o `none` para las actividades generales; cualquier otro valor es 400, sin otros comodines), `periodId` (el periodo guardado en la actividad), `status`, `priority`, `type`, `overdue=true|false`,
+**Filtros** (se combinan con AND): `scope=current` (el único valor; el servidor lo resuelve a **todos los periodos actuales y activos** del usuario con `PeriodLookup.listCurrent`, nunca una lista enviada por el cliente: `periodIds`, `userId` y otros parámetros extra se ignoran; sin periodo actual devuelve una lista vacía; un `periodId` que además se nombre solo **estrecha**, a propósito —a diferencia de `GET /api/subjects`, donde `scope=current` y `periodId` son excluyentes y juntos dan `400`—; es el alcance por omisión de la página de Actividades, igual al de los contadores del Inicio), `subjectId` (un uuid, o `none` para las actividades generales; cualquier otro valor es 400, sin otros comodines), `periodId` (el periodo guardado en la actividad), `status`, `priority`, `type`, `overdue=true|false`,
 `from` y `to` (días locales del usuario, `YYYY-MM-DD`, ambos inclusivos). Valores inválidos → `400 VALIDATION_ERROR`.
 Límites: título 1–150, descripción ≤ 2000.
 

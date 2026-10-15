@@ -1,8 +1,10 @@
 import { QueryError } from '../components/QueryError';
 import { addDays, formatDateOnly, formatDuration, isRealDateOnly } from '@planner/core';
 import { Link, useSearchParams } from 'react-router';
+import { originLabelOf, readsSeveralPeriods } from '../academic/origin';
 import { useProgress, useWorkload } from '../insights/useInsights';
 import { ProgressBar } from './progress/ProgressBar';
+import { ProgressByPeriod } from './progress/ProgressByPeriod';
 import { SubjectProgressList } from './progress/SubjectProgressList';
 import { WorkloadDetail, busiestText, plural, totalsLine } from './progress/WorkloadDetail';
 
@@ -134,11 +136,15 @@ export function ProgressPage() {
 }
 
 function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProgress>['data']> }) {
-  const { general, subjects } = data;
+  const { general, subjects, byPeriod } = data;
+  // More than one period is read: the copy must not say "this period", and each study gets its own line.
+  const several = readsSeveralPeriods(byPeriod);
   if (general.total === 0 && subjects.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-slate-300 p-4">
-        Aún no hay asignaturas ni actividades registradas en este periodo.
+        {several
+          ? 'Aún no hay asignaturas ni actividades registradas en tus estudios actuales.'
+          : 'Aún no hay asignaturas ni actividades registradas en este periodo.'}
       </p>
     );
   }
@@ -166,13 +172,19 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
           </>
         )}
         <p className="text-sm text-slate-600">
-          Mide solo las actividades que has registrado en este periodo. Todas pesan lo mismo.
+          {several
+            ? 'Mide solo las actividades que has registrado en tus estudios actuales. Todas pesan lo mismo.'
+            : 'Mide solo las actividades que has registrado en este periodo. Todas pesan lo mismo.'}
           {withoutSubject > 0 &&
             ` Incluye ${withoutSubject === 1 ? '1 actividad sin asignatura' : `${withoutSubject} actividades sin asignatura`}, que no aparece en ninguna asignatura.`}
         </p>
       </div>
+      {several && <ProgressByPeriod byPeriod={byPeriod} />}
       <h3 className="sr-only">Por asignatura</h3>
-      <SubjectProgressList subjects={subjects} />
+      <SubjectProgressList
+        subjects={subjects}
+        origin={(periodId) => originLabelOf(byPeriod, periodId ?? '')}
+      />
     </>
   );
 }

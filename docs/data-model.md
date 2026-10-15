@@ -66,16 +66,16 @@ Sesión en servidor. Guarda `tokenHash` (SHA-256 del token aleatorio de 256 bits
 
 ### Activity
 
-| Campo         | Significado                                                                                                                                                                                     |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `periodId`    | Periodo al que pertenece. **Obligatorio e inmutable**; lo deriva el servidor (el de la asignatura, o el periodo hogar si no hay asignatura). No forma parte del DTO público                     |
-| `subjectId`   | Asignatura **opcional**. Nulo = actividad general (sin asignatura). Con valor, su periodo es el mismo `periodId` (clave foránea compuesta)                                                      |
-| `type`        | `TASK`, `EXAM`, `QUIZ`, `PROJECT`, `PRESENTATION`, `WORKSHOP`, `READING`, `OTHER` (por defecto `TASK`)                                                                                          |
-| `priority`    | `LOW`, `MEDIUM`, `HIGH` (por defecto `MEDIUM`)                                                                                                                                                  |
-| `status`      | `PENDING`, `IN_PROGRESS`, `COMPLETED` (por defecto `PENDING`)                                                                                                                                   |
-| `dueAt`       | **Instante UTC**. Con `hasTime = false` es el **final del día local** del usuario (23:59:59.999)                                                                                                |
-| `hasTime`     | Si el estudiante indicó hora. Sin hora no se inventa «11:59 p. m.» en pantalla                                                                                                                  |
-| `completedAt` | Lo fija el **backend**, nunca el cliente: pasar a `COMPLETED` estampa «ahora», seguir finalizada conserva la marca, reabrir la borra. Restricción: `status = COMPLETED` ⇔ `completedAt` no nulo |
+| Campo         | Significado                                                                                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `periodId`    | Periodo al que pertenece. **Obligatorio e inmutable**; lo deriva el servidor (el de la asignatura, o el periodo hogar si no hay asignatura). Se expone solo para **leer** (`periodId` en el DTO, desde P0.5-3: así se halla su estudio); ninguna petición lo envía |
+| `subjectId`   | Asignatura **opcional**. Nulo = actividad general (sin asignatura). Con valor, su periodo es el mismo `periodId` (clave foránea compuesta)                                                                                                                         |
+| `type`        | `TASK`, `EXAM`, `QUIZ`, `PROJECT`, `PRESENTATION`, `WORKSHOP`, `READING`, `OTHER` (por defecto `TASK`)                                                                                                                                                             |
+| `priority`    | `LOW`, `MEDIUM`, `HIGH` (por defecto `MEDIUM`)                                                                                                                                                                                                                     |
+| `status`      | `PENDING`, `IN_PROGRESS`, `COMPLETED` (por defecto `PENDING`)                                                                                                                                                                                                      |
+| `dueAt`       | **Instante UTC**. Con `hasTime = false` es el **final del día local** del usuario (23:59:59.999)                                                                                                                                                                   |
+| `hasTime`     | Si el estudiante indicó hora. Sin hora no se inventa «11:59 p. m.» en pantalla                                                                                                                                                                                     |
+| `completedAt` | Lo fija el **backend**, nunca el cliente: pasar a `COMPLETED` estampa «ahora», seguir finalizada conserva la marca, reabrir la borra. Restricción: `status = COMPLETED` ⇔ `completedAt` no nulo                                                                    |
 
 Límites de texto: título 150 caracteres, descripción 2000.
 

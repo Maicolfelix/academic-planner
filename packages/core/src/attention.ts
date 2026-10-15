@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { periodSchema } from './academic.js';
+import { currentPeriodContextSchema } from './studyTrack.js';
 import {
   RADAR_STATUSES,
   type ActivityPriority,
@@ -215,7 +216,9 @@ const attentionItemSchema = z.object({
 export const attentionSchema = z.object({
   generatedAt: z.iso.datetime(),
   /** null when the user has not set up a period yet. */
+  /** The HOME period (or null); the recommendation reads ALL the periods in `periods`. */
   period: periodSchema.nullable(),
+  periods: z.array(currentPeriodContextSchema),
   recommendation: attentionItemSchema.nullable(),
   alternatives: z.array(attentionItemSchema).max(ATTENTION_ALTERNATIVES_LIMIT),
   /**

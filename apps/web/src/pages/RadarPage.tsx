@@ -6,6 +6,8 @@ import {
   radarExplanation,
 } from '@planner/core';
 import { Link } from 'react-router';
+import { readsSeveralPeriods, scopeNames } from '../academic/origin';
+import { useOrigins } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { QueryError } from '../components/QueryError';
 import { useNow } from '../lib/useNow';
@@ -20,20 +22,28 @@ import { RadarSummary } from './radar/RadarSummary';
  */
 export function RadarPage() {
   const radar = useRadar();
+  const originOf = useOrigins();
   const timeZone = useMe().data?.timezone ?? DEFAULT_TIMEZONE;
   const now = useNow();
 
   if (radar.isPending) return <p role="status">Cargando Radar…</p>;
   if (!radar.data) return <QueryError query={radar} title="No se pudo cargar el Radar" />;
 
-  const { summary, groups, period } = radar.data;
+  const { summary, groups, period, periods } = radar.data;
+  const several = readsSeveralPeriods(periods);
   const open = Object.values(summary).reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold">Radar académico</h1>
-        {period && <p className="text-sm text-slate-600 break-words">{period.name}</p>}
+        {several ? (
+          <p className="text-sm text-slate-600 break-words">
+            En tus estudios actuales: {scopeNames(periods).join(' · ')}
+          </p>
+        ) : (
+          period && <p className="text-sm text-slate-600 break-words">{period.name}</p>
+        )}
         <p className="mt-1 text-sm text-slate-700">
           Ordena tus actividades abiertas según el tiempo que falta para cada fecha límite. No es
           prioridad ni una recomendación de qué hacer primero.
@@ -51,7 +61,9 @@ export function RadarPage() {
 
       {open === 0 && (
         <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
-          No tienes actividades abiertas en el periodo actual.
+          {several
+            ? 'No tienes actividades abiertas en tus estudios actuales.'
+            : 'No tienes actividades abiertas en el periodo actual.'}
         </p>
       )}
 
@@ -68,6 +80,7 @@ export function RadarPage() {
             timeZone={timeZone}
             now={now}
             overdue={status === 'OVERDUE'}
+            origin={originOf}
             describe={(a) => radarExplanation(a, now, timeZone)}
             footer={
               hidden > 0 && (

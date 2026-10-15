@@ -199,6 +199,8 @@ export const reminderSchema = z.object({
 export const dueReminderSchema = reminderSchema.extend({
   activity: z.object({
     id: z.uuid(),
+    /** The period of the activity (to tell which study it comes from). */
+    periodId: z.uuid(),
     title: z.string(),
     type: z.enum(ACTIVITY_TYPES),
     dueAt: z.iso.datetime(),

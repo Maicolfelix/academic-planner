@@ -210,6 +210,21 @@ export type UpdatePeriodRequest = z.input<typeof updatePeriodSchema>;
 
 // ───────────────────────── Subject ─────────────────────────
 
+/**
+ * Query string of GET /api/subjects: ONE period (`periodId`) OR `scope=current` (all the current, active periods; the server
+ * decides), never both: a valid parameter must not be silently ignored. (Activities differ on purpose: there a named period
+ * narrows the scope.)
+ */
+export const listSubjectsQuerySchema = z
+  .object({
+    periodId: z.uuid('Periodo inválido.').optional(),
+    scope: z.literal('current', { error: 'Alcance inválido.' }).optional(),
+  })
+  .refine((q) => q.periodId === undefined || q.scope === undefined, {
+    message: 'Usa un periodo o el alcance actual, no ambos.',
+    path: ['scope'],
+  });
+
 export const SUBJECT_NAME_MAX = 100;
 export const SUBJECT_PROFESSOR_MAX = 100;
 export const SUBJECT_DESCRIPTION_MAX = 500;

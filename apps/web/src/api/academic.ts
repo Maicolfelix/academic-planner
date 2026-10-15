@@ -1,4 +1,6 @@
 import {
+  currentPeriodsResponseSchema,
+  type CurrentPeriodContext,
   homePeriodResponseSchema,
   periodListResponseSchema,
   subjectBatchResponseSchema,
@@ -18,6 +20,11 @@ import { apiFetch } from './client';
 
 export async function fetchPeriods(): Promise<AcademicPeriod[]> {
   return (await apiFetch('/api/periods', { schema: periodListResponseSchema })).periods;
+}
+
+/** Every current, active period with its study, in the server's order (the general one, the primary study's, the rest). */
+export async function fetchCurrentPeriods(): Promise<CurrentPeriodContext[]> {
+  return (await apiFetch('/api/periods/current', { schema: currentPeriodsResponseSchema })).periods;
 }
 
 /** The HOME current period as the server decides it (never derived from the list), or null when there is none. */
@@ -54,6 +61,12 @@ export async function createSubjectsBatchRequest(
     body: input,
     schema: subjectBatchResponseSchema,
   });
+}
+
+/** The subjects of ALL the current, active periods in one request (the server decides which periods those are). */
+export async function fetchCurrentSubjects(): Promise<Subject[]> {
+  return (await apiFetch('/api/subjects?scope=current', { schema: subjectListResponseSchema }))
+    .subjects;
 }
 
 export async function fetchSubjects(periodId: string): Promise<Subject[]> {

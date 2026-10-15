@@ -14,14 +14,14 @@ import {
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useActivities } from '../activities/useActivities';
-import { usePeriods, useCurrentPeriod, useSubjects } from '../academic/useAcademic';
+import { usePeriods, useCurrentPeriod, useOrigins, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
 import { useIsDesktop } from '../lib/useIsDesktop';
 import { useNow } from '../lib/useNow';
 import { useSchedule, useScheduleBlock } from '../schedule/useSchedule';
 import { agendaActivities } from './calendar/agendaActivities';
-import { ActivityFormDialog } from './activities/ActivityFormDialog';
+import { ActivityDialog } from './activities/ActivityDialog';
 import { BlockFormDialog } from './calendar/BlockFormDialog';
 import { DayList } from './calendar/DayList';
 import { DeleteBlockDialog } from './calendar/DeleteBlockDialog';
@@ -43,6 +43,7 @@ export function CalendarPage() {
   const now = useNow();
   const isDesktop = useIsDesktop();
   const { period } = useCurrentPeriod();
+  const originOf = useOrigins();
   const periods = usePeriods().data ?? [];
 
   // "Today" and the week come from the user's profile timezone, never from the browser's.
@@ -171,6 +172,7 @@ export function CalendarPage() {
           />
         ) : (
           <DayList
+            origin={originOf}
             days={days}
             selected={selectedDay}
             today={today}
@@ -215,7 +217,7 @@ export function CalendarPage() {
         />
       )}
       {editingActivity && subjects.isSuccess && (
-        <ActivityFormDialog
+        <ActivityDialog
           subjects={subjects.data}
           activity={editingActivity}
           timeZone={timeZone}

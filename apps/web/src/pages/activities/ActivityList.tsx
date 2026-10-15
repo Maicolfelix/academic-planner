@@ -1,4 +1,5 @@
 import type { Activity, ActivityStatus, Subject } from '@planner/core';
+import type { OriginOf } from '../../academic/origin';
 import { ActivityCard } from './ActivityCard';
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
   onStatusChange: (activity: Activity, status: ActivityStatus) => void;
   onEdit: (activity: Activity) => void;
   onDelete: (activity: Activity) => void;
+  /** The study each activity comes from (only when it is worth saying). */
+  origin?: OriginOf;
 }
 
 /**
@@ -26,6 +29,7 @@ export function ActivityList({
   onStatusChange,
   onEdit,
   onDelete,
+  origin,
 }: Props) {
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const ordered = [
@@ -40,6 +44,7 @@ export function ActivityList({
           key={activity.id}
           activity={activity}
           subject={activity.subjectId ? subjectById.get(activity.subjectId) : undefined}
+          origin={origin?.(activity.periodId) ?? null}
           timeZone={timeZone}
           now={now}
           statusPending={pendingStatusId === activity.id}

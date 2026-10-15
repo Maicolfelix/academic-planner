@@ -9,6 +9,7 @@ import type { RunInTransaction } from '../db/prisma.js';
 import { AppError, notFound, validationError } from '../errors/AppError.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { toDateOnly, toPeriodDto } from '../mappers.js';
+import { toCurrentPeriodContext } from './currentPeriods.js';
 import { createPeriodRepository, type PeriodRepository } from '../repositories/periodRepository.js';
 import {
   createStudyTrackRepository,
@@ -85,6 +86,11 @@ export function createPeriodService(periods: PeriodRepository, inTransaction: Ru
     async home(userId: string) {
       const period = await periods.findHomeCurrent(userId);
       return period ? toPeriodDto(period) : null;
+    },
+
+    /** Every current, active period with its study (`PeriodLookup.listCurrent`, the one definition), in its fixed order. */
+    async current(userId: string) {
+      return (await periods.listCurrent(userId)).map(toCurrentPeriodContext);
     },
 
     async get(userId: string, id: string) {

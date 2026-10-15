@@ -3,7 +3,14 @@ import { DEFAULT_TIMEZONE, type Activity, type ActivityStatus } from '@planner/c
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useUpdateActivity, useActivities } from '../activities/useActivities';
-import { useCurrentPeriod, useSubjects } from '../academic/useAcademic';
+import { readsSeveralPeriods } from '../academic/origin';
+import {
+  useCurrentPeriod,
+  useCurrentPeriods,
+  useCurrentSubjects,
+  useOrigins,
+  useSubjects,
+} from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { clearDraft, useStoredDraft } from '../lib/drafts';
 import { useNow } from '../lib/useNow';
@@ -12,7 +19,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
 import { activityDraftSchema, activityDraftScope, isBlank } from './activities/activityDraft';
-import { ActivityFormDialog } from './activities/ActivityFormDialog';
+import { ActivityDialog } from './activities/ActivityDialog';
 import { ActivityList } from './activities/ActivityList';
 import { DeleteActivityDialog } from './activities/DeleteActivityDialog';
 import {
@@ -23,15 +30,23 @@ import {
   type ActivityFilters as Filters,
 } from './activities/filterParams';
 
-/** Activities of the current period: filter (kept in the URL), create, edit, change status, delete. */
+/**
+ * Activities of ALL the current, active periods (the same scope as the counters of the Home): filter (kept in the URL), create,
+ * edit, change status, delete. READING is multi-period; WRITING is not: a new activity is created in the HOME period with the
+ * HOME period's subjects, and editing one uses the subjects of the activity's own period (the activity never changes period).
+ */
 export function ActivitiesPage() {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
   const setFilters = (next: Filters) => setParams(serializeFilters(next), { replace: true });
 
   const { period } = useCurrentPeriod();
+  // To CREATE: the home period's subjects. To READ (the list and its subject filter): the subjects of every current period.
   const subjects = useSubjects(period?.id);
-  const activities = useActivities(toApiQuery(filters, period?.id), period !== undefined);
+  const currentSubjects = useCurrentSubjects();
+  const currentPeriods = useCurrentPeriods();
+  const originOf = useOrigins();
+  const activities = useActivities(toApiQuery(filters), period !== undefined);
   const me = useMe().data;
   const timeZone = me?.timezone ?? DEFAULT_TIMEZONE;
   // An activity the student began and did not finish (kept as a draft): offered back, never forced.
@@ -77,7 +92,9 @@ export function ActivitiesPage() {
   };
   if (!period) return null; // RequirePeriod guarantees one; keeps the type honest
 
-  const subjectList = subjects.data ?? [];
+  const subjectList = subjects.data ?? []; // home: what a NEW activity may use
+  const readableSubjects = currentSubjects.data ?? []; // everything the list shows and filters by
+  const several = readsSeveralPeriods(currentPeriods.data ?? []);
   const list = activities.data ?? [];
   const filtered = hasActiveFilters(filters);
 
@@ -98,7 +115,11 @@ export function ActivitiesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Actividades" description={period.name} actions={list.length > 0 && add} />
+      <PageHeader
+        title="Actividades"
+        description={several ? 'Todos tus estudios actuales' : period.name}
+        actions={list.length > 0 && add}
+      />
 
       {notice && (
         <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success-ink">
@@ -137,8 +158,14 @@ export function ActivitiesPage() {
       )}
 
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
+      <QueryError query={currentSubjects} title="No se pudieron cargar tus asignaturas" />
 
-      <ActivityFilters filters={filters} subjects={subjectList} onChange={setFilters} />
+      <ActivityFilters
+        filters={filters}
+        subjects={readableSubjects}
+        onChange={setFilters}
+        origin={originOf}
+      />
 
       {activities.isPending && <p role="status">Cargando actividades…</p>}
 
@@ -164,7 +191,8 @@ export function ActivitiesPage() {
       {list.length > 0 && (
         <ActivityList
           activities={list}
-          subjects={subjectList}
+          subjects={readableSubjects}
+          origin={originOf}
           timeZone={timeZone}
           now={now}
           pendingStatusId={updateStatus.isPending ? updateStatus.variables?.id : undefined}
@@ -174,12 +202,16 @@ export function ActivitiesPage() {
         />
       )}
 
-      {/* Wait for the subjects: the form decides its first mode (a subject to choose, or none) from them, once. */}
-      {current && subjects.isSuccess && (
-        <ActivityFormDialog
+      {/* A NEW activity waits for the HOME subjects (the form decides its first mode, a subject to choose or none, from them,
+          once). EDITING does not: ActivityDialog loads the subjects of the activity's own period and shows its own error. */}
+      {current && (current !== 'new' || subjects.isSuccess) && (
+        <ActivityDialog
           subjects={subjectList}
           activity={current === 'new' ? undefined : current}
-          defaultSubjectId={filters.subject}
+          // a subject chosen in the filter saves a selection only when a NEW activity could actually use it (the home period's)
+          defaultSubjectId={
+            subjectList.some((s) => s.id === filters.subject) ? filters.subject : undefined
+          }
           timeZone={timeZone}
           onClose={closeEditor}
           onSaved={(message) => {

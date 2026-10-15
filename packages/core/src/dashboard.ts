@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { periodSchema } from './academic.js';
+import { currentPeriodContextSchema } from './studyTrack.js';
 import { activitySchema } from './activity.js';
 import { scheduleOccurrenceSchema } from './schedule.js';
 import { toLocalParts } from './time.js';
@@ -78,17 +79,24 @@ export const dashboardActivitySchema = activitySchema.extend({
 const count = z.number().int().nonnegative();
 
 /**
- * Everything the Dashboard needs, for the CURRENT period of the authenticated user. Nothing here is
- * stored: every number is derived from User, AcademicPeriod, Subject and Activity on each request.
- * The three lists never overlap: an activity is overdue, due today, or upcoming — never two at once.
+ * Everything the Dashboard needs, for ALL the current, active periods of the authenticated user (the general one and the one of
+ * each active study; never a past period nor an archived study's). Nothing here is stored: every number is derived from User,
+ * AcademicPeriod, Subject and Activity on each request. The three lists never overlap: an activity is overdue, due today, or
+ * upcoming — never two at once.
  */
 export const dashboardSchema = z.object({
   generatedAt: z.iso.datetime(),
   /** Today's date on the user's wall clock (YYYY-MM-DD). */
   localDate: z.string(),
   greeting: z.string(),
-  /** null when the user has not set up a period yet (the app sends them to onboarding). */
+  /**
+   * The HOME period (the general current one; else the primary active study's; else null): where things that have no explicit
+   * destination are written. Kept for the screens that work with one period; the summary below is NOT limited to it.
+   */
   period: periodSchema.nullable(),
+  /** Every current, active period the summary reads, with its study (empty when there is none). */
+  periods: z.array(currentPeriodContextSchema),
+  /** The subjects of all those periods. */
   subjectCount: count,
   summary: z.object({
     total: count,
@@ -107,7 +115,7 @@ export const dashboardSchema = z.object({
   upcoming: z.array(dashboardActivitySchema),
   /** Open and past due, most overdue first, at most DASHBOARD_OVERDUE_LIMIT. */
   overdue: z.array(dashboardActivitySchema),
-  /** Today's classes (type CLASS only) of the current period, by start time, at most DASHBOARD_CLASSES_LIMIT. */
+  /** Today's classes (type CLASS only) of all those periods, by start time, at most DASHBOARD_CLASSES_LIMIT. */
   classesToday: z.array(scheduleOccurrenceSchema),
 });
 

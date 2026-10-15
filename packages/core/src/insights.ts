@@ -4,6 +4,7 @@ import type { ActivityStatus } from './activity.js';
 import { WEEKDAYS, addDays, weekdayOf, type Weekday } from './calendar.js';
 import { calculateProgress } from './dashboard.js';
 import type { ScheduleBlockType } from './schedule.js';
+import { currentPeriodContextSchema } from './studyTrack.js';
 import { toLocalParts } from './time.js';
 
 /**
@@ -292,14 +293,27 @@ const progressSummaryShape = {
   percentage: z.number().int().min(0).max(100),
 };
 
-/** GET /api/progress: the CURRENT period of the user. `subjects` is alphabetical and includes empty ones. */
+/**
+ * GET /api/progress: the progress of the activities registered in ALL the current, active periods of the user. `general` is
+ * the overall count of all of them (with or without a subject); `byPeriod` splits it, one entry per period with its study
+ * (the same order as everywhere), so a student with two studies is never shown one mixed number as if it were a single
+ * semester. `subjects` is alphabetical, includes empty ones and says which period each belongs to. It is a count of
+ * registered activities, never a grade or an average.
+ */
 export const progressSchema = z.object({
   generatedAt: z.iso.datetime(),
-  /** null when the user has not set up a period yet. */
+  /** The HOME period (or null when the user has not set up one yet); the progress reads ALL the periods in `byPeriod`. */
   period: periodSchema.nullable(),
   general: z.object(progressSummaryShape),
+  byPeriod: z.array(currentPeriodContextSchema.extend({ general: z.object(progressSummaryShape) })),
   subjects: z.array(
-    z.object({ id: z.uuid(), name: z.string(), color: z.string(), ...progressSummaryShape }),
+    z.object({
+      id: z.uuid(),
+      periodId: z.uuid(),
+      name: z.string(),
+      color: z.string(),
+      ...progressSummaryShape,
+    }),
   ),
 });
 export const progressResponseSchema = z.object({ progress: progressSchema });
@@ -318,7 +332,9 @@ const workloadDaySchema = z.object({
 
 export const workloadSchema = z.object({
   generatedAt: z.iso.datetime(),
+  /** The HOME period (or null); the week adds up ALL the current, active periods in `periods`. */
   period: periodSchema.nullable(),
+  periods: z.array(currentPeriodContextSchema),
   week: z.object({ from: z.string(), to: z.string() }),
   totals: z.object({
     activityCount: count,

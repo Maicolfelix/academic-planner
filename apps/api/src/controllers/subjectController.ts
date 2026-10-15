@@ -1,13 +1,16 @@
-import { createSubjectBatchSchema, createSubjectSchema, updateSubjectSchema } from '@planner/core';
+import {
+  createSubjectBatchSchema,
+  createSubjectSchema,
+  listSubjectsQuerySchema,
+  updateSubjectSchema,
+} from '@planner/core';
 import type { RequestHandler } from 'express';
-import { z } from 'zod';
 import { parseIdParam } from '../http/params.js';
 import { authOf } from '../middleware/requireAuth.js';
 import type { SubjectBatchService } from '../services/subjectBatchService.js';
 import type { SubjectService } from '../services/subjectService.js';
 
 const NOT_FOUND = 'Asignatura no encontrada.';
-const listQuerySchema = z.object({ periodId: z.uuid('Periodo inválido.').optional() });
 
 /** Thin HTTP layer: validate input, take the owner from the session, delegate to the service. */
 export function createSubjectController(service: SubjectService, batch: SubjectBatchService) {
@@ -15,8 +18,13 @@ export function createSubjectController(service: SubjectService, batch: SubjectB
 
   return {
     list: (async (req, res) => {
-      const { periodId } = listQuerySchema.parse(req.query);
-      res.json({ subjects: await service.list(owner(req), periodId) });
+      const { periodId, scope } = listSubjectsQuerySchema.parse(req.query);
+      res.json({
+        subjects:
+          scope === 'current'
+            ? await service.listCurrent(owner(req))
+            : await service.list(owner(req), periodId),
+      });
     }) satisfies RequestHandler,
 
     create: (async (req, res) => {

@@ -81,6 +81,8 @@ Existe para que **una regla tenga una sola definición**. Si la interfaz y la AP
 
 **Periodo actual por ámbito (P0.5-2, [D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)).** Un periodo puede pertenecer a un estudio (`studyTrackId`, nullable) y «actual» es uno por ámbito. `periodRepository` ya no tiene «el» periodo actual: expone `findHomeCurrent` (el periodo **hogar**: el actual sin estudio; si no, el del estudio principal activo; si no, ninguno), `findCurrentUntracked`, `findCurrentForTrack` y `listCurrent` (para la lectura multi-periodo de P0.5-3). Todos los lectores singulares usan `findHomeCurrent` de forma explícita.
 
+**Resumen de los periodos actuales (P0.5-3, [D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)).** HOME (el periodo de las escrituras sin destino) y «todos los actuales» (lo que leen los resúmenes) son distintos: el Inicio, el Radar, la Atención, el Progreso, la Carga y los recordatorios vencidos leen **todos** los periodos actuales y activos con **una** consulta (`PeriodLookup.listCurrent`, vía `readCurrentPeriods`) y `periodId IN (...)`; los flujos de escritura y el onboarding siguen usando `findHomeCurrent`. La Agenda ya era global. El origen (estudio) de cada cosa **se deriva** (`periodId` → periodo → estudio), nunca se guarda.
+
 ## Flujos «proponer, no crear»
 
 Captura rápida, Bandeja académica e Importación de horario **solo proponen**; nada se guarda hasta que el estudiante confirma, y confirmar usa los mismos endpoints de creación que los formularios manuales (no existe un camino de creación propio).
