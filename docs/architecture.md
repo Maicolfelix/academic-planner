@@ -83,6 +83,8 @@ Existe para que **una regla tenga una sola definición**. Si la interfaz y la AP
 
 **Resumen de los periodos actuales (P0.5-3, [D33](decisions.md#d33-resumen-global-de-los-periodos-actuales-p05-3)).** HOME (el periodo de las escrituras sin destino) y «todos los actuales» (lo que leen los resúmenes) son distintos: el Inicio, el Radar, la Atención, el Progreso, la Carga y los recordatorios vencidos leen **todos** los periodos actuales y activos con **una** consulta (`PeriodLookup.listCurrent`, vía `readCurrentPeriods`) y `periodId IN (...)`; los flujos de escritura y el onboarding siguen usando `findHomeCurrent`. La Agenda ya era global. El origen (estudio) de cada cosa **se deriva** (`periodId` → periodo → estudio), nunca se guarda.
 
+**Mis estudios (P0.5-4, [D34](decisions.md#d34-mis-estudios-y-adopción-explícita-p05-4)).** `/settings/studies` (fuera de `RequirePeriod`) administra los estudios; no es un espacio de trabajo. Dos acciones orquestadas y atómicas (`studySetupService`: `setup` y `adoptPeriod`, una transacción con el candado por usuario de los estudios) crean un estudio con su primer periodo y materias, o adoptan un periodo existente sin copiar nada; el núcleo de creación de materias por nombre (`subjectNames.ts`) lo comparten el lote rápido y el alta. Los datos anteriores no se migran en silencio: la web ofrece «Convertir en estudio» y el estudiante confirma. `/subjects?period=` da un destino explícito a las materias; todo lo demás con destino implícito sigue en HOME. Las mutaciones de estudios invalidan la caché por un solo camino (`invalidateAfterHomeChange`).
+
 ## Flujos «proponer, no crear»
 
 Captura rápida, Bandeja académica e Importación de horario **solo proponen**; nada se guarda hasta que el estudiante confirma, y confirmar usa los mismos endpoints de creación que los formularios manuales (no existe un camino de creación propio).
@@ -108,7 +110,7 @@ No se guardan: «vencida», categoría del Radar, puntaje de Atención, progreso
 
 ## Frontend
 
-- **Rutas** (`apps/web/src/App.tsx`): públicas `/login`, `/register`, `/status`; protegidas `/onboarding` (fuera de `RequirePeriod`; a donde va el registro) y, con periodo actual, `/dashboard`, `/subjects`, `/activities`, `/calendar`, `/calendar/import`, `/radar`, `/progress`, `/inbox`; cualquier otra ruta muestra la pantalla 404. Las pantallas secundarias se cargan con `React.lazy`.
+- **Rutas** (`apps/web/src/App.tsx`): públicas `/login`, `/register`, `/status`; protegidas `/onboarding`, `/settings/studies` y `/subjects` (fuera de `RequirePeriod`: el registro va al onboarding, Mis estudios arregla un HOME ausente y `/subjects` pide HOME por sí misma solo sin `?period=`) y, con periodo actual, `/dashboard`, `/activities`, `/calendar`, `/calendar/import`, `/radar`, `/progress`, `/inbox`; cualquier otra ruta muestra la pantalla 404. Las pantallas secundarias se cargan con `React.lazy`.
 - **Datos del servidor:** TanStack Query; las mutaciones de actividades invalidan `['activities']`, el Dashboard y `['reminders']`. Un refresco fallido no reemplaza datos ya mostrados.
 - **Hora:** la interfaz no hace matemática de zonas; usa los ayudantes de `packages/core` y siempre muestra 12 h con a. m./p. m.
 - **PWA:** service worker que precachea solo el shell; `/api/*` siempre por red (ver [pwa.md](pwa.md)).

@@ -1,10 +1,11 @@
 import { Suspense } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useDueReminders } from '../reminders/useReminders';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useSlidingIndicator } from '../lib/useSlidingIndicator';
 import { LogoutButton } from './LogoutButton';
 import { ReminderBadge } from './ReminderBadge';
+import { buttonStyles } from './ui/buttonStyles';
 import { BookIcon, BrandMark, CalendarIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
 
 /**
@@ -50,6 +51,7 @@ const TITLES: [prefix: string, title: string][] = [
   ['/radar', 'Radar académico'],
   ['/progress', 'Progreso'],
   ['/inbox', 'Bandeja académica'],
+  ['/settings/studies', 'Mis estudios'],
 ];
 
 /**
@@ -158,6 +160,13 @@ export function AppShell() {
           </nav>
 
           {/* The end of the bar is where the avatar and the bell will go: they arrive with their own features. */}
+          <Link
+            to="/settings/studies"
+            aria-current={pathname.startsWith('/settings/studies') ? 'page' : undefined}
+            className={buttonStyles({ variant: 'ghost', size: 'sm' })}
+          >
+            Mis estudios
+          </Link>
           <LogoutButton />
         </div>
       </header>

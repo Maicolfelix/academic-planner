@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, educationContextSchema, hasNoNul, periodSchema } from './academic.js';
+import {
+  INVALID_CHARACTERS,
+  SUBJECT_BATCH_MAX,
+  educationContextSchema,
+  hasNoNul,
+  periodSchema,
+  studyPeriodSchema,
+  subjectNameSchema,
+  subjectSchema,
+} from './academic.js';
 import { findProgramByKey } from './profile.js';
 
 /**
@@ -108,18 +117,21 @@ const programKeyField = z
  * Strict: only these three fields. The owner, `isPrimary` and `status` are never the client's to say (the server decides
  * them), and neither is a period or a primary use. The name is required unless a catalog key brings the canonical one.
  */
-export const createStudyTrackSchema = z
-  .strictObject({
-    name: studyTrackNameSchema.optional(),
-    type: educationContextSchema,
-    programKey: programKeyField,
-  })
-  .superRefine((v, ctx) => {
-    checkProgram(v, ctx);
-    if (typeof v.programKey !== 'string' && v.name === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['name'], message: 'Ingresa el nombre del estudio.' });
-    }
-  });
+const newTrackFields = {
+  name: studyTrackNameSchema.optional(),
+  type: educationContextSchema,
+  programKey: programKeyField,
+};
+
+/** A NEW track needs a catalog key (which brings the canonical name) or a name of its own. */
+function checkNewTrack(v: ProgramFields, ctx: z.RefinementCtx) {
+  checkProgram(v, ctx);
+  if (typeof v.programKey !== 'string' && v.name === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['name'], message: 'Ingresa el nombre del estudio.' });
+  }
+}
+
+export const createStudyTrackSchema = z.strictObject(newTrackFields).superRefine(checkNewTrack);
 export type CreateStudyTrackInput = z.infer<typeof createStudyTrackSchema>;
 export type CreateStudyTrackRequest = z.input<typeof createStudyTrackSchema>;
 
@@ -178,3 +190,46 @@ export function resolveStudyTrackProgram(
   if (programKey === null) return { programKey: null, name: current.name };
   return { programKey: current.programKey, name: current.name };
 }
+
+// ───────────────────────── Setup and adoption (P0.5-4) ─────────────────────────
+
+/**
+ * A study set up in ONE request: the study, its first period (current in its scope) and, optionally, its first subjects. All or
+ * nothing. Strict at every level: the owner, `isPrimary`, `status`, a period id, a study id, an education context and colors are
+ * never the client's to say (the server decides them: the first active study is the primary one, the subjects take the study's
+ * type and the server's colors).
+ */
+export const setupStudyTrackSchema = z.strictObject({
+  track: z.strictObject(newTrackFields).superRefine(checkNewTrack),
+  period: studyPeriodSchema,
+  subjects: z
+    .array(subjectNameSchema)
+    .max(SUBJECT_BATCH_MAX, `Máximo ${SUBJECT_BATCH_MAX} asignaturas a la vez.`)
+    .optional(),
+});
+export type SetupStudyTrackInput = z.infer<typeof setupStudyTrackSchema>;
+export type SetupStudyTrackRequest = z.input<typeof setupStudyTrackSchema>;
+
+export const setupStudyTrackResponseSchema = z.object({
+  studyTrack: studyTrackSchema,
+  period: periodSchema,
+  subjects: z.array(subjectSchema),
+});
+export type SetupStudyTrackResponse = z.infer<typeof setupStudyTrackResponseSchema>;
+
+/**
+ * Turns an EXISTING period of the user that belongs to no study into the first period of a NEW study, without copying anything
+ * (the period keeps its id, dates, level, subjects, activities and schedule blocks). The same three fields as a new study plus
+ * the period; the server checks that the period is the user's own and has no study.
+ */
+export const adoptPeriodSchema = z
+  .strictObject({ periodId: z.uuid('Periodo inválido.'), ...newTrackFields })
+  .superRefine(checkNewTrack);
+export type AdoptPeriodInput = z.infer<typeof adoptPeriodSchema>;
+export type AdoptPeriodRequest = z.input<typeof adoptPeriodSchema>;
+
+export const adoptPeriodResponseSchema = z.object({
+  studyTrack: studyTrackSchema,
+  period: periodSchema,
+});
+export type AdoptPeriodResponse = z.infer<typeof adoptPeriodResponseSchema>;

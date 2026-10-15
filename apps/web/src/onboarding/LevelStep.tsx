@@ -12,8 +12,10 @@ interface Props {
   error?: string;
   onPickNumber: (n: number) => void;
   onSaveNote: (note: string) => void;
-  /** "Ahora no": decide this step without saving anything. */
+  /** "Ahora no": decide this step without saving anything. In `optional` mode it is what "Siguiente" does with nothing. */
   onSkip: () => void;
+  /** "Siguiente" with nothing chosen is "no level" instead of an error, and there is no "Ahora no" (adding a study). */
+  optional?: boolean;
 }
 
 /**
@@ -21,6 +23,10 @@ interface Props {
  * saves and moves on, so a slip can be corrected. "Otro" takes a bigger number (the domain accepts 1 to 99) or a short
  * description, and the two fields exclude each other as they are typed (the domain still refuses both, as a defence). The
  * words change with the use; the data is the same. "Ahora no" is the only way to leave without saving.
+ *
+ * `optional` (adding a study, where nothing is saved until the last step) has ONE action: "Siguiente" with a level saves it in
+ * the flow, and with nothing it moves on without one, so "Ahora no" would be the very same thing and is not drawn. Tapping the
+ * marked number again unmarks it, so a level can still be taken back. The onboarding keeps its two actions.
  */
 export function LevelStep({
   primaryUse,
@@ -30,13 +36,14 @@ export function LevelStep({
   onPickNumber,
   onSaveNote,
   onSkip,
+  optional = false,
 }: Props) {
   const copy = levelCopy(primaryUse);
   const quick = Array.from({ length: copy.options }, (_, i) => i + 1);
   const beyondQuick =
     current.studyLevelNote !== null ||
     (current.studyLevel !== null && current.studyLevel > copy.options);
-  const [other, setOther] = useState(beyondQuick);
+  const [other, setOther] = useState(beyondQuick || copy.options === 0);
   const [picked, setPicked] = useState<number | null>(
     current.studyLevel !== null && current.studyLevel <= copy.options ? current.studyLevel : null,
   );
@@ -58,6 +65,7 @@ export function LevelStep({
       note,
       currentLevel: current.studyLevel,
       noun: copy.noun,
+      emptyMeansSkip: optional,
     });
     if (action.kind === 'error') return setFieldError(action.message);
     setFieldError(undefined);
@@ -68,49 +76,51 @@ export function LevelStep({
 
   return (
     <form onSubmit={next} noValidate className="flex flex-col gap-4">
-      <div role="group" aria-label={copy.noun} className="grid grid-cols-5 gap-2">
-        {quick.map((n) => {
-          const on = !other && picked === n;
-          return (
-            <button
-              key={n}
-              type="button"
-              aria-label={`${copy.noun} ${n}`}
-              aria-pressed={on}
-              disabled={pending}
-              onClick={() => {
-                setPicked(n);
-                setOther(false);
-                setFieldError(undefined);
-              }}
-              className={`min-h-12 rounded-control border text-lg font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
-                on
-                  ? 'border-accent bg-accent-soft text-accent-ink'
-                  : 'border-border bg-surface hover:bg-secondary'
-              }`}
-            >
-              {n}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          aria-expanded={other}
-          aria-pressed={other}
-          disabled={pending}
-          onClick={() => {
-            setOther(true);
-            setFieldError(undefined);
-          }}
-          className={`min-h-12 rounded-control border font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
-            other
-              ? 'border-accent bg-accent-soft text-accent-ink'
-              : 'border-border bg-surface hover:bg-secondary'
-          }`}
-        >
-          Otro
-        </button>
-      </div>
+      {copy.options > 0 && (
+        <div role="group" aria-label={copy.noun} className="grid grid-cols-5 gap-2">
+          {quick.map((n) => {
+            const on = !other && picked === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                aria-label={`${copy.noun} ${n}`}
+                aria-pressed={on}
+                disabled={pending}
+                onClick={() => {
+                  setPicked(optional && picked === n ? null : n);
+                  setOther(false);
+                  setFieldError(undefined);
+                }}
+                className={`min-h-12 rounded-control border text-lg font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
+                  on
+                    ? 'border-accent bg-accent-soft text-accent-ink'
+                    : 'border-border bg-surface hover:bg-secondary'
+                }`}
+              >
+                {n}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            aria-expanded={other}
+            aria-pressed={other}
+            disabled={pending}
+            onClick={() => {
+              setOther(true);
+              setFieldError(undefined);
+            }}
+            className={`min-h-12 rounded-control border font-semibold transition-[background-color,transform] duration-(--duration-fast) ease-standard active:scale-95 disabled:opacity-60 ${
+              other
+                ? 'border-accent bg-accent-soft text-accent-ink'
+                : 'border-border bg-surface hover:bg-secondary'
+            }`}
+          >
+            Otro
+          </button>
+        </div>
+      )}
 
       {other && (
         <div className="flex flex-col gap-3">
@@ -140,7 +150,7 @@ export function LevelStep({
               setFieldError(undefined);
             }}
             maxLength={STUDY_LEVEL_NOTE_MAX}
-            placeholder="Internado, año de práctica…"
+            placeholder={copy.placeholder}
             autoComplete="off"
             error={fieldError}
           />
@@ -165,9 +175,11 @@ export function LevelStep({
         <Button type="submit" variant="primary" disabled={pending} aria-busy={pending || undefined}>
           {pending ? 'Guardando…' : 'Siguiente'}
         </Button>
-        <Button variant="ghost" onClick={onSkip} disabled={pending}>
-          Ahora no
-        </Button>
+        {!optional && (
+          <Button variant="ghost" onClick={onSkip} disabled={pending}>
+            Ahora no
+          </Button>
+        )}
       </div>
     </form>
   );

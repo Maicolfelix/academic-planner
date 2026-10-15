@@ -96,6 +96,8 @@ cada consulta lleva `userId`; una actividad o asignatura ajena responde `404 NOT
 
 **Crear.** `subjectId` ausente o `null` crea una actividad general, anclada al periodo actual. Con `subjectId`, la asignatura debe ser del usuario (ajena e inexistente dan el mismo 404) y la actividad toma **su** periodo. Crear, el cálculo del periodo y los recordatorios AUTO ocurren en una sola transacción.
 
+**Mis estudios no cambia esto (P0.5-4).** Crear una actividad sin destino explícito sigue anclándose a HOME y la lista de Actividades sigue leyendo todos los periodos actuales; no hay selector de destino de actividades ([D34](decisions.md#d34-mis-estudios-y-adopción-explícita-p05-4)).
+
 **Editar `subjectId`** (ausente y `null` son cosas distintas):
 
 | Se envía                                               | Resultado                                                                                                                                                |

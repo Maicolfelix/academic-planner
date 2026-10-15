@@ -12,6 +12,8 @@ interface Props {
   /** Field errors the server found (they are shown next to their field). */
   serverFieldErrors?: Record<string, string[]>;
   onSubmit: (input: { name: string; startDate: string; endDate: string }) => void;
+  /** What the student already wrote (coming back to this step): shown instead of the offered name and empty dates. */
+  initial?: { name: string; startDate: string; endDate: string };
 }
 
 /**
@@ -19,10 +21,17 @@ interface Props {
  * start and end, nothing else. The name is offered; the dates are NEVER guessed: the student writes them, so they are
  * always what they meant.
  */
-export function PeriodStep({ primaryUse, pending, error, serverFieldErrors, onSubmit }: Props) {
-  const [name, setName] = useState(() => defaultPeriodName(primaryUse));
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+export function PeriodStep({
+  primaryUse,
+  pending,
+  error,
+  serverFieldErrors,
+  onSubmit,
+  initial,
+}: Props) {
+  const [name, setName] = useState(() => initial?.name ?? defaultPeriodName(primaryUse));
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '');
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const errors = { ...serverFieldErrors, ...fieldErrors };
 

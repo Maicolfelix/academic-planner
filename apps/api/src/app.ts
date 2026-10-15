@@ -62,6 +62,7 @@ import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProfileService } from './services/profileService.js';
+import { createStudySetupService } from './services/studySetupService.js';
 import { createStudyTrackService } from './services/studyTrackService.js';
 import { createProgressService } from './services/progressService.js';
 import { createCaptureConfirmService } from './services/captureConfirmService.js';
@@ -209,6 +210,7 @@ export function createApp(deps: AppDeps): Express {
   );
   const studyTrackController = createStudyTrackController(
     createStudyTrackService(createStudyTrackRepository(prisma), runInTransaction),
+    createStudySetupService({ runInTransaction }),
   );
   const subjectController = createSubjectController(
     createSubjectService(

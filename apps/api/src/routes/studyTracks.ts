@@ -9,6 +9,8 @@ export function studyTracksRouter(
   router.use(requireAuth); // every study route needs a session
   router.get('/', controller.list);
   router.post('/', controller.create);
+  router.post('/setup', controller.setup);
+  router.post('/adopt-period', controller.adoptPeriod);
   router.patch('/:id', controller.update);
   router.post('/:id/make-primary', controller.makePrimary);
   router.post('/:id/archive', controller.archive);

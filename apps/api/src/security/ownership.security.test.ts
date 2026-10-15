@@ -186,6 +186,20 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
 });
 
 describe('foreign keys in a request body or query', () => {
+  it('adopt-period: B’s period gets the exact answer of a random id, and nothing changes (a period id travels in the body)', async () => {
+    const w = await world();
+    const before = await snapshot();
+    const adopt = (periodId: string) =>
+      w.a.agent
+        .post('/api/study-tracks/adopt-period')
+        .send({ periodId, name: 'Robado', type: 'UNIVERSITY' });
+    const foreign = await adopt(w.b.period.id);
+    const missing = await adopt(ghost());
+    expect(foreign.status).toBe(404);
+    expect(same(foreign)).toEqual(same(missing));
+    expect(await snapshot()).toEqual(before);
+  });
+
   it('B’s subject, activity and period can not be used by A (same answer as a non-existent one)', async () => {
     const w = await world();
     const before = await snapshot();
@@ -487,6 +501,22 @@ describe('strict bodies: no mass assignment', () => {
     const before = await snapshot();
     const attempts: request.Test[] = [
       w.a.agent.post('/api/study-tracks').send({ name: 'Z', type: 'SCHOOL', [key]: value }),
+      w.a.agent.post('/api/study-tracks/setup').send({
+        track: { name: 'Z', type: 'SCHOOL' },
+        period: { name: 'Z', startDate: '2026-08-03', endDate: '2026-11-28' },
+        [key]: value,
+      }),
+      w.a.agent.post('/api/study-tracks/setup').send({
+        track: { name: 'Z', type: 'SCHOOL', [key]: value },
+        period: { name: 'Z', startDate: '2026-08-03', endDate: '2026-11-28' },
+      }),
+      w.a.agent.post('/api/study-tracks/setup').send({
+        track: { name: 'Z', type: 'SCHOOL' },
+        period: { name: 'Z', startDate: '2026-08-03', endDate: '2026-11-28', [key]: value },
+      }),
+      w.a.agent
+        .post('/api/study-tracks/adopt-period')
+        .send({ periodId: w.a.period.id, name: 'Z', type: 'SCHOOL', [key]: value }),
       w.a.agent.patch(`/api/study-tracks/${myTrack.id}`).send({ name: 'Z', [key]: value }),
       w.a.agent.post('/api/subjects').send({ periodId: w.a.period.id, name: 'Z', [key]: value }),
       w.a.agent.patch(`/api/subjects/${w.a.subject.id}`).send({ name: 'Z', [key]: value }),
@@ -570,6 +600,8 @@ describe('every protected route refuses an anonymous caller', () => {
     ['patch', `/api/periods/${randomUUID()}`],
     ['get', '/api/study-tracks'],
     ['post', '/api/study-tracks'],
+    ['post', '/api/study-tracks/setup'],
+    ['post', '/api/study-tracks/adopt-period'],
     ['patch', `/api/study-tracks/${randomUUID()}`],
     ['post', `/api/study-tracks/${randomUUID()}/make-primary`],
     ['post', `/api/study-tracks/${randomUUID()}/archive`],

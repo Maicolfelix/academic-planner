@@ -14,8 +14,10 @@ interface Props {
   onPickCatalog: (entry: ProgramEntry) => void;
   /** A program the student wrote (no key). */
   onSaveCustom: (name: string) => void;
-  /** "Ahora no": decide this step without saving anything. */
+  /** "Ahora no": decide this step without saving anything. Also what "Siguiente" does when nothing changed. */
   onSkip: () => void;
+  /** The answer is not optional (adding a study): there is no "Ahora no". */
+  required?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ProgramStep({
   onPickCatalog,
   onSaveCustom,
   onSkip,
+  required = false,
 }: Props) {
   const copy = programCopy(primaryUse);
   const freeFirst = primaryUse === 'OTHER_STUDENT';
@@ -131,9 +134,11 @@ export function ProgramStep({
           >
             {pending ? 'Guardando…' : 'Siguiente'}
           </Button>
-          <Button variant="ghost" onClick={onSkip} disabled={pending}>
-            Ahora no
-          </Button>
+          {!required && (
+            <Button variant="ghost" onClick={onSkip} disabled={pending}>
+              Ahora no
+            </Button>
+          )}
         </div>
       </form>
     </>
