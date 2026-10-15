@@ -147,12 +147,12 @@ Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, coleg
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 
-| Id    | Objetivo                                                                    |
-| ----- | --------------------------------------------------------------------------- |
-| B1/B2 | Notas por cortes/evaluaciones y «¿cuánto necesito sacar?» (aritmética pura) |
-| A6    | Importación de syllabus (**después** del modelo de notas)                   |
-| B4    | Faltas / asistencia (solo excepciones)                                      |
-| B5    | Semana cargada, con hechos y sin juicios                                    |
+| Id    | Objetivo                                                                                                                                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| B1/B2 | Notas por cortes/evaluaciones y «¿cuánto necesito sacar?» (aritmética pura). **Diseño aprobado ([D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones)), validación con 3 casos pendiente: no iniciado** |
+| A6    | Importación de syllabus (**después** del modelo de notas)                                                                                                                                                                            |
+| B4    | Faltas / asistencia (solo excepciones)                                                                                                                                                                                               |
+| B5    | Semana cargada, con hechos y sin juicios                                                                                                                                                                                             |
 
 ### Etapa C — Planificación personal (`1.3.x`)
 
@@ -255,7 +255,7 @@ Tres investigaciones de bajo costo, antes de construir producto:
 
 1. **Calendarios.** Google Calendar, Apple Calendar y Outlook: importación y suscripción, latencia de refresco, `VALARM` y experiencia móvil. Protocolo, fixtures y estado (A4-0 y A4-0b; Apple Calendar en iPhone probado con QA real; Google, Outlook y Android sin probar): [docs/spikes/a4-calendar-feed](spikes/a4-calendar-feed/README.md). Lo implementado (A4.1): [calendar-export.md](calendar-export.md).
 2. **Datos reales.** Recolectar, anonimizados, ~10 horarios, ~10 syllabus y ~5 archivos `.ics` como línea base. **No se agregan al repositorio sin anonimización explícita.**
-3. **Notas.** Probar «¿cuánto necesito sacar?» con 3 estudiantes en una hoja de cálculo o prototipo; preguntar escala, cortes, pesos y reglas de redondeo.
+3. **Notas.** Probar «¿cuánto necesito sacar?» con 3 estudiantes en una hoja de cálculo o prototipo; preguntar escala, cortes, pesos y reglas de redondeo. La ficha y los criterios GO / NO-GO están en [grades-validation.md](grades-validation.md) (**pendiente**).
 
 ## Cálculo de notas: ejemplo aprobado
 
@@ -265,28 +265,28 @@ La aritmética es determinista (nunca IA). Farmacología: corte 1 = 30 % con 3.4
 - **Objetivo 3.0:** (3.0 − 1.86) / 0.40 = **2.85** necesario en el corte restante.
 - **Objetivo 4.5:** (4.5 − 1.86) / 0.40 = **6.6**, **imposible** si la escala máxima es 5.0.
 
-**Decisión pendiente:** reglas institucionales de redondeo, escala y nota mínima. La escala sale de la configuración, no del código; los ejemplos con 0.0–5.0 son ilustrativos y no se documentan como universales.
+**Decisión ([D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones)):** el redondeo es solo de presentación y nunca afecta la comparación con la nota aprobatoria; «necesito» se muestra redondeado hacia arriba. **Sigue pendiente de validar con casos reales:** las reglas institucionales de escala, nota mínima y redondeo. La escala sale de la configuración, no del código; los ejemplos con 0.0–5.0 son ilustrativos y no se documentan como universales.
 
 ## Modelo de datos futuro
 
 **PROPOSED — NOT IMPLEMENTED.** Propuesta para discutir al iniciar cada etapa; no hay migraciones ni cambios en el schema de Prisma. Los nombres y la forma final se deciden tras revisar el modelo vigente ([data-model.md](data-model.md)).
 
-| Entidad o campo                                    | Etapa | Propósito propuesto                                                      |
-| -------------------------------------------------- | ----- | ------------------------------------------------------------------------ |
-| `Activity.createdVia`                              | 0     | Método de captura de cada actividad (sin contenido)                      |
-| `UserActivityDay`                                  | 0     | Días con actividad por usuario, para retención                           |
-| `CalendarFeed`                                     | A     | Token del feed (solo su hash), creación y revocación                     |
-| `Activity.externalUid`                             | A     | Evitar duplicados al reimportar un `.ics`                                |
-| `GradingComponent`                                 | B     | Cortes y evaluaciones con peso y nota                                    |
-| `AcademicPeriod.gradeMin`, `gradeMax`, `gradePass` | B     | Escala de notas configurable                                             |
-| `Subject.absenceLimitPercent`                      | B     | Límite de faltas configurable                                            |
-| `OccurrenceMark`                                   | B     | Excepciones (`ABSENT`, `CANCELLED`) por clase y fecha                    |
-| `Activity.actualMinutes`                           | C     | Tiempo real que tomó una actividad                                       |
-| `Activity.estimatedMinutes`                        | C     | Estimación manual opcional (decisión pendiente, ver riesgos de arranque) |
-| `User.dayStart`, `User.dayEnd`                     | C     | Ventana diaria para calcular huecos                                      |
-| `ScheduleBlock.activityId`                         | C     | Vincular un bloque de estudio con su actividad                           |
-| `AiConsent`, `AiUsage`                             | D     | Consentimiento y uso (latencia, tokens), sin contenido                   |
-| `StudyResource`, `ResourceChunk`                   | D     | Material del estudiante y sus fragmentos para búsqueda                   |
+| Entidad o campo                                    | Etapa | Propósito propuesto                                                                                                                                                                         |
+| -------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Activity.createdVia`                              | 0     | Método de captura de cada actividad (sin contenido)                                                                                                                                         |
+| `UserActivityDay`                                  | 0     | Días con actividad por usuario, para retención                                                                                                                                              |
+| `CalendarFeed`                                     | A     | Token del feed (solo su hash), creación y revocación                                                                                                                                        |
+| `Activity.externalUid`                             | A     | Evitar duplicados al reimportar un `.ics`                                                                                                                                                   |
+| `GradingComponent`                                 | B     | **Reemplazado por [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones):** `GradingProfile`, `GradingPeriod` y `Evaluation` (diseño aprobado, no implementado) |
+| `AcademicPeriod.gradeMin`, `gradeMax`, `gradePass` | B     | **Reemplazado por [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones):** la escala vive en `GradingProfile` (1:1 con el periodo), en milésimas               |
+| `Subject.absenceLimitPercent`                      | B     | Límite de faltas configurable                                                                                                                                                               |
+| `OccurrenceMark`                                   | B     | Excepciones (`ABSENT`, `CANCELLED`) por clase y fecha                                                                                                                                       |
+| `Activity.actualMinutes`                           | C     | Tiempo real que tomó una actividad                                                                                                                                                          |
+| `Activity.estimatedMinutes`                        | C     | Estimación manual opcional (decisión pendiente, ver riesgos de arranque)                                                                                                                    |
+| `User.dayStart`, `User.dayEnd`                     | C     | Ventana diaria para calcular huecos                                                                                                                                                         |
+| `ScheduleBlock.activityId`                         | C     | Vincular un bloque de estudio con su actividad                                                                                                                                              |
+| `AiConsent`, `AiUsage`                             | D     | Consentimiento y uso (latencia, tokens), sin contenido                                                                                                                                      |
+| `StudyResource`, `ResourceChunk`                   | D     | Material del estudiante y sus fragmentos para búsqueda                                                                                                                                      |
 
 ## Seguridad y privacidad por integración
 

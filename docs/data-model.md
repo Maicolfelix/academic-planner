@@ -108,6 +108,15 @@ Recordatorio **interno** (dentro de la app). Solo guarda el _cuándo_; el mensaj
 
 Índice único parcial: una actividad no puede tener dos `AUTO` con el mismo offset. Reglas por tipo y ciclo de vida: [reminders.md](reminders.md).
 
+## Notas (propuesto: diseño aprobado, NO implementado)
+
+**No hay migraciones ni cambios en el esquema de Prisma.** Diseño aprobado en [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones), pendiente de la validación con 3 casos reales ([grades-validation.md](grades-validation.md)):
+
+- `GradingProfile` (1:1 con `AcademicPeriod`, `UNIQUE(periodId)`): `minMilli`, `maxMilli`, `passMilli`, `decimals`; solo para periodos con estudio.
+- `GradingPeriod` (corte): `periodId`, `name`, `position`, `finalShareBp` (peso sobre la nota final, 1..10000; la suma del periodo ≤ 10000).
+- `Evaluation`: `subjectId`, `periodId`, `gradingPeriodId` (obligatorio), `activityId?`, `name`, `periodShareBp` (peso dentro del corte), `scoreMilli?` (siempre en la escala del perfil), `rawEarnedMilli?` y `rawMaxMilli?` (ambos o ninguno), `scoredAt?`. Claves compuestas que fuerzan mismo usuario y mismo periodo; **sin `studyTrackId`** (el estudio se deriva por materia → periodo → estudio).
+- Lo que **no** se guardaría: la nota actual, el acumulado, el peso restante, el «necesito sacar» ni «incompleto» (se derivan).
+
 ## Datos derivados (no se almacenan)
 
 Se calculan en cada lectura con un reloj inyectable; guardarlos obligaría a mantenerlos al día y permitiría que se contradijeran.
