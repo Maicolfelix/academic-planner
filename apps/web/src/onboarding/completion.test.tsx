@@ -9,6 +9,7 @@ import {
   currentSubjectsKey,
   homePeriodKey,
   periodsKey,
+  subjectsKey,
 } from '../academic/useAcademic';
 import { ME_KEY } from '../auth/useAuth';
 import { OnboardingPage } from '../pages/OnboardingPage';
@@ -17,7 +18,14 @@ import { PROFILE_KEY } from '../profile/useProfile';
 import { studyTracksKey } from '../studyTracks/useStudyTracks';
 import { FinalStep } from './FinalStep';
 import { LevelStep } from './LevelStep';
-import { finalStudyName } from './onboardingModel';
+import {
+  finalStudyName,
+  flowFor,
+  onboardingStep,
+  previousStep,
+  progressSteps,
+  type OnboardingFacts,
+} from './onboardingModel';
 
 const PERIOD_ID = '5f0c3a4e-9a52-4c1e-8f6a-3f1d2c4b6a70';
 const TRACK_ID = '9a8b7c6d-1111-4222-8333-444455556666';
@@ -273,5 +281,118 @@ describe('Mis estudios after completing, and the profile as a proposal only whil
   it('the profile proposes the study of the plan ONLY while the account has no study', () => {
     const page = code('../pages/StudiesPage.tsx');
     expect(page).toMatch(/suggestStudy\(allTracks\.length === 0 \? profile\.data : null, legacy\)/);
+  });
+});
+
+describe('once the account has a study, the program question does not exist (the study is the authority)', () => {
+  const facts = (
+    over: Partial<OnboardingFacts> & { use?: Profile['primaryUse'] } = {},
+  ): OnboardingFacts => ({
+    profile: {
+      primaryUse: over.use ?? 'UNIVERSITY_STUDENT',
+      programName: null,
+      onboardingStatus: 'IN_PROGRESS',
+    },
+    period: over.period === undefined ? { studyLevel: null, studyLevelNote: null } : over.period,
+    decided: over.decided ?? new Set<string>(),
+    hasStudies: over.hasStudies ?? false,
+  });
+
+  it('without a study the program is still asked; with ONE (active or archived) it is settled and the wizard goes on', () => {
+    expect(onboardingStep(facts())).toBe('PROGRAM');
+    expect(onboardingStep(facts({ hasStudies: true }))).toBe('LEVEL'); // university: the level is next
+    expect(onboardingStep(facts({ use: 'OTHER_STUDENT', hasStudies: true }))).toBe('SUBJECTS');
+    expect(onboardingStep(facts({ use: 'OTHER_STUDENT' }))).toBe('PROGRAM');
+  });
+
+  it('having a study skips ONLY the program: the period, the level and the subjects are still asked when they are missing', () => {
+    expect(onboardingStep(facts({ hasStudies: true, period: null }))).toBe('PERIOD');
+    expect(onboardingStep(facts({ hasStudies: true }))).toBe('LEVEL');
+    expect(
+      onboardingStep(facts({ hasStudies: true, period: { studyLevel: 4, studyLevelNote: null } })),
+    ).toBe('SUBJECTS');
+    expect(
+      onboardingStep(
+        facts({
+          hasStudies: true,
+          period: { studyLevel: 4, studyLevelNote: null },
+          decided: new Set(['SUBJECTS']),
+        }),
+      ),
+    ).toBe('FINAL');
+    // primaryUse stays editable and keeps deciding the rest of the flow
+    expect(flowFor('SCHOOL_STUDENT', true)).toEqual(['LEVEL', 'SUBJECTS']);
+    expect(flowFor('UNIVERSITY_STUDENT', true)).toEqual(['LEVEL', 'SUBJECTS']);
+    expect(flowFor('UNIVERSITY_STUDENT', false)).toEqual(['PROGRAM', 'LEVEL', 'SUBJECTS']);
+  });
+
+  it('"Atrás" and the quiet progress marks never lead to the program either', () => {
+    expect(previousStep('LEVEL', facts({ hasStudies: true }))).not.toBe('PROGRAM');
+    expect(previousStep('LEVEL', facts())).toBe('PROGRAM');
+    expect(progressSteps('UNIVERSITY_STUDENT', true)).toEqual([
+      'USE',
+      'PERIOD',
+      'LEVEL',
+      'SUBJECTS',
+      'FINAL',
+    ]);
+    expect(progressSteps('UNIVERSITY_STUDENT')).toContain('PROGRAM');
+  });
+
+  /** The page with what the server already knows; `studies` undefined = the list has not answered yet. */
+  const pageWith = (use: Profile['primaryUse'], studies: StudyTrack[] | undefined) => {
+    const c = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    c.setQueryData(ME_KEY, USER);
+    c.setQueryData(PROFILE_KEY, profile({ primaryUse: use }));
+    c.setQueryData(homePeriodKey, period());
+    c.setQueryData(subjectsKey(PERIOD_ID), []);
+    if (studies) c.setQueryData(studyTracksKey, studies);
+    return renderToStaticMarkup(
+      <QueryClientProvider client={c}>
+        <StaticRouter location="/onboarding">
+          <OnboardingPage />
+        </StaticRouter>
+      </QueryClientProvider>,
+    );
+  };
+
+  it('the page: university with no study asks the program (as always); with a study it never renders it', () => {
+    expect(pageWith('UNIVERSITY_STUDENT', [])).toContain('Carrera o programa');
+    for (const studies of [[track()], [track({ status: 'ARCHIVED', isPrimary: false })]]) {
+      const out = pageWith('UNIVERSITY_STUDENT', studies);
+      expect(out).not.toContain('Carrera o programa');
+      expect(out).not.toContain('Mi carrera no aparece');
+      expect(out).toContain('¿En qué semestre estás?'); // straight to what is still pending
+      expect(out).not.toContain('se administra desde Mis estudios');
+    }
+  });
+
+  it('the page: another study with a study goes to its subjects; without one it asks the program', () => {
+    expect(pageWith('OTHER_STUDENT', [])).toContain('Curso o programa');
+    const out = pageWith('OTHER_STUDENT', [track({ type: 'OTHER_ACADEMIC' })]);
+    expect(out).not.toContain('Curso o programa');
+    expect(out).toContain('¿Qué materias o módulos tienes?');
+  });
+
+  it('while the list of studies has not answered nothing is decided (no step is assumed "with no studies")', () => {
+    const out = pageWith('UNIVERSITY_STUDENT', undefined);
+    expect(out).toContain('Cargando…');
+    expect(out).not.toContain('Carrera o programa');
+    expect(out).not.toContain('¿En qué semestre estás?');
+  });
+
+  it('the page never writes the program on its own: the only writes of it are two handlers of the program step', () => {
+    const page = code('../pages/OnboardingPage.tsx');
+    // no effect touches the program or decides a step from render
+    for (const effect of page.match(/useEffect\([\s\S]*?\}, \[[^\]]*\]\)/g) ?? []) {
+      expect(effect).not.toMatch(/programKey|programName|decide\(|updateProfile/);
+    }
+    expect(page.match(/updateProfile\.mutate\(\{ program(Key|Name)/g)).toHaveLength(2);
+    // and both handlers are only wired to the PROGRAM case, which the derived step never reaches with a study
+    const programCase = page.slice(page.indexOf("case 'PROGRAM'"), page.indexOf("case 'LEVEL'"));
+    expect(programCase).toMatch(/onPickCatalog=\{pickProgram\}/);
+    expect(programCase).toMatch(/onSaveCustom=\{saveProgram\}/);
+    expect(page.indexOf('pickProgram', page.indexOf("case 'LEVEL'"))).toBe(-1);
+    expect(page).toMatch(/view === 'PROGRAM' && hasStudies \? derived/);
   });
 });

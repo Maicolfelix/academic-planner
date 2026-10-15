@@ -100,15 +100,19 @@ function Onboarding({ userId }: { userId: string }) {
     setErrors((e) => ({ ...e, [step]: messageOf(err) }));
   const clearError = (step: OnboardingStep) => setErrors((e) => ({ ...e, [step]: undefined }));
 
+  // Whether the account has any study decides if the program step exists, so it must be KNOWN first: while the list loads
+  // there is no step (never "no studies yet").
+  const hasStudies = (studies.data?.length ?? 0) > 0;
   const facts = useMemo(
     () =>
-      profile.data && home.data !== undefined
-        ? { profile: profile.data, period: currentPeriod, decided }
+      profile.data && home.data !== undefined && studies.data !== undefined
+        ? { profile: profile.data, period: currentPeriod, decided, hasStudies }
         : null,
-    [profile.data, home.data, currentPeriod, decided],
+    [profile.data, home.data, currentPeriod, decided, studies.data, hasStudies],
   );
   const derived = facts ? onboardingStep(facts) : null;
-  const derivedOrView = view ?? derived;
+  // A step the student went back to ("Atrás") stays, except the program once a study exists: it is no longer asked.
+  const derivedOrView = view === 'PROGRAM' && hasStudies ? derived : (view ?? derived);
   const step = derivedOrView === 'DONE' && finishing ? 'FINAL' : derivedOrView;
 
   // Moving to another step: the heading announces it (and takes the focus).
@@ -121,9 +125,20 @@ function Onboarding({ userId }: { userId: string }) {
     previous.current = step;
   }, [step]);
 
-  if (profile.isPending || home.isPending) return <FullPageMessage>Cargando…</FullPageMessage>;
-  if ((profile.isError && !profile.data) || (home.isError && home.data === undefined)) {
-    const failed = profile.isError && !profile.data ? profile : home;
+  if (profile.isPending || home.isPending || studies.isPending) {
+    return <FullPageMessage>Cargando…</FullPageMessage>;
+  }
+  if (
+    (profile.isError && !profile.data) ||
+    (home.isError && home.data === undefined) ||
+    (studies.isError && !studies.data)
+  ) {
+    const failed =
+      profile.isError && !profile.data
+        ? profile
+        : home.isError && home.data === undefined
+          ? home
+          : studies;
     return (
       <RetryMessage
         text={`No se pudo cargar: ${failed.error!.message}`}
@@ -131,6 +146,7 @@ function Onboarding({ userId }: { userId: string }) {
         onRetry={() => {
           void profile.refetch();
           void home.refetch();
+          void studies.refetch();
         }}
       />
     );
@@ -156,6 +172,7 @@ function Onboarding({ userId }: { userId: string }) {
       ref={heading}
       step={step}
       primaryUse={use}
+      hasStudies={hasStudies}
       title={title}
       intro={intro}
       footer={footer}

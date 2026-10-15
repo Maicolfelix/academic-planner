@@ -253,6 +253,25 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(profileSide.filter((f) => /studyTrack|studySetup/i.test(read(f))).map(rel)).toEqual([]);
   });
 
+  it('the onboarding never writes the profile program once a study exists: the step is not asked, and the server still refuses it', () => {
+    const read2 = (f: string) => withoutTypeChecks(read(path.join(ROOT, f)));
+    const model = read2('apps/web/src/onboarding/onboardingModel.ts');
+    // the wizard knows whether there are studies, and then the program is settled and left out of the flow
+    expect(model).toMatch(/hasStudies: boolean/);
+    expect(model).toMatch(/f\.hasStudies \|\| f\.profile\.programName !== null/);
+    expect(model).toMatch(/hasStudies && step === 'PROGRAM'/);
+    const page = read2('apps/web/src/pages/OnboardingPage.tsx');
+    // ...and it is only derived once the list of studies is KNOWN (never "no studies" while it loads)
+    expect(page).toMatch(/studies\.data !== undefined\s*\?/);
+    expect(page).toMatch(/studies\.isPending/);
+    // the only writes of the program are the two handlers of the program step: no effect, no render-time decision
+    expect(page.match(/updateProfile\.mutate\(\{ program(Key|Name)/g)).toHaveLength(2);
+    // the backend defence stays for old clients and direct calls
+    const profile = read2('apps/api/src/services/profileService.ts');
+    expect(profile).toMatch(/PROGRAM_MANAGED_BY_STUDY/);
+    expect(profile).toMatch(/studies\.countAll\(userId\)\) > 0\) throw programManagedByStudy\(\)/);
+  });
+
   it('the profile program is NOT an authority: only the profile itself and the pure derivation of the onboarding study read it', () => {
     const readers = api.filter((f) => /programName/.test(withoutTypeChecks(read(f)))).map(rel);
     expect(readers.sort()).toEqual([

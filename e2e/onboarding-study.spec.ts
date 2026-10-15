@@ -293,3 +293,65 @@ test('an OLDER account (finished, a program, a general period, no study) is NEVE
   expect(await tracks(page)).toHaveLength(1);
   assertClean();
 });
+
+for (const archived of [false, true]) {
+  test(`a study set up in Mis estudios DURING the onboarding${archived ? ' (and archived)' : ''}: no program question, no 409, it is not touched and no second study appears`, async ({
+    page,
+  }) => {
+    const assertClean = watch(page);
+    await start(page, 'Universidad');
+    await period(page);
+    // the student is now asked the program... but first sets up a study on their own (here: through the API, deterministic)
+    await expect(page.getByLabel('Carrera o programa')).toBeVisible();
+    const created = await page.request.post('/api/study-tracks', {
+      data: { name: 'Diplomado', type: 'OTHER_ACADEMIC' },
+    });
+    expect(created.status()).toBe(201);
+    const id = (await created.json()).studyTrack.id;
+    if (archived) {
+      expect(
+        (await page.request.post(`/api/study-tracks/${id}/archive`, { data: {} })).status(),
+      ).toBe(200);
+    }
+    const profileWrites: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'PATCH' && r.url().endsWith('/api/profile')) {
+        profileWrites.push(r.postData() ?? '');
+      }
+    });
+    await page.reload();
+
+    // the program is not asked: the study is the authority. The wizard goes on with what is still pending
+    await expect(h1(page, '¿En qué semestre estás?')).toBeVisible();
+    await expect(page.getByLabel('Carrera o programa')).toHaveCount(0);
+    await expect(page.getByText('se administra desde Mis estudios')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Semestre 4' }).click();
+    await next(page);
+    await addSubjects(page, ['Farmacología']);
+    await expect(h1(page, FINAL)).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Organizaremos'); // completing will not create another study
+    await page.getByRole('button', { name: 'Ir al Inicio' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    // nothing wrote the profile's program, nothing was refused, and the study the student set up is exactly as they left it
+    expect(profileWrites.filter((b) => /program(Name|Key)/.test(b))).toEqual([]);
+    const all = await tracks(page);
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({
+      id,
+      name: 'Diplomado',
+      type: 'OTHER_ACADEMIC',
+      isPrimary: !archived,
+      status: archived ? 'ARCHIVED' : 'ACTIVE',
+    });
+    expect((await apiGet(page, '/api/profile')).profile).toMatchObject({
+      primaryUse: 'UNIVERSITY_STUDENT',
+      programName: null,
+      programKey: null,
+      onboardingStatus: 'COMPLETED',
+    });
+    // the period they made is still general (their own setup wins: completing did not link it)
+    expect((await apiGet(page, '/api/periods')).periods[0].studyTrackId).toBeNull();
+    assertClean();
+  });
+}
