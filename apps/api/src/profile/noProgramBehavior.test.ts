@@ -62,6 +62,8 @@ describe('no behaviour depends on a particular program or on the primary use', (
       // the demo seed WRITES the demo student's answer (a university student who finished the onboarding); it reads nothing
       'apps/api/src/demo/seedDemo.ts',
       'apps/api/src/repositories/profileRepository.ts',
+      // completing the onboarding asks only whether the profile has an ANSWER (a skipped one is not marked COMPLETED)
+      'apps/api/src/services/onboardingService.ts',
       'apps/api/src/services/profileService.ts',
       // the only other reader: the DEFAULT education context of a NEW subject (primaryUseToEducationContext), never a permission
       'apps/api/src/services/subjectMaterializer.ts',
@@ -91,12 +93,15 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(readers.sort()).toEqual([
       'apps/api/src/app.ts', // wires the routes and the services
       'apps/api/src/controllers/studyTrackController.ts',
+      'apps/api/src/demo/seedDemo.ts', // the demo student's primary study (and its cleanup)
       'apps/api/src/mappers.ts', // the public shape of a study and of a period
       'apps/api/src/repositories/periodRepository.ts', // a period belongs to a study or to none; the home and current lookups
       'apps/api/src/repositories/studyTrackRepository.ts',
       'apps/api/src/routes/studyTracks.ts',
       'apps/api/src/services/currentPeriods.ts', // the one reader of all the current periods (with their study)
+      'apps/api/src/services/onboardingService.ts', // P0.5-5: completing the onboarding creates / adopts the first study (explicit endpoint)
       'apps/api/src/services/periodService.ts', // create / move a period, one current per scope
+      'apps/api/src/services/profileService.ts', // P0.5-5: with any study, the profile's program is no longer editable (a READ of the count)
       'apps/api/src/services/studySetupService.ts', // setup / adopt-period: the two explicit, atomic ways to create a study
       'apps/api/src/services/studyTrackService.ts',
       // the DEFAULT context of a NEW subject: the type of its period's study (never a name, never a permission)
@@ -127,6 +132,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/api/src/services/activityService.ts', // a general activity without a destination
       'apps/api/src/services/captureConfirmService.ts', // Smart Capture confirmation
       'apps/api/src/services/captureService.ts',
+      'apps/api/src/services/onboardingService.ts', // the period the onboarding already made is the one that becomes the study's
       'apps/api/src/services/periodService.ts', // GET /api/periods/home itself
       'apps/api/src/services/quickCaptureService.ts',
       'apps/api/src/services/scheduleImportConfirmService.ts',
@@ -189,7 +195,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     f.includes(`${path.sep}apps${path.sep}web${path.sep}src${path.sep}`),
   );
 
-  it('a study is created only by an explicit request: the profile, the onboarding and the period never write one', () => {
+  it('a study is created only by an EXPLICIT request: Mis estudios (create / setup / adopt) or the completion of the onboarding; never by the profile, registration, a login or a read', () => {
     // the only code that INSERTS a study
     const creators = api
       .filter((f) => /studyTrack/i.test(read(f)))
@@ -199,20 +205,85 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       .map(rel);
     expect(creators.sort()).toEqual([
       'apps/api/src/repositories/studyTrackRepository.ts',
+      'apps/api/src/services/onboardingService.ts', // POST /api/onboarding/complete: the student's own, explicit completion
       'apps/api/src/services/studySetupService.ts',
       'apps/api/src/services/studyTrackService.ts',
     ]);
-    // the orchestration reads neither the profile nor a name/type to decide anything: what it creates is what the request said
+    // the completion service is reachable ONLY from its own route (not from a login, a read or another service)
+    const onboardingUsers = api
+      .filter((f) => /createOnboardingService|OnboardingService/.test(read(f)))
+      .map(rel);
+    expect(onboardingUsers.sort()).toEqual([
+      'apps/api/src/app.ts',
+      'apps/api/src/controllers/onboardingController.ts',
+      'apps/api/src/services/onboardingService.ts',
+    ]);
+    // registration and sign-in know nothing about studies: the account is born with its profile and NO study
+    const auth = api.filter((f) => /[\\/]auth[\\/]authService\.ts$|routes[\\/]auth\.ts$/.test(f));
+    expect(auth.length).toBeGreaterThanOrEqual(2);
+    expect(
+      auth
+        .filter((f) => /studyTrack|studySetup|onboardingService/i.test(withoutTypeChecks(read(f))))
+        .map(rel),
+    ).toEqual([]);
+    // the orchestration of Mis estudios reads neither the profile nor a name/type to decide anything
     const setup = withoutTypeChecks(
       read(path.join(ROOT, 'apps/api/src/services/studySetupService.ts')),
     );
     expect(setup).not.toMatch(/profile|primaryUse|programName/i);
-    // and nothing on the profile side knows about studies (no silent UserProfile -> StudyTrack)
+    // NO dual write: no study service writes the profile, and the profile service never writes a study (it only READS the count)
+    for (const f of ['studyTrackService', 'studySetupService']) {
+      expect(
+        withoutTypeChecks(read(path.join(ROOT, `apps/api/src/services/${f}.ts`))),
+        f,
+      ).not.toMatch(/createProfileRepository|profiles?\.update|userProfile/);
+    }
+    const profileService = withoutTypeChecks(
+      read(path.join(ROOT, 'apps/api/src/services/profileService.ts')),
+    );
+    expect(profileService).not.toMatch(
+      /studies\.(create|update|clearPrimary|clearCurrentPeriods)|studyTrack\.(create|update)/,
+    );
+    expect(profileService).toMatch(/studies\.countAll\(userId\)/);
+    // the profile's controller, repository and route know nothing about studies
     const profileSide = api.filter((f) =>
-      /profile(Service|Repository|Controller)|routes\/profile/.test(f),
+      /profile(Repository|Controller)|routes\/profile/.test(rel(f)),
     );
     expect(profileSide.length).toBeGreaterThanOrEqual(3);
     expect(profileSide.filter((f) => /studyTrack|studySetup/i.test(read(f))).map(rel)).toEqual([]);
+  });
+
+  it('the onboarding never writes the profile program once a study exists: the step is not asked, and the server still refuses it', () => {
+    const read2 = (f: string) => withoutTypeChecks(read(path.join(ROOT, f)));
+    const model = read2('apps/web/src/onboarding/onboardingModel.ts');
+    // the wizard knows whether there are studies, and then the program is settled and left out of the flow
+    expect(model).toMatch(/hasStudies: boolean/);
+    expect(model).toMatch(/f\.hasStudies \|\| f\.profile\.programName !== null/);
+    expect(model).toMatch(/hasStudies && step === 'PROGRAM'/);
+    const page = read2('apps/web/src/pages/OnboardingPage.tsx');
+    // ...and it is only derived once the list of studies is KNOWN (never "no studies" while it loads)
+    expect(page).toMatch(/studies\.data !== undefined\s*\?/);
+    expect(page).toMatch(/studies\.isPending/);
+    // the only writes of the program are the two handlers of the program step: no effect, no render-time decision
+    expect(page.match(/updateProfile\.mutate\(\{ program(Key|Name)/g)).toHaveLength(2);
+    // the backend defence stays for old clients and direct calls
+    const profile = read2('apps/api/src/services/profileService.ts');
+    expect(profile).toMatch(/PROGRAM_MANAGED_BY_STUDY/);
+    expect(profile).toMatch(/studies\.countAll\(userId\)\) > 0\) throw programManagedByStudy\(\)/);
+  });
+
+  it('the profile program is NOT an authority: only the profile itself and the pure derivation of the onboarding study read it', () => {
+    const readers = api.filter((f) => /programName/.test(withoutTypeChecks(read(f)))).map(rel);
+    expect(readers.sort()).toEqual([
+      'apps/api/src/repositories/profileRepository.ts',
+      'apps/api/src/services/profileService.ts',
+    ]);
+    // and nothing in the API reads it to name, type or authorize a study: that goes through the pure derivation in core, once
+    const onboarding = withoutTypeChecks(
+      read(path.join(ROOT, 'apps/api/src/services/onboardingService.ts')),
+    );
+    expect(onboarding).toMatch(/studyOfOnboarding\(profile\)/);
+    expect(onboarding).not.toMatch(/programName|programKey\s*[:=]\s*profile/);
   });
 
   it('an explicit /subjects?period= does NOT require HOME, and only the plain /subjects does', () => {
@@ -259,9 +330,18 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(onboarding.length).toBeGreaterThanOrEqual(6);
     expect(
       onboarding
-        .filter((f) => /studyTrack|useSetupStudy|useAdoptPeriod|settings\/studies/i.test(read(f)))
+        .filter((f) =>
+          /useSetupStudy|useAdoptPeriod|useUpdateStudyTrack|useMakeStudyTrack|useArchiveStudyTrack|useRestoreStudyTrack|useCreateStudyPeriod|useUpdateStudyPeriod|settings\/studies/.test(
+            read(f),
+          ),
+        )
         .map(rel),
     ).toEqual([]);
+    // the onboarding touches a study in ONE way only: the COMPLETION endpoint (the server decides) and a READ of how many exist
+    const page = read2('apps/web/src/pages/OnboardingPage.tsx');
+    expect(page).toMatch(/completeOnboarding\.mutateAsync\(\)/);
+    expect(page).toMatch(/useStudyTracks\(\)/);
+    expect(page).not.toMatch(/studyTrack\.|studyTracks\.(create|update)|setupStudy|adoptPeriod/);
   });
 
   it('the web knows about studies only through the Mis estudios screens, their hooks and the labels of the summaries', () => {
@@ -274,6 +354,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     ).toEqual([
       'apps/web/src/academic/origin.ts', // the label of an item's study, read from the server's current periods
       'apps/web/src/api/studyTracks.ts',
+      'apps/web/src/pages/OnboardingPage.tsx', // READS how many studies exist (to preview what completing does); the server creates it
       'apps/web/src/pages/StudiesPage.tsx', // Mis estudios
       'apps/web/src/pages/SubjectsPage.tsx', // reads the study of the period it shows (its title); never sends one
       'apps/web/src/pages/progress/ProgressByPeriod.tsx', // one progress line per study

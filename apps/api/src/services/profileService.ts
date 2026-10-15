@@ -6,6 +6,7 @@ import {
 } from '@planner/core';
 import type { RunInTransaction } from '../db/prisma.js';
 import { AppError } from '../errors/AppError.js';
+import { createStudyTrackRepository } from '../repositories/studyTrackRepository.js';
 import {
   createProfileRepository,
   type ProfileData,
@@ -41,6 +42,10 @@ const invalidTransition = (from: string, to: string) =>
     { from, to },
   );
 
+/** Once a study exists, "which program" is said in Mis estudios: the profile's copy is only legacy / onboarding staging. */
+const programManagedByStudy = () =>
+  new AppError(409, 'PROGRAM_MANAGED_BY_STUDY', 'Tu programa se administra desde Mis estudios.');
+
 /**
  * The educational profile of the SESSION's user. The service never receives an owner from the client: the controller
  * passes the session's id. `primaryUse` and the program only describe; no rule anywhere reads them to allow or deny.
@@ -60,6 +65,9 @@ export function createProfileService(profiles: ProfileRepository, inTransaction:
     async update(userId: string, input: UpdateProfileInput): Promise<Profile> {
       return inTransaction(async (tx) => {
         const repo = createProfileRepository(tx);
+        // The same order as completing the onboarding (the study lock, then the row): no two requests wait on each other.
+        const studies = createStudyTrackRepository(tx);
+        await studies.lockUser(userId);
         await repo.lock(userId); // a missing row locks nothing: it is checked right after, never created
         const current = await repo.find(userId);
         if (!current) throw profileInvariantBroken();
@@ -67,6 +75,10 @@ export function createProfileService(profiles: ProfileRepository, inTransaction:
         const data: ProfileData = {};
         if (input.primaryUse !== undefined) data.primaryUse = input.primaryUse;
         if (input.programKey !== undefined || input.programName !== undefined) {
+          // P0.5-5: the study is the authority of the formation. With any study (archived too) the profile's program is no longer
+          // editable here, and nothing keeps the two in step (no dual write). Without one (the onboarding's staging, and the
+          // accounts that finished before studies existed) it works as always.
+          if ((await studies.countAll(userId)) > 0) throw programManagedByStudy();
           const program = resolveProgram(current, input);
           data.programKey = program.programKey;
           data.programName = program.programName;

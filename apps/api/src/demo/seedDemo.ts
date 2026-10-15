@@ -1,6 +1,7 @@
 import {
   createActivitySchema,
   createSubjectSchema,
+  DEFAULT_STUDY_NAMES,
   toLocalParts,
   updateActivitySchema,
 } from '@planner/core';
@@ -17,6 +18,7 @@ import { createPeriodService } from '../services/periodService.js';
 import { createReminderService } from '../services/reminderService.js';
 import { createScheduleService } from '../services/scheduleService.js';
 import { createSubjectMaterializer } from '../services/subjectMaterializer.js';
+import { createStudySetupService } from '../services/studySetupService.js';
 import { createSubjectService } from '../services/subjectService.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import {
@@ -94,6 +96,8 @@ async function clearDemoData(prisma: PrismaClient, userId: string) {
     prisma.scheduleBlock.deleteMany({ where: { userId } }),
     prisma.subject.deleteMany({ where: { userId } }),
     prisma.academicPeriod.deleteMany({ where: { userId } }),
+    // The study its period belonged to (after the periods: they point at it).
+    prisma.studyTrack.deleteMany({ where: { userId } }),
     // A reset invalidates the demo browser's session on purpose: it must sign in again to a consistent state.
     prisma.session.deleteMany({ where: { userId } }),
   ]);
@@ -179,6 +183,14 @@ export async function seedDemo(prisma: PrismaClient, opts: SeedOptions): Promise
   );
 
   const period = await periods.create(user.id, { ...plan.period, isCurrent: true });
+  // The world after P0.5-5: a university student who finished the onboarding has a PRIMARY study, and the period is its own.
+  // It is the generic one (what completing the onboarding without naming a program creates): the seed invents no career. The
+  // real service adopts the period in place, so the subjects below are created in a period that already belongs to it.
+  await createStudySetupService({ runInTransaction }).adoptPeriod(user.id, {
+    periodId: period.id,
+    name: DEFAULT_STUDY_NAMES.UNIVERSITY,
+    type: 'UNIVERSITY',
+  });
 
   const subjectIds = new Map<string, string>();
   for (const s of plan.subjects) {

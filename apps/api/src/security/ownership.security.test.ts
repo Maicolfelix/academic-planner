@@ -598,6 +598,7 @@ describe('every protected route refuses an anonymous caller', () => {
     ['get', '/api/periods/current'],
     ['post', '/api/periods'],
     ['patch', `/api/periods/${randomUUID()}`],
+    ['post', '/api/onboarding/complete'],
     ['get', '/api/study-tracks'],
     ['post', '/api/study-tracks'],
     ['post', '/api/study-tracks/setup'],

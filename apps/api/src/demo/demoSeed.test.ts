@@ -233,6 +233,37 @@ describe('the demo student has a finished university profile', () => {
     expect(await prisma.userProfile.count({ where: { userId: user.id } })).toBe(1);
   });
 
+  it('has the world after P0.5-5: ONE primary generic "Universidad" study that owns its current period (no career, no level invented)', async () => {
+    await seedDemo(prisma, { now: NOW });
+    await seedDemo(prisma, { now: NOW }); // repeatable: still exactly one
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_EMAIL } });
+    const tracks = await prisma.studyTrack.findMany({ where: { userId: user.id } });
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0]).toMatchObject({
+      name: 'Universidad',
+      type: 'UNIVERSITY',
+      programKey: null,
+      isPrimary: true,
+      status: 'ACTIVE',
+    });
+    const periods = await prisma.academicPeriod.findMany({ where: { userId: user.id } });
+    expect(periods).toHaveLength(1);
+    expect(periods[0]).toMatchObject({
+      isCurrent: true,
+      studyTrackId: tracks[0]!.id,
+      studyLevel: null,
+      studyLevelNote: null,
+    });
+    // the demo student is the same world a new university student reaches: the HOME period is the study's
+    const agent = await login();
+    expect((await agent.get('/api/periods/home').expect(200)).body.period.id).toBe(periods[0]!.id);
+    expect(
+      (await agent.get('/api/study-tracks').expect(200)).body.studyTracks.map(
+        (t: { name: string }) => t.name,
+      ),
+    ).toEqual(['Universidad']);
+  });
+
   it('its subjects take the UNIVERSITY default, through the same rule as every other subject', async () => {
     await seedDemo(prisma, { now: NOW });
     const user = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_EMAIL } });

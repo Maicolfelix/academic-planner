@@ -133,6 +133,8 @@ Objetivo: conocer al usuario desde el registro, de forma **corta, opcional, prog
 
 #### P0.5 — Base multi-estudio
 
+**P0.5 DONE** (P0.5-1 … P0.5-5, PR #39–#43). El siguiente bloque de producto es notas / cortes / evaluaciones: no se inicia sin aprobación explícita.
+
 Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, colegio + técnico…). `primaryUse` **no** se convierte en lista: la entidad es `StudyTrack` ([D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)). El _discovery_ recomendó hacerlo **antes de Notas** (la escala, la nota mínima y el promedio pertenecen a un estudio). Orden propuesto, un PR cada uno y **cada uno con aprobación explícita**:
 
 | PR     | Contenido                                                                                                                                                                                | Estado                                                          |
@@ -141,7 +143,7 @@ Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, coleg
 | P0.5-2 | Vincular periodos (`AcademicPeriod.studyTrackId?`, un periodo actual **por estudio**), periodo «hogar», regla del `materializer`                                                         | **DONE: fusionado (PR #40, merge `51d2bec`)**                   |
 | P0.5-3 | Lectura multi-periodo (Inicio, Radar, Atención, Progreso, Carga, recordatorios, lista de Actividades), etiqueta de origen en la Agenda y Actividades                                     | **DONE: fusionado (PR #41, merge `8df3e26`)**                   |
 | P0.5-4 | «Mis estudios»: listar, agregar (alta atómica), convertir la planificación actual (adopción explícita), editar, principal, archivar, restaurar, periodos; materias con periodo explícito | **DONE (PR #42; QA real en iPhone aprobada por el mantenedor)** |
-| P0.5-5 | Integración con el onboarding y la autoridad de `programName`/`programKey`                                                                                                               | no iniciado                                                     |
+| P0.5-5 | Onboarding → estudio: completar crea el estudio principal y adopta el periodo; el estudio pasa a ser la autoridad (el programa del perfil queda como metadato heredado)                  | **DONE (PR #43; QA real en iPhone aprobada por el mantenedor)** |
 
 ### Etapa B — Contexto universitario (`1.2.x`)
 

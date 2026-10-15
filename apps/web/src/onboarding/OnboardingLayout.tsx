@@ -15,13 +15,18 @@ export const OnboardingLayout = forwardRef<
   {
     step: ProgressStep;
     primaryUse: PrimaryUse | null;
+    /** The account already has a study: the program step does not exist for it (the quiet progress marks leave it out). */
+    hasStudies?: boolean;
     title: string;
     intro?: string;
     children: ReactNode;
     footer?: ReactNode;
   }
->(function OnboardingLayout({ step, primaryUse, title, intro, children, footer }, headingRef) {
-  const steps = progressSteps(primaryUse);
+>(function OnboardingLayout(
+  { step, primaryUse, hasStudies = false, title, intro, children, footer },
+  headingRef,
+) {
+  const steps = progressSteps(primaryUse, hasStudies);
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
       <div

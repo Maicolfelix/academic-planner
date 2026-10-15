@@ -4,6 +4,8 @@ import { CheckIcon } from '../components/ui/icons';
 interface Props {
   /** What the subjects step did, when it did something. */
   subjects?: { created: number; reused: number };
+  /** The study this period will be organized in (a student who studies and has not set one up); null/absent: nothing to say. */
+  studyName?: string | null;
   pending: boolean;
   error?: string;
   onImport: () => void;
@@ -16,7 +18,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * The last screen is small on purpose (no celebration): two ways out. Both finish the wizard; "Importar mi horario" only
  * takes the student to the import, which they review and confirm themselves (nothing is imported here).
  */
-export function FinalStep({ subjects, pending, error, onImport, onHome }: Props) {
+export function FinalStep({ subjects, studyName, pending, error, onImport, onHome }: Props) {
   const created = subjects?.created ?? 0;
   const reused = subjects?.reused ?? 0;
   return (
@@ -29,6 +31,12 @@ export function FinalStep({ subjects, pending, error, onImport, onHome }: Props)
             {created > 0 && reused > 0 && ' · '}
             {reused > 0 && `${plural(reused, 'ya estaba', 'ya estaban')} en tu periodo`}
           </span>
+        </p>
+      )}
+      {studyName && (
+        <p>
+          Listo. Organizaremos este periodo dentro de{' '}
+          <span className="font-medium break-words">{studyName}</span>.
         </p>
       )}
       <p className="text-muted-foreground">Puedes cambiar todo esto después.</p>

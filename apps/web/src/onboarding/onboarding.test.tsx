@@ -14,6 +14,7 @@ import { homePeriodKey, subjectsKey } from '../academic/useAcademic';
 import { ME_KEY } from '../auth/useAuth';
 import { OnboardingPage } from '../pages/OnboardingPage';
 import { PROFILE_KEY } from '../profile/useProfile';
+import { studyTracksKey } from '../studyTracks/useStudyTracks';
 import { profileNotice, ProfileNotice } from '../profile/ProfileNotice';
 import { FinalStep } from './FinalStep';
 import { LevelStep } from './LevelStep';
@@ -95,6 +96,7 @@ function page(p: Profile | undefined, periods: AcademicPeriod[] | undefined, sub
   // the page reads the HOME period, which the server answers (here: the one current period of these accounts, or none)
   if (periods) client.setQueryData(homePeriodKey, periods.find((x) => x.isCurrent) ?? null);
   if (subjects) client.setQueryData(subjectsKey(PERIOD_ID), subjects);
+  client.setQueryData(studyTracksKey, []); // the page needs to KNOW whether there are studies before it derives a step
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <StaticRouter location="/onboarding">
@@ -113,11 +115,13 @@ const facts = (
     program?: string | null;
     level?: number | null;
     decided?: string[];
+    hasStudies?: boolean;
   } = {},
 ): OnboardingFacts => ({
   profile: { primaryUse: use, onboardingStatus: status, programName: opts.program ?? null },
   period: opts.period === false ? null : { studyLevel: opts.level ?? null, studyLevelNote: null },
   decided: new Set(opts.decided ?? []),
+  hasStudies: opts.hasStudies ?? false,
 });
 
 describe('the optional steps of each use', () => {

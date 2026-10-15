@@ -4,6 +4,7 @@ import {
   hasNoNul,
   normalizeNameKey,
   studyLevelSchema,
+  studyOfOnboarding,
   type AcademicPeriod,
   type PrimaryUse,
   type Profile,
@@ -30,7 +31,12 @@ export type OptionalStep = 'PROGRAM' | 'LEVEL' | 'SUBJECTS';
 export type OnboardingStep = RequiredStep | OptionalStep | 'FINAL' | 'DONE';
 
 /** The optional steps of each use, in order. A personal use has none; no answer has none. */
-export function flowFor(primaryUse: PrimaryUse | null): OptionalStep[] {
+export function flowFor(primaryUse: PrimaryUse | null, hasStudies = false): OptionalStep[] {
+  // "Which program" is the authority of a STUDY once one exists (set up in "Mis estudios"): the wizard has nothing to ask there.
+  return flowOf(primaryUse).filter((step) => !(hasStudies && step === 'PROGRAM'));
+}
+
+function flowOf(primaryUse: PrimaryUse | null): OptionalStep[] {
   switch (primaryUse) {
     case 'UNIVERSITY_STUDENT':
       return ['PROGRAM', 'LEVEL', 'SUBJECTS'];
@@ -52,12 +58,18 @@ export interface OnboardingFacts {
   period: Pick<AcademicPeriod, 'studyLevel' | 'studyLevelNote'> | null;
   /** The steps the student answered or skipped in this wizard (kept in the local draft). */
   decided: ReadonlySet<string>;
+  /**
+   * The account has at least one study (archived ones count), e.g. one set up in "Mis estudios" meanwhile. From then on the study
+   * is the authority of the formation: the program question is not asked and the profile's program is never written (the server
+   * refuses it with PROGRAM_MANAGED_BY_STUDY). It must be KNOWN before the step is derived: never assume "none" while it loads.
+   */
+  hasStudies: boolean;
 }
 
 /** Is this optional step settled: answered (the server has it) or skipped/confirmed by the student? */
 function settled(step: OptionalStep, f: OnboardingFacts): boolean {
   if (f.decided.has(step)) return true;
-  if (step === 'PROGRAM') return f.profile.programName !== null;
+  if (step === 'PROGRAM') return f.hasStudies || f.profile.programName !== null;
   if (step === 'LEVEL')
     return f.period !== null && (f.period.studyLevel !== null || f.period.studyLevelNote !== null);
   return false; // SUBJECTS: asked once (the existing subjects are shown, never retyped)
@@ -71,13 +83,13 @@ export function onboardingStep(f: OnboardingFacts): OnboardingStep {
   const skippedUse = f.decided.has('USE') || (!period && profile.onboardingStatus === 'SKIPPED');
   if (profile.primaryUse === null && !skippedUse) return 'USE';
   if (!period) return 'PERIOD';
-  for (const step of flowFor(profile.primaryUse)) if (!settled(step, f)) return step;
+  for (const step of flowFor(profile.primaryUse, f.hasStudies)) if (!settled(step, f)) return step;
   return 'FINAL';
 }
 
 /** The step "Atrás" goes to (the answers stay where the server keeps them), or null on the first one. */
 export function previousStep(step: OnboardingStep, f: OnboardingFacts): OnboardingStep | null {
-  const flow = flowFor(f.profile.primaryUse);
+  const flow = flowFor(f.profile.primaryUse, f.hasStudies);
   const order: OnboardingStep[] = [
     'USE',
     ...(f.period ? [] : (['PERIOD'] as const)),
@@ -98,8 +110,11 @@ export const STEP_LABEL: Record<RequiredStep | OptionalStep | 'FINAL', string> =
 };
 
 /** The steps worth showing in the quiet progress marks for this student (only the ones that exist for them). */
-export function progressSteps(primaryUse: PrimaryUse | null): (keyof typeof STEP_LABEL)[] {
-  return ['USE', 'PERIOD', ...flowFor(primaryUse), 'FINAL'];
+export function progressSteps(
+  primaryUse: PrimaryUse | null,
+  hasStudies = false,
+): (keyof typeof STEP_LABEL)[] {
+  return ['USE', 'PERIOD', ...flowFor(primaryUse, hasStudies), 'FINAL'];
 }
 
 // ───────────────────────── Step 1 and 2 (P0-4a) ─────────────────────────
@@ -288,6 +303,20 @@ export function addChip(
 
 export const removeChip = (chips: readonly string[], name: string): string[] =>
   chips.filter((c) => c !== name);
+
+/**
+ * What the last screen tells a student who studies, before anything happens: "Listo. Organizaremos este periodo dentro de
+ * Medicina." It says the study that completing the onboarding WILL create (the same derivation the server uses), so the two never
+ * disagree. Nothing is promised to a teacher, a personal use, a skipped profile or somebody who already set up a study in
+ * "Mis estudios" (`existingStudies` > 0, or not known yet): for them completing creates none.
+ */
+export function finalStudyName(
+  profile: Pick<Profile, 'primaryUse' | 'programName' | 'programKey'>,
+  existingStudies: number | undefined,
+): string | null {
+  if (existingStudies !== 0) return null;
+  return studyOfOnboarding(profile)?.name ?? null;
+}
 
 // ───────────────────────── The wizard's local draft ─────────────────────────
 
