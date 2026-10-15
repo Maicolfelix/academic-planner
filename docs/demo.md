@@ -105,3 +105,5 @@ Ejecuta el restablecimiento (arriba) **el mismo día**: el dataset se calcula re
 ## Pruebas
 
 `apps/api/src/demo/demoSeed.test.ts` (BD de test, nunca la de desarrollo): guardas, comando real con códigos de salida, primera y segunda ejecución, restablecimiento, preservación de otros usuarios, fallo a mitad, inicio de sesión real, Radar, Atención, Progreso, Carga, Dashboard, Agenda, recordatorios, propiedad, y cinco fechas de borde (lunes 00:01, domingo 23:59, fin de mes, fin de año, 29 de febrero). `e2e/demo-seed.spec.ts`: el recorrido en el navegador (360 y 1366 px) con axe y sin desbordes. Ninguna otra prueba depende del seed.
+
+**Estudio del demo (P0.5-5).** El estudiante demo tiene un estudio principal **genérico** «Universidad» (tipo universidad, sin programa ni nivel inventados) dueño de su periodo actual, creado por el mismo servicio de adopción que usa «Mis estudios»: es el mundo de un estudiante universitario que terminó el onboarding después de P0.5-5. Sigue siendo determinista e idempotente (volver a sembrar deja exactamente uno).
