@@ -20,15 +20,12 @@ import {
  */
 export function StudyCard({
   card,
-  canOpenSubjects,
   onEdit,
   onPeriods,
   onPrimary,
   onArchive,
 }: {
   card: StudyCardModel;
-  /** There is a HOME period, so the subjects screen can open (without one the app asks for a period first). */
-  canOpenSubjects: boolean;
   onEdit: () => void;
   onPeriods: () => void;
   onPrimary: () => void;
@@ -86,7 +83,7 @@ export function StudyCard({
       )}
 
       <div className="flex flex-wrap gap-2">
-        {current && canOpenSubjects ? (
+        {current ? (
           <Link
             to={`/subjects?period=${current.id}`}
             aria-label={`Ver materias de ${track.name}`}

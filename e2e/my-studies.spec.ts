@@ -153,9 +153,8 @@ test('add a second study with the short flow; both are read by the Home; the fir
   await page.goto('/settings/studies');
   await page.getByRole('button', { name: 'Agregar estudio' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Agregar estudio' });
-  await expect(dialog.getByText('Paso 1 de 5')).toHaveCount(0); // the number of steps depends on the type
   await dialog.getByRole('button', { name: /Otro estudio/ }).click();
-  await expect(dialog.getByText('Paso 1 de 5')).toBeVisible();
+  await expect(dialog.getByText('Paso 1 de 6')).toBeVisible(); // the same six steps for every kind of study
   await dialog.getByRole('button', { name: 'Siguiente' }).click();
   await dialog.getByLabel('Nombre del estudio').fill('Diplomado en Ciberseguridad');
   await dialog.getByRole('button', { name: 'Siguiente' }).click();
@@ -163,7 +162,11 @@ test('add a second study with the short flow; both are read by the Home; the fir
   await dialog.getByLabel('Inicio', { exact: true }).fill(dates.startDate);
   await dialog.getByLabel('Fin', { exact: true }).fill(dates.endDate);
   await dialog.getByRole('button', { name: 'Siguiente' }).click();
-  // "Otro estudio" has no level question; the subjects step is next
+  // "Otro estudio" asks the level too, in its own words, and it is optional: Siguiente with nothing is valid
+  await expect(
+    dialog.getByRole('heading', { level: 3, name: '¿En qué nivel estás?' }),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
   await dialog.getByLabel('Escribe una materia').fill('Seguridad de Redes');
   await dialog.getByLabel('Escribe una materia').press('Enter');
   await dialog.getByLabel('Escribe una materia').fill('Criptografía');
@@ -451,5 +454,281 @@ test('Mis estudios fits every width and is clean for assistive technology, with 
   await page.getByRole('menuitem', { name: /^Periodos/ }).click();
   await expectNoHorizontalOverflow(page);
   await axe('periods dialog');
+  assertClean();
+});
+
+/** Walks the "Agregar estudio" flow for an "Otro estudio" up to the level step. */
+async function otherStudyUntilLevel(page: Page, name: string) {
+  await page.goto('/settings/studies');
+  await page.getByRole('button', { name: 'Agregar estudio' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Agregar estudio' });
+  await dialog.getByRole('button', { name: /Otro estudio/ }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByLabel('Nombre del estudio').fill(name);
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByLabel('Nombre del periodo').fill('Periodo 1');
+  await dialog.getByLabel('Inicio', { exact: true }).fill(dates.startDate);
+  await dialog.getByLabel('Fin', { exact: true }).fill(dates.endDate);
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(
+    dialog.getByRole('heading', { level: 3, name: '¿En qué nivel estás?' }),
+  ).toBeVisible();
+  return dialog;
+}
+
+test('"otro estudio" may have a level: a number (Técnico), words (Inglés B2) or none (Diplomado); they exclude each other and Atrás keeps them', async ({
+  page,
+}) => {
+  const assertClean = watch(page);
+  await register(page, uniqueEmail());
+  await expect(page).toHaveURL(/\/onboarding$/);
+  const levelOf = async (study: string) => {
+    const tracks = (await get(page, '/api/study-tracks')).studyTracks;
+    const id = tracks.find((t: { name: string }) => t.name === study).id;
+    const period = (await get(page, '/api/periods')).periods.find(
+      (p: { studyTrackId: string }) => p.studyTrackId === id,
+    );
+    return { studyLevel: period.studyLevel, studyLevelNote: period.studyLevelNote };
+  };
+
+  // 1) a technical program: level 2 (a number), shown on the confirmation and in the card
+  let dialog = await otherStudyUntilLevel(page, 'Técnico en Sistemas');
+  await expect(dialog.getByRole('button', { name: /^Nivel \d/ })).toHaveCount(0); // no "semestre" buttons for another study
+  await expect(dialog).not.toContainText('Semestre');
+  // the two fields exclude each other as they are typed
+  await dialog.getByLabel('O descríbelo').fill('Módulo 3');
+  await dialog.getByLabel(/^Número/).fill('2');
+  await expect(dialog.getByLabel('O descríbelo')).toHaveValue('');
+  await dialog.getByLabel('O descríbelo').fill('Módulo 3');
+  await expect(dialog.getByLabel(/^Número/)).toHaveValue('');
+  await dialog.getByLabel('O descríbelo').fill('');
+  await dialog.getByLabel(/^Número/).fill('2');
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // no subjects
+  await expect(dialog.getByText('Nivel 2')).toBeVisible(); // the confirmation shows the level that was given
+  // Atrás twice keeps what was written
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await expect(dialog.getByLabel(/^Número/)).toHaveValue('2');
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Crear estudio' }).click();
+  await expect(studyCard(page, 'Técnico en Sistemas')).toContainText('Nivel 2');
+  expect(await levelOf('Técnico en Sistemas')).toEqual({ studyLevel: 2, studyLevelNote: null });
+
+  // 2) a language course: the level is words ("B2")
+  dialog = await otherStudyUntilLevel(page, 'Inglés');
+  await dialog.getByLabel('O descríbelo').fill('B2');
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(dialog.getByText('B2', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Crear estudio' }).click();
+  await expect(studyCard(page, 'Inglés')).toContainText('B2');
+  expect(await levelOf('Inglés')).toEqual({ studyLevel: null, studyLevelNote: 'B2' });
+
+  // 3) a diploma with no level: "Ahora no" is valid, and so is Siguiente with nothing; the confirmation has no Nivel line
+  dialog = await otherStudyUntilLevel(page, 'Diplomado');
+  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // nothing chosen: "no level", not an error
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Siguiente' }).click(); // subjects: none
+  await expect(dialog.getByText('Nivel', { exact: true })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await dialog.getByRole('button', { name: 'Atrás' }).click();
+  await dialog.getByRole('button', { name: 'Ahora no' }).click();
+  await dialog.getByRole('button', { name: 'Siguiente' }).click();
+  await dialog.getByRole('button', { name: 'Crear estudio' }).click();
+  await expect(studyCard(page, 'Diplomado')).toBeVisible();
+  expect(await levelOf('Diplomado')).toEqual({ studyLevel: null, studyLevelNote: null });
+  assertClean();
+});
+
+test('with NO HOME (the main study has no current period, a secondary one does) the explicit subjects of that study still open; the plain page asks for a period', async ({
+  page,
+}) => {
+  const assertClean = watch(page, ['404 /api/study-tracks/*']);
+  await register(page, uniqueEmail());
+  await expect(page).toHaveURL(/\/onboarding$/);
+  const a = await post(page, '/api/study-tracks/setup', {
+    track: { name: 'Medicina', type: 'UNIVERSITY' },
+    period: { name: '2026-2', ...dates },
+    subjects: ['Farmacología'],
+  });
+  const b = await post(page, '/api/study-tracks/setup', {
+    track: { name: 'Diplomado', type: 'OTHER_ACADEMIC' },
+    period: { name: 'Cohorte', ...dates },
+    subjects: ['Seguridad de Redes'],
+  });
+  // the main study loses its current period (archiving clears it, restoring does not bring it back) and takes the main place again
+  await post(page, `/api/study-tracks/${b.studyTrack.id}/make-primary`);
+  await post(page, `/api/study-tracks/${a.studyTrack.id}/archive`);
+  await post(page, `/api/study-tracks/${a.studyTrack.id}/restore`);
+  await post(page, `/api/study-tracks/${a.studyTrack.id}/make-primary`);
+  expect((await get(page, '/api/periods/home')).period).toBeNull(); // HOME: none
+  expect((await get(page, '/api/periods/current')).periods).toHaveLength(1); // ...yet a secondary study has a current period
+
+  // Mis estudios opens (it never needs HOME) and offers the secondary study's subjects
+  await page.goto('/settings/studies');
+  await expect(page).toHaveURL(/\/settings\/studies$/);
+  await expect(page.getByText('todavía no tiene un periodo actual')).toBeVisible();
+  await expect(studyCard(page, 'Medicina')).toContainText('Sin periodo actual');
+  await page.getByRole('link', { name: 'Ver materias de Diplomado' }).click();
+  await expect(page).toHaveURL(new RegExp(`/subjects\\?period=${b.period.id}$`)); // NOT the onboarding
+  await expect(page.getByRole('heading', { level: 1, name: 'Mis asignaturas' })).toBeVisible();
+  await expect(page.getByText(/^Diplomado · Cohorte/)).toBeVisible();
+  await expect(page.getByText('Seguridad de Redes').first()).toBeVisible();
+
+  // a new subject goes to THAT period, although it is not HOME
+  await page.getByRole('button', { name: 'Agregar asignatura' }).first().click();
+  const form = page.getByRole('dialog', { name: 'Agregar asignatura' });
+  await form.getByLabel('Nombre').fill('Ética');
+  await form.getByRole('button', { name: 'Agregar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByText('Ética').first()).toBeVisible();
+  const created = (await get(page, `/api/subjects?periodId=${b.period.id}`)).subjects.find(
+    (x: { name: string }) => x.name === 'Ética',
+  );
+  expect(created).toMatchObject({ periodId: b.period.id });
+  expect(
+    (await get(page, `/api/subjects?periodId=${a.period.id}`)).subjects.map(
+      (x: { name: string }) => x.name,
+    ),
+  ).toEqual(['Farmacología']);
+
+  // a period that is not yours (or does not exist): the same message, and still not the onboarding
+  await page.goto('/subjects?period=00000000-0000-4000-8000-000000000099');
+  await expect(page).toHaveURL(/\/subjects\?period=/);
+  await expect(page.getByText('No encontramos ese periodo.')).toBeVisible();
+
+  // the PLAIN page still needs HOME: without one, the onboarding, as before
+  await page.goto('/subjects');
+  await expect(page).toHaveURL(/\/onboarding$/);
+  assertClean();
+});
+
+test('every width from 320 to 1366: Mis estudios, its dialogs and its menu fit, with long names, and the keyboard works', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop-1366', 'sets its own widths: one project is enough');
+  test.setTimeout(240_000);
+  const assertClean = watch(page);
+  const legacy = await legacyAccount(page);
+  const LONG = 'Diplomado de especialización en seguridad informática y redes de computadores';
+  await post(page, '/api/study-tracks/setup', {
+    track: { name: LONG, type: 'OTHER_ACADEMIC' },
+    period: { name: 'Cohorte de octubre a diciembre del año dos mil veintiséis', ...dates },
+    subjects: ['Seguridad de Redes'],
+  });
+  await post(page, '/api/study-tracks/setup', {
+    track: { name: 'Medicina', type: 'UNIVERSITY' },
+    period: { name: '2026-2', ...dates, studyLevel: 4 },
+  });
+  const axe = async (label: string) => {
+    await entrancesDone(page);
+    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(
+      violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`),
+      label,
+    ).toEqual([]);
+  };
+  const fits = async (label: string) => {
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `${label}: horizontal overflow in px`).toBeLessThanOrEqual(0);
+    // nothing important is wider than the screen
+    const wide = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll('dialog[open], main button, main a, dialog[open] button'),
+      )
+        .filter((e) => (e as HTMLElement).getBoundingClientRect().right > window.innerWidth + 1)
+        .map((e) => (e.textContent ?? '').trim().slice(0, 30)),
+    );
+    expect(wide, `${label}: elements beyond the screen`).toEqual([]);
+  };
+  const tall = async (label: string) => {
+    // touch targets of the visible controls are at least 44 px high
+    const small = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll('main button, dialog[open] button, main a[class*="min-h"]'),
+      )
+        .map((e) => e as HTMLElement)
+        .filter((e) => e.offsetParent !== null && e.getBoundingClientRect().height < 43.5)
+        .map(
+          (e) =>
+            `${(e.getAttribute('aria-label') ?? e.textContent ?? '').trim().slice(0, 30)} ${Math.round(e.getBoundingClientRect().height)}px`,
+        ),
+    );
+    expect(small, `${label}: controls under 44 px`).toEqual([]);
+  };
+
+  for (const width of [320, 360, 390, 430, 768, 1366]) {
+    await page.setViewportSize({ width, height: 800 });
+    const at = (what: string) => `${width}px ${what}`;
+    await page.goto('/settings/studies');
+    await expect(page.getByRole('heading', { level: 1, name: 'Mis estudios' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3 })).toHaveCount(2);
+    await fits(at('list'));
+    await tall(at('list'));
+
+    // the action menu, by keyboard: Enter on the button opens it, focus goes inside, Escape gives the focus back
+    const trigger = page.getByRole('button', { name: `Más acciones: ${LONG}`, exact: true });
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem').first()).toBeFocused();
+    await fits(at('action menu'));
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+
+    // adopt (the plan of the older account), the wizard (type and program step) and the periods dialog
+    await page.getByRole('button', { name: 'Convertir en estudio' }).click();
+    const adopt = page.getByRole('dialog', { name: 'Convertir en estudio' });
+    await fits(at('adopt dialog'));
+    await tall(at('adopt dialog'));
+    await adopt.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(adopt).toBeHidden();
+
+    await page.getByRole('button', { name: 'Agregar estudio' }).first().click();
+    const wizard = page.getByRole('dialog', { name: 'Agregar estudio' });
+    await expect(wizard.getByRole('heading', { level: 3 })).toBeFocused();
+    await fits(at('wizard, type'));
+    await tall(at('wizard, type'));
+    await wizard.getByRole('button', { name: /Universidad/ }).click();
+    await wizard.getByRole('button', { name: 'Siguiente' }).click();
+    await fits(at('wizard, program'));
+    await wizard.getByLabel('Carrera o programa').fill('Med');
+    await fits(at('wizard, program with matches'));
+    await tall(at('wizard, program with matches'));
+    await page.keyboard.press('Escape'); // something was typed: it asks first
+    await expect(wizard.getByRole('alert')).toContainText('cambios sin guardar');
+    await wizard.getByRole('button', { name: 'Descartar cambios' }).click();
+    await expect(wizard).toBeHidden();
+
+    await page.getByRole('button', { name: `Más acciones: ${LONG}`, exact: true }).click();
+    await page.getByRole('menuitem', { name: /^Periodos/ }).click();
+    const periods = page.getByRole('dialog', { name: new RegExp('^Periodos de ') });
+    await fits(at('periods dialog'));
+    await tall(at('periods dialog'));
+    await periods.getByRole('button', { name: 'Nuevo periodo' }).click();
+    await fits(at('new period form'));
+    await tall(at('new period form'));
+    await page.keyboard.press('Escape');
+    if (await periods.isVisible()) await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    // the subjects of a study with a long name
+    await page.getByRole('link', { name: `Ver materias de ${LONG}` }).click();
+    await expect(page).toHaveURL(/\/subjects\?period=/);
+    await fits(at('subjects of a study'));
+  }
+  // axe once at a narrow and once at a wide width, with a dialog open
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/settings/studies');
+    await axe(`${width}px list`);
+    await page.getByRole('button', { name: 'Agregar estudio' }).first().click();
+    await axe(`${width}px wizard`);
+    await page.keyboard.press('Escape');
+  }
+  expect(legacy.period.id).toBeTruthy();
   assertClean();
 });

@@ -20,6 +20,8 @@ import {
 } from '../academic/useAcademic';
 import { ME_KEY } from '../auth/useAuth';
 import { ApiRequestError } from '../api/client';
+import { LevelStep } from '../onboarding/LevelStep';
+import { exclusiveLevelInput, levelCopy, levelNext } from '../onboarding/onboardingModel';
 import { AdoptDialog } from '../pages/studies/AdoptDialog';
 import { AddStudyDialog } from '../pages/studies/AddStudyDialog';
 import { StudiesPage } from '../pages/StudiesPage';
@@ -215,20 +217,14 @@ describe('the pure model of "Mis estudios"', () => {
 });
 
 describe('the "Agregar estudio" flow as data', () => {
-  it('has five or six steps: "otro estudio" has no level question', () => {
-    expect(wizardSteps('UNIVERSITY')).toEqual([
-      'TYPE',
-      'NAME',
-      'PERIOD',
-      'LEVEL',
-      'SUBJECTS',
-      'CONFIRM',
-    ]);
-    expect(wizardSteps('SCHOOL')).toContain('LEVEL');
-    expect(wizardSteps('OTHER_ACADEMIC')).not.toContain('LEVEL');
-    expect(stepAfter('PERIOD', 'OTHER_ACADEMIC')).toBe('SUBJECTS');
-    expect(stepAfter('PERIOD', 'SCHOOL')).toBe('LEVEL');
-    expect(stepBefore('SUBJECTS', 'OTHER_ACADEMIC')).toBe('PERIOD');
+  it('has the same six steps for every kind of study: the level is asked (optionally) for "otro estudio" too', () => {
+    const six = ['TYPE', 'NAME', 'PERIOD', 'LEVEL', 'SUBJECTS', 'CONFIRM'];
+    for (const type of ['UNIVERSITY', 'SCHOOL', 'OTHER_ACADEMIC'] as const) {
+      expect(wizardSteps(type), type).toEqual(six);
+    }
+    expect(stepAfter('PERIOD', 'OTHER_ACADEMIC')).toBe('LEVEL');
+    expect(stepAfter('LEVEL', 'OTHER_ACADEMIC')).toBe('SUBJECTS');
+    expect(stepBefore('SUBJECTS', 'OTHER_ACADEMIC')).toBe('LEVEL');
     expect(stepBefore('TYPE', null)).toBeNull();
     expect(stepAfter('CONFIRM', 'SCHOOL')).toBeNull();
   });
@@ -360,6 +356,19 @@ describe('the screen: it only READS what it opens, and each state says what it i
       home: MED_P,
     });
     expect(out).toMatch(/<h3 class="[^"]*break-words[^"]*">Diplomado de especialización/);
+  });
+
+  it('a study whose period is current keeps its "Ver materias" link even when there is NO HOME', () => {
+    // the main study has no current period and a secondary one does: HOME is null, and the explicit link must still be there
+    const out = page({
+      tracks: [MED, DIP],
+      periods: [MED_P, DIP_P],
+      currents: [current(DIP_P, DIP)],
+      home: null,
+    });
+    expect(out).toContain(`href="/subjects?period=${DIP_P.id}"`);
+    expect(out).toContain('aria-label="Ver materias de Diplomado en Ciberseguridad"');
+    expect(out).not.toContain(`href="/subjects?period=${MED_P.id}"`); // Medicina has none current: nothing to open
   });
 
   it('a study without a current period says so and offers to choose or create one (no link to subjects)', () => {
@@ -526,8 +535,8 @@ describe('the subjects screen works for an explicit period, and says which study
 
   it('a new subject goes to the period shown (an explicit destination), and the period comes from the list the server gave', () => {
     const src = readFileSync(new URL('../pages/SubjectsPage.tsx', import.meta.url), 'utf8');
-    expect(src).toMatch(/periods\.data\?\.find\(\(p\) => p\.id === requested\)/); // owned periods only
-    expect(src).toMatch(/useSubjects\(period\?\.id\)/);
+    expect(src).toMatch(/periods\.data\?\.find\(\(p\) => p\.id === id\)/); // owned periods only
+    expect(src).toMatch(/useSubjects\(period\.id\)/);
     expect(src).toMatch(/periodId=\{period\.id\}/);
     expect(src).not.toMatch(/studyTrackId\s*:|periodIds/); // the study is only READ from the period, never sent
   });
@@ -637,6 +646,186 @@ describe('the study screens keep the rules of the product', () => {
     const gate = app.indexOf('<RequirePeriod />');
     expect(route).toBeGreaterThan(-1);
     expect(route).toBeLessThan(gate); // it does not wait for a HOME period: it is where one gets fixed
+    // /subjects is outside that gate too: the page asks for HOME itself, and only when no explicit period is named
+    const subjects = app.indexOf('path="/subjects"');
+    expect(subjects).toBeGreaterThan(-1);
+    expect(subjects).toBeLessThan(gate);
+    expect(app.slice(gate)).not.toContain('path="/subjects"');
+    const page = read('../pages/SubjectsPage.tsx');
+    expect(page).toMatch(/case 'ONBOARD':\s*return <Navigate to="\/onboarding" replace \/>/);
     expect(read('../components/AppShell.tsx')).toMatch(/to="\/settings\/studies"/);
+  });
+});
+
+describe('an explicit period needs no HOME; the plain subjects page still does', () => {
+  const NO_HOME: Seed = {
+    tracks: [MED, DIP],
+    periods: [MED_P, DIP_P],
+    home: null,
+    currents: [current(DIP_P, DIP)],
+  };
+  const subjectsAt = (location: string, seed: Seed) => {
+    const c = client(seed);
+    c.setQueryData(subjectsKey(MED_P.id), [subject(1, 'Farmacología', MED_P.id)]);
+    c.setQueryData(subjectsKey(DIP_P.id), [subject(2, 'Seguridad de Redes', DIP_P.id)]);
+    return wrap(<SubjectsPage />, c, location);
+  };
+
+  it('with a HOME period, an explicit period opens THAT one (not HOME)', () => {
+    const out = subjectsAt(`/subjects?period=${DIP_P.id}`, { ...NO_HOME, home: MED_P });
+    expect(out).toContain('Seguridad de Redes');
+    expect(out).not.toContain('Farmacología');
+  });
+
+  it('with NO HOME, a secondary study’s current period opens its subjects (HOME is not consulted)', () => {
+    const out = subjectsAt(`/subjects?period=${DIP_P.id}`, NO_HOME);
+    expect(out).toContain('Mis asignaturas');
+    expect(out).toContain('Seguridad de Redes');
+    expect(out).toContain('Diplomado en Ciberseguridad · Cohorte');
+    expect(out).toContain('Agregar asignatura'); // and a new subject there goes to THAT period (periodId={period.id})
+  });
+
+  it('with NO HOME, the plain /subjects does not render the page: it sends the user to the onboarding, as before', () => {
+    const out = subjectsAt('/subjects', NO_HOME);
+    expect(out).toBe(''); // <Navigate to="/onboarding" replace />: nothing of the page is drawn
+    // and with a HOME it is the page, as always
+    expect(subjectsAt('/subjects', { ...NO_HOME, home: MED_P })).toContain('Farmacología');
+  });
+
+  it('a foreign or unknown period is the same message with or without a HOME, and never the onboarding', () => {
+    const ghost = `/subjects?period=${U(999)}`;
+    for (const seed of [NO_HOME, { ...NO_HOME, home: MED_P }]) {
+      const out = subjectsAt(ghost, seed);
+      expect(out).toContain('No encontramos ese periodo.');
+      expect(out).toContain('Ir a Mis estudios');
+    }
+  });
+
+  it('the explicit branch never consults HOME: it is a guard on the source, not only on a render', () => {
+    const src = readFileSync(new URL('../pages/SubjectsPage.tsx', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/.*$/gm, '');
+    const explicit = src.slice(
+      src.indexOf('function ExplicitPeriodSubjects'),
+      src.indexOf('function SubjectsView'),
+    );
+    expect(explicit.length).toBeGreaterThan(200);
+    expect(explicit).not.toMatch(
+      /useHomePeriod|useCurrentPeriod|homeGate|RequirePeriod|onboarding/,
+    );
+    const home = src.slice(
+      src.indexOf('function HomePeriodSubjects'),
+      src.indexOf('function ExplicitPeriodSubjects'),
+    );
+    expect(home).toMatch(/useHomePeriod\(\)/);
+    expect(home).toMatch(/homeGate\(home\)/);
+  });
+});
+
+describe('the level of a study, for every kind: a number OR a few words, always optional', () => {
+  const none = { studyLevel: null, studyLevelNote: null };
+  const step = (primaryUse: 'UNIVERSITY_STUDENT' | 'SCHOOL_STUDENT' | 'OTHER_STUDENT') =>
+    wrap(
+      <LevelStep
+        primaryUse={primaryUse}
+        current={none}
+        pending={false}
+        onPickNumber={() => {}}
+        onSaveNote={() => {}}
+        onSkip={() => {}}
+        optional
+      />,
+      client({}),
+    );
+
+  it('"otro estudio" says "nivel" (never "semestre"), offers a number or words and no quick numbers', () => {
+    const copy = levelCopy('OTHER_STUDENT');
+    expect(copy).toMatchObject({ title: '¿En qué nivel estás?', noun: 'Nivel', options: 0 });
+    expect(copy.placeholder).toContain('Módulo 3');
+    const out = step('OTHER_STUDENT');
+    expect(out).toContain('Número (hasta 99)');
+    expect(out).toContain('O descríbelo');
+    expect(out).toContain('Módulo 3, Nivel B2, Etapa final');
+    expect(out).not.toMatch(/Semestre|aria-label="Nivel \d/);
+    expect(out).not.toContain('>Otro<'); // there is nothing to expand: the two fields are the answer
+    expect(out).toContain('Ahora no'); // and it can still be skipped
+  });
+
+  it('a university and a school keep their words and their quick numbers', () => {
+    expect(levelCopy('UNIVERSITY_STUDENT')).toMatchObject({ noun: 'Semestre', options: 10 });
+    expect(levelCopy('SCHOOL_STUDENT')).toMatchObject({ noun: 'Grado', options: 11 });
+    expect(step('UNIVERSITY_STUDENT')).toContain('aria-label="Semestre 4"');
+    expect(step('SCHOOL_STUDENT')).toContain('aria-label="Grado 9"');
+  });
+
+  it('Siguiente with nothing is "no level" when adding a study (and still an error in the onboarding)', () => {
+    const base = { picked: null, number: '', note: '', currentLevel: null, noun: 'Nivel' };
+    expect(levelNext({ ...base, other: true, emptyMeansSkip: true })).toEqual({ kind: 'skip' });
+    expect(levelNext({ ...base, other: false, emptyMeansSkip: true })).toEqual({ kind: 'skip' });
+    expect(levelNext({ ...base, other: true }).kind).toBe('error');
+    expect(levelNext({ ...base, other: true, number: '2', emptyMeansSkip: true })).toEqual({
+      kind: 'number',
+      value: 2,
+    });
+    expect(levelNext({ ...base, other: true, note: 'B2', emptyMeansSkip: true })).toEqual({
+      kind: 'note',
+      note: 'B2',
+    });
+  });
+
+  it('a number clears the words and the words clear the number (never both)', () => {
+    expect(exclusiveLevelInput('number', '2', { number: '', note: 'Módulo 3' })).toEqual({
+      number: '2',
+      note: '',
+    });
+    expect(exclusiveLevelInput('note', 'B2', { number: '2', note: '' })).toEqual({
+      number: '',
+      note: 'B2',
+    });
+    expect(
+      levelNext({
+        picked: null,
+        number: '2',
+        note: 'B2',
+        other: true,
+        currentLevel: null,
+        noun: 'Nivel',
+      }).kind,
+    ).toBe('error');
+  });
+
+  it('the confirmation shows the level when it was given (a number in "nivel" words, or the words) and no line when not', () => {
+    const base = {
+      ...emptyWizard,
+      type: 'OTHER_ACADEMIC' as const,
+      name: 'Técnico en Sistemas',
+      period: { name: 'Módulo 1', startDate: '2026-08-03', endDate: '2026-11-28' },
+    };
+    expect(levelLabel('OTHER_ACADEMIC', { studyLevel: 2, studyLevelNote: null })).toBe('Nivel 2');
+    expect(levelLabel('OTHER_ACADEMIC', { studyLevel: null, studyLevelNote: 'B2' })).toBe('B2');
+    expect(levelLabel('OTHER_ACADEMIC', none)).toBeNull();
+    // and the request carries a number OR a note, or neither
+    expect(
+      toSetupRequest({ ...base, level: { studyLevel: 2, studyLevelNote: null } }).period,
+    ).toMatchObject({ studyLevel: 2 });
+    const note = toSetupRequest({
+      ...base,
+      level: { studyLevel: null, studyLevelNote: 'B2' },
+    }).period;
+    expect(note).toMatchObject({ studyLevelNote: 'B2' });
+    expect(note).not.toHaveProperty('studyLevel');
+    const nothing = toSetupRequest({ ...base, level: none }).period;
+    expect(nothing).not.toHaveProperty('studyLevel');
+    expect(nothing).not.toHaveProperty('studyLevelNote');
+  });
+
+  it('going Back keeps what was written: the level step starts from the saved level', () => {
+    const src = readFileSync(
+      new URL('../pages/studies/AddStudyDialog.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(src).toMatch(/current=\{data\.level\}/);
+    expect(src).toMatch(/level: d\.level/); // changing the kind of study does not throw the level away
+    expect(src).not.toMatch(/level: type === 'OTHER_ACADEMIC'/);
   });
 });

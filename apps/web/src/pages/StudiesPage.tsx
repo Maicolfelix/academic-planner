@@ -132,7 +132,6 @@ export function StudiesPage() {
               <StudyCard
                 key={card.track.id}
                 card={card}
-                canOpenSubjects={home.data != null}
                 onEdit={() => setDialog({ kind: 'edit', track: card.track })}
                 onPeriods={() => setDialog({ kind: 'periods', track: card.track })}
                 onPrimary={() =>

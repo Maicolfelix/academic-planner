@@ -114,7 +114,7 @@ export function AddStudyDialog({
                 programKey: type === d.type ? d.programKey : null,
                 period: d.period,
                 subjects: d.subjects,
-                level: type === 'OTHER_ACADEMIC' ? emptyWizard.level : d.level,
+                level: d.level,
               }))
             }
             onNext={next}
@@ -175,6 +175,7 @@ export function AddStudyDialog({
               next();
             }}
             onSkip={next}
+            optional
           />
         )}
 

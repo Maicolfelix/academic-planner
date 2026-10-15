@@ -7,16 +7,21 @@ import type {
 
 /**
  * THE "AGREGAR ESTUDIO" FLOW AS DATA. Six short steps; the last one only confirms, and nothing is written before it. A school
- * study has a name offered ("Colegio") but every part stays editable; dates are never guessed; the level is optional; subjects are
- * optional. "Otro estudio" skips the level on purpose (a "semester" would be a question without a clear meaning, see D30): the
- * period's level can still be added afterwards.
+ * study has a name offered ("Colegio") but every part stays editable; dates are never guessed; the level is optional for EVERY
+ * kind of study (a technical program, a diploma or a language course may have levels, modules or stages: for "other study" it is
+ * a number or a few words, never a "semester"); subjects are optional.
  */
 export type WizardStep = 'TYPE' | 'NAME' | 'PERIOD' | 'LEVEL' | 'SUBJECTS' | 'CONFIRM';
 
-export const wizardSteps = (type: EducationContext | null): WizardStep[] =>
-  type === 'OTHER_ACADEMIC'
-    ? ['TYPE', 'NAME', 'PERIOD', 'SUBJECTS', 'CONFIRM']
-    : ['TYPE', 'NAME', 'PERIOD', 'LEVEL', 'SUBJECTS', 'CONFIRM'];
+/** The same six steps for every kind of study; the level is optional for all of them (its words change, see `levelCopy`). */
+export const wizardSteps = (_type: EducationContext | null): WizardStep[] => [
+  'TYPE',
+  'NAME',
+  'PERIOD',
+  'LEVEL',
+  'SUBJECTS',
+  'CONFIRM',
+];
 
 export const stepAfter = (step: WizardStep, type: EducationContext | null): WizardStep | null =>
   wizardSteps(type)[wizardSteps(type).indexOf(step) + 1] ?? null;

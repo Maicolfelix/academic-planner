@@ -195,14 +195,40 @@ export interface LevelCopy {
   title: string;
   /** The words for one option ("Semestre 4"). */
   noun: string;
-  /** How many quick options are offered; more is "Otro". The domain accepts 1..99 or a note. */
+  /** How many quick options are offered; more is "Otro". The domain accepts 1..99 or a note. Zero: only the number or the words. */
   options: number;
+  /** What the free description could look like. */
+  placeholder: string;
 }
 
+/**
+ * The words of the level question. A university has semesters and a school has grades; "other study" (a technical program, a
+ * diploma, a language course) has no single word for it (level, module, stage...), so it offers no quick numbers and no
+ * taxonomy: a number or a few words of the student's own.
+ */
 export function levelCopy(primaryUse: PrimaryUse | null): LevelCopy {
-  return primaryUse === 'SCHOOL_STUDENT'
-    ? { title: '¿En qué grado estás?', noun: 'Grado', options: 11 }
-    : { title: '¿En qué semestre estás?', noun: 'Semestre', options: 10 };
+  if (primaryUse === 'SCHOOL_STUDENT') {
+    return {
+      title: '¿En qué grado estás?',
+      noun: 'Grado',
+      options: 11,
+      placeholder: 'Internado, año de práctica…',
+    };
+  }
+  if (primaryUse === 'OTHER_STUDENT') {
+    return {
+      title: '¿En qué nivel estás?',
+      noun: 'Nivel',
+      options: 0,
+      placeholder: 'Módulo 3, Nivel B2, Etapa final…',
+    };
+  }
+  return {
+    title: '¿En qué semestre estás?',
+    noun: 'Semestre',
+    options: 10,
+    placeholder: 'Internado, año de práctica…',
+  };
 }
 
 export function subjectsTitle(primaryUse: PrimaryUse | null): string {
@@ -319,7 +345,15 @@ export function levelNext(input: {
   note: string;
   currentLevel: number | null;
   noun: string;
+  /** Nothing chosen and nothing written is simply "no level" (adding a study: every part of the level is optional). */
+  emptyMeansSkip?: boolean;
 }): LevelNext {
+  if (input.emptyMeansSkip) {
+    const nothing = input.other
+      ? input.number.trim() === '' && input.note.trim() === ''
+      : input.picked === null;
+    if (nothing) return { kind: 'skip' };
+  }
   if (!input.other) {
     if (input.picked === null)
       return { kind: 'error', message: `Elige un ${input.noun.toLowerCase()} o toca «Ahora no».` };

@@ -215,6 +215,32 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     expect(profileSide.filter((f) => /studyTrack|studySetup/i.test(read(f))).map(rel)).toEqual([]);
   });
 
+  it('an explicit /subjects?period= does NOT require HOME, and only the plain /subjects does', () => {
+    const read2 = (f: string) => withoutTypeChecks(read(path.join(ROOT, f)));
+    // the route sits outside the HOME gate (the gate would send a user without HOME to the onboarding before the page could decide)
+    const app = read2('apps/web/src/App.tsx');
+    expect(app.indexOf('path="/subjects"')).toBeGreaterThan(-1);
+    expect(app.indexOf('path="/subjects"')).toBeLessThan(app.indexOf('<RequirePeriod />'));
+    expect(app.slice(app.indexOf('<RequirePeriod />'))).not.toContain('path="/subjects"');
+    // the page itself asks for HOME only in the plain mode
+    const page = read2('apps/web/src/pages/SubjectsPage.tsx');
+    const explicit = page.slice(
+      page.indexOf('function ExplicitPeriodSubjects'),
+      page.indexOf('function SubjectsView'),
+    );
+    const plain = page.slice(
+      page.indexOf('function HomePeriodSubjects'),
+      page.indexOf('function ExplicitPeriodSubjects'),
+    );
+    expect(explicit.length).toBeGreaterThan(200);
+    expect(explicit).not.toMatch(/useHomePeriod|useCurrentPeriod|homeGate|onboarding/);
+    expect(plain).toMatch(/homeGate\(home\)/);
+    expect(plain).toMatch(/Navigate to="\/onboarding"/);
+    // and the "Ver materias" link of a study depends only on that study having a current period
+    const card = read2('apps/web/src/pages/studies/StudyCard.tsx');
+    expect(card).not.toMatch(/useHomePeriod|useCurrentPeriod|canOpenSubjects/);
+  });
+
   it('opening the Mis estudios screen cannot write: its page and its cards hold no effect and no mutation, and the onboarding knows nothing of studies', () => {
     const read2 = (p: string) => withoutTypeChecks(read(path.join(ROOT, p)));
     for (const f of [

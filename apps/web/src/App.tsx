@@ -56,14 +56,15 @@ export function App() {
           </Route>
           <Route element={<RequireAuth />}>
             <Route path="/onboarding" element={<OnboardingPage />} />
-            {/* Mis estudios is where a missing HOME period gets fixed, so it does NOT wait for one (no RequirePeriod). */}
+            {/* Outside the HOME gate: Mis estudios is where a missing HOME period gets fixed, and /subjects asks for HOME
+                itself ONLY when no `?period=` names the period to open (an explicit, owned period needs no HOME). */}
             <Route element={<AppShell />}>
               <Route path="/settings/studies" element={<StudiesPage />} />
+              <Route path="/subjects" element={<SubjectsPage />} />
             </Route>
             <Route element={<RequirePeriod />}>
               <Route element={<AppShell />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/subjects" element={<SubjectsPage />} />
                 <Route path="/activities" element={<ActivitiesPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/radar" element={<RadarPage />} />
