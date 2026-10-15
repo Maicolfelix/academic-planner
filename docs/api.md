@@ -59,14 +59,18 @@ Sin id en la URL: el dueño sale solo de la sesión (nunca `userId`, correo ni z
 
 ## Estudios (`/api/study-tracks`) — [decisión D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)
 
-| Método y ruta                             | Sesión | Para qué                                                        | Entrada (estricta)              | Éxito                 |
-| ----------------------------------------- | :----: | --------------------------------------------------------------- | ------------------------------- | --------------------- |
-| `GET /api/study-tracks`                   |   sí   | Todos los estudios del usuario (principal, activos, archivados) | —                               | `200 { studyTracks }` |
-| `POST /api/study-tracks`                  |   sí   | Crear un estudio (el primero activo queda como principal)       | `{ name?, type, programKey? }`  | `201 { studyTrack }`  |
-| `PATCH /api/study-tracks/:id`             |   sí   | Cambiar nombre, tipo o clave (≥ 1 campo)                        | `{ name?, type?, programKey? }` | `200 { studyTrack }`  |
-| `POST /api/study-tracks/:id/make-primary` |   sí   | Mover el principal (transaccional; no uno archivado)            | sin cuerpo                      | `200 { studyTracks }` |
-| `POST /api/study-tracks/:id/archive`      |   sí   | Archivar (no el principal si hay otros activos)                 | sin cuerpo                      | `200 { studyTracks }` |
-| `POST /api/study-tracks/:id/restore`      |   sí   | Volver a `ACTIVE` (principal solo si no hay otro activo)        | sin cuerpo                      | `200 { studyTracks }` |
+| Método y ruta                             | Sesión | Para qué                                                                         | Entrada (estricta)                       | Éxito                                  |
+| ----------------------------------------- | :----: | -------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------- |
+| `GET /api/study-tracks`                   |   sí   | Todos los estudios del usuario (principal, activos, archivados)                  | —                                        | `200 { studyTracks }`                  |
+| `POST /api/study-tracks`                  |   sí   | Crear un estudio (el primero activo queda como principal)                        | `{ name?, type, programKey? }`           | `201 { studyTrack }`                   |
+| `PATCH /api/study-tracks/:id`             |   sí   | Cambiar nombre, tipo o clave (≥ 1 campo)                                         | `{ name?, type?, programKey? }`          | `200 { studyTrack }`                   |
+| `POST /api/study-tracks/:id/make-primary` |   sí   | Mover el principal (transaccional; no uno archivado)                             | sin cuerpo                               | `200 { studyTracks }`                  |
+| `POST /api/study-tracks/:id/archive`      |   sí   | Archivar (no el principal si hay otros activos)                                  | sin cuerpo                               | `200 { studyTracks }`                  |
+| `POST /api/study-tracks/:id/restore`      |   sí   | Volver a `ACTIVE` (principal solo si no hay otro activo)                         | sin cuerpo                               | `200 { studyTracks }`                  |
+| `POST /api/study-tracks/setup`            |   sí   | Un estudio + su primer periodo (actual) + materias, **todo o nada**              | `{ track, period, subjects? }`           | `201 { studyTrack, period, subjects }` |
+| `POST /api/study-tracks/adopt-period`     |   sí   | Un estudio nuevo que **adopta** un periodo existente sin estudio (no copia nada) | `{ periodId, name \| programKey, type }` | `201 { studyTrack, period }`           |
+
+**Mis estudios (P0.5-4, [D34](decisions.md#d34-mis-estudios-y-adopción-explícita-p05-4)).** `setup` y `adopt-period` son **transaccionales** (el mismo candado por usuario que las demás escrituras de estudios) y **estrictos en cada nivel**: el cliente nunca envía dueño, `isPrimary`, estado, `periodId` del periodo nuevo, `studyTrackId`, contexto ni colores. `setup`: el primer estudio activo queda como principal, el periodo es el actual de su ámbito y las materias reutilizan las reglas del lote rápido (máx. 30, sin duplicados, tipo del estudio); un fallo deshace todo. `adopt-period`: el periodo debe ser del usuario (ajeno o inexistente: el mismo `404`) y no tener estudio (`409 PERIOD_ALREADY_IN_STUDY`); conserva su id y todo lo que cuelga de él; `409 PRIMARY_STUDY_HAS_NO_CURRENT_PERIOD` si dejaría la app sin HOME. `GET /api/subjects` sigue aceptando `?periodId=` (también el de un estudio secundario) **o** `?scope=current`, nunca ambos.
 
 No hay `DELETE`. El dueño sale solo de la sesión; un estudio ajeno, inexistente o con un id mal formado da el mismo `404`. Nunca se acepta `userId`, `id`, `isPrimary`, `status`, `periodId` ni `primaryUse`. Errores propios: `409 PRIMARY_TRACK_REQUIRES_REPLACEMENT`, `409 STUDY_TRACK_ARCHIVED`. Un periodo puede pertenecer a un estudio ([D32](decisions.md#d32-un-periodo-puede-pertenecer-a-un-estudio-p05-2)); archivar un estudio apaga sus periodos actuales y restaurarlo no los reactiva.
 
