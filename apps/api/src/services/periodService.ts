@@ -29,6 +29,13 @@ const notEmpty = () =>
     'Este periodo todavía tiene asignaturas, actividades o bloques de agenda. Elimínalos primero para poder borrarlo.',
   );
 
+const hasGrading = () =>
+  new AppError(
+    409,
+    'PERIOD_HAS_GRADING',
+    'Este periodo tiene notas configuradas, así que no puede quedarse sin estudio.',
+  );
+
 const archivedStudy = () =>
   new AppError(409, 'STUDY_TRACK_ARCHIVED', 'Ese estudio está archivado. Restáuralo primero.');
 
@@ -148,6 +155,7 @@ export function createPeriodService(periods: PeriodRepository, inTransaction: Ru
 
         if (target !== null && (moving || becomingCurrent))
           await usableStudy(studies, userId, target);
+        if (moving && target === null && (await repo.hasGrading(userId, id))) throw hasGrading();
         if (moving && existing.isCurrent && (await repo.otherCurrentInScope(userId, target, id))) {
           throw currentConflict();
         }

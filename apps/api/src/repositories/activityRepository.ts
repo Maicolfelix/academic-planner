@@ -104,6 +104,10 @@ export function createActivityRepository(prisma: Db) {
       return rows.length > 0;
     },
 
+    /** How many evaluations (grades) link this activity: it cannot change subject while any does. */
+    countEvaluations: (userId: string, id: string) =>
+      prisma.evaluation.count({ where: { userId, activityId: id } }),
+
     create: (data: ActivityCreateData) => prisma.activity.create({ data }),
 
     /** `where: { id, userId }` makes ownership part of the write itself (P2025 when it is not yours). */

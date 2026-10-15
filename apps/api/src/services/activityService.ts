@@ -31,6 +31,12 @@ export interface Actor {
 
 const activityNotFound = () => notFound('Actividad no encontrada.');
 const subjectNotFound = () => notFound('Asignatura no encontrada.');
+const linkedToEvaluation = () =>
+  new AppError(
+    409,
+    'ACTIVITY_LINKED_TO_EVALUATION',
+    'Esta actividad está vinculada a una evaluación: desvincúlala antes de cambiarla de asignatura.',
+  );
 /** Same code the Agenda uses for the same situation (no current period to anchor the record to). */
 const noCurrentPeriod = () =>
   new AppError(
@@ -170,6 +176,8 @@ export function createActivityService(
           // Absent: untouched. null: detach (the period stays). A uuid: it must be the user's own AND from the
           // activity's period — an activity never changes period (the composite foreign key backs this up).
           const moving = input.subjectId !== undefined && input.subjectId !== existing.subjectId;
+          if (moving && (await txActivities.countEvaluations(actor.id, id)) > 0)
+            throw linkedToEvaluation();
           if (moving && input.subjectId) {
             const subject = await subjects.findOwned(actor.id, input.subjectId);
             if (!subject) throw subjectNotFound();

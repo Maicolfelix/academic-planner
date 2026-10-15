@@ -197,6 +197,16 @@ export function createPeriodRepository(db: Db) {
         data: { ...dates(data), ...(makeCurrent && { isCurrent: true }) },
       }),
 
+    /** The grading configuration or evaluations the period carries: it cannot leave its study while it has any. */
+    async hasGrading(userId: string, periodId: string): Promise<boolean> {
+      const [profiles, cuts, evaluations] = await Promise.all([
+        db.gradingProfile.count({ where: { userId, periodId } }),
+        db.gradingPeriod.count({ where: { userId, periodId } }),
+        db.evaluation.count({ where: { userId, periodId } }),
+      ]);
+      return profiles + cuts + evaluations > 0;
+    },
+
     countSubjects: (periodId: string) => db.subject.count({ where: { periodId } }),
 
     countScheduleBlocks: (periodId: string) => db.scheduleBlock.count({ where: { periodId } }),

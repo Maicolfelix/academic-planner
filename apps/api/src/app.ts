@@ -15,6 +15,7 @@ import { createAcademicInboxController } from './controllers/academicInboxContro
 import { createActivityController } from './controllers/activityController.js';
 import { createAttentionController } from './controllers/attentionController.js';
 import { createDashboardController } from './controllers/dashboardController.js';
+import { createGradingController } from './controllers/gradingController.js';
 import {
   createProgressController,
   createWorkloadController,
@@ -32,6 +33,7 @@ import { createScheduleImportController } from './controllers/scheduleImportCont
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
 import { createDashboardRepository } from './repositories/dashboardRepository.js';
+import { createGradingRepository } from './repositories/gradingRepository.js';
 import { createInsightsRepository } from './repositories/insightsRepository.js';
 import { createPeriodRepository } from './repositories/periodRepository.js';
 import { createProfileRepository } from './repositories/profileRepository.js';
@@ -45,6 +47,7 @@ import { activitiesRouter } from './routes/activities.js';
 import { attentionRouter } from './routes/attention.js';
 import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
+import { gradingRouter } from './routes/grading.js';
 import { healthRouter } from './routes/health.js';
 import { progressRouter, workloadRouter } from './routes/insights.js';
 import { captureRouter } from './routes/capture.js';
@@ -62,6 +65,7 @@ import { createAcademicInboxService } from './services/academicInboxService.js';
 import { createActivityService } from './services/activityService.js';
 import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
+import { createGradingService } from './services/gradingService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProfileService } from './services/profileService.js';
 import { createOnboardingService } from './services/onboardingService.js';
@@ -231,6 +235,16 @@ export function createApp(deps: AppDeps): Express {
     createSubjectBatchService({ runInTransaction }),
   );
 
+  const gradingController = createGradingController(
+    createGradingService({
+      grading: createGradingRepository(prisma),
+      subjects: subjectRepository,
+      periods: periodRepository,
+      runInTransaction,
+      clock,
+    }),
+  );
+
   const app = express();
   app.disable('x-powered-by');
   if (deps.trustProxy !== undefined) app.set('trust proxy', deps.trustProxy);
@@ -257,6 +271,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/academic-inbox', academicInboxRouter(academicInboxController, requireAuth));
   app.use('/api/quick-capture', quickCaptureRouter(quickCaptureController, requireAuth));
   app.use('/api/capture', captureRouter(captureController, requireAuth));
+  app.use('/api', gradingRouter(gradingController, requireAuth));
   app.use('/api/progress', progressRouter(progressController, requireAuth));
   app.use('/api/workload', workloadRouter(workloadController, requireAuth));
   app.use('/api/attention', attentionRouter(attentionController, requireAuth));

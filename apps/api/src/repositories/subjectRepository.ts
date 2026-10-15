@@ -67,6 +67,10 @@ export function createSubjectRepository(prisma: Db) {
       return { activities, scheduleBlocks };
     },
 
+    /** Evaluations (grades) hang from the subject: their presence blocks deletion too (a separate rule, see D36). */
+    countEvaluations: (userId: string, subjectId: string) =>
+      prisma.evaluation.count({ where: { userId, subjectId } }),
+
     /** `where: { id, userId }` makes ownership part of the write itself (P2025 when it is not yours). */
     update: (userId: string, id: string, data: SubjectUpdateData) =>
       prisma.subject.update({ where: { id, userId }, data }),
