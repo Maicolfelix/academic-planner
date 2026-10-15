@@ -1,6 +1,7 @@
 import type { Profile } from '@planner/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchProfile, updateProfileRequest } from '../api/profile';
+import { invalidateAfterHomeChange } from '../academic/useAcademic';
+import { completeOnboardingRequest, fetchProfile, updateProfileRequest } from '../api/profile';
 
 export const PROFILE_KEY = ['profile'] as const;
 
@@ -15,5 +16,21 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: updateProfileRequest,
     onSuccess: (profile: Profile) => qc.setQueryData(PROFILE_KEY, profile),
+  });
+}
+
+/**
+ * Finishing the onboarding can create the student's primary study and link their period to it, so it refreshes everything that
+ * depends on that (the studies, the labels, the Home...) through the ONE shared invalidation, after putting the new profile in
+ * the cache. The mutation waits for it, so the screen that follows reads the finished state.
+ */
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: completeOnboardingRequest,
+    onSuccess: async (res) => {
+      qc.setQueryData(PROFILE_KEY, res.profile);
+      await invalidateAfterHomeChange(qc);
+    },
   });
 }

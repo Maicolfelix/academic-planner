@@ -19,6 +19,7 @@ import { LevelStep } from '../onboarding/LevelStep';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import {
   ONBOARDING_DRAFT_SCOPE,
+  finalStudyName,
   levelCopy,
   onboardingDraftSchema,
   onboardingStep,
@@ -32,7 +33,8 @@ import { PeriodStep } from '../onboarding/PeriodStep';
 import { PrimaryUseStep } from '../onboarding/PrimaryUseStep';
 import { ProgramStep } from '../onboarding/ProgramStep';
 import { SubjectsStep } from '../onboarding/SubjectsStep';
-import { useProfile, useUpdateProfile } from '../profile/useProfile';
+import { useCompleteOnboarding, useProfile, useUpdateProfile } from '../profile/useProfile';
+import { useStudyTracks } from '../studyTracks/useStudyTracks';
 import { OFFLINE_MESSAGE } from '../pwa/pwaState';
 
 const messageOf = (err: Error) => (isUnreachable(err) ? OFFLINE_MESSAGE : err.message);
@@ -57,6 +59,9 @@ function Onboarding({ userId }: { userId: string }) {
   const profile = useProfile();
   const home = useHomePeriod();
   const updateProfile = useUpdateProfile();
+  const completeOnboarding = useCompleteOnboarding();
+  // Only to tell the student, on the last screen, what completing will do (a study already set up changes that).
+  const studies = useStudyTracks();
   const createPeriod = useCreatePeriod();
   const updatePeriod = useUpdatePeriod();
   const createSubjects = useCreateSubjectsBatch();
@@ -229,21 +234,16 @@ function Onboarding({ userId }: { userId: string }) {
     );
   }
 
-  // ── 6. the end: COMPLETED (when the profile was answered), the draft is gone, and out ──
+  // ── 6. the end: ONE call finishes the onboarding on the server (it may create the primary study and adopt this period), the
+  // draft is gone, and out. The student leaves ONLY after it succeeded: a failure keeps them here, with the error and a retry. ──
   async function finish(to: string) {
+    if (finishing) return; // a second tap while it is saving must not call again
     clearError('FINAL');
     setFinishing(true);
     try {
-      const { primaryUse, onboardingStatus } = profile.data!;
-      if (primaryUse !== null && onboardingStatus !== 'COMPLETED') {
-        // COMPLETED is reached from IN_PROGRESS: an answered profile that is "not started" or "skipped" passes through it
-        if (onboardingStatus !== 'IN_PROGRESS') {
-          await updateProfile.mutateAsync({ onboardingStatus: 'IN_PROGRESS' });
-        }
-        await updateProfile.mutateAsync({ onboardingStatus: 'COMPLETED' });
-      }
+      await completeOnboarding.mutateAsync();
       draft.clear();
-      setLeavingTo(to); // only now: the status is saved, so the Home reads the finished profile
+      setLeavingTo(to); // only now: it is saved, so the Home reads the finished state
     } catch (err) {
       setFinishing(false);
       fail('FINAL')(err as Error);
@@ -324,6 +324,7 @@ function Onboarding({ userId }: { userId: string }) {
         'Listo para empezar',
         <FinalStep
           subjects={summary ?? undefined}
+          studyName={finalStudyName(profile.data, studies.data?.length)}
           pending={updateProfile.isPending || finishing}
           error={errors.FINAL}
           onImport={() => void finish('/calendar/import')}

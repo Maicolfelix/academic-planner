@@ -4,6 +4,7 @@ import {
   hasNoNul,
   normalizeNameKey,
   studyLevelSchema,
+  studyOfOnboarding,
   type AcademicPeriod,
   type PrimaryUse,
   type Profile,
@@ -288,6 +289,20 @@ export function addChip(
 
 export const removeChip = (chips: readonly string[], name: string): string[] =>
   chips.filter((c) => c !== name);
+
+/**
+ * What the last screen tells a student who studies, before anything happens: "Listo. Organizaremos este periodo dentro de
+ * Medicina." It says the study that completing the onboarding WILL create (the same derivation the server uses), so the two never
+ * disagree. Nothing is promised to a teacher, a personal use, a skipped profile or somebody who already set up a study in
+ * "Mis estudios" (`existingStudies` > 0, or not known yet): for them completing creates none.
+ */
+export function finalStudyName(
+  profile: Pick<Profile, 'primaryUse' | 'programName' | 'programKey'>,
+  existingStudies: number | undefined,
+): string | null {
+  if (existingStudies !== 0) return null;
+  return studyOfOnboarding(profile)?.name ?? null;
+}
 
 // ───────────────────────── The wizard's local draft ─────────────────────────
 

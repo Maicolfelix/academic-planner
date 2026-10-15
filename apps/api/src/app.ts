@@ -20,6 +20,7 @@ import {
   createWorkloadController,
 } from './controllers/insightsController.js';
 import { createPeriodController } from './controllers/periodController.js';
+import { createOnboardingController } from './controllers/onboardingController.js';
 import { createProfileController } from './controllers/profileController.js';
 import { createStudyTrackController } from './controllers/studyTrackController.js';
 import { createCaptureController } from './controllers/captureController.js';
@@ -49,6 +50,7 @@ import { progressRouter, workloadRouter } from './routes/insights.js';
 import { captureRouter } from './routes/capture.js';
 import { quickCaptureRouter } from './routes/quickCapture.js';
 import { periodsRouter } from './routes/periods.js';
+import { onboardingRouter } from './routes/onboarding.js';
 import { profileRouter } from './routes/profile.js';
 import { studyTracksRouter } from './routes/studyTracks.js';
 import { radarRouter } from './routes/radar.js';
@@ -62,6 +64,7 @@ import { createAttentionService } from './services/attentionService.js';
 import { createDashboardService } from './services/dashboardService.js';
 import { createPeriodService } from './services/periodService.js';
 import { createProfileService } from './services/profileService.js';
+import { createOnboardingService } from './services/onboardingService.js';
 import { createStudySetupService } from './services/studySetupService.js';
 import { createStudyTrackService } from './services/studyTrackService.js';
 import { createProgressService } from './services/progressService.js';
@@ -205,6 +208,9 @@ export function createApp(deps: AppDeps): Express {
   const periodController = createPeriodController(
     createPeriodService(periodRepository, runInTransaction),
   );
+  const onboardingController = createOnboardingController(
+    createOnboardingService({ runInTransaction }),
+  );
   const profileController = createProfileController(
     createProfileService(createProfileRepository(prisma), runInTransaction),
   );
@@ -241,6 +247,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/auth', authRouter({ auth, sessions, requireAuth, secureCookies, rateLimits }));
 
   app.use('/api/profile', profileRouter(profileController, requireAuth));
+  app.use('/api/onboarding', onboardingRouter(onboardingController, requireAuth));
   app.use('/api/study-tracks', studyTracksRouter(studyTrackController, requireAuth));
   app.use('/api/periods', periodsRouter(periodController, requireAuth));
   app.use('/api/subjects', subjectsRouter(subjectController, requireAuth));

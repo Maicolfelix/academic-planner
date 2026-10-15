@@ -34,6 +34,9 @@ export function createStudyTrackRepository(db: Db) {
 
     countActive: (userId: string) => db.studyTrack.count({ where: { userId, status: 'ACTIVE' } }),
 
+    /** Every study of the user, archived ones included: "has this person set up any study at all?" */
+    countAll: (userId: string) => db.studyTrack.count({ where: { userId } }),
+
     /** One transaction at a time per user: the rules below read the other tracks, so two requests must not interleave. */
     async lockUser(userId: string): Promise<void> {
       await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`study-track:${userId}`}, 0))`;

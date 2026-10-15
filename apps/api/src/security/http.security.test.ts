@@ -35,6 +35,7 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ['post', '/api/auth/login', { email: credentials.email, password: credentials.password }],
   ['post', '/api/auth/logout'],
   ['patch', '/api/profile', { primaryUse: 'PERSONAL' }],
+  ['post', '/api/onboarding/complete'],
   ['post', '/api/study-tracks', { name: 'E', type: 'SCHOOL' }],
   [
     'post',

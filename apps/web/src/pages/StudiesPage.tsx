@@ -116,7 +116,7 @@ export function StudiesPage() {
             setDialog({
               kind: 'adopt',
               period: legacy,
-              suggestion: suggestStudy(profile.data, legacy),
+              suggestion: suggestStudy(allTracks.length === 0 ? profile.data : null, legacy),
             })
           }
         />
