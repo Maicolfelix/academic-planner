@@ -60,19 +60,19 @@
 
 ## Demostración y estado del proyecto
 
-| Documento                                                  | Contenido                                                                 |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [demo.md](demo.md)                                         | Datos de demostración, credenciales sintéticas y guion                    |
-| [project-state.md](project-state.md)                       | Estado actual compacto, riesgos y comandos                                |
-| [grades-validation.md](grades-validation.md)               | Ficha de validación con 3 casos reales del modelo de notas (pendiente)    |
-| [roadmap-post-rc.md](roadmap-post-rc.md)                   | Ciclo de producto post-RC: visión, etapas, decisiones (planificación)     |
-| [phase-history.md](phase-history.md)                       | Resumen de las fases 0–20                                                 |
-| [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) | Notas del Release Candidate 2 (vigente): qué corrige, límites, pendientes |
-| [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md) | Notas del Release Candidate: qué incluye, límites, pendientes             |
-| [release-manifest.md](release-manifest.md)                 | Ficha técnica del candidato: versión, requisitos, migraciones, etiquetado |
-| [release-validation.md](release-validation.md)             | Evidencia de la validación del candidato                                  |
-| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (candidatos rc.1 y rc.2; sin v1.0.0 final)                        |
-| [../ARCHITECTURE_PLAN_v1.md](../ARCHITECTURE_PLAN_v1.md)   | Plan original de la Fase 0 (documento histórico)                          |
+| Documento                                                  | Contenido                                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [demo.md](demo.md)                                         | Datos de demostración, credenciales sintéticas y guion                       |
+| [project-state.md](project-state.md)                       | Estado actual compacto, riesgos y comandos                                   |
+| [grades-validation.md](grades-validation.md)               | Validación del modelo de notas con 3 sistemas reales (proxy; GO provisional) |
+| [roadmap-post-rc.md](roadmap-post-rc.md)                   | Ciclo de producto post-RC: visión, etapas, decisiones (planificación)        |
+| [phase-history.md](phase-history.md)                       | Resumen de las fases 0–20                                                    |
+| [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) | Notas del Release Candidate 2 (vigente): qué corrige, límites, pendientes    |
+| [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md) | Notas del Release Candidate: qué incluye, límites, pendientes                |
+| [release-manifest.md](release-manifest.md)                 | Ficha técnica del candidato: versión, requisitos, migraciones, etiquetado    |
+| [release-validation.md](release-validation.md)             | Evidencia de la validación del candidato                                     |
+| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (candidatos rc.1 y rc.2; sin v1.0.0 final)                           |
+| [../ARCHITECTURE_PLAN_v1.md](../ARCHITECTURE_PLAN_v1.md)   | Plan original de la Fase 0 (documento histórico)                             |
 
 ## Terminología
 

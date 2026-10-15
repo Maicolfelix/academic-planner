@@ -88,7 +88,7 @@ Los resúmenes («qué requiere mi atención ahora») leen **todos** los periodo
 
 ### Notas: diseño aprobado, no implementado (D36)
 
-Aún **no existen** notas, cortes ni evaluaciones. El modelo aprobado ([D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones)) las pondría en el periodo: una escala numérica por periodo (`GradingProfile`), cortes compartidos por todas sus materias (`GradingPeriod`, con peso sobre la nota final) y evaluaciones por materia (`Evaluation`, con peso dentro del corte, nota canónica en la escala y, opcionalmente, lo que se reportó como «18 de 20»), con enlace opcional a una actividad. Un periodo general (sin estudio) no tendría notas. Antes de implementar hace falta la validación con 3 casos reales ([grades-validation.md](grades-validation.md)). Hoy el Progreso sigue siendo solo conteo de actividades, nunca una nota ni un promedio.
+Aún **no existen** notas, cortes ni evaluaciones. El modelo aprobado ([D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones)) las pondría en el periodo: una escala numérica por periodo (`GradingProfile`), cortes compartidos por todas sus materias (`GradingPeriod`, con peso sobre la nota final) y evaluaciones por materia (`Evaluation`, con peso dentro del corte, nota canónica en la escala y, opcionalmente, lo que se reportó como «18 de 20»), con enlace opcional a una actividad. Un periodo general (sin estudio) no tendría notas. Validado con 3 sistemas reales documentados (GO provisional; [grades-validation.md](grades-validation.md)); la validación UX con estudiantes sigue pendiente. Hoy el Progreso sigue siendo solo conteo de actividades, nunca una nota ni un promedio.
 
 ### Del onboarding al estudio (P0.5-5)
 

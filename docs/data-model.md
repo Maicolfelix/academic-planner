@@ -110,7 +110,7 @@ Recordatorio **interno** (dentro de la app). Solo guarda el _cuándo_; el mensaj
 
 ## Notas (propuesto: diseño aprobado, NO implementado)
 
-**No hay migraciones ni cambios en el esquema de Prisma.** Diseño aprobado en [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones), pendiente de la validación con 3 casos reales ([grades-validation.md](grades-validation.md)):
+**No hay migraciones ni cambios en el esquema de Prisma.** Diseño aprobado en [D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones), validado con 3 sistemas reales documentados, GO provisional ([grades-validation.md](grades-validation.md)):
 
 - `GradingProfile` (1:1 con `AcademicPeriod`, `UNIQUE(periodId)`): `minMilli`, `maxMilli`, `passMilli`, `decimals`; solo para periodos con estudio.
 - `GradingPeriod` (corte): `periodId`, `name`, `position`, `finalShareBp` (peso sobre la nota final, 1..10000; la suma del periodo ≤ 10000).
