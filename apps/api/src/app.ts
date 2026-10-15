@@ -239,6 +239,7 @@ export function createApp(deps: AppDeps): Express {
     createGradingService({
       grading: createGradingRepository(prisma),
       subjects: subjectRepository,
+      activities: activityRepository,
       periods: periodRepository,
       runInTransaction,
       clock,

@@ -16,7 +16,10 @@ import type { RunInTransaction } from '../db/prisma.js';
 import { AppError, notFound, validationError } from '../errors/AppError.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { toEvaluationDto, toGradingPeriodDto, toGradingProfileDto } from '../mappers.js';
-import { createActivityRepository } from '../repositories/activityRepository.js';
+import {
+  createActivityRepository,
+  type ActivityRepository,
+} from '../repositories/activityRepository.js';
 import {
   createGradingRepository,
   type GradingRepository,
@@ -72,11 +75,12 @@ const weightExceeded = (field: string, what: string) =>
 export function createGradingService(deps: {
   grading: GradingRepository;
   subjects: SubjectRepository;
+  activities: ActivityRepository;
   periods: PeriodRepository;
   runInTransaction: RunInTransaction;
   clock: () => Date;
 }) {
-  const { grading, subjects, periods, runInTransaction, clock } = deps;
+  const { grading, subjects, activities, periods, runInTransaction, clock } = deps;
 
   const write = <T>(
     userId: string,
@@ -110,22 +114,28 @@ export function createGradingService(deps: {
       });
   }
 
-  /** The score must be in the profile's scale; a pair "earned/max" converts only on a scale that starts at 0. */
+  /**
+   * The canonical score (always in the profile's scale) of an evaluation being written.
+   *  - `score` given: that one (null = none), checked against the scale;
+   *  - a numeric "earned/max" pair without a score: on a scale that starts at 0 the score is RECOMPUTED from the new pair; on any
+   *    other scale there is no honest conversion, so the student must give the score (400) — the previous one is never kept;
+   *  - no pair at all: `fallback` (the stored score; null on create).
+   */
   function resolveScore(
     scale: { minMilli: number; maxMilli: number },
     score: number | null | undefined,
     raw: { earned: number | null | undefined; max: number | null | undefined },
     fallback: number | null,
   ): number | null {
-    let result = score === undefined ? fallback : score;
-    if (score === undefined && typeof raw.earned === 'number' && typeof raw.max === 'number') {
-      const converted = rawToScoreMilli(scale, raw.earned, raw.max);
-      if (converted !== null) result = converted;
-      else if (fallback === null)
+    let result: number | null;
+    if (score !== undefined) result = score;
+    else if (typeof raw.earned === 'number' && typeof raw.max === 'number') {
+      result = rawToScoreMilli(scale, raw.earned, raw.max);
+      if (result === null)
         throw validationError({
           scoreMilli: ['En esta escala escribe la nota ya convertida; no se calcula sola.'],
         });
-    }
+    } else result = fallback;
     if (result !== null && (result < scale.minMilli || result > scale.maxMilli))
       throw validationError({ scoreMilli: ['La nota está fuera de la escala del periodo.'] });
     return result;
@@ -224,35 +234,35 @@ export function createGradingService(deps: {
     async createEvaluation(userId: string, input: CreateEvaluationInput) {
       const subject = await subjects.findOwned(userId, input.subjectId);
       if (!subject) throw subjectNotFound();
-      return write(userId, async (tx, repo) => {
-        await trackedPeriod(tx, userId, subject.periodId);
-        const profile = await repo.findProfile(userId, subject.periodId);
-        if (!profile) throw notConfigured();
+      try {
+        return await write(userId, async (tx, repo) => {
+          await trackedPeriod(tx, userId, subject.periodId);
+          const profile = await repo.findProfile(userId, subject.periodId);
+          if (!profile) throw notConfigured();
 
-        const cut = await repo.findCut(userId, input.gradingPeriodId);
-        if (!cut) throw cutNotFound();
-        if (cut.periodId !== subject.periodId)
-          throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
+          const cut = await repo.findCut(userId, input.gradingPeriodId);
+          if (!cut) throw cutNotFound();
+          if (cut.periodId !== subject.periodId)
+            throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
 
-        const activityId = input.activityId ?? null;
-        if (activityId !== null) await checkActivity(tx, userId, activityId, subject.id);
+          const activityId = input.activityId ?? null;
+          if (activityId !== null) await checkActivity(tx, userId, activityId, subject.id);
 
-        if (
-          (await repo.sumEvaluationShares(userId, subject.id, cut.id)) + input.periodShareBp >
-          WEIGHT_BP_MAX
-        )
-          throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
+          if (
+            (await repo.sumEvaluationShares(userId, subject.id, cut.id)) + input.periodShareBp >
+            WEIGHT_BP_MAX
+          )
+            throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
 
-        const score = resolveScore(
-          profile,
-          input.scoreMilli,
-          { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
-          null,
-        );
-        const hasRaw = typeof input.rawEarnedMilli === 'number';
-        if (hasRaw && score === null)
-          throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
-        try {
+          const score = resolveScore(
+            profile,
+            input.scoreMilli,
+            { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
+            null,
+          );
+          const hasRaw = typeof input.rawEarnedMilli === 'number';
+          if (hasRaw && score === null)
+            throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
           return toEvaluationDto(
             await repo.createEvaluation(userId, subject.periodId, {
               subjectId: subject.id,
@@ -266,12 +276,17 @@ export function createGradingService(deps: {
               scoredAt: score === null ? null : clock(),
             }),
           );
-        } catch (err) {
-          // The cut or the activity vanished between the check and the insert: the foreign keys say no.
-          if (isPrismaError(err, 'P2003')) throw cutNotFound();
-          throw err;
-        }
-      });
+        });
+      } catch (err) {
+        // A foreign key can fail for the cut, the activity or the subject, and the failed transaction is gone: look again at
+        // what the request named and report the one that vanished (never "the cut" by default).
+        if (!isPrismaError(err, 'P2003')) throw err;
+        if (!(await subjects.findOwned(userId, input.subjectId))) throw subjectNotFound();
+        if (!(await grading.findCut(userId, input.gradingPeriodId))) throw cutNotFound();
+        if (input.activityId && !(await activities.findOwned(userId, input.activityId)))
+          throw activityNotFound();
+        throw err;
+      }
     },
 
     async updateEvaluation(userId: string, id: string, input: UpdateEvaluationInput) {

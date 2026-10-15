@@ -1,7 +1,9 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Express } from 'express';
 import request from 'supertest';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, periodInput, prisma, resetDb, signUp } from '../../test/helpers.js';
 
 const app: Express = buildApp();
@@ -793,5 +795,163 @@ describe('the database refuses what the service would', () => {
         data: { ...base, periodId: w.period.id, subjectId: s2.id, gradingPeriodId: w.cuts[0]!.id },
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe('raw "earned/max" never leaves a stale canonical score', () => {
+  const scale17 = { minMilli: 1000, maxMilli: 7000, passMilli: 4000, decimals: 1 };
+
+  /** One scored evaluation (existing score `score`) on the given scale. */
+  async function scored(scale: object, score: number) {
+    const w = await world('a@example.com', { grading: false });
+    await w.agent.post(`/api/periods/${w.period.id}/grading`).send(scale).expect(201);
+    const cut = (
+      await w.agent
+        .post(`/api/periods/${w.period.id}/grading-periods`)
+        .send({ name: 'N', finalShareBp: 10_000 })
+        .expect(201)
+    ).body.gradingPeriod;
+    const ev = (
+      await evaluation(w.agent, {
+        subjectId: w.subject.id,
+        gradingPeriodId: cut.id,
+        name: 'P',
+        periodShareBp: 5000,
+        scoreMilli: score,
+      }).expect(201)
+    ).body.evaluation;
+    return { w, ev };
+  }
+  const row = (id: string) => prisma.evaluation.findUniqueOrThrow({ where: { id } });
+  const RAW = { rawEarnedMilli: 18_000, rawMaxMilli: 20_000 };
+
+  it('scale 1–7: a raw pair alone is refused and nothing changes', async () => {
+    const { w, ev } = await scored(scale17, 4000);
+    const before = await row(ev.id);
+    const res = await w.agent.patch(`/api/evaluations/${ev.id}`).send(RAW);
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details.fields.scoreMilli).toBeDefined();
+    expect(await row(ev.id)).toEqual(before);
+  });
+
+  it('scale 1–7: the pair with an explicit score keeps both', async () => {
+    const { w, ev } = await scored(scale17, 4000);
+    const res = await w.agent.patch(`/api/evaluations/${ev.id}`).send({ ...RAW, scoreMilli: 6500 });
+    expect(res.status).toBe(200);
+    expect(res.body.evaluation).toMatchObject({ scoreMilli: 6500, ...RAW });
+  });
+
+  it('scale 0–5: the pair alone RECOMPUTES the score from the new pair (never the old one)', async () => {
+    const { w, ev } = await scored(SCALE_05, 3000);
+    const res = await w.agent.patch(`/api/evaluations/${ev.id}`).send(RAW);
+    expect(res.status).toBe(200);
+    expect(res.body.evaluation).toMatchObject({ scoreMilli: 4500, ...RAW });
+    expect((await row(ev.id)).scoredAt).not.toBeNull();
+  });
+
+  it('clearing only the pair keeps the canonical score; clearing the score clears pair and scoredAt', async () => {
+    const { w, ev } = await scored(SCALE_05, 3000);
+    await w.agent.patch(`/api/evaluations/${ev.id}`).send(RAW).expect(200);
+    const kept = await w.agent
+      .patch(`/api/evaluations/${ev.id}`)
+      .send({ rawEarnedMilli: null, rawMaxMilli: null })
+      .expect(200);
+    expect(kept.body.evaluation).toMatchObject({
+      scoreMilli: 4500,
+      rawEarnedMilli: null,
+      rawMaxMilli: null,
+    });
+    await w.agent.patch(`/api/evaluations/${ev.id}`).send(RAW).expect(200);
+    const cleared = await w.agent
+      .patch(`/api/evaluations/${ev.id}`)
+      .send({ scoreMilli: null })
+      .expect(200);
+    expect(cleared.body.evaluation).toMatchObject({
+      scoreMilli: null,
+      rawEarnedMilli: null,
+      rawMaxMilli: null,
+      scoredAt: null,
+    });
+  });
+
+  it('an update without the pair keeps the stored score', async () => {
+    const { w, ev } = await scored(scale17, 4000);
+    const res = await w.agent.patch(`/api/evaluations/${ev.id}`).send({ name: 'Otro' }).expect(200);
+    expect(res.body.evaluation.scoreMilli).toBe(4000);
+  });
+});
+
+describe('a foreign key that fails reports what vanished', () => {
+  /** Runs `fn` just before the insert of the evaluation, inside the real transaction (a deterministic race). */
+  function beforeInsert(fn: () => Promise<unknown>) {
+    const original = prisma.$transaction.bind(prisma) as (...a: unknown[]) => Promise<unknown>;
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation(((cb: unknown, opts: unknown) =>
+      original(async (tx: { evaluation: { create: (a: unknown) => Promise<unknown> } }) => {
+        const create = tx.evaluation.create.bind(tx.evaluation);
+        tx.evaluation.create = async (args) => {
+          await fn();
+          return create(args);
+        };
+        return (cb as (t: unknown) => Promise<unknown>)(tx);
+      }, opts)) as never);
+    return spy;
+  }
+  afterEach(() => vi.restoreAllMocks());
+
+  it('the linked activity vanished: the activity 404, not "cut not found"', async () => {
+    const w = await world();
+    const act = (
+      await w.agent
+        .post('/api/activities')
+        .send({ subjectId: w.subject.id, title: 'Entrega', dueDate: '2099-03-15' })
+        .expect(201)
+    ).body.activity;
+    beforeInsert(() => prisma.activity.delete({ where: { id: act.id } }));
+    const res = await evaluation(w.agent, {
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[0]!.id,
+      name: 'P',
+      periodShareBp: 1000,
+      activityId: act.id,
+    });
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Actividad no encontrada.');
+    expect(await prisma.evaluation.count()).toBe(0);
+  });
+
+  it('the cut vanished: the cut 404', async () => {
+    const w = await world();
+    beforeInsert(() => prisma.gradingPeriod.delete({ where: { id: w.cuts[2]!.id } }));
+    const res = await evaluation(w.agent, {
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[2]!.id,
+      name: 'P',
+      periodShareBp: 1000,
+    });
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Corte no encontrado.');
+  });
+});
+
+describe('maintenance guard: the hand-written Evaluation → Activity key', () => {
+  it('exists in the database exactly as the migration writes it (Prisma cannot represent it)', async () => {
+    const rows = await prisma.$queryRaw<{ def: string }[]>`
+      SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'Evaluation_activityId_subjectId_fkey'`;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.def).toContain(
+      'FOREIGN KEY ("activityId", "subjectId") REFERENCES "Activity"(id, "subjectId")',
+    );
+    expect(rows[0]!.def).toContain('ON DELETE SET NULL ("activityId")');
+  });
+
+  it('is still written in the migration, the source of truth for it', () => {
+    const dir = path.join(__dirname, '../../prisma/migrations');
+    const sql = readdirSync(dir)
+      .filter((d) => d.endsWith('_grading_foundation'))
+      .map((d) => readFileSync(path.join(dir, d, 'migration.sql'), 'utf8'))
+      .join('\n');
+    expect(sql).toContain('"Evaluation_activityId_subjectId_fkey"');
+    expect(sql).toContain('ON DELETE SET NULL ("activityId")');
   });
 });
