@@ -36,6 +36,15 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ['post', '/api/auth/logout'],
   ['patch', '/api/profile', { primaryUse: 'PERSONAL' }],
   ['post', '/api/study-tracks', { name: 'E', type: 'SCHOOL' }],
+  [
+    'post',
+    '/api/study-tracks/setup',
+    {
+      track: { name: 'E', type: 'SCHOOL' },
+      period: { name: 'P', startDate: '2026-08-03', endDate: '2026-11-28' },
+    },
+  ],
+  ['post', '/api/study-tracks/adopt-period', { periodId: uuid(), name: 'E', type: 'SCHOOL' }],
   ['patch', `/api/study-tracks/${uuid()}`, { name: 'E' }],
   ['post', `/api/study-tracks/${uuid()}/make-primary`],
   ['post', `/api/study-tracks/${uuid()}/archive`],

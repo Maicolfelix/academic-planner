@@ -97,6 +97,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/api/src/routes/studyTracks.ts',
       'apps/api/src/services/currentPeriods.ts', // the one reader of all the current periods (with their study)
       'apps/api/src/services/periodService.ts', // create / move a period, one current per scope
+      'apps/api/src/services/studySetupService.ts', // setup / adopt-period: the two explicit, atomic ways to create a study
       'apps/api/src/services/studyTrackService.ts',
       // the DEFAULT context of a NEW subject: the type of its period's study (never a name, never a permission)
       'apps/api/src/services/subjectMaterializer.ts',
@@ -188,7 +189,56 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     f.includes(`${path.sep}apps${path.sep}web${path.sep}src${path.sep}`),
   );
 
-  it('the web knows about studies only through the few actions that can move HOME (no screen, no onboarding)', () => {
+  it('a study is created only by an explicit request: the profile, the onboarding and the period never write one', () => {
+    // the only code that INSERTS a study
+    const creators = api
+      .filter((f) => /studyTrack/i.test(read(f)))
+      .filter((f) =>
+        /\bstudyTrack\.create\(|\b(studies|repo)\.create\(/.test(withoutTypeChecks(read(f))),
+      )
+      .map(rel);
+    expect(creators.sort()).toEqual([
+      'apps/api/src/repositories/studyTrackRepository.ts',
+      'apps/api/src/services/studySetupService.ts',
+      'apps/api/src/services/studyTrackService.ts',
+    ]);
+    // the orchestration reads neither the profile nor a name/type to decide anything: what it creates is what the request said
+    const setup = withoutTypeChecks(
+      read(path.join(ROOT, 'apps/api/src/services/studySetupService.ts')),
+    );
+    expect(setup).not.toMatch(/profile|primaryUse|programName/i);
+    // and nothing on the profile side knows about studies (no silent UserProfile -> StudyTrack)
+    const profileSide = api.filter((f) =>
+      /profile(Service|Repository|Controller)|routes\/profile/.test(f),
+    );
+    expect(profileSide.length).toBeGreaterThanOrEqual(3);
+    expect(profileSide.filter((f) => /studyTrack|studySetup/i.test(read(f))).map(rel)).toEqual([]);
+  });
+
+  it('opening the Mis estudios screen cannot write: its page and its cards hold no effect and no mutation, and the onboarding knows nothing of studies', () => {
+    const read2 = (p: string) => withoutTypeChecks(read(path.join(ROOT, p)));
+    for (const f of [
+      'apps/web/src/pages/StudiesPage.tsx',
+      'apps/web/src/pages/studies/StudyCard.tsx',
+      'apps/web/src/pages/studies/LegacyPlanCard.tsx',
+    ]) {
+      expect(read2(f), f).not.toMatch(
+        /useEffect|\.mutate(Async)?\(|\buse(Setup|Adopt|Update|Make|Archive|Restore|Create)\w*\(/,
+      );
+    }
+    const onboarding = web.filter(
+      (f) =>
+        /apps\/web\/src\/(onboarding\/|pages\/OnboardingPage)/.test(rel(f)) && !/\.test\./.test(f),
+    );
+    expect(onboarding.length).toBeGreaterThanOrEqual(6);
+    expect(
+      onboarding
+        .filter((f) => /studyTrack|useSetupStudy|useAdoptPeriod|settings\/studies/i.test(read(f)))
+        .map(rel),
+    ).toEqual([]);
+  });
+
+  it('the web knows about studies only through the Mis estudios screens, their hooks and the labels of the summaries', () => {
     expect(web.length).toBeGreaterThan(50);
     expect(
       web
@@ -198,7 +248,16 @@ describe('a study track describes: only periods belong to one, and no behaviour 
     ).toEqual([
       'apps/web/src/academic/origin.ts', // the label of an item's study, read from the server's current periods
       'apps/web/src/api/studyTracks.ts',
+      'apps/web/src/pages/StudiesPage.tsx', // Mis estudios
+      'apps/web/src/pages/SubjectsPage.tsx', // reads the study of the period it shows (its title); never sends one
       'apps/web/src/pages/progress/ProgressByPeriod.tsx', // one progress line per study
+      'apps/web/src/pages/studies/AddStudyDialog.tsx',
+      'apps/web/src/pages/studies/AdoptDialog.tsx',
+      'apps/web/src/pages/studies/EditStudyDialog.tsx',
+      'apps/web/src/pages/studies/PeriodsDialog.tsx',
+      'apps/web/src/pages/studies/StudyActionDialog.tsx',
+      'apps/web/src/studies/studyModel.ts',
+      'apps/web/src/studies/studyWizardModel.ts',
       'apps/web/src/studyTracks/useStudyTracks.ts',
     ]);
     // and no workspace or study selector exists anywhere: the app stays one Home, one Agenda
@@ -235,7 +294,12 @@ describe('a study track describes: only periods belong to one, and no behaviour 
         withoutTypeChecks(read(f)),
       ),
     );
-    expect(offenders.map(rel)).toEqual([]);
+    // The only ones that look for a current period inside a LIST are the Mis estudios screens, and neither finds HOME: one
+    // asks whether a STUDY's own periods have a current one, the other finds the plan that belongs to no study.
+    expect(offenders.map(rel).sort()).toEqual([
+      'apps/web/src/pages/studies/PeriodsDialog.tsx',
+      'apps/web/src/studies/studyModel.ts',
+    ]);
     // and the files that decide it say HOME explicitly (a guard against the pattern matching nothing)
     const read2 = (p: string) => read(path.join(ROOT, p));
     expect(read2('apps/web/src/auth/guards.tsx')).toMatch(/useHomePeriod\(\)/);

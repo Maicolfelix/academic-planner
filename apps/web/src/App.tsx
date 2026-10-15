@@ -33,6 +33,7 @@ const ProgressPage = named(() => import('./pages/ProgressPage'), 'ProgressPage')
 const RadarPage = named(() => import('./pages/RadarPage'), 'RadarPage');
 const ScheduleImportPage = named(() => import('./pages/ScheduleImportPage'), 'ScheduleImportPage');
 const StatusPage = named(() => import('./pages/StatusPage'), 'StatusPage');
+const StudiesPage = named(() => import('./pages/StudiesPage'), 'StudiesPage');
 const SubjectsPage = named(() => import('./pages/SubjectsPage'), 'SubjectsPage');
 
 export function App() {
@@ -55,6 +56,10 @@ export function App() {
           </Route>
           <Route element={<RequireAuth />}>
             <Route path="/onboarding" element={<OnboardingPage />} />
+            {/* Mis estudios is where a missing HOME period gets fixed, so it does NOT wait for one (no RequirePeriod). */}
+            <Route element={<AppShell />}>
+              <Route path="/settings/studies" element={<StudiesPage />} />
+            </Route>
             <Route element={<RequirePeriod />}>
               <Route element={<AppShell />}>
                 <Route path="/dashboard" element={<DashboardPage />} />

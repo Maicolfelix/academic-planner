@@ -128,6 +128,24 @@ export const createPeriodSchema = z
   .refine(levelAlternatives, { path: ['studyLevelNote'], message: BOTH_LEVELS_MESSAGE });
 
 /**
+ * The first period created TOGETHER with a study (`POST /api/study-tracks/setup`): name, dates and an optional level (a number OR
+ * a note). Strict, and deliberately without `isCurrent`, `studyTrackId` and the owner: the server links it to the new study and
+ * makes it that study's current period.
+ */
+export const studyPeriodSchema = z
+  .strictObject({
+    ...periodFields,
+    studyLevel: studyLevelSchema.nullish(),
+    studyLevelNote: studyLevelNoteSchema.optional(),
+  })
+  .refine((v) => isEndAfterStart(v.startDate, v.endDate), {
+    path: ['endDate'],
+    message: END_AFTER_START_MESSAGE,
+  })
+  .refine(levelAlternatives, { path: ['studyLevelNote'], message: BOTH_LEVELS_MESSAGE });
+export type StudyPeriodInput = z.infer<typeof studyPeriodSchema>;
+
+/**
  * `isCurrent` can only be set to `true` (to un-mark a period, mark another one): a user never ends up
  * with periods but none current by accident. The start/end pair is re-checked against stored values
  * in the service when only one of them is sent.
