@@ -108,6 +108,19 @@ export function summarizeSubjectGrade(
   };
 }
 
+/**
+ * The ACCUMULATED grade: what the graded evaluations have already contributed to the FINAL grade, with everything still pending
+ * counting as 0 for now (K / total). It is NOT the average of what was graded (that is `currentMilli`): 4.5 on 30 % of the final
+ * grade accumulates 1.35. Rounded for display only; null while nothing is graded.
+ */
+export function accumulatedMilli(
+  cuts: readonly CutWeight[],
+  items: readonly WeightedScore[],
+): number | null {
+  const { k, e } = totals(cuts, items);
+  return e === 0n ? null : Number(divRound(k, TOTAL));
+}
+
 /** The final grade (milli, rounded for display) if everything still to be graded scored `assumedMilli`. */
 export function projectedFinalMilli(
   cuts: readonly CutWeight[],

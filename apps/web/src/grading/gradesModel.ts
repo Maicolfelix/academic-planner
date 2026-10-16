@@ -1,5 +1,6 @@
 import {
   GRADE_MILLI_MAX,
+  accumulatedMilli,
   RAW_MILLI_MAX,
   formatNeeded,
   formatPercent,
@@ -30,12 +31,25 @@ import {
 export const currentText = (s: SubjectGradeSummaryDto, decimals: number) =>
   s.currentMilli === null ? 'Sin notas todavía' : formatScore(s.currentMilli, decimals);
 
-/** Neutral, never an order or a judgement. Null while nothing is graded. */
+/**
+ * Neutral, never an order or a judgement. It speaks ONLY about what was graded so far (the average of the evaluated part), never
+ * about the subject as a whole. Null while nothing is graded.
+ */
 export function statusText(s: SubjectGradeSummaryDto): string | null {
   if (s.currentPasses === null) return null;
   return s.currentPasses
-    ? 'Por ahora estás por encima de la nota mínima.'
-    : 'Por ahora estás por debajo de la nota mínima.';
+    ? 'Lo evaluado hasta ahora está por encima de la nota mínima.'
+    : 'Lo evaluado hasta ahora está por debajo de la nota mínima.';
+}
+
+/** The accumulated grade ("lo que llevas en la materia"), or the words when nothing is graded yet. */
+export function accumulatedText(
+  cuts: readonly GradingPeriod[],
+  evaluations: readonly Evaluation[],
+  decimals: number,
+): string {
+  const milli = accumulatedMilli(cuts, evaluations);
+  return milli === null ? 'Sin notas todavía' : formatScore(milli, decimals);
 }
 
 export interface RequiredView {

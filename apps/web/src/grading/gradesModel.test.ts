@@ -6,6 +6,7 @@ import type {
 } from '@planner/core';
 import { describe, expect, it } from 'vitest';
 import {
+  accumulatedText,
   buildCuts,
   buildEvaluation,
   buildQuickGrade,
@@ -276,12 +277,23 @@ describe('what the summary says', () => {
     expect(currentText(summary({ currentMilli: null, currentPasses: null }), 1)).toBe(
       'Sin notas todavía',
     );
-    expect(statusText(summary())).toBe('Por ahora estás por encima de la nota mínima.');
+    expect(statusText(summary())).toBe(
+      'Lo evaluado hasta ahora está por encima de la nota mínima.',
+    );
     expect(statusText(summary({ currentPasses: false }))).toBe(
-      'Por ahora estás por debajo de la nota mínima.',
+      'Lo evaluado hasta ahora está por debajo de la nota mínima.',
     );
     expect(statusText(summary({ currentPasses: null }))).toBeNull();
     expect(statusText(summary({ currentPasses: false }))).not.toMatch(/mal|perdiendo|riesgo/i);
+  });
+
+  it('the accumulated grade is not the average of the evaluated part', () => {
+    const cuts = [cut(1, 3000), cut(2, 7000)];
+    const evaluations = [ev(1, cuts[0]!.id, 10_000, 4500)]; // 4.5 on a cut worth 30 % of the final grade
+    expect(accumulatedText(cuts, evaluations, 1)).toBe('1.4'); // 1.35 accumulated (half up), over the whole final grade
+    expect(currentText(summary({ currentMilli: 4500 }), 1)).toBe('4.5'); // the average of what was graded
+    expect(accumulatedText(cuts, [ev(1, cuts[0]!.id, 10_000, null)], 1)).toBe('Sin notas todavía');
+    expect(statusText(summary())).not.toMatch(/materia|general/i); // it speaks only about what was evaluated
   });
 
   it('NEEDED / SECURED / IMPOSSIBLE and the estimate flag', () => {

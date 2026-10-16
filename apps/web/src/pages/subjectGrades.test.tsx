@@ -180,7 +180,7 @@ describe('the subject grades page', () => {
       'La escala y los cortes se comparten con las demás materias de este periodo.',
     );
     expect(out).toContain('Configurar notas');
-    expect(out).not.toContain('Nota actual');
+    expect(out).not.toContain('Nota acumulada');
   });
 
   it('the study type comes from the real study: Cortes (university), never a default while anything loads', () => {
@@ -259,7 +259,7 @@ describe('the subject grades page', () => {
       activities: [{ id: U(200), title: 'Entrega taller' } as Activity],
     });
     expect(out).toContain('4.3');
-    expect(out).toContain('Por ahora estás por encima de la nota mínima.');
+    expect(out).toContain('Lo evaluado hasta ahora está por encima de la nota mínima.');
     expect(out).toContain('Necesitas aproximadamente 2.3 en lo que falta.');
     expect(out).toContain('¿Cuánto necesito?');
     expect(out).toContain('Peso: 50 % del corte');
@@ -286,6 +286,35 @@ describe('the subject grades page', () => {
     expect(out).toContain('Subtotal: 3.5');
   });
 
+  it('tells the accumulated grade of the subject apart from the average of what was graded', () => {
+    const c1 = cut(1, 3000);
+    const out = render({
+      grades: configured({
+        gradingPeriods: [c1, cut(2, 7000)],
+        evaluations: [evaluation(1, c1.id, { periodShareBp: 10_000, scoreMilli: 4500 })],
+        summary: summary({
+          currentMilli: 4500,
+          evaluatedWeightUnits: 30_000_000,
+          remainingWeightUnits: 70_000_000,
+        }),
+      }),
+    });
+    expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>1.4</); // 4.5 on 30 % = 1.35 → 1.4 accumulated
+    expect(out).toMatch(/data-testid="current-grade"[^>]*>4.5</); // the average of the evaluated part
+    expect(out).toContain('Nota acumulada');
+    expect(out).toContain('Promedio de lo evaluado');
+    expect(out).toContain('lo pendiente cuenta 0 por ahora');
+    expect(out).toContain('Lo evaluado hasta ahora está por encima de la nota mínima.');
+    expect(out).not.toContain('Por ahora estás'); // no sentence that could read as the subject's overall verdict
+    expect(out).toContain('Aprobatoria: 3.0');
+  });
+
+  it('nothing graded: neither number pretends to exist', () => {
+    const out = render({ grades: configured() });
+    expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>Sin notas todavía</);
+    expect(out).toMatch(/data-testid="current-grade"[^>]*>Sin notas todavía</);
+  });
+
   it('incomplete weights are marked as an estimate; complete ones are not', () => {
     const out = render({ grades: configured({ summary: summary({ complete: false }) }) });
     expect(out).toContain('Estimación: faltan pesos por definir.');
@@ -305,7 +334,7 @@ describe('the subject grades page', () => {
     ).toContain('Con el peso restante no alcanza para llegar a la nota objetivo.');
     expect(
       render({ grades: configured({ summary: summary({ currentPasses: false }) }) }),
-    ).toContain('Por ahora estás por debajo de la nota mínima.');
+    ).toContain('Lo evaluado hasta ahora está por debajo de la nota mínima.');
   });
 
   it('an archived study is still readable, and says so', () => {
@@ -314,7 +343,7 @@ describe('the subject grades page', () => {
       grades: configured({ summary: summary() }),
     });
     expect(out).toContain('Este estudio está archivado');
-    expect(out).toContain('Nota actual');
+    expect(out).toContain('Nota acumulada');
   });
 
   it('never shows the internals', () => {

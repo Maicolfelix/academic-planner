@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   WEIGHT_UNIT_TOTAL,
+  accumulatedMilli,
   ceilMilli,
   projectedFinalMilli,
   rawToScoreMilli,
@@ -85,6 +86,29 @@ describe('summarizeSubjectGrade', () => {
     expect(roundMilli(s.currentMilli!, 1)).toBe(3000); // what a student may see…
     expect(s.currentPasses).toBe(false); // …never changes the verdict
     expect(summarizeSubjectGrade(scale05, cuts, full([3000, 3000, 3000])).currentPasses).toBe(true);
+  });
+});
+
+describe('accumulatedMilli (what the graded evaluations already add to the final grade)', () => {
+  it('is not the average of what was graded: 4.5 on 30 % accumulates 1.35 (shown 1.4 with one decimal)', () => {
+    const items = full([4500, null, null]);
+    expect(summarizeSubjectGrade(scale05, cuts, items).currentMilli).toBe(4500); // the average of the graded part
+    expect(accumulatedMilli(cuts, items)).toBe(1350); // the accumulated, over the whole final grade
+  });
+  it('adds the cuts: 4.0·30 % + 3.0·30 % + 5.0·40 % = 4.1', () => {
+    expect(accumulatedMilli(cuts, full([4000, 3000, 5000]))).toBe(4100);
+  });
+  it('nothing graded: null; pending counts 0 while something is', () => {
+    expect(accumulatedMilli(cuts, full([null, null, null]))).toBeNull();
+    expect(accumulatedMilli(cuts, full([5000, null, null]))).toBe(1500);
+  });
+  it('a 100 % grade accumulates the score itself', () => {
+    expect(
+      accumulatedMilli(
+        [{ id: 'c1', finalShareBp: 10_000 }],
+        [{ gradingPeriodId: 'c1', periodShareBp: 10_000, scoreMilli: 3700 }],
+      ),
+    ).toBe(3700);
   });
 });
 

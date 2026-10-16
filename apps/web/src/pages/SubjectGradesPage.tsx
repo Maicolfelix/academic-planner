@@ -24,6 +24,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { AlertIcon, CheckIcon, PencilIcon, SlidersIcon, TrashIcon } from '../components/ui/icons';
 import {
   ESTIMATE_TEXT,
+  accumulatedText,
   currentText,
   cutSubtotal,
   groupByCut,
@@ -248,14 +249,28 @@ function TrackedGradesView({
           className="flex flex-col gap-3 p-4"
         >
           <h2 id="grade-summary" className="text-section-title">
-            Nota actual
+            Resumen de notas
           </h2>
-          <p className="text-3xl font-semibold break-words" data-testid="current-grade">
-            {currentText(summary, profile.decimals)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Aprobatoria: {formatScore(profile.passMilli, profile.decimals)}
-          </p>
+          <div>
+            <p className="text-sm font-medium">Nota acumulada</p>
+            <p className="text-3xl font-semibold break-words" data-testid="accumulated-grade">
+              {accumulatedText(grades.gradingPeriods, grades.evaluations, profile.decimals)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Lo que llevas en la materia: suma lo que cada evaluación ya aporta a la nota final (lo
+              pendiente cuenta 0 por ahora). Aprobatoria:{' '}
+              {formatScore(profile.passMilli, profile.decimals)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Promedio de lo evaluado</p>
+            <p className="text-xl font-semibold break-words" data-testid="current-grade">
+              {currentText(summary, profile.decimals)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Solo de las evaluaciones con nota, sin contar lo pendiente.
+            </p>
+          </div>
           {statusText(summary) && (
             <p className="flex items-start gap-2">
               {summary.currentPasses ? (

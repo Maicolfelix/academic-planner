@@ -126,7 +126,11 @@ test('A · university: the first configuration, an evaluation, the current grade
   // Corte 1 is complete: 3.5·60 % + 4.5·40 % = 3.9 → 30 % of the final grade, so the current grade is 3.9.
   await expect(page.getByTestId('current-grade')).toHaveText('3.9');
   await expect(page.getByText('Subtotal: 3.9')).toBeVisible();
-  await expect(page.getByText('Por ahora estás por encima de la nota mínima.')).toBeVisible();
+  await expect(
+    page.getByText('Lo evaluado hasta ahora está por encima de la nota mínima.'),
+  ).toBeVisible();
+  // The accumulated grade of the subject is another figure: 3.9 on 30 % of the final grade = 1.17 → 1.2.
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('1.2');
   // Weights still missing (cuts 2 and 3 have no evaluations): the figures are an estimate, and it says so.
   await expect(page.getByTestId('estimate-note')).toHaveText(
     'Estimación: faltan pesos por definir.',
