@@ -26,7 +26,10 @@ import {
   type GradingRepository,
 } from '../repositories/gradingRepository.js';
 import { createPeriodRepository, type PeriodRepository } from '../repositories/periodRepository.js';
-import { createStudyTrackRepository } from '../repositories/studyTrackRepository.js';
+import {
+  createStudyTrackRepository,
+  type StudyTrackRepository,
+} from '../repositories/studyTrackRepository.js';
 import type { SubjectRepository } from '../repositories/subjectRepository.js';
 
 const periodNotFound = () => notFound('Periodo no encontrado.');
@@ -78,10 +81,11 @@ export function createGradingService(deps: {
   subjects: SubjectRepository;
   activities: ActivityRepository;
   periods: PeriodRepository;
+  studyTracks: StudyTrackRepository;
   runInTransaction: RunInTransaction;
   clock: () => Date;
 }) {
-  const { grading, subjects, activities, periods, runInTransaction, clock } = deps;
+  const { grading, subjects, activities, periods, studyTracks, runInTransaction, clock } = deps;
 
   const write = <T>(
     userId: string,
@@ -390,10 +394,13 @@ export function createGradingService(deps: {
     async getSubjectGrades(userId: string, subjectId: string): Promise<SubjectGradesResponse> {
       const subject = await subjects.findOwned(userId, subjectId);
       if (!subject) throw subjectNotFound();
-      const [profile, cuts, evaluations] = await Promise.all([
+      const period = await periods.findOwned(userId, subject.periodId);
+      if (!period) throw subjectNotFound(); // (unreachable: the subject's period always exists)
+      const [profile, cuts, evaluations, study] = await Promise.all([
         grading.findProfile(userId, subject.periodId),
         grading.listCuts(userId, subject.periodId),
         grading.listForSubject(userId, subjectId),
+        period.studyTrackId ? studyTracks.findOwned(userId, period.studyTrackId) : null,
       ]);
       let summary: SubjectGradesResponse['summary'] = null;
       if (profile) {
@@ -410,6 +417,10 @@ export function createGradingService(deps: {
       return {
         subjectId,
         periodId: subject.periodId,
+        period: { id: period.id, name: period.name, studyTrackId: period.studyTrackId },
+        studyTrack: study
+          ? { id: study.id, name: study.name, type: study.type, status: study.status }
+          : null,
         profile: profile ? toGradingProfileDto(profile) : null,
         gradingPeriods: cuts.map(toGradingPeriodDto),
         evaluations: evaluations.map(toEvaluationDto),

@@ -1078,3 +1078,46 @@ describe('the configuration belongs to the period (B2)', () => {
     expect(res.gradingPeriods).toEqual([]);
   });
 });
+
+describe('GET /subjects/:id/grades carries the period and the study (derived by the server)', () => {
+  it('a tracked period: its name, its study and the study type', async () => {
+    const w = await world();
+    const res = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    expect(res.period).toEqual({ id: w.period.id, name: w.period.name, studyTrackId: w.track.id });
+    expect(res.studyTrack).toEqual({
+      id: w.track.id,
+      name: 'Medicina',
+      type: 'UNIVERSITY',
+      status: 'ACTIVE',
+    });
+  });
+
+  it.each(['SCHOOL', 'OTHER_ACADEMIC'])('the type is the real one: %s', async (type) => {
+    const w = await world('a@example.com', { grading: false });
+    await w.agent.patch(`/api/study-tracks/${w.track.id}`).send({ type }).expect(200);
+    const res = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    expect(res.studyTrack.type).toBe(type);
+  });
+
+  it('an untracked period: no study and no type', async () => {
+    const w = await world('a@example.com', { tracked: false });
+    const res = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    expect(res.period.studyTrackId).toBeNull();
+    expect(res.studyTrack).toBeNull();
+  });
+
+  it('an archived study says so (its grades stay readable)', async () => {
+    const w = await world();
+    await w.agent.post(`/api/study-tracks/${w.track.id}/archive`).expect(200);
+    const res = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    expect(res.studyTrack.status).toBe('ARCHIVED');
+  });
+
+  it('exposes nothing of the owner', async () => {
+    const w = await world();
+    const text = JSON.stringify(
+      (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body,
+    );
+    expect(text).not.toContain(w.user.id);
+  });
+});

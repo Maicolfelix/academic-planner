@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, hasNoNul, type EducationContext } from './academic.js';
+import {
+  INVALID_CHARACTERS,
+  educationContextSchema,
+  hasNoNul,
+  type EducationContext,
+} from './academic.js';
 import { WEIGHT_UNIT_TOTAL } from './gradingMath.js';
 
 /**
@@ -219,9 +224,25 @@ export const subjectGradeSummarySchema = z.object({
 export type SubjectGradeSummaryDto = z.infer<typeof subjectGradeSummarySchema>;
 
 /** GET /api/subjects/:id/grades. `profile` null = the subject's period has no grading configured (no summary then). */
+export const gradesPeriodContextSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  /** null = the period belongs to no study: it cannot be graded. */
+  studyTrackId: z.uuid().nullable(),
+});
+export const gradesStudyContextSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  type: educationContextSchema,
+  status: z.enum(['ACTIVE', 'ARCHIVED']),
+});
+
 export const subjectGradesResponseSchema = z.object({
   subjectId: z.uuid(),
   periodId: z.uuid(),
+  /** The period and its study, derived by the server (the screen never has to look them up, nor guess a type). */
+  period: gradesPeriodContextSchema,
+  studyTrack: gradesStudyContextSchema.nullable(),
   profile: gradingProfileSchema.nullable(),
   gradingPeriods: z.array(gradingPeriodSchema),
   evaluations: z.array(evaluationSchema),

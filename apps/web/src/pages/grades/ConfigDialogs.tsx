@@ -132,7 +132,7 @@ export function CutDialog({
 }) {
   const term = GRADING_PERIOD_TERMS[studyType].one;
   const create = useCreateGradingPeriod(periodId);
-  const update = useUpdateGradingPeriod();
+  const update = useUpdateGradingPeriod(periodId);
   const pending = create.isPending || update.isPending;
   const [name, setName] = useState(cut?.name ?? defaultName);
   const [weight, setWeight] = useState(cut ? bpToPercentText(cut.finalShareBp) : '');
@@ -203,18 +203,20 @@ export function ConfirmRemoveDialog({
   kind,
   id,
   name,
+  periodId,
   subjectId,
   onClose,
   onDone,
 }: {
   kind: 'cut' | 'evaluation';
+  periodId: string;
   id: string;
   name: string;
   subjectId: string;
   onClose: () => void;
   onDone: () => void;
 }) {
-  const removeCut = useDeleteGradingPeriod();
+  const removeCut = useDeleteGradingPeriod(periodId);
   const removeEvaluation = useDeleteEvaluation(subjectId);
   const remove = kind === 'cut' ? removeCut : removeEvaluation;
   return (

@@ -41,13 +41,20 @@ export function useSubjectGrades(subjectId: string) {
 }
 
 /**
- * The scale and the cuts belong to the PERIOD, so every subject of it shows them: changing them refreshes the grades of ALL the
- * subjects that are cached (one prefix). An evaluation belongs to one subject, so only that subject's grades are refreshed.
- * Nothing else in the app reads grades yet, so nothing else is invalidated.
+ * The scale and the cuts belong to ONE period, so every subject OF THAT PERIOD shows them: changing them refreshes the cached
+ * grades whose response says that period (never those of another period or study). An evaluation belongs to one subject, so only
+ * that subject's grades are refreshed. Nothing else in the app reads grades yet, so nothing else is invalidated.
  */
-function useRefreshPeriodGrades() {
+export const isGradesOfPeriod = (data: unknown, periodId: string) =>
+  (data as { periodId?: string } | undefined)?.periodId === periodId;
+
+function useRefreshPeriodGrades(periodId: string) {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: SUBJECT_GRADES_KEY });
+  return () =>
+    qc.invalidateQueries({
+      queryKey: SUBJECT_GRADES_KEY,
+      predicate: (query) => isGradesOfPeriod(query.state.data, periodId),
+    });
 }
 
 function useRefreshSubjectGrades(subjectId: string) {
@@ -56,7 +63,7 @@ function useRefreshSubjectGrades(subjectId: string) {
 }
 
 export function useSetupGrading(periodId: string) {
-  const refresh = useRefreshPeriodGrades();
+  const refresh = useRefreshPeriodGrades(periodId);
   return useMutation({
     mutationFn: (input: SetupGradingInput) => setupGradingRequest(periodId, input),
     onSuccess: refresh,
@@ -64,7 +71,7 @@ export function useSetupGrading(periodId: string) {
 }
 
 export function useUpdateGradingProfile(periodId: string) {
-  const refresh = useRefreshPeriodGrades();
+  const refresh = useRefreshPeriodGrades(periodId);
   return useMutation({
     mutationFn: (input: UpdateGradingProfileInput) => updateGradingProfileRequest(periodId, input),
     onSuccess: refresh,
@@ -72,15 +79,15 @@ export function useUpdateGradingProfile(periodId: string) {
 }
 
 export function useCreateGradingPeriod(periodId: string) {
-  const refresh = useRefreshPeriodGrades();
+  const refresh = useRefreshPeriodGrades(periodId);
   return useMutation({
     mutationFn: (input: CreateGradingPeriodInput) => createGradingPeriodRequest(periodId, input),
     onSuccess: refresh,
   });
 }
 
-export function useUpdateGradingPeriod() {
-  const refresh = useRefreshPeriodGrades();
+export function useUpdateGradingPeriod(periodId: string) {
+  const refresh = useRefreshPeriodGrades(periodId);
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateGradingPeriodInput }) =>
       updateGradingPeriodRequest(id, input),
@@ -88,8 +95,8 @@ export function useUpdateGradingPeriod() {
   });
 }
 
-export function useDeleteGradingPeriod() {
-  const refresh = useRefreshPeriodGrades();
+export function useDeleteGradingPeriod(periodId: string) {
+  const refresh = useRefreshPeriodGrades(periodId);
   return useMutation({ mutationFn: deleteGradingPeriodRequest, onSuccess: refresh });
 }
 

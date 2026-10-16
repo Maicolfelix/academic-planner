@@ -367,3 +367,29 @@ test('H · an archived study keeps its grades readable', async ({ page }) => {
   await expect(page.getByTestId('current-grade')).toHaveText('4.0');
   check();
 });
+
+test('I · the study type comes with the grades: slow studies/periods lists never show university words', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'SCHOOL', ['Matemáticas']);
+  const slow = async (route: import('@playwright/test').Route) => {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    await route.continue();
+  };
+  await page.route('**/api/study-tracks', slow);
+  await page.route('**/api/periods', slow);
+  await page.goto(gradesUrl(subjects[0]!.id));
+  // Well before the lists answer, the school wording is already there (it is derived by the server with the grades).
+  await expect(page.getByText('La escala y los periodos de evaluación se comparten')).toBeVisible({
+    timeout: 3000,
+  });
+  await expect(page.getByText(/cortes/i)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Configurar notas' }).click();
+  const setup = page.getByRole('dialog', { name: 'Configurar notas · Escala' });
+  await setup.getByRole('button', { name: 'Siguiente' }).click();
+  const cuts = page.getByRole('dialog', { name: 'Configurar notas · Periodos de evaluación' });
+  await expect(cuts.getByRole('radio', { name: '25 % / 25 % / 25 % / 25 %' })).toBeChecked();
+  await expect(cuts.getByRole('radio', { name: '30 % / 30 % / 40 %' })).toHaveCount(0);
+  check();
+});

@@ -4,7 +4,6 @@ import {
   formatPercent,
   formatScore,
   formatUnitsPercent,
-  type AcademicPeriod,
   type EducationContext,
   type Evaluation,
   type GradingPeriod,
@@ -14,7 +13,6 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useActivities } from '../activities/useActivities';
-import { usePeriods } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
 import { QueryError } from '../components/QueryError';
 import { ActionMenu } from '../components/ui/ActionMenu';
@@ -36,7 +34,6 @@ import {
   type CutGroup,
 } from '../grading/gradesModel';
 import { useSubject, useSubjectGrades } from '../grading/useGrading';
-import { useStudyTracks } from '../studyTracks/useStudyTracks';
 import { ConfirmRemoveDialog, CutDialog, ScaleEditDialog } from './grades/ConfigDialogs';
 import { EvaluationDialog, QuickGradeDialog } from './grades/EvaluationDialogs';
 import { SetupDialog } from './grades/SetupDialog';
@@ -75,6 +72,63 @@ export function SubjectGradesPage() {
   return <GradesView subject={subject.data} grades={grades.data} refetch={grades} />;
 }
 
+type StudyContext = NonNullable<SubjectGradesResponse['studyTrack']>;
+
+/**
+ * The period and its study come WITH the grades (derived by the server), so the screen never waits for, nor guesses, a study type:
+ *  - a period that belongs to no study cannot be graded (and no type is invented for it);
+ *  - a period that names a study whose context did not arrive is an inconsistent answer: it is retried, never read as a default.
+ */
+function GradesView({
+  subject,
+  grades,
+  refetch,
+}: {
+  subject: Subject;
+  grades: SubjectGradesResponse;
+  refetch: Parameters<typeof QueryError>[0]['query'];
+}) {
+  const { period, studyTrack } = grades;
+  if (period.studyTrackId !== null && !studyTrack) {
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader title={`Notas de ${subject.name}`} />
+        <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
+          <p className="mb-2">No pudimos cargar el estudio de este periodo.</p>
+          <Button onClick={() => refetch.refetch()}>Reintentar</Button>
+        </div>
+      </div>
+    );
+  }
+  if (!studyTrack) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeader title={`Notas de ${subject.name}`} description={period.name} />
+        <p>
+          <Link to="/subjects" className="text-sm font-medium text-accent-ink underline">
+            ← Volver a Mis asignaturas
+          </Link>
+        </p>
+        <EmptyState
+          title="Las notas necesitan un estudio"
+          titleAs="h2"
+          action={
+            <Link to="/settings/studies" className={buttonStyles({ variant: 'primary' })}>
+              Ir a Mis estudios
+            </Link>
+          }
+        >
+          Este periodo no pertenece a ningún estudio. Conviértelo en un estudio para llevar tus
+          notas.
+        </EmptyState>
+      </div>
+    );
+  }
+  return (
+    <TrackedGradesView subject={subject} grades={grades} track={studyTrack} refetch={refetch} />
+  );
+}
+
 /** The friendly answer for a subject that does not exist or is not yours (the API answers both with the same 404). */
 export function GradesNotFound() {
   return (
@@ -92,24 +146,23 @@ export function GradesNotFound() {
   );
 }
 
-function GradesView({
+function TrackedGradesView({
   subject,
   grades,
+  track,
   refetch,
 }: {
   subject: Subject;
   grades: SubjectGradesResponse;
+  track: StudyContext;
   refetch: Parameters<typeof QueryError>[0]['query'];
 }) {
-  const periods = usePeriods();
-  const tracks = useStudyTracks();
   const activities = useActivities({ subjectId: subject.id }, true);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [notice, setNotice] = useState<string>();
 
-  const period: AcademicPeriod | undefined = periods.data?.find((p) => p.id === grades.periodId);
-  const track = tracks.data?.find((t) => t.id === period?.studyTrackId);
-  const studyType: EducationContext = track?.type ?? 'UNIVERSITY';
+  const { period } = grades;
+  const studyType: EducationContext = track.type; // only ever the real study's type
   const terms = GRADING_PERIOD_TERMS[studyType];
   const { profile, summary } = grades;
   const groups = groupByCut(grades.gradingPeriods, grades.evaluations);
@@ -123,9 +176,9 @@ function GradesView({
   const close = () => setDialog(null);
 
   const description = [
-    period && period.name,
-    track && (tracks.data?.length ?? 0) >= 2 ? track.name : undefined,
-    track?.status === 'ARCHIVED' ? 'Estudio archivado' : undefined,
+    track.name,
+    period.name,
+    track.status === 'ARCHIVED' ? 'Estudio archivado' : undefined,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -161,7 +214,7 @@ function GradesView({
         </Link>
       </p>
 
-      {track?.status === 'ARCHIVED' && (
+      {track.status === 'ARCHIVED' && (
         <p className="rounded-control bg-secondary p-3 text-sm">
           Este estudio está archivado. Tus notas se conservan y puedes consultarlas.
         </p>
@@ -173,22 +226,7 @@ function GradesView({
       )}
       <QueryError query={refetch} title="No se pudieron actualizar las notas" />
 
-      {!profile && period && period.studyTrackId === null && (
-        <EmptyState
-          title="Las notas necesitan un estudio"
-          titleAs="h2"
-          action={
-            <Link to="/settings/studies" className={buttonStyles({ variant: 'primary' })}>
-              Ir a Mis estudios
-            </Link>
-          }
-        >
-          Este periodo no pertenece a ningún estudio. Conviértelo en un estudio para llevar tus
-          notas.
-        </EmptyState>
-      )}
-
-      {!profile && period && period.studyTrackId !== null && (
+      {!profile && (
         <EmptyState
           title="Configura cómo califican esta materia"
           titleAs="h2"
@@ -269,7 +307,7 @@ function GradesView({
         </EmptyState>
       )}
 
-      {dialog?.kind === 'setup' && period && (
+      {dialog?.kind === 'setup' && (
         <SetupDialog
           periodId={period.id}
           studyType={studyType}
@@ -323,6 +361,7 @@ function GradesView({
           kind="evaluation"
           id={dialog.evaluation.id}
           name={dialog.evaluation.name}
+          periodId={period.id}
           subjectId={subject.id}
           onClose={close}
           onDone={() => done('Evaluación eliminada.')}
@@ -333,6 +372,7 @@ function GradesView({
           kind="cut"
           id={dialog.cut.id}
           name={dialog.cut.name}
+          periodId={period.id}
           subjectId={subject.id}
           onClose={close}
           onDone={() => done('Eliminado.')}
