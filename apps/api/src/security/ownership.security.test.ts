@@ -202,6 +202,14 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
           .post(`/api/periods/${id}/grading`)
           .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 }),
     ],
+    [
+      'POST /periods/:id/grading/setup',
+      (a, id) =>
+        a.post(`/api/periods/${id}/grading/setup`).send({
+          profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
+          gradingPeriods: [{ name: 'Robado', finalShareBp: 10000 }],
+        }),
+    ],
     ['GET /periods/:id/grading', (a, id) => a.get(`/api/periods/${id}/grading`)],
     [
       'PATCH /periods/:id/grading',

@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import { StaticRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { SUBJECT_COLOR_VALUES, type Subject } from '@planner/core';
 import { readableInk, withAlpha } from '../../lib/readableInk';
@@ -15,7 +16,11 @@ const subject = (over: Partial<Subject> = {}): Subject =>
   }) as Subject;
 
 const html = (s: Subject) =>
-  renderToStaticMarkup(<SubjectCard subject={s} onEdit={() => {}} onDelete={() => {}} />);
+  renderToStaticMarkup(
+    <StaticRouter location="/subjects">
+      <SubjectCard subject={s} onEdit={() => {}} onDelete={() => {}} />
+    </StaticRouter>,
+  );
 
 describe('initialsOf', () => {
   it('takes the first letters of the significant words, or the first two letters of a single word', () => {
@@ -82,11 +87,14 @@ describe('SubjectCard', () => {
     expect(full).toContain('Modelo relacional.');
   });
 
-  it('keeps Editar and Eliminar as real labelled buttons of 44 px, deleting in the danger color', () => {
+  it('keeps Editar, Notas and Eliminar as real labelled controls of 44 px, deleting in the danger color', () => {
     const out = html(subject());
     expect(out).toContain('aria-label="Editar Bases de Datos"');
     expect(out).toContain('aria-label="Eliminar Bases de Datos"');
-    expect(out.match(/min-h-11/g)).toHaveLength(2);
+    // B2: the grades of the subject, a secondary action that replaces none of the others
+    expect(out).toContain('aria-label="Notas de Bases de Datos"');
+    expect(out).toContain('href="/subjects/7c1d5f10-1b2e-4a38-8f6a-5b9c0d3e2a41/grades"');
+    expect(out.match(/min-h-11/g)).toHaveLength(3);
     expect(out).toContain('text-danger');
   });
 

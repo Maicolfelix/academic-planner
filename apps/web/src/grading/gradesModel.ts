@@ -1,0 +1,402 @@
+import {
+  GRADE_MILLI_MAX,
+  RAW_MILLI_MAX,
+  formatNeeded,
+  formatPercent,
+  formatPoints,
+  formatScore,
+  percentToBp,
+  pointsToMilli,
+  scaleProblems,
+  scoreToMilli,
+  type CreateEvaluationInput,
+  type CutDraft,
+  type Evaluation,
+  type GradingPeriod,
+  type GradingProfile,
+  type SubjectGradeSummaryDto,
+  type UpdateEvaluationInput,
+} from '@planner/core';
+
+/**
+ * The pure side of the subject grades screen (B2): the words it says, the numbers it derives for display and the translation of
+ * what a student types ("40", "4.2", "18" of "20") into the request. Nothing here knows React, and nothing shows or builds an
+ * internal figure (milli, basis points): the conversions come from `@planner/core`.
+ */
+
+// ── What the summary says ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** "3.4", or the words when nothing is graded yet. */
+export const currentText = (s: SubjectGradeSummaryDto, decimals: number) =>
+  s.currentMilli === null ? 'Sin notas todavía' : formatScore(s.currentMilli, decimals);
+
+/** Neutral, never an order or a judgement. Null while nothing is graded. */
+export function statusText(s: SubjectGradeSummaryDto): string | null {
+  if (s.currentPasses === null) return null;
+  return s.currentPasses
+    ? 'Por ahora estás por encima de la nota mínima.'
+    : 'Por ahora estás por debajo de la nota mínima.';
+}
+
+export interface RequiredView {
+  kind: 'SECURED' | 'IMPOSSIBLE' | 'NEEDED';
+  text: string;
+  /** The weights do not add up to 100 %: every figure is an estimate and the screen says so, always. */
+  estimate: boolean;
+}
+
+export const ESTIMATE_TEXT = 'Estimación: faltan pesos por definir.';
+
+/** The "¿Cuánto necesito?" block, for the pass mark as the target. */
+export function requiredView(s: SubjectGradeSummaryDto, decimals: number): RequiredView {
+  const estimate = !s.complete;
+  switch (s.required.status) {
+    case 'SECURED':
+      return {
+        kind: 'SECURED',
+        estimate,
+        text: 'Con lo ya registrado, el objetivo está asegurado aunque el resto quede en el mínimo de la escala.',
+      };
+    case 'IMPOSSIBLE':
+      return {
+        kind: 'IMPOSSIBLE',
+        estimate,
+        text: 'Con el peso restante no alcanza para llegar a la nota objetivo.',
+      };
+    case 'NEEDED':
+      return {
+        kind: 'NEEDED',
+        estimate,
+        text: `Necesitas aproximadamente ${formatNeeded(s.required.requiredMilli, decimals)} en lo que falta.`,
+      };
+  }
+}
+
+// ── Cuts and their evaluations ──────────────────────────────────────────────────────────────────────────────────────────
+
+export interface CutGroup {
+  cut: GradingPeriod;
+  evaluations: Evaluation[];
+  /** The evaluations of this cut add up to 100 % (otherwise there is no honest subtotal). */
+  weightsComplete: boolean;
+}
+
+export function groupByCut(
+  cuts: readonly GradingPeriod[],
+  evaluations: readonly Evaluation[],
+): CutGroup[] {
+  return cuts.map((cut) => {
+    const own = evaluations.filter((e) => e.gradingPeriodId === cut.id);
+    return {
+      cut,
+      evaluations: own,
+      weightsComplete: own.reduce((sum, e) => sum + e.periodShareBp, 0) === 10_000,
+    };
+  });
+}
+
+/**
+ * The subtotal of a cut, ONLY when it can be said clearly: the weights of its evaluations add up to 100 % and every one is
+ * graded. It is computed on the screen, never stored, and rounded for display.
+ */
+export function cutSubtotal(group: CutGroup, decimals: number): string | null {
+  if (!group.weightsComplete || group.evaluations.length === 0) return null;
+  let weighted = 0;
+  for (const e of group.evaluations) {
+    if (e.scoreMilli === null) return null;
+    weighted += e.scoreMilli * e.periodShareBp;
+  }
+  return formatScore(Math.round(weighted / 10_000), decimals);
+}
+
+/** "4.2" for a graded evaluation; null while pending. */
+export const scoreText = (e: Pick<Evaluation, 'scoreMilli'>, decimals: number) =>
+  e.scoreMilli === null ? null : formatScore(e.scoreMilli, decimals);
+
+/** "18 / 20" when the student reported points; it never replaces the score. */
+export const rawText = (e: Pick<Evaluation, 'rawEarnedMilli' | 'rawMaxMilli'>) =>
+  e.rawEarnedMilli !== null && e.rawMaxMilli !== null
+    ? formatPoints(e.rawEarnedMilli, e.rawMaxMilli)
+    : null;
+
+// ── The evaluation form ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+export type ScoreMode = 'NOTE' | 'POINTS';
+
+export interface EvaluationFormValues {
+  name: string;
+  gradingPeriodId: string;
+  /** "40" (percent of the cut). */
+  weight: string;
+  mode: ScoreMode;
+  note: string;
+  earned: string;
+  max: string;
+  /** '' = not linked. */
+  activityId: string;
+}
+
+export const emptyEvaluationForm = (gradingPeriodId: string): EvaluationFormValues => ({
+  name: '',
+  gradingPeriodId,
+  weight: '',
+  mode: 'NOTE',
+  note: '',
+  earned: '',
+  max: '',
+  activityId: '',
+});
+
+export type FormErrors = Partial<Record<keyof EvaluationFormValues | 'form', string>>;
+
+const trimmed = (s: string) => s.trim();
+
+/**
+ * The scale starts at 0 → points convert by themselves; otherwise the student gives the score too (a conversion on a scale that
+ * does not start at 0 would be a guess, and the server refuses it).
+ */
+export const pointsConvertAlone = (profile: Pick<GradingProfile, 'minMilli'>) =>
+  profile.minMilli === 0;
+
+function checkScore(text: string, profile: GradingProfile): { milli?: number; error?: string } {
+  const milli = scoreToMilli(text);
+  const range = `${formatScore(profile.minMilli, profile.decimals)} y ${formatScore(profile.maxMilli, profile.decimals)}`;
+  if (milli === null) return { error: `Escribe una nota entre ${range}.` };
+  if (milli < profile.minMilli || milli > profile.maxMilli)
+    return { error: `La nota debe estar entre ${range}.` };
+  return { milli };
+}
+
+type Built<T> = { input: T; errors?: undefined } | { input?: undefined; errors: FormErrors };
+
+/**
+ * The request for creating (`create`) or updating an evaluation. Editing sends every field, with `null` where the student
+ * emptied one, so a cleared note or points really clears.
+ */
+export function buildEvaluation(
+  values: EvaluationFormValues,
+  profile: GradingProfile,
+  subjectId: string,
+  mode: 'create',
+): Built<CreateEvaluationInput>;
+export function buildEvaluation(
+  values: EvaluationFormValues,
+  profile: GradingProfile,
+  subjectId: string,
+  mode: 'update',
+  original?: Evaluation,
+): Built<UpdateEvaluationInput>;
+export function buildEvaluation(
+  values: EvaluationFormValues,
+  profile: GradingProfile,
+  subjectId: string,
+  mode: 'create' | 'update',
+  original?: Evaluation,
+): Built<CreateEvaluationInput> | Built<UpdateEvaluationInput> {
+  const errors: FormErrors = {};
+  const name = trimmed(values.name);
+  if (!name) errors.name = 'Escribe el nombre de la evaluación.';
+
+  const bp = percentToBp(values.weight);
+  if (bp === null || bp < 1) errors.weight = 'Escribe un peso entre 0 y 100 %.';
+
+  let scoreMilli: number | null | undefined;
+  let rawEarnedMilli: number | null | undefined;
+  let rawMaxMilli: number | null | undefined;
+  const clearing = mode === 'update' ? null : undefined;
+
+  if (values.mode === 'NOTE') {
+    if (trimmed(values.note) === '') {
+      scoreMilli = clearing;
+    } else {
+      const checked = checkScore(values.note, profile);
+      if (checked.error) errors.note = checked.error;
+      else scoreMilli = checked.milli;
+    }
+    rawEarnedMilli = clearing;
+    rawMaxMilli = clearing;
+  } else {
+    const hasPoints = trimmed(values.earned) !== '' || trimmed(values.max) !== '';
+    if (!hasPoints) {
+      scoreMilli = clearing;
+      rawEarnedMilli = clearing;
+      rawMaxMilli = clearing;
+    } else {
+      const earned = pointsToMilli(values.earned);
+      const max = pointsToMilli(values.max);
+      if (earned === null) errors.earned = 'Escribe los puntos obtenidos.';
+      if (max === null || max <= 0) errors.max = 'Escribe el máximo de puntos (mayor que 0).';
+      if (earned !== null && max !== null && max > 0 && earned > max)
+        errors.earned = 'Lo obtenido no puede superar el máximo.';
+      if (earned !== null && earned > RAW_MILLI_MAX) errors.earned = 'Número demasiado grande.';
+      if (!errors.earned && !errors.max) {
+        rawEarnedMilli = earned;
+        rawMaxMilli = max;
+        if (!pointsConvertAlone(profile)) {
+          // No guessing on a scale that does not start at 0: the student gives the score as well.
+          if (trimmed(values.note) === '')
+            errors.note = 'En esta escala escribe también la nota ya convertida.';
+          else {
+            const checked = checkScore(values.note, profile);
+            if (checked.error) errors.note = checked.error;
+            else scoreMilli = checked.milli;
+          }
+        }
+        // A scale that starts at 0: scoreMilli stays absent and the server converts the points — unless the points were not
+        // touched, in which case the stored score is kept as it is (it may have been given explicitly next to them).
+        else if (
+          original &&
+          original.scoreMilli !== null &&
+          original.rawEarnedMilli === earned &&
+          original.rawMaxMilli === max
+        )
+          scoreMilli = original.scoreMilli;
+      }
+    }
+  }
+
+  if (Object.keys(errors).length > 0) return { errors };
+
+  const base = {
+    name,
+    gradingPeriodId: values.gradingPeriodId,
+    periodShareBp: bp as number,
+    ...(scoreMilli !== undefined && { scoreMilli }),
+    ...(rawEarnedMilli !== undefined && { rawEarnedMilli }),
+    ...(rawMaxMilli !== undefined && { rawMaxMilli }),
+  };
+  if (mode === 'create')
+    return {
+      input: {
+        ...base,
+        subjectId,
+        ...(values.activityId && { activityId: values.activityId }),
+      },
+    };
+  return { input: { ...base, activityId: values.activityId === '' ? null : values.activityId } };
+}
+
+/** The form values of an existing evaluation (points mode when it has them). */
+export function formFromEvaluation(e: Evaluation): EvaluationFormValues {
+  const points = e.rawEarnedMilli !== null && e.rawMaxMilli !== null;
+  return {
+    name: e.name,
+    gradingPeriodId: e.gradingPeriodId,
+    weight: String(e.periodShareBp / 100),
+    mode: points ? 'POINTS' : 'NOTE',
+    // the EXACT figure (never the rounded one for display), so saving again cannot change the stored score
+    note: e.scoreMilli === null ? '' : String(e.scoreMilli / 1000),
+    earned: points ? String(e.rawEarnedMilli! / 1000) : '',
+    max: points ? String(e.rawMaxMilli! / 1000) : '',
+    activityId: e.activityId ?? '',
+  };
+}
+
+/** The quick grade: only the score. */
+export function buildQuickGrade(
+  text: string,
+  profile: GradingProfile,
+): { scoreMilli: number; error?: undefined } | { error: string; scoreMilli?: undefined } {
+  const checked = checkScore(text, profile);
+  return checked.error ? { error: checked.error } : { scoreMilli: checked.milli! };
+}
+
+// ── The scale and the cuts ──────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface ScaleFormValues {
+  min: string;
+  max: string;
+  pass: string;
+  decimals: string;
+}
+
+export const scaleFormFrom = (p: GradingProfile): ScaleFormValues => ({
+  min: String(p.minMilli / 1000),
+  max: String(p.maxMilli / 1000),
+  pass: String(p.passMilli / 1000),
+  decimals: String(p.decimals),
+});
+
+export type ScaleErrors = Partial<Record<keyof ScaleFormValues, string>>;
+
+export function buildScale(v: ScaleFormValues):
+  | {
+      profile: { minMilli: number; maxMilli: number; passMilli: number; decimals: number };
+      errors?: undefined;
+    }
+  | { profile?: undefined; errors: ScaleErrors } {
+  const errors: ScaleErrors = {};
+  const min = scoreToMilli(v.min);
+  const max = scoreToMilli(v.max);
+  const pass = scoreToMilli(v.pass);
+  const decimals = Number(v.decimals);
+  if (min === null) errors.min = 'Escribe la nota mínima.';
+  if (max === null) errors.max = 'Escribe la nota máxima.';
+  if (pass === null) errors.pass = 'Escribe la nota para aprobar.';
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 3)
+    errors.decimals = 'Elige entre 0 y 3 decimales.';
+  if (min !== null && max !== null && pass !== null) {
+    if (max > GRADE_MILLI_MAX) errors.max = 'La nota máxima no puede pasar de 100.';
+    const problems = scaleProblems({ minMilli: min, maxMilli: max, passMilli: pass });
+    if (problems.maxMilli) errors.max = errors.max ?? problems.maxMilli;
+    if (problems.passMilli) errors.pass = problems.passMilli;
+  }
+  if (Object.keys(errors).length > 0) return { errors };
+  return {
+    profile: { minMilli: min!, maxMilli: max!, passMilli: pass!, decimals },
+  };
+}
+
+export interface CutRow {
+  name: string;
+  /** "30" (percent of the final grade). */
+  percent: string;
+}
+
+export const rowsFromDrafts = (cuts: readonly CutDraft[]): CutRow[] =>
+  cuts.map((c) => ({ name: c.name, percent: String(c.finalShareBp / 100) }));
+
+/** Sum of the percentages typed, in basis points (ignoring the rows that are not numbers). */
+export const rowsTotalBp = (rows: readonly CutRow[]) =>
+  rows.reduce((sum, r) => sum + (percentToBp(r.percent) ?? 0), 0);
+
+export function buildCuts(
+  rows: readonly CutRow[],
+): { cuts: CutDraft[]; errors?: undefined } | { cuts?: undefined; errors: string[] } {
+  const errors: string[] = [];
+  if (rows.length === 0) errors.push('Agrega al menos un corte.');
+  const cuts: CutDraft[] = [];
+  rows.forEach((r, i) => {
+    const name = r.name.trim();
+    const bp = percentToBp(r.percent);
+    if (!name) errors.push(`Escribe el nombre del corte ${i + 1}.`);
+    if (bp === null || bp < 1)
+      errors.push(`Escribe un peso entre 0 y 100 % para el corte ${i + 1}.`);
+    if (name && bp !== null && bp >= 1) cuts.push({ name, finalShareBp: bp });
+  });
+  if (errors.length === 0 && rowsTotalBp(rows) > 10_000)
+    errors.push(`Los cortes suman ${formatPercent(rowsTotalBp(rows))}: no pueden pasar de 100 %.`);
+  return errors.length > 0 ? { errors } : { cuts };
+}
+
+/** The server's reason, in words, for the codes this screen can meet. */
+export function gradingErrorText(code: string, message: string): string {
+  if (code === 'GRADING_SCALE_LOCKED')
+    return 'Ya hay notas registradas; la escala mínima y máxima ya no se pueden cambiar.';
+  if (code === 'GRADING_PERIOD_NOT_EMPTY')
+    return 'Este corte todavía tiene evaluaciones. Muévelas o elimínalas primero.';
+  if (code === 'PERIOD_NOT_TRACKED')
+    return 'Las notas necesitan un periodo que pertenezca a un estudio.';
+  return message;
+}
+
+/** The server's per-field reasons (a sum over 100 %, a score out of range…) mapped to the evaluation form's own fields. */
+export function evaluationServerErrors(fields: Record<string, string[]>): FormErrors | null {
+  const out: FormErrors = {};
+  if (fields.periodShareBp) out.weight = fields.periodShareBp[0];
+  if (fields.scoreMilli) out.note = fields.scoreMilli[0];
+  if (fields.gradingPeriodId) out.gradingPeriodId = fields.gradingPeriodId[0];
+  if (fields.activityId) out.activityId = fields.activityId[0];
+  if (fields.name) out.name = fields.name[0];
+  return Object.keys(out).length > 0 ? out : null;
+}

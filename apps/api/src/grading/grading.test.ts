@@ -955,3 +955,126 @@ describe('maintenance guard: the hand-written Evaluation → Activity key', () =
     expect(sql).toContain('ON DELETE SET NULL ("activityId")');
   });
 });
+
+describe('POST /periods/:id/grading/setup (atomic)', () => {
+  const profile = { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 };
+  const cuts = [
+    { name: 'Corte 1', finalShareBp: 3000 },
+    { name: 'Corte 2', finalShareBp: 3000 },
+    { name: 'Corte 3', finalShareBp: 4000 },
+  ];
+
+  it('creates the scale and the cuts together, numbered in order', async () => {
+    const w = await world('a@example.com', { grading: false });
+    const res = await w.agent
+      .post(`/api/periods/${w.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: cuts })
+      .expect(201);
+    expect(res.body.profile).toMatchObject(profile);
+    expect(res.body.gradingPeriods.map((c: { position: number }) => c.position)).toEqual([1, 2, 3]);
+    expect(await prisma.gradingPeriod.count()).toBe(3);
+  });
+
+  it('is all or nothing: a second setup, an untracked period and bad weights leave nothing behind', async () => {
+    const w = await world('a@example.com', { grading: false });
+    const over = await w.agent
+      .post(`/api/periods/${w.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: [...cuts, { name: 'Extra', finalShareBp: 1 }] });
+    expect(over.status).toBe(400);
+    expect(await prisma.gradingProfile.count()).toBe(0);
+    await w.agent
+      .post(`/api/periods/${w.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: cuts })
+      .expect(201);
+    const again = await w.agent
+      .post(`/api/periods/${w.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: cuts });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('GRADING_EXISTS');
+    expect(await prisma.gradingPeriod.count()).toBe(3);
+
+    const u = await world('b@example.com', { tracked: false });
+    const untracked = await u.agent
+      .post(`/api/periods/${u.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: cuts });
+    expect(untracked.status).toBe(409);
+    expect(untracked.body.error.code).toBe('PERIOD_NOT_TRACKED');
+  });
+
+  it('a failure while creating a cut rolls the profile back too', async () => {
+    const w = await world('a@example.com', { grading: false });
+    const original = prisma.$transaction.bind(prisma) as (...a: unknown[]) => Promise<unknown>;
+    vi.spyOn(prisma, '$transaction').mockImplementation(((cb: unknown, opts: unknown) =>
+      original(async (tx: { gradingPeriod: { create: (a: unknown) => Promise<unknown> } }) => {
+        const create = tx.gradingPeriod.create.bind(tx.gradingPeriod);
+        let calls = 0;
+        tx.gradingPeriod.create = async (args) => {
+          if (++calls === 2) throw new Error('boom');
+          return create(args);
+        };
+        return (cb as (t: unknown) => Promise<unknown>)(tx);
+      }, opts)) as never);
+    const res = await w.agent
+      .post(`/api/periods/${w.period.id}/grading/setup`)
+      .send({ profile, gradingPeriods: cuts });
+    vi.restoreAllMocks();
+    expect(res.status).toBe(500);
+    expect(await prisma.gradingProfile.count()).toBe(0);
+    expect(await prisma.gradingPeriod.count()).toBe(0);
+  });
+
+  it.each([
+    ['no cuts', { profile, gradingPeriods: [] }],
+    ['unknown field', { profile, gradingPeriods: cuts, userId: randomUUID() }],
+    [
+      'too many cuts',
+      {
+        profile,
+        gradingPeriods: Array.from({ length: 13 }, (_, i) => ({
+          name: `C${i}`,
+          finalShareBp: 100,
+        })),
+      },
+    ],
+    ['bad scale', { profile: { ...profile, passMilli: 9000 }, gradingPeriods: cuts }],
+  ])('rejects %s', async (_l, body) => {
+    const w = await world('a@example.com', { grading: false });
+    await w.agent.post(`/api/periods/${w.period.id}/grading/setup`).send(body).expect(400);
+    expect(await prisma.gradingProfile.count()).toBe(0);
+  });
+});
+
+describe('the configuration belongs to the period (B2)', () => {
+  it('a second subject of the same period sees the scale and the cuts without configuring anything', async () => {
+    const w = await world();
+    const other = (
+      await w.agent
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
+        .expect(201)
+    ).body.subject;
+    const mine = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    const theirs = (await w.agent.get(`/api/subjects/${other.id}/grades`).expect(200)).body;
+    expect(theirs.profile).toEqual(mine.profile);
+    expect(theirs.gradingPeriods).toEqual(mine.gradingPeriods);
+    expect(theirs.gradingPeriods).toHaveLength(3);
+    expect(theirs.evaluations).toEqual([]);
+    expect(theirs.summary).not.toBeNull();
+  });
+
+  it('a subject of ANOTHER period of the same study does not (each period has its own scale)', async () => {
+    const w = await world();
+    const p2 = (
+      await w.agent
+        .post('/api/periods')
+        .send({ ...periodInput, name: 'Otro', studyTrackId: w.track.id })
+        .expect(201)
+    ).body.period;
+    const s2 = (
+      await w.agent.post('/api/subjects').send({ periodId: p2.id, name: 'Anatomía' }).expect(201)
+    ).body.subject;
+    const res = (await w.agent.get(`/api/subjects/${s2.id}/grades`).expect(200)).body;
+    expect(res.profile).toBeNull();
+    expect(res.gradingPeriods).toEqual([]);
+  });
+});

@@ -231,10 +231,42 @@ export type SubjectGradesResponse = z.infer<typeof subjectGradesResponseSchema>;
 
 /** What the interface calls a `GradingPeriod`, by the type of the study: nothing else may depend on this. */
 export const GRADING_PERIOD_TERMS = {
-  UNIVERSITY: { one: 'Corte', many: 'Cortes' },
-  SCHOOL: { one: 'Periodo de evaluación', many: 'Periodos de evaluación' },
-  OTHER_ACADEMIC: { one: 'Etapa', many: 'Etapas' },
-} as const satisfies Record<EducationContext, { one: string; many: string }>;
+  UNIVERSITY: { one: 'Corte', many: 'Cortes', theMany: 'los cortes' },
+  SCHOOL: {
+    one: 'Periodo de evaluación',
+    many: 'Periodos de evaluación',
+    theMany: 'los periodos de evaluación',
+  },
+  OTHER_ACADEMIC: { one: 'Etapa', many: 'Etapas', theMany: 'las etapas' },
+} as const satisfies Record<EducationContext, { one: string; many: string; theMany: string }>;
 
 /** The weights of one subject, as a percentage for display (units → 0..100). */
 export const unitsToPercent = (units: number) => (units / WEIGHT_UNIT_TOTAL) * 100;
+
+/**
+ * `POST /api/periods/:id/grading/setup`: the scale AND the cuts of a period in ONE request, all or nothing, so a configuration
+ * is never left half done. Same rules as the separate routes (the weights of the cuts add up to at most 100 %); at least one
+ * cut ("Nota final" at 100 % when the period has no cuts).
+ */
+export const GRADING_PERIODS_MAX = 12;
+export const setupGradingSchema = z
+  .strictObject({
+    profile: createGradingProfileSchema,
+    gradingPeriods: z.array(createGradingPeriodSchema).min(1).max(GRADING_PERIODS_MAX),
+  })
+  .superRefine((v, ctx) => {
+    const total = v.gradingPeriods.reduce((sum, c) => sum + c.finalShareBp, 0);
+    if (total > WEIGHT_BP_MAX)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['gradingPeriods'],
+        message: 'Los cortes no pueden sumar más de 100 %.',
+      });
+  });
+export type SetupGradingInput = z.infer<typeof setupGradingSchema>;
+
+export const setupGradingResponseSchema = z.object({
+  profile: gradingProfileSchema,
+  gradingPeriods: z.array(gradingPeriodSchema),
+});
+export type SetupGradingResponse = z.infer<typeof setupGradingResponseSchema>;

@@ -7,6 +7,7 @@ import {
   type CreateEvaluationInput,
   type CreateGradingPeriodInput,
   type CreateGradingProfileInput,
+  type SetupGradingInput,
   type SubjectGradesResponse,
   type UpdateEvaluationInput,
   type UpdateGradingPeriodInput,
@@ -148,6 +149,30 @@ export function createGradingService(deps: {
           await trackedPeriod(tx, userId, periodId);
           if (await repo.findProfile(userId, periodId)) throw alreadyConfigured();
           return toGradingProfileDto(await repo.createProfile(userId, periodId, input));
+        });
+      } catch (err) {
+        if (isPrismaError(err, 'P2002')) throw alreadyConfigured();
+        throw err;
+      }
+    },
+
+    /**
+     * The scale AND the cuts in ONE transaction: a configuration is never left half done. The weights were already checked by the
+     * schema (the period has no cuts yet, since cuts need the scale), so this only adds the usual period and uniqueness rules.
+     */
+    async setupGrading(userId: string, periodId: string, input: SetupGradingInput) {
+      try {
+        return await write(userId, async (tx, repo) => {
+          await trackedPeriod(tx, userId, periodId);
+          if (await repo.findProfile(userId, periodId)) throw alreadyConfigured();
+          const profile = await repo.createProfile(userId, periodId, input.profile);
+          const cuts = [];
+          for (const [i, cut] of input.gradingPeriods.entries())
+            cuts.push(await repo.createCut(userId, periodId, { ...cut, position: i + 1 }));
+          return {
+            profile: toGradingProfileDto(profile),
+            gradingPeriods: cuts.map(toGradingPeriodDto),
+          };
         });
       } catch (err) {
         if (isPrismaError(err, 'P2002')) throw alreadyConfigured();

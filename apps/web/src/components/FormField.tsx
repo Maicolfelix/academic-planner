@@ -9,7 +9,7 @@ interface FormFieldProps {
   multiline?: boolean;
   autoComplete?: string;
   /** The keyboard a phone shows (numbers only, for instance). */
-  inputMode?: 'numeric' | 'text' | 'search';
+  inputMode?: 'numeric' | 'decimal' | 'text' | 'search';
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;

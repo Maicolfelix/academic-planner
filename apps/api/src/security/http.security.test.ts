@@ -58,6 +58,14 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
     `/api/periods/${uuid()}/grading`,
     { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
   ],
+  [
+    'post',
+    `/api/periods/${uuid()}/grading/setup`,
+    {
+      profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
+      gradingPeriods: [{ name: 'Nota final', finalShareBp: 10000 }],
+    },
+  ],
   ['patch', `/api/periods/${uuid()}/grading`, { passMilli: 2500 }],
   ['post', `/api/periods/${uuid()}/grading-periods`, { name: 'C', finalShareBp: 1000 }],
   ['patch', `/api/grading-periods/${uuid()}`, { name: 'C' }],

@@ -2,6 +2,7 @@ import {
   createEvaluationSchema,
   createGradingPeriodSchema,
   createGradingProfileSchema,
+  setupGradingSchema,
   updateEvaluationSchema,
   updateGradingPeriodSchema,
   updateGradingProfileSchema,
@@ -20,6 +21,13 @@ export function createGradingController(service: GradingService) {
       const periodId = parseIdParam(req.params.id, 'Periodo no encontrado.');
       const input = createGradingProfileSchema.parse(req.body ?? {});
       res.status(201).json({ profile: await service.setupProfile(owner(req), periodId, input) });
+    }) satisfies RequestHandler,
+
+    /** The scale and the cuts of a period in one atomic request. */
+    setupAll: (async (req, res) => {
+      const periodId = parseIdParam(req.params.id, 'Periodo no encontrado.');
+      const input = setupGradingSchema.parse(req.body ?? {});
+      res.status(201).json(await service.setupGrading(owner(req), periodId, input));
     }) satisfies RequestHandler,
 
     getPeriod: (async (req, res) => {

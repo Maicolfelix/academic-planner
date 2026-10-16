@@ -1,8 +1,10 @@
 import type { Subject } from '@planner/core';
+import { Link } from 'react-router';
 import { readableInk, withAlpha } from '../../lib/readableInk';
 import { Button } from '../../components/ui/Button';
+import { buttonStyles } from '../../components/ui/buttonStyles';
 import { Card } from '../../components/ui/Card';
-import { PencilIcon, TrashIcon, UserIcon } from '../../components/ui/icons';
+import { BookIcon, PencilIcon, TrashIcon, UserIcon } from '../../components/ui/icons';
 
 /** Up to two letters for a subject's tile: "Bases de Datos" → "BD", "Redes" → "RE" (a face of its own). */
 export function initialsOf(name: string): string {
@@ -74,7 +76,7 @@ export function SubjectCard({
         </p>
       )}
 
-      <div className="relative mt-auto flex items-center gap-1 pt-1">
+      <div className="relative mt-auto flex flex-wrap items-center gap-1 pt-1">
         <Button
           size="sm"
           aria-label={`Editar ${subject.name}`}
@@ -84,6 +86,14 @@ export function SubjectCard({
           <PencilIcon />
           Editar
         </Button>
+        <Link
+          to={`/subjects/${subject.id}/grades`}
+          aria-label={`Notas de ${subject.name}`}
+          className={buttonStyles({ size: 'sm', className: 'gap-1.5' })}
+        >
+          <BookIcon />
+          Notas
+        </Link>
         <Button
           size="sm"
           variant="ghost"
