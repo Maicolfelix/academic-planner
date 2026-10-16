@@ -124,19 +124,52 @@ function checkRaw(
   }
 }
 
-/** The subject, the cut, the link to an activity and the weight come from the client; the owner and the period never do. */
+/**
+ * The subject, the cut, the link to an activity and the weight come from the client; the owner and the period never do.
+ * Two shapes:
+ *  - a DETAILED evaluation: `name` and `periodShareBp` are required;
+ *  - a DIRECT CUT GRADE (`isCutGrade: true`): the student's grade of the whole cut. The name (generated) and the weight (100 % of
+ *    the cut) are the server's, so sending them, or an activity, is refused; a score (or the points) is required.
+ */
 export const createEvaluationSchema = z
   .strictObject({
     subjectId: z.uuid(),
     gradingPeriodId: z.uuid(),
     activityId: z.uuid().nullable().optional(),
-    name: nameSchema,
-    periodShareBp: weightBp,
+    name: nameSchema.optional(),
+    periodShareBp: weightBp.optional(),
+    isCutGrade: z.boolean().optional(),
     scoreMilli: scoreMilli.nullable().optional(),
     rawEarnedMilli: rawField.nullable().optional(),
     rawMaxMilli: rawField.nullable().optional(),
   })
-  .superRefine(checkRaw);
+  .superRefine((v, ctx) => {
+    checkRaw(v, ctx);
+    if (v.isCutGrade) {
+      for (const key of ['name', 'periodShareBp', 'activityId'] as const)
+        if (v[key] !== undefined)
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'No se envía en la nota de un corte.',
+          });
+      if ((v.scoreMilli ?? null) === null && (v.rawEarnedMilli ?? null) === null)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['scoreMilli'],
+          message: 'Escribe la nota del corte.',
+        });
+    } else {
+      if (v.name === undefined)
+        ctx.addIssue({ code: 'custom', path: ['name'], message: 'Ingresa el nombre.' });
+      if (v.periodShareBp === undefined)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['periodShareBp'],
+          message: 'Ingresa un porcentaje.',
+        });
+    }
+  });
 export type CreateEvaluationInput = z.infer<typeof createEvaluationSchema>;
 
 /** The subject never changes (move = delete + create). Sending the raw pair needs both of its halves. */
@@ -191,6 +224,8 @@ export const evaluationSchema = z.object({
   rawEarnedMilli: z.number().nullable(),
   rawMaxMilli: z.number().nullable(),
   scoredAt: z.string().nullable(),
+  /** The student's grade of the whole cut (no breakdown): its name is generated, it weighs 100 % of the cut. */
+  isCutGrade: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -249,6 +284,10 @@ export const subjectGradesResponseSchema = z.object({
   summary: subjectGradeSummarySchema.nullable(),
 });
 export type SubjectGradesResponse = z.infer<typeof subjectGradesResponseSchema>;
+
+/** The generated name of a direct cut grade: internal, never typed by the student ("Nota de Corte 1"). */
+export const cutGradeName = (cutName: string): string =>
+  `Nota de ${cutName}`.slice(0, GRADING_NAME_MAX);
 
 /** What the interface calls a `GradingPeriod`, by the type of the study: nothing else may depend on this. */
 export const GRADING_PERIOD_TERMS = {

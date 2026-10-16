@@ -93,6 +93,7 @@ const evaluation = (n: number, cutId: string, over: Partial<Evaluation> = {}): E
   rawEarnedMilli: null,
   rawMaxMilli: null,
   scoredAt: null,
+  isCutGrade: false,
   createdAt: iso,
   updatedAt: iso,
   ...over,
@@ -230,17 +231,66 @@ describe('the subject grades page', () => {
     expect(out).not.toContain('Configurar notas');
   });
 
-  it('configured and empty: "Sin notas todavía", the pass mark, every cut with its weight and an add action', () => {
+  it('configured and empty: every cut is "Pendiente" with a button to register its grade — no evaluation form to start', () => {
     const out = render({ grades: configured() });
     expect(out).toContain('Sin notas todavía');
-    expect(out).toContain('Aprobatoria: 3.0');
+    expect(out).toContain('Objetivo para aprobar');
     expect(out).toContain('30 % de la nota final');
     expect(out).toContain('40 % de la nota final');
-    expect(out).toContain('Aún no hay evaluaciones aquí.');
-    expect(out).toContain('aria-label="Agregar evaluación a Corte 3"');
+    expect(out).toContain('aria-label="Registrar nota de Corte 3"');
+    expect(out.match(/Pendiente/g)!.length).toBeGreaterThanOrEqual(3);
+    expect(out).not.toContain('Aún no hay evaluaciones');
+    expect(out).not.toContain('Agregar evaluación a'); // breaking a cut down is the secondary path (the menu)
+    expect(out).not.toMatch(/Nombre/); // registering a cut's grade never asks for a name
   });
 
-  it('with evaluations: current grade, neutral status, what is needed and the rows', () => {
+  it('30/30/40 with only the second cut graded 4.5: the accumulated grade, the contribution and no estimate', () => {
+    const [c1, c2, c3] = [cut(1, 3000), cut(2, 3000), cut(3, 4000)];
+    const out = render({
+      grades: configured({
+        gradingPeriods: [c1, c2, c3],
+        evaluations: [
+          evaluation(2, c2.id, {
+            periodShareBp: 10_000,
+            scoreMilli: 4500,
+            isCutGrade: true,
+            name: 'Nota de Corte 2',
+          }),
+        ],
+        summary: summary({
+          complete: true,
+          currentMilli: 4500,
+          evaluatedWeightUnits: 30_000_000,
+          remainingWeightUnits: 70_000_000,
+          undefinedWeightUnits: 0,
+          required: { status: 'NEEDED', requiredMilli: 2358 },
+        }),
+      }),
+    });
+    expect(out).toContain('Resumen de notas');
+    expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>1\.4</); // 1.35 shown with one decimal
+    expect(out).toContain('/ 5.0');
+    expect(out).toContain('Lo que ya llevas acumulado en la nota final.');
+    expect(out).toContain('1 de 3 cortes con nota');
+    expect(out).toContain('Objetivo para aprobar');
+    expect(out).toMatch(/data-testid="current-grade"[^>]*>4\.5</);
+    expect(out).toContain('Promedio de lo registrado');
+    expect(out).toContain('Calificado 30 %');
+    expect(out).toContain('Pendiente 70 %');
+    expect(out).toContain(
+      'Necesitas aproximadamente 2.4 de promedio en el 70 % restante para llegar a 3.0.',
+    );
+    expect(out).toContain('Queda 70 % de la nota final.');
+    expect(out).not.toContain('Estimación'); // the weights ARE defined; only the grades are missing
+    expect(out).not.toContain('faltan pesos');
+    // the card of the graded cut: the grade and what it adds; the others stay pending
+    expect(out).toContain('Aporta a la definitiva: 1.35');
+    expect(out).toContain('aria-label="Editar nota de Corte 2"');
+    expect(out).not.toContain('Lo evaluado hasta ahora'); // no textual verdict in the summary
+    expect(out).not.toContain('lo pendiente cuenta 0'); // not the main explanation of the accumulated grade
+  });
+
+  it('a cut broken down into evaluations keeps the detailed rows, with their name and weight', () => {
     const c1 = cut(1, 3000);
     const out = render({
       grades: configured({
@@ -254,24 +304,20 @@ describe('the subject grades page', () => {
           }),
           evaluation(2, c1.id),
         ],
-        summary: summary(),
+        summary: summary({ complete: true }),
       }),
       activities: [{ id: U(200), title: 'Entrega taller' } as Activity],
     });
-    expect(out).toContain('4.3');
-    expect(out).toContain('Lo evaluado hasta ahora está por encima de la nota mínima.');
-    expect(out).toContain('Necesitas aproximadamente 2.3 en lo que falta.');
-    expect(out).toContain('¿Cuánto necesito?');
     expect(out).toContain('Peso: 50 % del corte');
     expect(out).toContain('18 / 20'); // the points, next to the canonical score
     expect(out).toContain('aria-label="Nota: 4.5"');
     expect(out).toContain('Actividad: Entrega taller');
     expect(out).toContain('Registrar nota de Evaluación 2'); // a pending one can be graded in one tap
-    expect(out).toContain('Pendiente');
+    expect(out).toContain('aria-label="Agregar evaluación a Corte 1"');
     expect(out).not.toContain('Subtotal'); // one evaluation is still pending: no honest subtotal
   });
 
-  it('a cut whose evaluations are all graded and add up to 100 % shows its subtotal', () => {
+  it('a cut whose evaluations are all graded and add up to 100 % shows its subtotal and what it adds', () => {
     const c1 = cut(1, 10_000);
     const out = render({
       grades: configured({
@@ -284,41 +330,26 @@ describe('the subject grades page', () => {
       }),
     });
     expect(out).toContain('Subtotal: 3.5');
-  });
-
-  it('tells the accumulated grade of the subject apart from the average of what was graded', () => {
-    const c1 = cut(1, 3000);
-    const out = render({
-      grades: configured({
-        gradingPeriods: [c1, cut(2, 7000)],
-        evaluations: [evaluation(1, c1.id, { periodShareBp: 10_000, scoreMilli: 4500 })],
-        summary: summary({
-          currentMilli: 4500,
-          evaluatedWeightUnits: 30_000_000,
-          remainingWeightUnits: 70_000_000,
-        }),
-      }),
-    });
-    expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>1.4</); // 4.5 on 30 % = 1.35 → 1.4 accumulated
-    expect(out).toMatch(/data-testid="current-grade"[^>]*>4.5</); // the average of the evaluated part
-    expect(out).toContain('Nota acumulada');
-    expect(out).toContain('Promedio de lo evaluado');
-    expect(out).toContain('lo pendiente cuenta 0 por ahora');
-    expect(out).toContain('Lo evaluado hasta ahora está por encima de la nota mínima.');
-    expect(out).not.toContain('Por ahora estás'); // no sentence that could read as the subject's overall verdict
-    expect(out).toContain('Aprobatoria: 3.0');
+    expect(out).toContain('Aporta a la definitiva: 3.50');
   });
 
   it('nothing graded: neither number pretends to exist', () => {
     const out = render({ grades: configured() });
     expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>Sin notas todavía</);
     expect(out).toMatch(/data-testid="current-grade"[^>]*>Sin notas todavía</);
+    expect(out).toContain('0 de 3 cortes con nota');
   });
 
-  it('incomplete weights are marked as an estimate; complete ones are not', () => {
-    const out = render({ grades: configured({ summary: summary({ complete: false }) }) });
-    expect(out).toContain('Estimación: faltan pesos por definir.');
-    expect(render({ grades: configured({ summary: summary() }) })).not.toContain('Estimación');
+  it('only a cut described to less than 100 % is an estimate, and it names the cut', () => {
+    const c1 = cut(1, 10_000, 'Corte único');
+    const out = render({
+      grades: configured({
+        gradingPeriods: [c1],
+        evaluations: [evaluation(1, c1.id, { periodShareBp: 7000, scoreMilli: 4000 })],
+        summary: summary({ complete: false }),
+      }),
+    });
+    expect(out).toContain('Estimación: falta definir parte del peso de Corte único.');
   });
 
   it('secured and impossible, in the words the student reads', () => {
@@ -332,9 +363,6 @@ describe('the subject grades page', () => {
         }),
       }),
     ).toContain('Con el peso restante no alcanza para llegar a la nota objetivo.');
-    expect(
-      render({ grades: configured({ summary: summary({ currentPasses: false }) }) }),
-    ).toContain('Lo evaluado hasta ahora está por debajo de la nota mínima.');
   });
 
   it('an archived study is still readable, and says so', () => {

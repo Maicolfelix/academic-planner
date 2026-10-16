@@ -395,6 +395,8 @@ model Evaluation {
   rawEarnedMilli  Int?
   rawMaxMilli     Int?
   scoredAt        DateTime?      @db.Timestamptz(3)
+  // The student's grade of a whole cut for this subject, with no breakdown (always 100 % of the cut, always scored, no activity).
+  isCutGrade      Boolean        @default(false)
   createdAt       DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -407,6 +409,7 @@ model Evaluation {
   //  - CHECK (periodShareBp between 1 and 10000; scoreMilli between 0 and 100000; name has 1..80 characters and is trimmed)
   //  - CHECK (the raw pair is both-or-none, needs a score, rawMaxMilli > 0 and rawEarnedMilli between 0 and rawMaxMilli)
   //  - CHECK (scoredAt is set exactly while scoreMilli is)
+  //  - CHECK (isCutGrade implies periodShareBp = 10000, no activity and a score) and a partial unique index (subjectId, gradingPeriodId) WHERE isCutGrade
 
   @@index([userId, periodId])
   @@index([subjectId])

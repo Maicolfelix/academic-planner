@@ -226,6 +226,7 @@ export const toEvaluationDto = (e: EvaluationRow): Evaluation => ({
   rawEarnedMilli: e.rawEarnedMilli,
   rawMaxMilli: e.rawMaxMilli,
   scoredAt: e.scoredAt?.toISOString() ?? null,
+  isCutGrade: e.isCutGrade,
   createdAt: e.createdAt.toISOString(),
   updatedAt: e.updatedAt.toISOString(),
 });

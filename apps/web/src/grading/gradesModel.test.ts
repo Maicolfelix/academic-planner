@@ -22,7 +22,11 @@ import {
   requiredView,
   rowsFromDrafts,
   scoreText,
-  statusText,
+  estimateText,
+  contributionText,
+  cutGradeMilli,
+  cutsWithGrade,
+  buildCutGrade,
   type EvaluationFormValues,
 } from './gradesModel';
 
@@ -66,6 +70,7 @@ const ev = (
   rawEarnedMilli: null,
   rawMaxMilli: null,
   scoredAt: null,
+  isCutGrade: false,
   createdAt: iso,
   updatedAt: iso,
   ...over,
@@ -272,43 +277,156 @@ describe('the scale and the cuts', () => {
 });
 
 describe('what the summary says', () => {
-  it('current grade and neutral status', () => {
+  it('current grade (the average of what is registered), or the words when nothing is', () => {
     expect(currentText(summary(), 1)).toBe('3.5');
     expect(currentText(summary({ currentMilli: null, currentPasses: null }), 1)).toBe(
       'Sin notas todavía',
     );
-    expect(statusText(summary())).toBe(
-      'Lo evaluado hasta ahora está por encima de la nota mínima.',
-    );
-    expect(statusText(summary({ currentPasses: false }))).toBe(
-      'Lo evaluado hasta ahora está por debajo de la nota mínima.',
-    );
-    expect(statusText(summary({ currentPasses: null }))).toBeNull();
-    expect(statusText(summary({ currentPasses: false }))).not.toMatch(/mal|perdiendo|riesgo/i);
   });
 
-  it('the accumulated grade is not the average of the evaluated part', () => {
+  it('the accumulated grade is not the average of what is registered', () => {
     const cuts = [cut(1, 3000), cut(2, 7000)];
     const evaluations = [ev(1, cuts[0]!.id, 10_000, 4500)]; // 4.5 on a cut worth 30 % of the final grade
     expect(accumulatedText(cuts, evaluations, 1)).toBe('1.4'); // 1.35 accumulated (half up), over the whole final grade
     expect(currentText(summary({ currentMilli: 4500 }), 1)).toBe('4.5'); // the average of what was graded
     expect(accumulatedText(cuts, [ev(1, cuts[0]!.id, 10_000, null)], 1)).toBe('Sin notas todavía');
-    expect(statusText(summary())).not.toMatch(/materia|general/i); // it speaks only about what was evaluated
   });
 
-  it('NEEDED / SECURED / IMPOSSIBLE and the estimate flag', () => {
-    expect(requiredView(summary(), 1)).toMatchObject({
+  it('NEEDED / SECURED / IMPOSSIBLE: the average the rest needs, over what remains, to reach the pass mark', () => {
+    // 30/30/40 with only the second cut graded 4.5: (3.0 − 1.35) / 0.70 = 2.357… → 2.4 (rounded UP), over the 70 % that remains
+    const example = summary({
+      required: { status: 'NEEDED', requiredMilli: 2358 },
+      remainingWeightUnits: 70_000_000,
+    });
+    expect(requiredView(example, 1, 3000)).toMatchObject({
       kind: 'NEEDED',
       estimate: false,
-      text: 'Necesitas aproximadamente 2.3 en lo que falta.',
+      text: 'Necesitas aproximadamente 2.4 de promedio en el 70 % restante para llegar a 3.0.',
     });
-    expect(requiredView(summary({ required: { status: 'SECURED' } }), 1).text).toBe(
+    expect(requiredView(summary({ required: { status: 'SECURED' } }), 1, 3000).text).toBe(
       'Con lo ya registrado, el objetivo está asegurado aunque el resto quede en el mínimo de la escala.',
     );
-    expect(requiredView(summary({ required: { status: 'IMPOSSIBLE' } }), 1).text).toBe(
+    expect(requiredView(summary({ required: { status: 'IMPOSSIBLE' } }), 1, 3000).text).toBe(
       'Con el peso restante no alcanza para llegar a la nota objetivo.',
     );
-    expect(requiredView(summary({ complete: false }), 1).estimate).toBe(true);
+    expect(requiredView(summary({ complete: false }), 1, 3000).estimate).toBe(true);
+  });
+});
+
+describe('an empty cut is not undefined weight', () => {
+  const cuts = [cut(1, 3000), cut(2, 3000), cut(3, 4000)];
+  const direct = (n: number, score: number) =>
+    ev(n, cuts[n - 1]!.id, 10_000, score, { isCutGrade: true, name: `Nota de Corte ${n}` });
+
+  it('30/30/40 with only the second cut graded: no estimate warning', () => {
+    const groups = groupByCut(cuts, [direct(2, 4500)]);
+    expect(estimateText({ complete: true }, groups, 'cortes')).toBeNull();
+  });
+
+  it('a cut described to less than 100 % names itself; cuts that do not add up say so', () => {
+    const partial = groupByCut(cuts, [ev(1, cuts[1]!.id, 7000, 4000)]);
+    expect(estimateText({ complete: false }, partial, 'cortes')).toBe(
+      'Estimación: falta definir parte del peso de Corte 2.',
+    );
+    const short = groupByCut([cut(1, 3000), cut(2, 3000)], []);
+    expect(estimateText({ complete: false }, short, 'cortes')).toBe(
+      'Estimación: los cortes suman 60 %, falta definir el resto.',
+    );
+    expect(estimateText({ complete: false }, groupByCut(cuts, []), 'cortes')).toBe(
+      'Estimación: faltan pesos por definir.',
+    );
+  });
+
+  it('the grade of a cut, what it adds to the final grade and how many cuts have one', () => {
+    const groups = groupByCut(cuts, [direct(2, 4500)]);
+    expect(groups[1]!.direct?.scoreMilli).toBe(4500);
+    expect(groups[1]!.detailed).toEqual([]);
+    expect(cutGradeMilli(groups[1]!)).toBe(4500);
+    expect(cutGradeMilli(groups[0]!)).toBeNull();
+    expect(contributionText(groups[1]!, 1)).toBe('1.35'); // 4.5 × 30 %: one more digit than the scale, not the average of the cut
+    expect(contributionText(groups[0]!, 1)).toBeNull();
+    expect(cutsWithGrade(groups)).toBe(1);
+  });
+
+  it('a broken-down cut has a grade only when its subtotal is clear', () => {
+    const groups = groupByCut(cuts, [
+      ev(1, cuts[0]!.id, 5000, 4000),
+      ev(2, cuts[0]!.id, 5000, 3000),
+    ]);
+    expect(cutGradeMilli(groups[0]!)).toBe(3500);
+    expect(groups[0]!.direct).toBeNull();
+    expect(groups[0]!.detailed).toHaveLength(2);
+  });
+});
+
+describe('the grade of a whole cut (no name, no weight, no cut selector)', () => {
+  const CUT = U(11);
+  it('a note: only the subject, the cut and the grade', () => {
+    const built = buildCutGrade(
+      { mode: 'NOTE', note: '4,5', earned: '', max: '' },
+      profile(),
+      SUBJECT,
+      CUT,
+    );
+    expect(built.create).toEqual({
+      subjectId: SUBJECT,
+      gradingPeriodId: CUT,
+      isCutGrade: true,
+      scoreMilli: 4500,
+    });
+    expect(built.create).not.toHaveProperty('name');
+    expect(built.create).not.toHaveProperty('periodShareBp');
+    expect(built.update).toEqual({ scoreMilli: 4500 });
+  });
+  it('the grade is required, and inside the scale', () => {
+    expect(
+      buildCutGrade({ mode: 'NOTE', note: '', earned: '', max: '' }, profile(), SUBJECT, CUT).errors
+        ?.note,
+    ).toBe('Escribe la nota del corte.');
+    expect(
+      buildCutGrade({ mode: 'NOTE', note: '9', earned: '', max: '' }, profile(), SUBJECT, CUT)
+        .errors?.note,
+    ).toMatch(/entre 0.0 y 5.0/);
+  });
+  it('18 of 20 on a scale that starts at 0 sends only the points (the server converts)', () => {
+    const built = buildCutGrade(
+      { mode: 'POINTS', note: '', earned: '18', max: '20' },
+      profile(),
+      SUBJECT,
+      CUT,
+    );
+    expect(built.create).toMatchObject({ rawEarnedMilli: 18_000, rawMaxMilli: 20_000 });
+    expect(built.create).not.toHaveProperty('scoreMilli');
+  });
+  it('on a scale that does not start at 0 the points need the grade too — nothing is guessed', () => {
+    const p = profile({ minMilli: 1000, maxMilli: 7000, passMilli: 4000 });
+    expect(
+      buildCutGrade({ mode: 'POINTS', note: '', earned: '18', max: '20' }, p, SUBJECT, CUT).errors
+        ?.note,
+    ).toMatch(/nota ya convertida/);
+  });
+  it('editing with the points untouched keeps the stored grade; changing them lets the server recompute', () => {
+    const original = ev(1, CUT, 10_000, 4333, {
+      isCutGrade: true,
+      rawEarnedMilli: 17_500,
+      rawMaxMilli: 20_000,
+    });
+    const same = buildCutGrade(
+      { mode: 'POINTS', note: '', earned: '17.5', max: '20' },
+      profile(),
+      SUBJECT,
+      CUT,
+      original,
+    );
+    expect(same.update).toMatchObject({ scoreMilli: 4333 });
+    const changed = buildCutGrade(
+      { mode: 'POINTS', note: '', earned: '19', max: '20' },
+      profile(),
+      SUBJECT,
+      CUT,
+      original,
+    );
+    expect(changed.update).not.toHaveProperty('scoreMilli');
   });
 });
 

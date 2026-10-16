@@ -1,5 +1,6 @@
 import {
   GRADING_PERIOD_TERMS,
+  accumulatedMilli,
   defaultCutName,
   formatPercent,
   formatScore,
@@ -21,21 +22,24 @@ import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
-import { AlertIcon, CheckIcon, PencilIcon, SlidersIcon, TrashIcon } from '../components/ui/icons';
+import { AlertIcon, PencilIcon, SlidersIcon, TrashIcon } from '../components/ui/icons';
 import {
-  ESTIMATE_TEXT,
   accumulatedText,
+  contributionText,
   currentText,
+  cutGradeMilli,
   cutSubtotal,
+  cutsWithGrade,
+  estimateText,
   groupByCut,
   rawText,
   requiredView,
   scoreText,
-  statusText,
   type CutGroup,
 } from '../grading/gradesModel';
 import { useSubject, useSubjectGrades } from '../grading/useGrading';
 import { ConfirmRemoveDialog, CutDialog, ScaleEditDialog } from './grades/ConfigDialogs';
+import { BreakdownDialog, CutGradeDialog } from './grades/CutGradeDialogs';
 import { EvaluationDialog, QuickGradeDialog } from './grades/EvaluationDialogs';
 import { SetupDialog } from './grades/SetupDialog';
 
@@ -43,6 +47,8 @@ type Dialog =
   | { kind: 'setup' }
   | { kind: 'scale' }
   | { kind: 'cut'; cut?: GradingPeriod }
+  | { kind: 'cut-grade'; cut: GradingPeriod; evaluation?: Evaluation }
+  | { kind: 'breakdown'; cut: GradingPeriod; direct: Evaluation }
   | { kind: 'evaluation'; evaluation?: Evaluation; cutId: string }
   | { kind: 'quick'; evaluation: Evaluation }
   | { kind: 'remove-evaluation'; evaluation: Evaluation }
@@ -252,40 +258,48 @@ function TrackedGradesView({
             Resumen de notas
           </h2>
           <div>
-            <p className="text-sm font-medium">Nota acumulada</p>
-            <p className="text-3xl font-semibold break-words" data-testid="accumulated-grade">
-              {accumulatedText(grades.gradingPeriods, grades.evaluations, profile.decimals)}
+            <h3 className="text-sm font-medium">Nota acumulada</h3>
+            <p className="flex flex-wrap items-baseline gap-x-2 text-3xl font-semibold">
+              <span data-testid="accumulated-grade" className="break-words">
+                {accumulatedText(grades.gradingPeriods, grades.evaluations, profile.decimals)}
+              </span>
+              {accumulatedMilli(grades.gradingPeriods, grades.evaluations) !== null && (
+                <span className="text-lg font-normal text-muted-foreground">
+                  / {formatScore(profile.maxMilli, profile.decimals)}
+                </span>
+              )}
             </p>
             <p className="text-sm text-muted-foreground">
-              Lo que llevas en la materia: suma lo que cada evaluación ya aporta a la nota final (lo
-              pendiente cuenta 0 por ahora). Aprobatoria:{' '}
-              {formatScore(profile.passMilli, profile.decimals)}
+              Lo que ya llevas acumulado en la nota final.
+            </p>
+            <p className="text-sm" data-testid="cuts-with-grade">
+              {cutsWithGrade(groups)} de {groups.length}{' '}
+              {(groups.length === 1 ? terms.one : terms.many).toLowerCase()} con nota
             </p>
           </div>
+          <p className="text-sm">
+            Objetivo para aprobar:{' '}
+            <strong>{formatScore(profile.passMilli, profile.decimals)}</strong>
+          </p>
+          <p className="text-sm text-muted-foreground" data-testid="weights-line">
+            Calificado {formatUnitsPercent(summary.evaluatedWeightUnits)} · Pendiente{' '}
+            {formatUnitsPercent(summary.remainingWeightUnits)} de la nota final
+          </p>
           <div>
-            <p className="text-sm font-medium">Promedio de lo evaluado</p>
+            <h3 className="text-sm font-medium">Promedio de lo registrado</h3>
             <p className="text-xl font-semibold break-words" data-testid="current-grade">
               {currentText(summary, profile.decimals)}
             </p>
             <p className="text-sm text-muted-foreground">
-              Solo de las evaluaciones con nota, sin contar lo pendiente.
+              Promedio de los {terms.many.toLowerCase()} o evaluaciones que ya tienen nota.
             </p>
           </div>
-          {statusText(summary) && (
-            <p className="flex items-start gap-2">
-              {summary.currentPasses ? (
-                <CheckIcon className="mt-0.5 size-4 shrink-0" />
-              ) : (
-                <AlertIcon className="mt-0.5 size-4 shrink-0" />
-              )}
-              <span>{statusText(summary)}</span>
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            Calificado: {formatUnitsPercent(summary.evaluatedWeightUnits)} de la nota final ·
-            Pendiente: {formatUnitsPercent(summary.remainingWeightUnits)}
-          </p>
-          <RequiredBlock summary={summary} decimals={profile.decimals} />
+          <RequiredBlock
+            summary={summary}
+            decimals={profile.decimals}
+            passMilli={profile.passMilli}
+            estimate={estimateText(summary, groups, terms.many.toLowerCase())}
+          />
         </Card>
       )}
 
@@ -298,6 +312,18 @@ function TrackedGradesView({
             termOne={terms.one}
             activityTitle={activityTitle}
             onAdd={() => setDialog({ kind: 'evaluation', cutId: group.cut.id })}
+            onRegisterGrade={() => setDialog({ kind: 'cut-grade', cut: group.cut })}
+            onEditGrade={() =>
+              setDialog({ kind: 'cut-grade', cut: group.cut, evaluation: group.direct! })
+            }
+            onRemoveGrade={() =>
+              setDialog({ kind: 'remove-evaluation', evaluation: group.direct! })
+            }
+            onBreakdown={() =>
+              group.direct
+                ? setDialog({ kind: 'breakdown', cut: group.cut, direct: group.direct })
+                : setDialog({ kind: 'evaluation', cutId: group.cut.id })
+            }
             onEditCut={() => setDialog({ kind: 'cut', cut: group.cut })}
             onRemoveCut={() => setDialog({ kind: 'remove-cut', cut: group.cut })}
             onQuick={(evaluation) => setDialog({ kind: 'quick', evaluation })}
@@ -362,6 +388,25 @@ function TrackedGradesView({
           }
         />
       )}
+      {dialog?.kind === 'cut-grade' && profile && (
+        <CutGradeDialog
+          subjectId={subject.id}
+          cut={dialog.cut}
+          profile={profile}
+          evaluation={dialog.evaluation}
+          onClose={close}
+          onDone={() => done('Nota guardada.')}
+        />
+      )}
+      {dialog?.kind === 'breakdown' && (
+        <BreakdownDialog
+          subjectId={subject.id}
+          cut={dialog.cut}
+          direct={dialog.direct}
+          onClose={close}
+          onDone={() => setDialog({ kind: 'evaluation', cutId: dialog.cut.id })}
+        />
+      )}
       {dialog?.kind === 'quick' && profile && (
         <QuickGradeDialog
           subjectId={subject.id}
@@ -400,11 +445,16 @@ function TrackedGradesView({
 function RequiredBlock({
   summary,
   decimals,
+  passMilli,
+  estimate,
 }: {
   summary: NonNullable<SubjectGradesResponse['summary']>;
   decimals: number;
+  passMilli: number;
+  /** Why the figures are an estimate (specific words), or null when they are not. */
+  estimate: string | null;
 }) {
-  const view = requiredView(summary, decimals);
+  const view = requiredView(summary, decimals, passMilli);
   return (
     <section
       aria-labelledby="grade-required"
@@ -416,25 +466,36 @@ function RequiredBlock({
       <p className="mt-1" data-testid="required-text">
         {view.text}
       </p>
-      {view.estimate && (
+      <p className="text-sm text-muted-foreground" data-testid="remaining-line">
+        Queda {formatUnitsPercent(summary.remainingWeightUnits)} de la nota final.
+      </p>
+      {estimate && (
         <p
           className="mt-1 flex items-start gap-2 text-sm text-warning-ink"
           data-testid="estimate-note"
         >
           <AlertIcon className="mt-0.5 size-4 shrink-0" />
-          <span>{ESTIMATE_TEXT}</span>
+          <span>{estimate}</span>
         </p>
       )}
     </section>
   );
 }
 
+/**
+ * One cut of the subject: subject → cut → grade. By default it is just the grade of the cut ("Nota 4.5", what it adds to the
+ * final grade, one button to register or edit it). Breaking the cut down into evaluations is the secondary, optional path.
+ */
 function CutSection({
   group,
   decimals,
   termOne,
   activityTitle,
   onAdd,
+  onRegisterGrade,
+  onEditGrade,
+  onRemoveGrade,
+  onBreakdown,
   onEditCut,
   onRemoveCut,
   onQuick,
@@ -446,15 +507,51 @@ function CutSection({
   termOne: string;
   activityTitle: (id: string | null) => string | undefined;
   onAdd: () => void;
+  onRegisterGrade: () => void;
+  onEditGrade: () => void;
+  onRemoveGrade: () => void;
+  onBreakdown: () => void;
   onEditCut: () => void;
   onRemoveCut: () => void;
   onQuick: (e: Evaluation) => void;
   onEdit: (e: Evaluation) => void;
   onRemove: (e: Evaluation) => void;
 }) {
-  const { cut, evaluations } = group;
-  const subtotal = cutSubtotal(group, decimals);
+  const { cut, detailed, direct } = group;
+  const breakdown = detailed.length > 0;
+  const gradeMilli = cutGradeMilli(group);
+  const grade = gradeMilli === null ? null : formatScore(gradeMilli, decimals);
+  const contribution = contributionText(group, decimals);
   const headingId = `cut-${cut.id}`;
+
+  const cutItems = [
+    { label: `Editar ${termOne.toLowerCase()}`, icon: <PencilIcon />, onSelect: onEditCut },
+    {
+      label: `Eliminar ${termOne.toLowerCase()}`,
+      ariaLabel: `Eliminar ${cut.name}`,
+      icon: <TrashIcon />,
+      danger: true,
+      onSelect: onRemoveCut,
+    },
+  ];
+  const items = breakdown
+    ? cutItems
+    : [
+        { label: 'Desglosar evaluaciones', onSelect: onBreakdown },
+        ...(direct
+          ? [
+              {
+                label: 'Quitar nota',
+                ariaLabel: `Quitar la nota de ${cut.name}`,
+                icon: <TrashIcon />,
+                danger: true,
+                onSelect: onRemoveGrade,
+              },
+            ]
+          : []),
+        ...cutItems,
+      ];
+
   return (
     <Card as="section" aria-labelledby={headingId} className="flex flex-col gap-3 p-4">
       <header className="flex items-start justify-between gap-2">
@@ -464,47 +561,64 @@ function CutSection({
           </h2>
           <p className="text-sm text-muted-foreground">
             {formatPercent(cut.finalShareBp)} de la nota final
-            {subtotal !== null && ` · Subtotal: ${subtotal}`}
           </p>
         </div>
-        <ActionMenu
-          label={`Más acciones: ${cut.name}`}
-          items={[
-            { label: `Editar ${termOne.toLowerCase()}`, icon: <PencilIcon />, onSelect: onEditCut },
-            {
-              label: `Eliminar ${termOne.toLowerCase()}`,
-              ariaLabel: `Eliminar ${cut.name}`,
-              icon: <TrashIcon />,
-              danger: true,
-              onSelect: onRemoveCut,
-            },
-          ]}
-        />
+        <ActionMenu label={`Más acciones: ${cut.name}`} items={items} />
       </header>
 
-      {evaluations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aún no hay evaluaciones aquí.</p>
-      ) : (
-        <ul className="flex flex-col divide-y divide-border">
-          {evaluations.map((e) => (
-            <EvaluationRow
-              key={e.id}
-              evaluation={e}
-              decimals={decimals}
-              activity={activityTitle(e.activityId)}
-              onQuick={() => onQuick(e)}
-              onEdit={() => onEdit(e)}
-              onRemove={() => onRemove(e)}
-            />
-          ))}
-        </ul>
+      {!breakdown && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Nota</p>
+            <p className="text-2xl font-semibold" data-testid={`cut-grade-${cut.id}`}>
+              {grade ?? 'Pendiente'}
+            </p>
+            {contribution !== null && (
+              <p className="text-sm text-muted-foreground">
+                Aporta a la definitiva: {contribution}
+              </p>
+            )}
+          </div>
+          <Button
+            variant={grade === null ? 'primary' : 'secondary'}
+            onClick={grade === null ? onRegisterGrade : onEditGrade}
+            aria-label={
+              grade === null ? `Registrar nota de ${cut.name}` : `Editar nota de ${cut.name}`
+            }
+          >
+            {grade === null ? 'Registrar nota' : 'Editar nota'}
+          </Button>
+        </div>
       )}
 
-      <div>
-        <Button size="sm" onClick={onAdd} aria-label={`Agregar evaluación a ${cut.name}`}>
-          Agregar evaluación
-        </Button>
-      </div>
+      {breakdown && (
+        <>
+          {grade !== null && (
+            <p className="text-sm text-muted-foreground">
+              Subtotal: {cutSubtotal(group, decimals)}
+              {contribution !== null && ` · Aporta a la definitiva: ${contribution}`}
+            </p>
+          )}
+          <ul className="flex flex-col divide-y divide-border">
+            {detailed.map((e) => (
+              <EvaluationRow
+                key={e.id}
+                evaluation={e}
+                decimals={decimals}
+                activity={activityTitle(e.activityId)}
+                onQuick={() => onQuick(e)}
+                onEdit={() => onEdit(e)}
+                onRemove={() => onRemove(e)}
+              />
+            ))}
+          </ul>
+          <div>
+            <Button size="sm" onClick={onAdd} aria-label={`Agregar evaluación a ${cut.name}`}>
+              Agregar evaluación
+            </Button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

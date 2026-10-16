@@ -3,6 +3,7 @@ import {
   WEIGHT_UNIT_TOTAL,
   accumulatedMilli,
   ceilMilli,
+  cutContributionMilli,
   projectedFinalMilli,
   rawToScoreMilli,
   requiredScore,
@@ -68,9 +69,32 @@ describe('summarizeSubjectGrade', () => {
       { gradingPeriodId: 'c3', periodShareBp: 10_000, scoreMilli: null },
     ];
     const s = summarizeSubjectGrade(scale05, cuts, items);
+    // c1 is only half described (15 % of the 30 % cut is defined); c2 has NO evaluations (fully defined, pending); c3 is 100 %.
     expect(s.complete).toBe(false);
-    expect(s.definedWeightUnits).toBe(0.15 * WEIGHT_UNIT_TOTAL + 0.4 * WEIGHT_UNIT_TOTAL);
-    expect(s.undefinedWeightUnits).toBe(0.45 * WEIGHT_UNIT_TOTAL);
+    expect(s.definedWeightUnits).toBe(
+      0.15 * WEIGHT_UNIT_TOTAL + 0.3 * WEIGHT_UNIT_TOTAL + 0.4 * WEIGHT_UNIT_TOTAL,
+    );
+    expect(s.undefinedWeightUnits).toBe(0.15 * WEIGHT_UNIT_TOTAL);
+  });
+
+  it('cuts without evaluations are NOT undefined weight: 30/30/40 with nothing detailed is fully defined', () => {
+    const s = summarizeSubjectGrade(scale05, cuts, []);
+    expect(s.complete).toBe(true);
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.remainingWeightUnits).toBe(WEIGHT_UNIT_TOTAL);
+  });
+
+  it('cuts whose own weights do not add up to 100 % are not fully defined (the cuts, not the evaluations)', () => {
+    const s = summarizeSubjectGrade(
+      scale05,
+      [
+        { id: 'c1', finalShareBp: 3000 },
+        { id: 'c2', finalShareBp: 3000 },
+      ],
+      [],
+    );
+    expect(s.complete).toBe(false);
+    expect(s.undefinedWeightUnits).toBe(0.4 * WEIGHT_UNIT_TOTAL);
   });
 
   it('an evaluation of an unknown cut weighs nothing', () => {
@@ -178,7 +202,35 @@ describe('requiredScore', () => {
     ];
     // 4.0 · 30 % = 120; need 300; remaining 70 % → 180/70 = 2.5714… → 2572
     expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'NEEDED', requiredMilli: 2572 });
-    expect(summarizeSubjectGrade(scale05, cuts, items).complete).toBe(false);
+    // c2 and c3 have no evaluations: their weight is defined (just pending). Only a cut described to less than 100 % is an estimate.
+    expect(summarizeSubjectGrade(scale05, cuts, items).complete).toBe(true);
+    const partial: WeightedScore[] = [
+      { gradingPeriodId: 'c1', periodShareBp: 7000, scoreMilli: 4000 },
+    ];
+    expect(summarizeSubjectGrade(scale05, cuts, partial).complete).toBe(false); // 30 % of the cut has no description
+  });
+
+  it('EXAMPLE: 30/30/40 with only the second cut graded 4.5 as a direct cut grade', () => {
+    const items: WeightedScore[] = [
+      { gradingPeriodId: 'c2', periodShareBp: 10_000, scoreMilli: 4500 },
+    ];
+    const s = summarizeSubjectGrade(scale05, cuts, items);
+    expect(accumulatedMilli(cuts, items)).toBe(1350); // exactly 1.35
+    expect(s.complete).toBe(true); // NOT an estimate: the weights are defined, the grades are missing
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.evaluatedWeightUnits).toBe(0.3 * WEIGHT_UNIT_TOTAL);
+    expect(s.remainingWeightUnits).toBe(0.7 * WEIGHT_UNIT_TOTAL);
+    expect(s.currentMilli).toBe(4500); // the average of what is registered
+    expect(roundMilli(accumulatedMilli(cuts, items)!, 1)).toBe(1400); // shown 1.4 with one decimal
+    // (3.0 − 1.35) / 0.70 = 2.357142… → needed 2358 milli, shown 2.4 (rounded UP), never 2.8
+    expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'NEEDED', requiredMilli: 2358 });
+    expect(ceilMilli(2358, 1)).toBe(2400);
+  });
+
+  it('the contribution of a graded cut to the final grade (4.5 on 30 % → 1.35), not its average', () => {
+    expect(cutContributionMilli(3000, 4500)).toBe(1350);
+    expect(cutContributionMilli(4000, 3000)).toBe(1200);
+    expect(cutContributionMilli(10_000, 3700)).toBe(3700);
   });
 
   it('a custom target works the same way', () => {

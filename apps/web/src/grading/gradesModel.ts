@@ -1,6 +1,8 @@
 import {
   GRADE_MILLI_MAX,
   accumulatedMilli,
+  cutContributionMilli,
+  formatUnitsPercent,
   RAW_MILLI_MAX,
   formatNeeded,
   formatPercent,
@@ -31,17 +33,6 @@ import {
 export const currentText = (s: SubjectGradeSummaryDto, decimals: number) =>
   s.currentMilli === null ? 'Sin notas todavía' : formatScore(s.currentMilli, decimals);
 
-/**
- * Neutral, never an order or a judgement. It speaks ONLY about what was graded so far (the average of the evaluated part), never
- * about the subject as a whole. Null while nothing is graded.
- */
-export function statusText(s: SubjectGradeSummaryDto): string | null {
-  if (s.currentPasses === null) return null;
-  return s.currentPasses
-    ? 'Lo evaluado hasta ahora está por encima de la nota mínima.'
-    : 'Lo evaluado hasta ahora está por debajo de la nota mínima.';
-}
-
 /** The accumulated grade ("lo que llevas en la materia"), or the words when nothing is graded yet. */
 export function accumulatedText(
   cuts: readonly GradingPeriod[],
@@ -55,14 +46,38 @@ export function accumulatedText(
 export interface RequiredView {
   kind: 'SECURED' | 'IMPOSSIBLE' | 'NEEDED';
   text: string;
-  /** The weights do not add up to 100 %: every figure is an estimate and the screen says so, always. */
+  /** The split of the final grade is not fully defined: every figure is an estimate and the screen says so, always. */
   estimate: boolean;
 }
 
 export const ESTIMATE_TEXT = 'Estimación: faltan pesos por definir.';
 
+/**
+ * Why the figures are an estimate, in specific words — or null when they are not. A cut WITHOUT evaluations is not "undefined
+ * weight" (its weight is defined, just pending); only a cut described to less than 100 % is, or cuts that do not add up to 100 %.
+ */
+export function estimateText(
+  summary: Pick<SubjectGradeSummaryDto, 'complete'>,
+  groups: readonly CutGroup[],
+  termManyLower: string,
+): string | null {
+  if (summary.complete) return null;
+  const partial = groups.filter((g) => g.evaluations.length > 0 && !g.weightsComplete);
+  const cutsBp = groups.reduce((sum, g) => sum + g.cut.finalShareBp, 0);
+  const reasons: string[] = [];
+  if (partial.length > 0)
+    reasons.push(`falta definir parte del peso de ${partial.map((g) => g.cut.name).join(', ')}`);
+  if (cutsBp < 10_000)
+    reasons.push(`los ${termManyLower} suman ${formatPercent(cutsBp)}, falta definir el resto`);
+  return reasons.length > 0 ? `Estimación: ${reasons.join('; ')}.` : ESTIMATE_TEXT;
+}
+
 /** The "¿Cuánto necesito?" block, for the pass mark as the target. */
-export function requiredView(s: SubjectGradeSummaryDto, decimals: number): RequiredView {
+export function requiredView(
+  s: SubjectGradeSummaryDto,
+  decimals: number,
+  passMilli: number,
+): RequiredView {
   const estimate = !s.complete;
   switch (s.required.status) {
     case 'SECURED':
@@ -81,7 +96,7 @@ export function requiredView(s: SubjectGradeSummaryDto, decimals: number): Requi
       return {
         kind: 'NEEDED',
         estimate,
-        text: `Necesitas aproximadamente ${formatNeeded(s.required.requiredMilli, decimals)} en lo que falta.`,
+        text: `Necesitas aproximadamente ${formatNeeded(s.required.requiredMilli, decimals)} de promedio en el ${formatUnitsPercent(s.remainingWeightUnits)} restante para llegar a ${formatScore(passMilli, decimals)}.`,
       };
   }
 }
@@ -91,6 +106,10 @@ export function requiredView(s: SubjectGradeSummaryDto, decimals: number): Requi
 export interface CutGroup {
   cut: GradingPeriod;
   evaluations: Evaluation[];
+  /** The student's grade of the WHOLE cut (no breakdown), if there is one. */
+  direct: Evaluation | null;
+  /** The cut broken down into evaluations (empty when it is a direct grade or has nothing yet). */
+  detailed: Evaluation[];
   /** The evaluations of this cut add up to 100 % (otherwise there is no honest subtotal). */
   weightsComplete: boolean;
 }
@@ -104,6 +123,8 @@ export function groupByCut(
     return {
       cut,
       evaluations: own,
+      direct: own.find((e) => e.isCutGrade) ?? null,
+      detailed: own.filter((e) => !e.isCutGrade),
       weightsComplete: own.reduce((sum, e) => sum + e.periodShareBp, 0) === 10_000,
     };
   });
@@ -113,14 +134,127 @@ export function groupByCut(
  * The subtotal of a cut, ONLY when it can be said clearly: the weights of its evaluations add up to 100 % and every one is
  * graded. It is computed on the screen, never stored, and rounded for display.
  */
-export function cutSubtotal(group: CutGroup, decimals: number): string | null {
+export function cutSubtotalMilli(group: CutGroup): number | null {
   if (!group.weightsComplete || group.evaluations.length === 0) return null;
   let weighted = 0;
   for (const e of group.evaluations) {
     if (e.scoreMilli === null) return null;
     weighted += e.scoreMilli * e.periodShareBp;
   }
-  return formatScore(Math.round(weighted / 10_000), decimals);
+  return Math.round(weighted / 10_000);
+}
+
+export function cutSubtotal(group: CutGroup, decimals: number): string | null {
+  const milli = cutSubtotalMilli(group);
+  return milli === null ? null : formatScore(milli, decimals);
+}
+
+/** The grade of a cut, when it has one: the direct grade, or the clear subtotal of its breakdown. Null while pending. */
+export const cutGradeMilli = (group: CutGroup): number | null =>
+  group.direct?.scoreMilli ?? cutSubtotalMilli(group);
+
+/** How many cuts have a grade ("1 de 3 cortes con nota"). */
+export const cutsWithGrade = (groups: readonly CutGroup[]) =>
+  groups.filter((g) => cutGradeMilli(g) !== null).length;
+
+/** What the cut adds to the final grade ("Aporta a la definitiva: 1.35"): one more digit than the scale, never stored. */
+export function contributionText(group: CutGroup, decimals: number): string | null {
+  const grade = cutGradeMilli(group);
+  return grade === null
+    ? null
+    : formatScore(cutContributionMilli(group.cut.finalShareBp, grade), Math.min(decimals + 1, 3));
+}
+
+// ── The direct grade of a cut ───────────────────────────────────────────────────────────────────────────────────────────
+
+export interface CutGradeFormValues {
+  mode: ScoreMode;
+  note: string;
+  earned: string;
+  max: string;
+}
+
+export const emptyCutGradeForm = (): CutGradeFormValues => ({
+  mode: 'NOTE',
+  note: '',
+  earned: '',
+  max: '',
+});
+
+export function cutGradeFormFrom(e: Evaluation): CutGradeFormValues {
+  const points = e.rawEarnedMilli !== null && e.rawMaxMilli !== null;
+  return {
+    mode: points ? 'POINTS' : 'NOTE',
+    note: e.scoreMilli === null ? '' : String(e.scoreMilli / 1000),
+    earned: points ? String(e.rawEarnedMilli! / 1000) : '',
+    max: points ? String(e.rawMaxMilli! / 1000) : '',
+  };
+}
+
+/**
+ * The request for the grade of a whole cut. No name, no weight, no cut selector: the cut and the subject come from the screen. On a
+ * scale that starts at 0 the points convert by themselves (unless they were not touched when editing); on another scale the grade
+ * is asked too (never guessed).
+ */
+export function buildCutGrade(
+  values: CutGradeFormValues,
+  profile: GradingProfile,
+  subjectId: string,
+  gradingPeriodId: string,
+  original?: Evaluation,
+):
+  | { create: CreateEvaluationInput; update: UpdateEvaluationInput; errors?: undefined }
+  | { create?: undefined; update?: undefined; errors: FormErrors } {
+  const errors: FormErrors = {};
+  let scoreMilli: number | undefined;
+  let rawEarnedMilli: number | null | undefined;
+  let rawMaxMilli: number | null | undefined;
+  const needsNote = values.mode === 'NOTE' || !pointsConvertAlone(profile);
+  if (values.mode === 'POINTS') {
+    const earned = pointsToMilli(values.earned);
+    const max = pointsToMilli(values.max);
+    if (earned === null) errors.earned = 'Escribe los puntos obtenidos.';
+    if (max === null || max <= 0) errors.max = 'Escribe el máximo de puntos (mayor que 0).';
+    if (earned !== null && max !== null && max > 0 && earned > max)
+      errors.earned = 'Lo obtenido no puede superar el máximo.';
+    if (earned !== null && earned > RAW_MILLI_MAX) errors.earned = 'Número demasiado grande.';
+    if (!errors.earned && !errors.max) {
+      rawEarnedMilli = earned;
+      rawMaxMilli = max;
+      if (
+        pointsConvertAlone(profile) &&
+        original?.scoreMilli != null &&
+        original.rawEarnedMilli === earned &&
+        original.rawMaxMilli === max
+      )
+        scoreMilli = original.scoreMilli;
+    }
+  } else {
+    rawEarnedMilli = original ? null : undefined;
+    rawMaxMilli = original ? null : undefined;
+  }
+  if (needsNote && !(values.mode === 'POINTS' && (errors.earned || errors.max))) {
+    if (values.note.trim() === '')
+      errors.note =
+        values.mode === 'NOTE'
+          ? 'Escribe la nota del corte.'
+          : 'En esta escala escribe también la nota ya convertida.';
+    else {
+      const checked = checkScore(values.note, profile);
+      if (checked.error) errors.note = checked.error;
+      else scoreMilli = checked.milli;
+    }
+  }
+  if (Object.keys(errors).length > 0) return { errors };
+  const score = scoreMilli === undefined ? {} : { scoreMilli };
+  const raw =
+    rawEarnedMilli === undefined
+      ? {}
+      : { rawEarnedMilli, rawMaxMilli: rawMaxMilli as number | null };
+  return {
+    create: { subjectId, gradingPeriodId, isCutGrade: true, ...score, ...raw },
+    update: { ...score, ...raw },
+  };
 }
 
 /** "4.2" for a graded evaluation; null while pending. */

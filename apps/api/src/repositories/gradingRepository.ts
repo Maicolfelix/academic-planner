@@ -12,6 +12,8 @@ export interface EvaluationData {
   gradingPeriodId: string;
   activityId: string | null;
   name: string;
+  /** The student's grade of the whole cut (no breakdown). */
+  isCutGrade?: boolean;
   periodShareBp: number;
   scoreMilli: number | null;
   rawEarnedMilli: number | null;
@@ -104,6 +106,14 @@ export function createGradingRepository(db: Db) {
         db.gradingPeriod.count({ where: { userId, periodId } }),
       ]);
       return profiles > 0 || cuts > 0;
+    },
+    /** How many evaluations this subject has in this cut, and whether one of them is the direct grade of the whole cut. */
+    async cutUsage(userId: string, subjectId: string, gradingPeriodId: string) {
+      const [total, direct] = await Promise.all([
+        db.evaluation.count({ where: { userId, subjectId, gradingPeriodId } }),
+        db.evaluation.count({ where: { userId, subjectId, gradingPeriodId, isCutGrade: true } }),
+      ]);
+      return { total, direct: direct > 0 };
     },
     countEvaluationsOfSubject: (userId: string, subjectId: string) =>
       db.evaluation.count({ where: { userId, subjectId } }),

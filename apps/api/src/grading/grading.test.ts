@@ -1121,3 +1121,157 @@ describe('GET /subjects/:id/grades carries the period and the study (derived by 
     expect(text).not.toContain(w.user.id);
   });
 });
+
+describe('the direct grade of a cut (subject → cut → grade)', () => {
+  const direct = (w: Awaited<ReturnType<typeof world>>, cut: number, extra: object = {}) =>
+    w.agent.post('/api/evaluations').send({
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[cut]!.id,
+      isCutGrade: true,
+      ...extra,
+    });
+
+  it('needs no name and no weight: the server names it and gives it 100 % of the cut', async () => {
+    const w = await world();
+    const res = await direct(w, 1, { scoreMilli: 4500 }).expect(201);
+    expect(res.body.evaluation).toMatchObject({
+      name: 'Nota de Corte 2',
+      periodShareBp: 10_000,
+      scoreMilli: 4500,
+      isCutGrade: true,
+      activityId: null,
+    });
+    expect((await prisma.evaluation.findFirstOrThrow()).isCutGrade).toBe(true);
+  });
+
+  it('EXAMPLE: 30/30/40 with only the second cut at 4.5 is NOT an estimate', async () => {
+    const w = await world();
+    await direct(w, 1, { scoreMilli: 4500 }).expect(201);
+    const { summary } = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200))
+      .body;
+    expect(summary).toMatchObject({
+      complete: true,
+      undefinedWeightUnits: 0,
+      evaluatedWeightUnits: 30_000_000,
+      remainingWeightUnits: 70_000_000,
+      currentMilli: 4500,
+      required: { status: 'NEEDED', requiredMilli: 2358 },
+    });
+  });
+
+  it('accepts points on a scale that starts at 0 (the server converts), and requires a grade', async () => {
+    const w = await world();
+    const res = await direct(w, 0, { rawEarnedMilli: 18_000, rawMaxMilli: 20_000 }).expect(201);
+    expect(res.body.evaluation).toMatchObject({ scoreMilli: 4500, rawEarnedMilli: 18_000 });
+    for (const body of [{}, { scoreMilli: null }]) {
+      const none = await direct(w, 1, body);
+      expect(none.status).toBe(400);
+    }
+    expect((await direct(w, 2, { scoreMilli: 5001 })).status).toBe(400);
+  });
+
+  it.each([
+    ['name', 'Parcial'],
+    ['periodShareBp', 5000],
+  ])('refuses to be sent %s (it is the server’s)', async (key, value) => {
+    const w = await world();
+    const res = await direct(w, 0, { scoreMilli: 4000, [key as string]: value });
+    expect(res.status).toBe(400);
+    expect(await prisma.evaluation.count()).toBe(0);
+  });
+
+  it('a cut is either a direct grade or broken down, never both (and only one direct grade)', async () => {
+    const w = await world();
+    await direct(w, 0, { scoreMilli: 4000 }).expect(201);
+    const second = await direct(w, 0, { scoreMilli: 3000 });
+    expect(second.status).toBe(409);
+    expect(second.body.error.code).toBe('CUT_GRADE_EXISTS');
+    const detailed = await evaluation(w.agent, {
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[0]!.id,
+      name: 'Parcial',
+      periodShareBp: 5000,
+    });
+    expect(detailed.status).toBe(409);
+    expect(detailed.body.error.code).toBe('CUT_HAS_DIRECT_GRADE');
+    await evaluation(w.agent, {
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[1]!.id,
+      name: 'Parcial',
+      periodShareBp: 5000,
+    }).expect(201);
+    const over = await direct(w, 1, { scoreMilli: 3000 });
+    expect(over.status).toBe(409);
+    expect(over.body.error.code).toBe('CUT_HAS_EVALUATIONS');
+    // moving a detailed evaluation into a cut that has a direct grade is refused too
+    const moving = (await prisma.evaluation.findFirstOrThrow({ where: { isCutGrade: false } })).id;
+    const move = await w.agent
+      .patch(`/api/evaluations/${moving}`)
+      .send({ gradingPeriodId: w.cuts[0]!.id });
+    expect(move.status).toBe(409);
+  });
+
+  it('only its grade changes; it cannot be emptied (it is removed instead); other subjects are independent', async () => {
+    const w = await world();
+    const other = (
+      await w.agent
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
+        .expect(201)
+    ).body.subject;
+    const ev = (await direct(w, 0, { scoreMilli: 4000 }).expect(201)).body.evaluation;
+    const edit = await w.agent
+      .patch(`/api/evaluations/${ev.id}`)
+      .send({ scoreMilli: 3500 })
+      .expect(200);
+    expect(edit.body.evaluation.scoreMilli).toBe(3500);
+    for (const body of [
+      { name: 'x' },
+      { periodShareBp: 5000 },
+      { gradingPeriodId: w.cuts[1]!.id },
+      { scoreMilli: null },
+    ]) {
+      expect(
+        (await w.agent.patch(`/api/evaluations/${ev.id}`).send(body)).status,
+        JSON.stringify(body),
+      ).toBe(400);
+    }
+    await w.agent
+      .post('/api/evaluations')
+      .send({
+        subjectId: other.id,
+        gradingPeriodId: w.cuts[0]!.id,
+        isCutGrade: true,
+        scoreMilli: 2000,
+      })
+      .expect(201);
+    await w.agent.delete(`/api/evaluations/${ev.id}`).expect(204);
+    await direct(w, 0, { scoreMilli: 4800 }).expect(201); // the cut is free again
+  });
+
+  it('the database keeps the marker honest: 100 % of the cut, scored, no activity, one per subject and cut', async () => {
+    const w = await world();
+    const base = {
+      userId: w.user.id,
+      periodId: w.period.id,
+      subjectId: w.subject.id,
+      gradingPeriodId: w.cuts[0]!.id,
+      name: 'Nota de Corte 1',
+      isCutGrade: true,
+      scoreMilli: 4000,
+      scoredAt: new Date(),
+    };
+    await expect(
+      prisma.evaluation.create({ data: { ...base, periodShareBp: 5000 } }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.evaluation.create({
+        data: { ...base, periodShareBp: 10_000, scoreMilli: null, scoredAt: null },
+      }),
+    ).rejects.toThrow();
+    await prisma.evaluation.create({ data: { ...base, periodShareBp: 10_000 } });
+    await expect(
+      prisma.evaluation.create({ data: { ...base, periodShareBp: 10_000 } }),
+    ).rejects.toThrow();
+  });
+});

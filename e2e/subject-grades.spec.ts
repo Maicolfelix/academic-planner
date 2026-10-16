@@ -60,7 +60,12 @@ async function addEvaluation(
   cut: string,
   v: { name: string; weight: string; note?: string; points?: [string, string] },
 ) {
-  await page.getByRole('button', { name: `Agregar evaluación a ${cut}` }).click();
+  const add = page.getByRole('button', { name: `Agregar evaluación a ${cut}` });
+  if (await add.count()) await add.click();
+  else {
+    await page.getByRole('button', { name: `Más acciones: ${cut}` }).click();
+    await page.getByRole('menuitem', { name: 'Desglosar evaluaciones' }).click();
+  }
   const dialog = page.getByRole('dialog', { name: 'Agregar evaluación' });
   await dialog.getByLabel('Nombre').fill(v.name);
   await dialog.getByLabel(/^Peso dentro de/).fill(v.weight);
@@ -107,7 +112,7 @@ test('A · university: the first configuration, an evaluation, the current grade
   // Configured, nothing graded.
   await expect(page.getByText('Notas configuradas.')).toBeVisible();
   await expect(page.getByTestId('current-grade')).toHaveText('Sin notas todavía');
-  await expect(page.getByText('Aprobatoria: 3.0')).toBeVisible();
+  await expect(page.getByText(/Objetivo para aprobar: 3[.]0/)).toBeVisible();
   await expect(page.getByRole('heading', { level: 2, name: 'Corte 1' })).toBeVisible();
   await expect(page.getByText('30 % de la nota final')).toHaveCount(2);
   await expect(page.getByText('40 % de la nota final')).toBeVisible();
@@ -126,15 +131,11 @@ test('A · university: the first configuration, an evaluation, the current grade
   // Corte 1 is complete: 3.5·60 % + 4.5·40 % = 3.9 → 30 % of the final grade, so the current grade is 3.9.
   await expect(page.getByTestId('current-grade')).toHaveText('3.9');
   await expect(page.getByText('Subtotal: 3.9')).toBeVisible();
-  await expect(
-    page.getByText('Lo evaluado hasta ahora está por encima de la nota mínima.'),
-  ).toBeVisible();
+  await expect(page.getByText(/Lo evaluado hasta ahora/)).toHaveCount(0); // no textual verdict in the summary
   // The accumulated grade of the subject is another figure: 3.9 on 30 % of the final grade = 1.17 → 1.2.
   await expect(page.getByTestId('accumulated-grade')).toHaveText('1.2');
-  // Weights still missing (cuts 2 and 3 have no evaluations): the figures are an estimate, and it says so.
-  await expect(page.getByTestId('estimate-note')).toHaveText(
-    'Estimación: faltan pesos por definir.',
-  );
+  // Cuts 2 and 3 have no evaluations: their weight is DEFINED (just pending), so this is not an estimate.
+  await expect(page.getByTestId('estimate-note')).toHaveCount(0);
   await expect(page.getByTestId('required-text')).toContainText('Necesitas aproximadamente');
 
   // More than 100 % is an inline error on the weight field, and the dialog stays open.
@@ -154,6 +155,10 @@ test('A · university: the first configuration, an evaluation, the current grade
   await edit.getByLabel('Corte', { exact: true }).selectOption({ label: 'Corte 2' });
   await save(edit, 'Guardar cambios');
   await expect(page.getByRole('region', { name: 'Corte 2' }).getByText('Taller 1')).toBeVisible();
+  // Corte 1 is now described to 60 % only: THAT is an undefined weight, and it names the cut.
+  await expect(page.getByTestId('estimate-note')).toContainText(
+    'falta definir parte del peso de Corte 1',
+  );
 
   // Delete asks first and keeps everything else.
   await page.getByRole('button', { name: 'Más acciones: Taller 1' }).click();
@@ -194,7 +199,7 @@ test('B · school: periodos de evaluación, 1–5 and four periods of 25 %', asy
     page.getByRole('heading', { level: 2, name: 'Periodo de evaluación 4' }),
   ).toBeVisible();
   await expect(page.getByText('25 % de la nota final')).toHaveCount(4);
-  await expect(page.getByText('Aprobatoria: 3.0')).toBeVisible();
+  await expect(page.getByText(/Objetivo para aprobar: 3[.]0/)).toBeVisible();
   check();
 });
 
@@ -217,7 +222,9 @@ test('C · diplomado: etapas, 1–7, a single "Nota final" and no guessed conver
   await expect(cuts.getByRole('radio', { name: 'Sin cortes (una sola nota final)' })).toBeChecked();
   await cuts.getByRole('button', { name: 'Guardar' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'Nota final' })).toBeVisible();
-  await expect(page.getByText('100 % de la nota final')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Nota final' }).getByText('100 % de la nota final'),
+  ).toBeVisible();
 
   // A direct note on the scale of the period.
   await save(
@@ -268,16 +275,40 @@ test('D · the scale and the cuts are the period’s: a second subject does not 
   await expect(page.getByRole('heading', { level: 1, name: 'Notas de Anatomía' })).toBeVisible();
   await expect(page.getByText('Configura cómo califican esta materia')).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 2, name: 'Corte 3' })).toBeVisible();
-  await expect(page.getByText('Aprobatoria: 3.0')).toBeVisible();
+  await expect(page.getByText(/Objetivo para aprobar: 3[.]0/)).toBeVisible();
   check();
 });
 
-test('E · 18 of 20 on a 0–5 scale becomes 4.5, and the points stay next to it', async ({
+test('E · 18 of 20 on a 0–5 scale becomes 4.5 as the grade of a cut, with no name asked', async ({
   page,
 }) => {
   const check = watch(page);
   const { subjects } = await account(page, 'UNIVERSITY');
   await page.goto(gradesUrl(subjects[0]!.id));
+  await configureDefault(page);
+
+  await page.getByRole('button', { name: 'Registrar nota de Corte 1' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nota de Corte 1' });
+  await expect(dialog.getByLabel('Nombre')).toHaveCount(0);
+  await dialog.getByRole('radio', { name: 'Puntos' }).check();
+  await dialog.getByLabel('Obtenidos').fill('18');
+  await dialog.getByLabel('De', { exact: true }).fill('20');
+  await expect(dialog.getByText('La nota se calcula a partir de los puntos')).toBeVisible();
+  await save(dialog, 'Guardar');
+  await expect(page.getByTestId(/^cut-grade-/).first()).toHaveText('4.5');
+  await expect(page.getByTestId('current-grade')).toHaveText('4.5');
+
+  // Changing only the points recomputes the grade (never keeps the old one).
+  await page.getByRole('button', { name: 'Editar nota de Corte 1' }).click();
+  const edit = page.getByRole('dialog', { name: 'Nota de Corte 1' });
+  await edit.getByLabel('Obtenidos').fill('10');
+  await save(edit, 'Guardar');
+  await expect(page.getByTestId(/^cut-grade-/).first()).toHaveText('2.5');
+  check();
+});
+
+/** The default configuration: 0.0–5.0 with 30/30/40. */
+async function configureDefault(page: Page) {
   await page.getByRole('button', { name: 'Configurar notas' }).click();
   await page
     .getByRole('dialog', { name: 'Configurar notas · Escala' })
@@ -288,28 +319,7 @@ test('E · 18 of 20 on a 0–5 scale becomes 4.5, and the points stay next to it
     .getByRole('button', { name: 'Guardar' })
     .click();
   await expect(page.getByText('Notas configuradas.')).toBeVisible();
-
-  const dialog = await addEvaluation(page, 'Corte 1', {
-    name: 'Quiz',
-    weight: '100',
-    points: ['18', '20'],
-  });
-  await expect(dialog.getByText('La nota se calcula a partir de los puntos')).toBeVisible();
-  await save(dialog);
-  await expect(page.getByLabel('Nota: 4.5')).toBeVisible();
-  await expect(page.getByText('18 / 20')).toBeVisible();
-  await expect(page.getByTestId('current-grade')).toHaveText('4.5');
-
-  // Changing only the points recomputes the score (never keeps the old one).
-  await page.getByRole('button', { name: 'Más acciones: Quiz' }).click();
-  await page.getByRole('menuitem', { name: 'Editar' }).click();
-  const edit = page.getByRole('dialog', { name: 'Editar evaluación' });
-  await edit.getByLabel('Obtenidos').fill('10');
-  await save(edit, 'Guardar cambios');
-  await expect(page.getByLabel('Nota: 2.5')).toBeVisible();
-  await expect(page.getByText('10 / 20')).toBeVisible();
-  check();
-});
+}
 
 test('F · 320 and 360 px: long names wrap and nothing scrolls sideways', async ({ page }) => {
   const check = watch(page);
@@ -395,5 +405,53 @@ test('I · the study type comes with the grades: slow studies/periods lists neve
   const cuts = page.getByRole('dialog', { name: 'Configurar notas · Periodos de evaluación' });
   await expect(cuts.getByRole('radio', { name: '25 % / 25 % / 25 % / 25 %' })).toBeChecked();
   await expect(cuts.getByRole('radio', { name: '30 % / 30 % / 40 %' })).toHaveCount(0);
+  check();
+});
+
+test('J · materia → corte → nota: only the second cut graded 4.5, no name asked, nothing to estimate', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Farmacología']);
+  await page.goto(gradesUrl(subjects[0]!.id));
+  await configureDefault(page);
+
+  // Every cut starts as "Pendiente" with one button: no evaluation form to begin with.
+  await expect(page.getByText('Aún no hay evaluaciones')).toHaveCount(0);
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('Sin notas todavía');
+
+  await page.getByRole('button', { name: 'Registrar nota de Corte 2' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nota de Corte 2' });
+  await expect(dialog.getByLabel('Nombre')).toHaveCount(0); // the cut and the subject already say what it is
+  await expect(dialog.getByLabel(/^Peso/)).toHaveCount(0);
+  await axe(page, 'grades · cut grade dialog');
+  await dialog.getByRole('textbox', { name: 'Nota' }).fill('4.5');
+  await save(dialog, 'Guardar');
+
+  const card = page.getByRole('region', { name: 'Corte 2' });
+  await expect(card.getByTestId(/^cut-grade-/)).toHaveText('4.5');
+  await expect(card.getByText('Aporta a la definitiva: 1.35')).toBeVisible();
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('1.4');
+  await expect(page.getByTestId('current-grade')).toHaveText('4.5');
+  await expect(page.getByTestId('cuts-with-grade')).toHaveText('1 de 3 cortes con nota');
+  await expect(page.getByTestId('weights-line')).toContainText('Calificado 30 %');
+  await expect(page.getByTestId('weights-line')).toContainText('Pendiente 70 %');
+  await expect(page.getByTestId('required-text')).toHaveText(
+    'Necesitas aproximadamente 2.4 de promedio en el 70 % restante para llegar a 3.0.',
+  );
+  await expect(page.getByTestId('remaining-line')).toHaveText('Queda 70 % de la nota final.');
+  await expect(page.getByTestId('estimate-note')).toHaveCount(0);
+  await expect(page.getByText(/faltan pesos por definir/)).toHaveCount(0);
+
+  // Breaking a cut that has a grade down asks first (the direct grade goes away); the breakdown is the secondary path.
+  await page.getByRole('button', { name: 'Más acciones: Corte 2' }).click();
+  await page.getByRole('menuitem', { name: 'Desglosar evaluaciones' }).click();
+  const ask = page.getByRole('dialog', { name: 'Desglosar Corte 2' });
+  await expect(ask.getByText('Este corte tiene una nota directa.')).toBeVisible();
+  await ask.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(card.getByTestId(/^cut-grade-/)).toHaveText('4.5');
+
+  await expectNoHorizontalOverflow(page);
+  await axe(page, 'grades · direct cut grades');
   check();
 });

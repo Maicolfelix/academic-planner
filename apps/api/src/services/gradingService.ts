@@ -1,5 +1,6 @@
 import {
   WEIGHT_BP_MAX,
+  cutGradeName,
   rawToScoreMilli,
   requiredScore,
   scaleProblems,
@@ -64,6 +65,25 @@ const scaleLocked = () =>
   );
 const cutNotEmpty = () =>
   new AppError(409, 'GRADING_PERIOD_NOT_EMPTY', 'Este corte todavía tiene evaluaciones.');
+
+const cutHasDirectGrade = () =>
+  new AppError(
+    409,
+    'CUT_HAS_DIRECT_GRADE',
+    'Este corte tiene una nota directa. Quítala si quieres desglosarlo en evaluaciones.',
+  );
+const cutHasEvaluations = () =>
+  new AppError(
+    409,
+    'CUT_HAS_EVALUATIONS',
+    'Este corte ya está desglosado en evaluaciones. Registra las notas en cada una.',
+  );
+const cutGradeExists = () =>
+  new AppError(
+    409,
+    'CUT_GRADE_EXISTS',
+    'Este corte ya tiene una nota. Edítala en lugar de crear otra.',
+  );
 
 const weightExceeded = (field: string, what: string) =>
   validationError({ [field]: [`${what} no pueden sumar más de 100 %.`] });
@@ -274,13 +294,20 @@ export function createGradingService(deps: {
           if (cut.periodId !== subject.periodId)
             throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
 
-          const activityId = input.activityId ?? null;
+          // A DIRECT CUT GRADE is the grade of the whole cut; a cut is either that or broken down, never both.
+          const isCutGrade = input.isCutGrade === true;
+          const usage = await repo.cutUsage(userId, subject.id, cut.id);
+          if (isCutGrade) {
+            if (usage.direct) throw cutGradeExists();
+            if (usage.total > 0) throw cutHasEvaluations();
+          } else if (usage.direct) throw cutHasDirectGrade();
+          const name = isCutGrade ? cutGradeName(cut.name) : (input.name as string);
+          const share = isCutGrade ? 10_000 : (input.periodShareBp as number);
+
+          const activityId = isCutGrade ? null : (input.activityId ?? null);
           if (activityId !== null) await checkActivity(tx, userId, activityId, subject.id);
 
-          if (
-            (await repo.sumEvaluationShares(userId, subject.id, cut.id)) + input.periodShareBp >
-            WEIGHT_BP_MAX
-          )
+          if ((await repo.sumEvaluationShares(userId, subject.id, cut.id)) + share > WEIGHT_BP_MAX)
             throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
 
           const score = resolveScore(
@@ -290,15 +317,16 @@ export function createGradingService(deps: {
             null,
           );
           const hasRaw = typeof input.rawEarnedMilli === 'number';
-          if (hasRaw && score === null)
+          if ((hasRaw || isCutGrade) && score === null)
             throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
           return toEvaluationDto(
             await repo.createEvaluation(userId, subject.periodId, {
               subjectId: subject.id,
               gradingPeriodId: cut.id,
               activityId,
-              name: input.name,
-              periodShareBp: input.periodShareBp,
+              name,
+              isCutGrade,
+              periodShareBp: share,
               scoreMilli: score,
               rawEarnedMilli: hasRaw ? (input.rawEarnedMilli as number) : null,
               rawMaxMilli: hasRaw ? (input.rawMaxMilli as number) : null,
@@ -328,12 +356,31 @@ export function createGradingService(deps: {
         const profile = await repo.findProfile(userId, current.periodId);
         if (!profile) throw notConfigured();
 
+        // The grade of a whole cut only changes its score (its name, weight, cut and activity are not the student's to set).
+        if (current.isCutGrade) {
+          const fixed = (
+            ['name', 'periodShareBp', 'gradingPeriodId', 'activityId'] as const
+          ).filter((k) => input[k] !== undefined);
+          if (fixed.length > 0)
+            throw validationError(
+              Object.fromEntries(
+                fixed.map((k) => [k, ['La nota de un corte solo cambia su nota.']]),
+              ),
+            );
+          if (input.scoreMilli === null)
+            throw validationError({
+              scoreMilli: ['Escribe la nota o quita la nota del corte.'],
+            });
+        }
+
         let cutId = current.gradingPeriodId;
         if (input.gradingPeriodId !== undefined && input.gradingPeriodId !== cutId) {
           const cut = await repo.findCut(userId, input.gradingPeriodId);
           if (!cut) throw cutNotFound();
           if (cut.periodId !== current.periodId)
             throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
+          if ((await repo.cutUsage(userId, current.subjectId, cut.id)).direct)
+            throw cutHasDirectGrade();
           cutId = cut.id;
         }
         const share = input.periodShareBp ?? current.periodShareBp;
