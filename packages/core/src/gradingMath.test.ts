@@ -332,3 +332,40 @@ describe('grading schemas', () => {
     expect(updateEvaluationSchema.safeParse({}).success).toBe(false);
   });
 });
+
+describe('each subject has its own cuts (D36 revised)', () => {
+  const grade = (shares: number[], scores: number[]) => {
+    const subjectCuts: CutWeight[] = shares.map((finalShareBp, i) => ({
+      id: `s${i}`,
+      finalShareBp,
+    }));
+    const items: WeightedScore[] = scores.map((scoreMilli, i) => ({
+      gradingPeriodId: `s${i}`,
+      periodShareBp: 10_000,
+      scoreMilli,
+    }));
+    return {
+      cuts: subjectCuts,
+      items,
+      accumulated: accumulatedMilli(subjectCuts, items),
+      summary: summarizeSubjectGrade(scale05, subjectCuts, items),
+    };
+  };
+
+  it('the same grades give different results with different distributions, each exact', () => {
+    expect(grade([3000, 3000, 4000], [3200, 4500, 4000]).accumulated).toBe(3910); // 30/30/40 → 3.91 → 3.9
+    const b = grade([2500, 3500, 4000], [3200, 4500, 4000]);
+    expect(b.accumulated).toBe(3975); // 0.8 + 1.575 + 1.6 = 3.975
+    expect(roundMilli(3975, 1)).toBe(4000); // shown 4.0 with one decimal
+    expect(b.summary.complete).toBe(true);
+    expect(grade([5000, 5000], [3000, 4000]).accumulated).toBe(3500); // 50/50
+  });
+
+  it('a single grade of 100 % is a normal case: 4.3 accumulates 4.3, nothing pending, nothing to ask', () => {
+    const c = grade([10_000], [4300]);
+    expect(c.accumulated).toBe(4300);
+    expect(c.summary.remainingWeightUnits).toBe(0);
+    expect(c.summary.complete).toBe(true);
+    expect(requiredScore(scale05, c.cuts, c.items)).toEqual({ status: 'SECURED' });
+  });
+});

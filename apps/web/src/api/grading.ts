@@ -2,7 +2,7 @@ import {
   evaluationResponseSchema,
   gradingPeriodResponseSchema,
   gradingProfileResponseSchema,
-  setupGradingResponseSchema,
+  setupSubjectGradingResponseSchema,
   subjectGradesResponseSchema,
   subjectResponseSchema,
   type CreateEvaluationInput,
@@ -10,8 +10,8 @@ import {
   type Evaluation,
   type GradingPeriod,
   type GradingProfile,
-  type SetupGradingInput,
-  type SetupGradingResponse,
+  type SetupSubjectGradingInput,
+  type SetupSubjectGradingResponse,
   type Subject,
   type SubjectGradesResponse,
   type UpdateEvaluationInput,
@@ -28,15 +28,18 @@ export async function fetchSubject(id: string): Promise<Subject> {
 export const fetchSubjectGrades = (id: string): Promise<SubjectGradesResponse> =>
   apiFetch(`/api/subjects/${id}/grades`, { schema: subjectGradesResponseSchema });
 
-/** The scale and the cuts of a period in ONE request: all or nothing. */
-export const setupGradingRequest = (
-  periodId: string,
-  input: SetupGradingInput,
-): Promise<SetupGradingResponse> =>
-  apiFetch(`/api/periods/${periodId}/grading/setup`, {
+/**
+ * How ONE subject splits its final grade (and, while the period has no scale yet, the period's scale) in ONE request: all or
+ * nothing. The scale is the period's; the cuts are the subject's own.
+ */
+export const setupSubjectGradingRequest = (
+  subjectId: string,
+  input: SetupSubjectGradingInput,
+): Promise<SetupSubjectGradingResponse> =>
+  apiFetch(`/api/subjects/${subjectId}/grading/setup`, {
     method: 'POST',
     body: input,
-    schema: setupGradingResponseSchema,
+    schema: setupSubjectGradingResponseSchema,
   });
 
 export async function updateGradingProfileRequest(
@@ -53,11 +56,11 @@ export async function updateGradingProfileRequest(
 }
 
 export async function createGradingPeriodRequest(
-  periodId: string,
+  subjectId: string,
   input: CreateGradingPeriodInput,
 ): Promise<GradingPeriod> {
   return (
-    await apiFetch(`/api/periods/${periodId}/grading-periods`, {
+    await apiFetch(`/api/subjects/${subjectId}/grading-periods`, {
       method: 'POST',
       body: input,
       schema: gradingPeriodResponseSchema,

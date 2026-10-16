@@ -63,7 +63,7 @@ export function ScaleEditDialog({
   return (
     <Modal title="Escala de notas" onClose={onClose}>
       <p className="mb-4 text-sm text-muted-foreground">
-        Esto aplica a todas las materias de este periodo.
+        La escala se comparte con las demás materias de este periodo.
       </p>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         {formError && <FormError>{formError}</FormError>}
@@ -116,14 +116,14 @@ export function ScaleEditDialog({
 
 /** Add or edit ONE cut of the period (name and weight over the final grade). */
 export function CutDialog({
-  periodId,
+  subjectId,
   studyType,
   cut,
   defaultName,
   onClose,
   onDone,
 }: {
-  periodId: string;
+  subjectId: string;
   studyType: EducationContext;
   cut?: GradingPeriod;
   defaultName: string;
@@ -131,8 +131,8 @@ export function CutDialog({
   onDone: () => void;
 }) {
   const term = GRADING_PERIOD_TERMS[studyType].one;
-  const create = useCreateGradingPeriod(periodId);
-  const update = useUpdateGradingPeriod(periodId);
+  const create = useCreateGradingPeriod(subjectId);
+  const update = useUpdateGradingPeriod(subjectId);
   const pending = create.isPending || update.isPending;
   const [name, setName] = useState(cut?.name ?? defaultName);
   const [weight, setWeight] = useState(cut ? bpToPercentText(cut.finalShareBp) : '');
@@ -183,7 +183,7 @@ export function CutDialog({
           value={weight}
           onChange={setWeight}
           error={errors.weight}
-          hint="Los pesos de todos los cortes no pueden pasar de 100 %."
+          hint="Los pesos de los cortes de esta materia no pueden pasar de 100 %."
         />
         <FormActions>
           <Button onClick={onClose} disabled={pending}>
@@ -203,20 +203,18 @@ export function ConfirmRemoveDialog({
   kind,
   id,
   name,
-  periodId,
   subjectId,
   onClose,
   onDone,
 }: {
   kind: 'cut' | 'evaluation';
-  periodId: string;
   id: string;
   name: string;
   subjectId: string;
   onClose: () => void;
   onDone: () => void;
 }) {
-  const removeCut = useDeleteGradingPeriod(periodId);
+  const removeCut = useDeleteGradingPeriod(subjectId);
   const removeEvaluation = useDeleteEvaluation(subjectId);
   const remove = kind === 'cut' ? removeCut : removeEvaluation;
   return (

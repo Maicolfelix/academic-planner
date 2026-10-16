@@ -8,7 +8,7 @@ import {
   type CreateEvaluationInput,
   type CreateGradingPeriodInput,
   type CreateGradingProfileInput,
-  type SetupGradingInput,
+  type SetupSubjectGradingInput,
   type SubjectGradesResponse,
   type UpdateEvaluationInput,
   type UpdateGradingPeriodInput,
@@ -63,6 +63,8 @@ const scaleLocked = () =>
     'GRADING_SCALE_LOCKED',
     'Ya hay notas registradas: la nota mínima y la máxima no se pueden cambiar.',
   );
+const cutsExist = () =>
+  new AppError(409, 'GRADING_EXISTS', 'Esta materia ya tiene sus cortes configurados.');
 const cutNotEmpty = () =>
   new AppError(409, 'GRADING_PERIOD_NOT_EMPTY', 'Este corte todavía tiene evaluaciones.');
 
@@ -181,40 +183,48 @@ export function createGradingService(deps: {
     },
 
     /**
-     * The scale AND the cuts in ONE transaction: a configuration is never left half done. The weights were already checked by the
-     * schema (the period has no cuts yet, since cuts need the scale), so this only adds the usual period and uniqueness rules.
+     * How the final grade of ONE subject is split, in ONE transaction (all or nothing). The SCALE belongs to the period: the first
+     * subject configured creates it (it needs `input.profile`); once it exists a profile sent again is ignored and the existing one
+     * is returned, so two subjects configured at the same time (serialized by the per-user lock) end with ONE profile and their own
+     * independent cuts. A subject that already has cuts is a 409.
      */
-    async setupGrading(userId: string, periodId: string, input: SetupGradingInput) {
+    async setupSubjectGrading(userId: string, subjectId: string, input: SetupSubjectGradingInput) {
+      const subject = await subjects.findOwned(userId, subjectId);
+      if (!subject) throw subjectNotFound();
       try {
         return await write(userId, async (tx, repo) => {
-          await trackedPeriod(tx, userId, periodId);
-          if (await repo.findProfile(userId, periodId)) throw alreadyConfigured();
-          const profile = await repo.createProfile(userId, periodId, input.profile);
+          await trackedPeriod(tx, userId, subject.periodId);
+          if ((await repo.countCutsOfSubject(userId, subject.id)) > 0) throw cutsExist();
+          let profile = await repo.findProfile(userId, subject.periodId);
+          if (!profile) {
+            if (!input.profile)
+              throw validationError({ profile: ['Configura primero la escala del periodo.'] });
+            profile = await repo.createProfile(userId, subject.periodId, input.profile);
+          }
           const cuts = [];
           for (const [i, cut] of input.gradingPeriods.entries())
-            cuts.push(await repo.createCut(userId, periodId, { ...cut, position: i + 1 }));
+            cuts.push(
+              await repo.createCut(userId, subject.periodId, subject.id, {
+                ...cut,
+                position: i + 1,
+              }),
+            );
           return {
             profile: toGradingProfileDto(profile),
             gradingPeriods: cuts.map(toGradingPeriodDto),
           };
         });
       } catch (err) {
-        if (isPrismaError(err, 'P2002')) throw alreadyConfigured();
+        if (isPrismaError(err, 'P2002')) throw cutsExist();
         throw err;
       }
     },
 
-    /** A read: the period's scale and cuts, or `profile: null` while nothing is configured. */
+    /** A read: the period's SCALE (shared by its subjects), or `profile: null` while it is not configured. */
     async getPeriodGrading(userId: string, periodId: string) {
       if (!(await periods.findOwned(userId, periodId))) throw periodNotFound();
-      const [profile, cuts] = await Promise.all([
-        grading.findProfile(userId, periodId),
-        grading.listCuts(userId, periodId),
-      ]);
-      return {
-        profile: profile ? toGradingProfileDto(profile) : null,
-        gradingPeriods: cuts.map(toGradingPeriodDto),
-      };
+      const profile = await grading.findProfile(userId, periodId);
+      return { profile: profile ? toGradingProfileDto(profile) : null };
     },
 
     async updateProfile(userId: string, periodId: string, input: UpdateGradingProfileInput) {
@@ -239,14 +249,19 @@ export function createGradingService(deps: {
       });
     },
 
-    async createCut(userId: string, periodId: string, input: CreateGradingPeriodInput) {
+    /** A cut of ONE subject: it never touches the cuts of another subject, even in the same period. */
+    async createCut(userId: string, subjectId: string, input: CreateGradingPeriodInput) {
+      const subject = await subjects.findOwned(userId, subjectId);
+      if (!subject) throw subjectNotFound();
       return write(userId, async (tx, repo) => {
-        await trackedPeriod(tx, userId, periodId);
-        if (!(await repo.findProfile(userId, periodId))) throw notConfigured();
-        if ((await repo.sumCutShares(userId, periodId)) + input.finalShareBp > WEIGHT_BP_MAX)
+        await trackedPeriod(tx, userId, subject.periodId);
+        if (!(await repo.findProfile(userId, subject.periodId))) throw notConfigured();
+        if ((await repo.sumCutShares(userId, subject.id)) + input.finalShareBp > WEIGHT_BP_MAX)
           throw weightExceeded('finalShareBp', 'Los cortes');
-        const position = await repo.nextCutPosition(periodId);
-        return toGradingPeriodDto(await repo.createCut(userId, periodId, { ...input, position }));
+        const position = await repo.nextCutPosition(subject.id);
+        return toGradingPeriodDto(
+          await repo.createCut(userId, subject.periodId, subject.id, { ...input, position }),
+        );
       });
     },
 
@@ -258,7 +273,7 @@ export function createGradingService(deps: {
         if (!(await repo.findCut(userId, id))) throw cutNotFound();
         if (
           input.finalShareBp !== undefined &&
-          (await repo.sumCutShares(userId, cut.periodId, id)) + input.finalShareBp > WEIGHT_BP_MAX
+          (await repo.sumCutShares(userId, cut.subjectId, id)) + input.finalShareBp > WEIGHT_BP_MAX
         )
           throw weightExceeded('finalShareBp', 'Los cortes');
         return toGradingPeriodDto(await repo.updateCut(userId, id, input));
@@ -291,8 +306,8 @@ export function createGradingService(deps: {
 
           const cut = await repo.findCut(userId, input.gradingPeriodId);
           if (!cut) throw cutNotFound();
-          if (cut.periodId !== subject.periodId)
-            throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
+          if (cut.subjectId !== subject.id)
+            throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
 
           // A DIRECT CUT GRADE is the grade of the whole cut; a cut is either that or broken down, never both.
           const isCutGrade = input.isCutGrade === true;
@@ -377,8 +392,8 @@ export function createGradingService(deps: {
         if (input.gradingPeriodId !== undefined && input.gradingPeriodId !== cutId) {
           const cut = await repo.findCut(userId, input.gradingPeriodId);
           if (!cut) throw cutNotFound();
-          if (cut.periodId !== current.periodId)
-            throw validationError({ gradingPeriodId: ['El corte debe ser del mismo periodo.'] });
+          if (cut.subjectId !== current.subjectId)
+            throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
           if ((await repo.cutUsage(userId, current.subjectId, cut.id)).direct)
             throw cutHasDirectGrade();
           cutId = cut.id;
@@ -445,12 +460,13 @@ export function createGradingService(deps: {
       if (!period) throw subjectNotFound(); // (unreachable: the subject's period always exists)
       const [profile, cuts, evaluations, study] = await Promise.all([
         grading.findProfile(userId, subject.periodId),
-        grading.listCuts(userId, subject.periodId),
+        grading.listCuts(userId, subject.id),
         grading.listForSubject(userId, subjectId),
         period.studyTrackId ? studyTracks.findOwned(userId, period.studyTrackId) : null,
       ]);
       let summary: SubjectGradesResponse['summary'] = null;
-      if (profile) {
+      // Without cuts there is nothing to add up yet: the subject still has to say how its final grade is split.
+      if (profile && cuts.length > 0) {
         const items = evaluations.map((e) => ({
           gradingPeriodId: e.gradingPeriodId,
           periodShareBp: e.periodShareBp,

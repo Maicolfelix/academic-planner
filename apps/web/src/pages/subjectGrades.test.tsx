@@ -75,6 +75,7 @@ const profile: GradingProfile = {
 const cut = (n: number, bp: number, name = `Corte ${n}`): GradingPeriod => ({
   id: U(10 + n),
   periodId: PERIOD_ID,
+  subjectId: SUBJECT_ID,
   name,
   position: n,
   finalShareBp: bp,
@@ -174,26 +175,38 @@ describe('the subject grades page', () => {
     expect(out).toContain('href="/subjects"');
   });
 
-  it('without a scale: says the configuration is shared with the other subjects, with one clear action', () => {
+  it('without a scale: asks for the period’s scale first, then how THIS subject is split, with one clear action', () => {
     const out = render();
-    expect(out).toContain('Configura cómo califican esta materia');
-    expect(out).toContain(
-      'La escala y los cortes se comparten con las demás materias de este periodo.',
-    );
+    expect(out).toContain('Configura las notas de esta materia');
+    expect(out).toContain('la escala, que se comparte con las demás materias de este periodo');
+    expect(out).toContain('cómo se divide la nota final de Farmacología');
     expect(out).toContain('Configurar notas');
     expect(out).not.toContain('Nota acumulada');
   });
 
-  it('the study type comes from the real study: Cortes (university), never a default while anything loads', () => {
-    const university = render();
-    expect(university).toContain('La escala y los cortes se comparten');
-    // SCHOOL / OTHER with the periods and studies lists NOT loaded at all (they are not even seeded): no university words, no university preset
+  it('with the scale already configured but no cuts for THIS subject: asks how it is split (nothing inherited)', () => {
+    const out = render({ grades: { profile, gradingPeriods: [], evaluations: [], summary: null } });
+    expect(out).toContain('¿Cómo se divide esta materia?');
+    expect(out).toContain('Configurar cortes');
+    expect(out).toContain('Cada materia tiene sus propios cortes y porcentajes');
+    expect(out).not.toContain('Corte 1'); // the 30/30/40 of another subject is not shown here
+    expect(out).not.toContain('Nota acumulada');
+    expect(out).not.toContain('Registrar nota');
+  });
+
+  it('the study type comes from the real study, never a default while anything loads', () => {
+    // SCHOOL / OTHER with the periods and studies lists NOT loaded at all (they are not even seeded): no university words
     for (const type of ['SCHOOL', 'OTHER_ACADEMIC'] as const) {
-      const out = render({ track: track({ type }) });
+      const out = render({
+        track: track({ type }),
+        grades: { profile, gradingPeriods: [], evaluations: [], summary: null },
+      });
       expect(out, type).not.toMatch(/cortes/i);
-      expect(out, type).not.toContain('30 %');
       expect(out, type).not.toContain('Corte 1');
     }
+    expect(
+      render({ grades: { profile, gradingPeriods: [], evaluations: [], summary: null } }),
+    ).toContain('Configurar cortes');
   });
 
   it('a period that names a study whose context is missing is retried, never read as a university', () => {
@@ -215,11 +228,12 @@ describe('the subject grades page', () => {
   });
 
   it('uses the words of the study: Periodos de evaluación (school), Etapas (other study)', () => {
-    expect(render({ track: track({ type: 'SCHOOL' }) })).toContain(
-      'La escala y los periodos de evaluación se comparten',
+    const empty = { profile, gradingPeriods: [], evaluations: [], summary: null };
+    expect(render({ track: track({ type: 'SCHOOL' }), grades: empty })).toContain(
+      'Configurar periodos de evaluación',
     );
-    expect(render({ track: track({ type: 'OTHER_ACADEMIC' }) })).toContain(
-      'La escala y las etapas se comparten',
+    expect(render({ track: track({ type: 'OTHER_ACADEMIC' }), grades: empty })).toContain(
+      'Configurar etapas',
     );
   });
 
@@ -328,6 +342,53 @@ describe('the subject grades page', () => {
     expect(out).not.toContain('Peso:'); // no internal evaluation weights
     expect(out).not.toContain('Agregar evaluación a');
     expect(out).not.toMatch(/Nombre/);
+  });
+
+  it('a single grade of 100 %: one card "Nota final", register 4.6 → 4.6 / 5.0, fully graded', () => {
+    const c = cut(1, 10_000, 'Nota final');
+    const pending = render({
+      grades: configured({
+        gradingPeriods: [c],
+        evaluations: [],
+        summary: summary({
+          complete: true,
+          currentMilli: null,
+          currentPasses: null,
+          evaluatedWeightUnits: 0,
+          remainingWeightUnits: 100_000_000,
+        }),
+      }),
+    });
+    expect(pending).toContain('Nota final');
+    expect(pending).toContain('100 % de la nota final');
+    expect(pending).toContain('Pendiente');
+    expect(pending).toContain('aria-label="Registrar nota de Nota final"');
+    const graded = render({
+      grades: configured({
+        gradingPeriods: [c],
+        evaluations: [
+          evaluation(1, c.id, {
+            periodShareBp: 10_000,
+            scoreMilli: 4600,
+            isCutGrade: true,
+            name: 'Nota de Nota final',
+          }),
+        ],
+        summary: summary({
+          complete: true,
+          currentMilli: 4600,
+          evaluatedWeightUnits: 100_000_000,
+          remainingWeightUnits: 0,
+          required: { status: 'SECURED' },
+        }),
+      }),
+    });
+    expect(graded).toMatch(/data-testid="accumulated-grade"[^>]*>4\.6</);
+    expect(graded).toContain('/ 5.0');
+    expect(graded).toContain('1 de 1 corte con nota');
+    expect(graded).toContain('Calificado 100 %');
+    expect(graded).toContain('Pendiente 0 %');
+    expect(graded).not.toContain('¿Cuánto necesito?');
   });
 
   it('a cut broken down into evaluations keeps the detailed rows, with their name and weight', () => {
@@ -508,10 +569,12 @@ describe('the dialogs', () => {
       <QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>,
     );
 
-  it('the setup starts with the scale (friendly presets, no internals) and shares the configuration', () => {
+  it('without a scale the setup starts with it (friendly presets, no internals) and says it is shared', () => {
     const out = wrap(
       <SetupDialog
-        periodId={PERIOD_ID}
+        subjectId={SUBJECT_ID}
+        subjectName="Farmacología"
+        hasScale={false}
         studyType="UNIVERSITY"
         onClose={() => {}}
         onDone={() => {}}
@@ -520,22 +583,62 @@ describe('the dialogs', () => {
     expect(out).toContain('0.0–5.0 · aprueba con 3.0');
     expect(out).toContain('0–100 · aprueba con 60');
     expect(out).toContain('Personalizada');
-    expect(out).toContain('se comparten con las demás materias de este periodo');
+    expect(out).toContain('La escala se comparte con las demás materias de este periodo.');
     expect(out).toContain('aria-labelledby');
   });
 
-  it('the school setup talks about periodos de evaluación', () => {
+  it('with the scale already there it goes straight to "¿Cómo se divide {materia}?", with presets that are only helps', () => {
     const out = wrap(
-      <SetupDialog periodId={PERIOD_ID} studyType="SCHOOL" onClose={() => {}} onDone={() => {}} />,
+      <SetupDialog
+        subjectId={SUBJECT_ID}
+        subjectName="Anatomía"
+        hasScale
+        studyType="UNIVERSITY"
+        onClose={() => {}}
+        onDone={() => {}}
+      />,
     );
-    expect(out).toContain('los periodos de evaluación');
+    expect(out).not.toContain('¿Cómo se califica?'); // the scale is not asked again
+    expect(out).toContain('¿Cómo se divide Anatomía? (Cortes)');
+    expect(out).toContain('30 % / 30 % / 40 %');
+    expect(out).toContain('Una sola nota (100 %)');
+    expect(out).toContain('Personalizar');
+    expect(out).toContain('solo vale para Anatomía');
+  });
+
+  it('the presets follow the kind of study, and any study offers a single grade', () => {
+    const school = wrap(
+      <SetupDialog
+        subjectId={SUBJECT_ID}
+        subjectName="Matemáticas"
+        hasScale
+        studyType="SCHOOL"
+        onClose={() => {}}
+        onDone={() => {}}
+      />,
+    );
+    expect(school).toContain('Configurar notas · Periodos de evaluación');
+    expect(school).toContain('25 % / 25 % / 25 % / 25 %');
+    expect(school).toContain('Una sola nota (100 %)');
+    const other = wrap(
+      <SetupDialog
+        subjectId={SUBJECT_ID}
+        subjectName="Módulo 1"
+        hasScale
+        studyType="OTHER_ACADEMIC"
+        onClose={() => {}}
+        onDone={() => {}}
+      />,
+    );
+    expect(other).toContain('Configurar notas · Etapas');
+    expect(other).toContain('Una sola nota (100 %)');
+    expect(other).not.toContain('30 %');
   });
 
   it('removing an evaluation asks first and says the activity stays', () => {
     const out = wrap(
       <ConfirmRemoveDialog
         kind="evaluation"
-        periodId={PERIOD_ID}
         id={U(1)}
         name="Parcial 1"
         subjectId={SUBJECT_ID}

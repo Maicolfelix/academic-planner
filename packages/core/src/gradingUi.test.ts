@@ -10,7 +10,9 @@ import {
   formatScore,
   formatUnitsPercent,
   percentToBp,
+  remainderOf,
   scoreToMilli,
+  withRemainder,
 } from './gradingUi.js';
 
 describe('percent ↔ basis points', () => {
@@ -89,5 +91,28 @@ describe('presets', () => {
   it('names the next cut with the term of the study', () => {
     expect(defaultCutName('UNIVERSITY', 4)).toBe('Corte 4');
     expect(defaultCutName('OTHER_ACADEMIC', 2)).toBe('Etapa 2');
+  });
+});
+
+describe('the auto-remainder (per subject)', () => {
+  const rows = (...p: string[]) => p.map((percent, i) => ({ name: `Corte ${i + 1}`, percent }));
+  const filled = (...p: string[]) => withRemainder(rows(...p)).map((r) => r.percent);
+
+  it('30 / 30 / blank → 40; 25 / blank / 40 → 35; blank / 35 / 40 → 25', () => {
+    expect(filled('30', '30', '')).toEqual(['30', '30', '40']);
+    expect(filled('25', '', '40')).toEqual(['25', '35', '40']);
+    expect(filled('', '35', '40')).toEqual(['25', '35', '40']);
+    expect(remainderOf(rows('25', '', '40'))).toEqual({ index: 1, bp: 3500 });
+  });
+  it('never guesses: two blanks, a typo, or nothing left over', () => {
+    expect(filled('30', '', '')).toEqual(['30', '', '']);
+    expect(filled('', '')).toEqual(['', '']);
+    expect(filled('30', 'abc', '')).toEqual(['30', 'abc', '']);
+    expect(filled('60', '40', '')).toEqual(['60', '40', '']); // nothing left for the blank
+    expect(filled('70', '50', '')).toEqual(['70', '50', '']); // already over 100 %
+  });
+  it('complete rows are left alone (the sum is checked by the caller)', () => {
+    expect(filled('30', '30', '40')).toEqual(['30', '30', '40']);
+    expect(filled('30', '30', '30')).toEqual(['30', '30', '30']);
   });
 });

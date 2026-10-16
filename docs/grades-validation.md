@@ -88,9 +88,11 @@
 
 **Resultado: GO provisional de ingeniería.** Dominio de notas: DISEÑO APROBADO / VALIDADO CON PROXY / LISTO PARA IMPLEMENTAR. Validación UX humana: PENDIENTE.
 
+> **Nota posterior (QA real, PR #45):** la columna «Pesos compartidos» y la fila del criterio NO-GO sobre pesos distintos por materia se leyeron como «raros». La QA real mostró que **sí** son normales (distintos profesores, distintos porcentajes en el mismo semestre), así que los cortes pasaron a ser **de la materia** ([D36](decisions.md#d36-modelo-de-calificaciones-por-periodo-cortes-y-evaluaciones)). Los tres casos siguen encajando: cada materia define sus cortes.
+
 ## MVP congelado (reconfirmado)
 
-`GradingProfile → AcademicPeriod`; `GradingPeriod → AcademicPeriod`; `Evaluation → Subject`; la evaluación exige `GradingPeriod`; una `Activity` tiene 0..N evaluaciones; `scoreMilli` canónico; `rawEarnedMilli`/`rawMaxMilli` aparte; solo escalas numéricas; cortes compartidos por `AcademicPeriod`; sin pesos de corte por materia; sin puntos extra; sin letras; sin fórmulas arbitrarias.
+`GradingProfile → AcademicPeriod`; `GradingPeriod → Subject` (revisado en la QA real; antes `→ AcademicPeriod`); `Evaluation → Subject`; la evaluación exige `GradingPeriod`; una `Activity` tiene 0..N evaluaciones; `scoreMilli` canónico; `rawEarnedMilli`/`rawMaxMilli` aparte; solo escalas numéricas; cortes compartidos por `AcademicPeriod`; sin pesos de corte por materia; sin puntos extra; sin letras; sin fórmulas arbitrarias.
 
 ## Pendiente antes de cerrar la UX de Notas
 

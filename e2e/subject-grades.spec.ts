@@ -93,9 +93,9 @@ test('A · university: the first configuration, an evaluation, the current grade
   await expect(
     page.getByRole('heading', { level: 1, name: 'Notas de Farmacología' }),
   ).toBeVisible();
-  await expect(page.getByText('Configura cómo califican esta materia')).toBeVisible();
+  await expect(page.getByText('Configura las notas de esta materia')).toBeVisible();
   await expect(
-    page.getByText('La escala y los cortes se comparten con las demás materias de este periodo.'),
+    page.getByText(/la escala, que se comparte con las demás materias de este periodo/),
   ).toBeVisible();
   await axe(page, 'grades · empty');
 
@@ -178,7 +178,7 @@ test('B · school: periodos de evaluación, 1–5 and four periods of 25 %', asy
   const check = watch(page);
   const { subjects } = await account(page, 'SCHOOL', ['Matemáticas']);
   await page.goto(gradesUrl(subjects[0]!.id));
-  await expect(page.getByText('La escala y los periodos de evaluación se comparten')).toBeVisible();
+  await expect(page.getByText('Configura las notas de esta materia')).toBeVisible();
 
   await page.getByRole('button', { name: 'Configurar notas' }).click();
   const setup = page.getByRole('dialog', { name: 'Configurar notas · Escala' });
@@ -209,7 +209,7 @@ test('C · diplomado: etapas, 1–7, a single "Nota final" and no guessed conver
   const check = watch(page, ['400 /api/evaluations*']);
   const { subjects } = await account(page, 'OTHER_ACADEMIC', ['Módulo 1']);
   await page.goto(gradesUrl(subjects[0]!.id));
-  await expect(page.getByText('La escala y las etapas se comparten')).toBeVisible();
+  await expect(page.getByText('Configura las notas de esta materia')).toBeVisible();
 
   await page.getByRole('button', { name: 'Configurar notas' }).click();
   const setup = page.getByRole('dialog', { name: 'Configurar notas · Escala' });
@@ -219,7 +219,7 @@ test('C · diplomado: etapas, 1–7, a single "Nota final" and no guessed conver
   await setup.getByRole('textbox', { name: 'Aprueba con' }).fill('4');
   await setup.getByRole('button', { name: 'Siguiente' }).click();
   const cuts = page.getByRole('dialog', { name: 'Configurar notas · Etapas' });
-  await expect(cuts.getByRole('radio', { name: 'Sin cortes (una sola nota final)' })).toBeChecked();
+  await expect(cuts.getByRole('radio', { name: 'Una sola nota (100 %)' })).toBeChecked();
   await cuts.getByRole('button', { name: 'Guardar' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'Nota final' })).toBeVisible();
   await expect(
@@ -250,22 +250,13 @@ test('C · diplomado: etapas, 1–7, a single "Nota final" and no guessed conver
   check();
 });
 
-test('D · the scale and the cuts are the period’s: a second subject does not configure again', async ({
+test('D · the scale is the period’s, the cuts are each subject’s: a second subject is asked how IT is split', async ({
   page,
 }) => {
   const check = watch(page);
   const { subjects } = await account(page, 'UNIVERSITY', ['Farmacología', 'Anatomía']);
   await page.goto(gradesUrl(subjects[0]!.id));
-  await page.getByRole('button', { name: 'Configurar notas' }).click();
-  await page
-    .getByRole('dialog', { name: 'Configurar notas · Escala' })
-    .getByRole('button', { name: 'Siguiente' })
-    .click();
-  await page
-    .getByRole('dialog', { name: 'Configurar notas · Cortes' })
-    .getByRole('button', { name: 'Guardar' })
-    .click();
-  await expect(page.getByText('Notas configuradas.')).toBeVisible();
+  await configureDefault(page); // scale + 30/30/40 for Farmacología
 
   // The entry from the subjects list: "Notas" on the card, without replacing the other actions.
   await page.goto('/subjects');
@@ -273,9 +264,102 @@ test('D · the scale and the cuts are the period’s: a second subject does not 
   await page.getByRole('link', { name: 'Notas de Anatomía' }).click();
   await expect(page).toHaveURL(new RegExp(`/subjects/${subjects[1]!.id}/grades$`));
   await expect(page.getByRole('heading', { level: 1, name: 'Notas de Anatomía' })).toBeVisible();
-  await expect(page.getByText('Configura cómo califican esta materia')).toHaveCount(0);
-  await expect(page.getByRole('heading', { level: 2, name: 'Corte 3' })).toBeVisible();
-  await expect(page.getByText(/Objetivo para aprobar: 3[.]0/)).toBeVisible();
+  // The scale exists, the 30/30/40 of Farmacología is NOT inherited: it asks how THIS subject is split.
+  await expect(page.getByText('¿Cómo se divide esta materia?')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Corte 3' })).toHaveCount(0);
+  await configureCuts(page, { custom: ['50', '50'] });
+  await expect(page.getByRole('heading', { level: 2, name: 'Corte 2' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Corte 3' })).toHaveCount(0);
+  await expect(page.getByText('50 % de la nota final')).toHaveCount(2);
+
+  // Farmacología keeps its own 30/30/40.
+  await page.goto(gradesUrl(subjects[0]!.id));
+  await expect(page.getByText('30 % de la nota final')).toHaveCount(2);
+  await expect(page.getByText('40 % de la nota final')).toBeVisible();
+  await expect(page.getByText('50 % de la nota final')).toHaveCount(0);
+  check();
+});
+
+test('L · same period, three distributions: each subject calculates with ITS OWN cuts', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', [
+    'Farmacología',
+    'Bases de datos',
+    'Seminario',
+  ]);
+  const [farma, bases, seminario] = subjects;
+
+  // Farmacología: 30/30/40 (and the scale of the period)
+  await page.goto(gradesUrl(farma!.id));
+  await configureDefault(page);
+  for (const [cut, grade] of [
+    ['Corte 1', '3.2'],
+    ['Corte 2', '4.5'],
+    ['Corte 3', '4.0'],
+  ] as const)
+    await registerCutGrade(page, cut, grade);
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('3.9'); // 3.91
+
+  // Bases de datos: 25 / (blank) / 40 → the blank takes the rest, 35
+  await page.goto(gradesUrl(bases!.id));
+  await expect(page.getByText('¿Cómo se divide esta materia?')).toBeVisible();
+  await configureCuts(page, { custom: ['25', '', '40'] });
+  await expect(page.getByText('25 % de la nota final')).toBeVisible();
+  await expect(page.getByText('35 % de la nota final')).toBeVisible();
+  await expect(page.getByText('40 % de la nota final')).toBeVisible();
+  for (const [cut, grade] of [
+    ['Corte 1', '3.2'],
+    ['Corte 2', '4.5'],
+    ['Corte 3', '4.0'],
+  ] as const)
+    await registerCutGrade(page, cut, grade);
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('4.0'); // 3.975 shown with one decimal
+
+  // Seminario: a single grade of 100 %
+  await page.goto(gradesUrl(seminario!.id));
+  await configureCuts(page, { radio: 'Una sola nota (100 %)' });
+  await expect(page.getByRole('heading', { level: 2, name: 'Nota final' })).toBeVisible();
+  await registerCutGrade(page, 'Nota final', '4.3');
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('4.3');
+  await expect(page.getByTestId('weights-line')).toContainText('Calificado 100 %');
+  await expect(page.getByTestId('weights-line')).toContainText('Pendiente 0 %');
+  await expect(page.getByText('¿Cuánto necesito?')).toHaveCount(0);
+
+  // No leakage: Farmacología and Bases de datos still say what they said.
+  await page.goto(gradesUrl(farma!.id));
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('3.9');
+  await expect(page.getByText('30 % de la nota final')).toHaveCount(2);
+  await page.goto(gradesUrl(bases!.id));
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('4.0');
+  await expect(page.getByText('35 % de la nota final')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  check();
+});
+
+test('M · a single grade of 100 %: "Nota final", register 4.6 → 4.6 / 5.0, fully graded', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Proyecto integrador']);
+  await page.goto(gradesUrl(subjects[0]!.id));
+  await page.getByRole('button', { name: 'Configurar notas' }).click();
+  await page
+    .getByRole('dialog', { name: 'Configurar notas · Escala' })
+    .getByRole('button', { name: 'Siguiente' })
+    .click();
+  const cuts = page.getByRole('dialog', { name: 'Configurar notas · Cortes' });
+  await cuts.getByRole('radio', { name: 'Una sola nota (100 %)' }).check();
+  await cuts.getByRole('button', { name: 'Guardar' }).click();
+  await expect(cuts).toBeHidden();
+  const card = page.getByRole('region', { name: 'Nota final' });
+  await expect(card.getByText('100 % de la nota final')).toBeVisible();
+  await expect(card.getByTestId(/^cut-grade-/)).toHaveText('Pendiente');
+  await registerCutGrade(page, 'Nota final', '4.6');
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('4.6');
+  await expect(page.getByText('/ 5.0')).toBeVisible();
+  await expect(page.getByTestId('weights-line')).toContainText('Calificado 100 %');
   check();
 });
 
@@ -306,6 +390,33 @@ test('E · 18 of 20 on a 0–5 scale becomes 4.5 as the grade of a cut, with no 
   await expect(page.getByTestId(/^cut-grade-/).first()).toHaveText('2.5');
   check();
 });
+
+/** Registers the grade of a whole cut (the dialog never asks for a name). */
+async function registerCutGrade(page: Page, cut: string, grade: string) {
+  await page.getByRole('button', { name: `Registrar nota de ${cut}` }).click();
+  const dialog = page.getByRole('dialog', { name: `Nota de ${cut}` });
+  await dialog.getByRole('textbox', { name: 'Nota' }).fill(grade);
+  await save(dialog, 'Guardar');
+}
+
+/** How ONE subject is split, once the period already has its scale: a quick option or custom percentages (blank = the rest). */
+async function configureCuts(page: Page, how: { radio: string } | { custom: string[] }) {
+  await page
+    .getByRole('button', { name: /^Configurar (cortes|periodos de evaluación|etapas)$/ })
+    .click();
+  const dialog = page.getByRole('dialog', { name: /^Configurar notas · / });
+  if ('radio' in how) await dialog.getByRole('radio', { name: how.radio }).check();
+  else {
+    await dialog.getByRole('radio', { name: 'Personalizar' }).check();
+    // start from the three rows of the first option; drop the extra ones, then type each percentage ("" = leave blank)
+    for (let i = 2; i >= how.custom.length; i--)
+      await dialog.getByRole('button', { name: `Quitar Corte ${i + 1}` }).click();
+    for (const [i, percent] of how.custom.entries())
+      await dialog.locator(`#cut-percent-${i}`).fill(percent);
+  }
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await expect(dialog).toBeHidden();
+}
 
 /** The default configuration: 0.0–5.0 with 30/30/40. */
 async function configureDefault(page: Page) {
@@ -394,8 +505,8 @@ test('I · the study type comes with the grades: slow studies/periods lists neve
   await page.route('**/api/study-tracks', slow);
   await page.route('**/api/periods', slow);
   await page.goto(gradesUrl(subjects[0]!.id));
-  // Well before the lists answer, the school wording is already there (it is derived by the server with the grades).
-  await expect(page.getByText('La escala y los periodos de evaluación se comparten')).toBeVisible({
+  // Well before the lists answer the page is usable and says nothing in university words (the study comes with the grades).
+  await expect(page.getByText('Configura las notas de esta materia')).toBeVisible({
     timeout: 3000,
   });
   await expect(page.getByText(/cortes/i)).toHaveCount(0);
@@ -403,6 +514,7 @@ test('I · the study type comes with the grades: slow studies/periods lists neve
   const setup = page.getByRole('dialog', { name: 'Configurar notas · Escala' });
   await setup.getByRole('button', { name: 'Siguiente' }).click();
   const cuts = page.getByRole('dialog', { name: 'Configurar notas · Periodos de evaluación' });
+  await expect(page.getByText(/cortes/i)).toHaveCount(0);
   await expect(cuts.getByRole('radio', { name: '25 % / 25 % / 25 % / 25 %' })).toBeChecked();
   await expect(cuts.getByRole('radio', { name: '30 % / 30 % / 40 %' })).toHaveCount(0);
   check();

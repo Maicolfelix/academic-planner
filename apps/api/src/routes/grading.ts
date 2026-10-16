@@ -11,10 +11,10 @@ export function gradingRouter(
 ): Router {
   const router = Router();
   router.post('/periods/:id/grading', requireAuth, controller.setup);
-  router.post('/periods/:id/grading/setup', requireAuth, controller.setupAll);
   router.get('/periods/:id/grading', requireAuth, controller.getPeriod);
   router.patch('/periods/:id/grading', requireAuth, controller.updateProfile);
-  router.post('/periods/:id/grading-periods', requireAuth, controller.createCut);
+  router.post('/subjects/:id/grading/setup', requireAuth, controller.setupSubject);
+  router.post('/subjects/:id/grading-periods', requireAuth, controller.createCut);
   router.patch('/grading-periods/:id', requireAuth, controller.updateCut);
   router.delete('/grading-periods/:id', requireAuth, controller.removeCut);
   router.post('/evaluations', requireAuth, controller.createEvaluation);

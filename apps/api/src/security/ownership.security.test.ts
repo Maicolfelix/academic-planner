@@ -88,7 +88,7 @@ async function world() {
       .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 });
     const cut = (
       await who.agent
-        .post(`/api/periods/${period.id}/grading-periods`)
+        .post(`/api/subjects/${subject.id}/grading-periods`)
         .send({ name: `Corte secreto de ${label}`, finalShareBp: 5000 })
     ).body.gradingPeriod as { id: string };
     const evaluation = (
@@ -203,9 +203,9 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
           .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 }),
     ],
     [
-      'POST /periods/:id/grading/setup',
+      'POST /subjects/:id/grading/setup',
       (a, id) =>
-        a.post(`/api/periods/${id}/grading/setup`).send({
+        a.post(`/api/subjects/${id}/grading/setup`).send({
           profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
           gradingPeriods: [{ name: 'Robado', finalShareBp: 10000 }],
         }),
@@ -216,9 +216,9 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
       (a, id) => a.patch(`/api/periods/${id}/grading`).send({ passMilli: 2000 }),
     ],
     [
-      'POST /periods/:id/grading-periods',
+      'POST /subjects/:id/grading-periods',
       (a, id) =>
-        a.post(`/api/periods/${id}/grading-periods`).send({ name: 'Robado', finalShareBp: 100 }),
+        a.post(`/api/subjects/${id}/grading-periods`).send({ name: 'Robado', finalShareBp: 100 }),
     ],
     [
       'PATCH /grading-periods/:id',
@@ -234,25 +234,27 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
   ];
 
   const target = (label: string, w: Awaited<ReturnType<typeof world>>) =>
-    label.includes('/grading-periods/:id')
-      ? w.gradedB.cut.id
-      : label.includes('/evaluations/:id')
-        ? w.gradedB.evaluation.id
-        : label.includes('/grading')
-          ? w.gradedB.period.id
-          : label.includes('/study-tracks')
-            ? w.studyTrack.id
-            : label.includes('/subjects')
-              ? w.b.subject.id
-              : label.includes('(general)')
-                ? w.generalActivity.id
-                : label.includes('/activities')
-                  ? w.activity.id
-                  : label.includes('/schedule')
-                    ? w.block.id
-                    : label.includes('/reminders')
-                      ? w.reminder.id
-                      : w.b.period.id;
+    label.includes('/subjects/:id/grading')
+      ? w.gradedB.subject.id
+      : label.includes('/grading-periods/:id')
+        ? w.gradedB.cut.id
+        : label.includes('/evaluations/:id')
+          ? w.gradedB.evaluation.id
+          : label.includes('/grading')
+            ? w.gradedB.period.id
+            : label.includes('/study-tracks')
+              ? w.studyTrack.id
+              : label.includes('/subjects')
+                ? w.b.subject.id
+                : label.includes('(general)')
+                  ? w.generalActivity.id
+                  : label.includes('/activities')
+                    ? w.activity.id
+                    : label.includes('/schedule')
+                      ? w.block.id
+                      : label.includes('/reminders')
+                        ? w.reminder.id
+                        : w.b.period.id;
 
   it.each(byId.map(([label, call]) => [label, call] as const))(
     '%s: B’s id gets the exact answer of a random id, and nothing changes',

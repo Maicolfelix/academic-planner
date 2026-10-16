@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateEvaluationInput,
   CreateGradingPeriodInput,
-  SetupGradingInput,
+  SetupSubjectGradingInput,
   UpdateEvaluationInput,
   UpdateGradingPeriodInput,
   UpdateGradingProfileInput,
@@ -14,7 +14,7 @@ import {
   deleteGradingPeriodRequest,
   fetchSubject,
   fetchSubjectGrades,
-  setupGradingRequest,
+  setupSubjectGradingRequest,
   updateEvaluationRequest,
   updateGradingPeriodRequest,
   updateGradingProfileRequest,
@@ -62,11 +62,20 @@ function useRefreshSubjectGrades(subjectId: string) {
   return () => qc.invalidateQueries({ queryKey: subjectGradesKey(subjectId) });
 }
 
-export function useSetupGrading(periodId: string) {
-  const refresh = useRefreshPeriodGrades(periodId);
+/**
+ * The first subject configured creates the PERIOD's scale, so the setup refreshes the grades of the whole period (its other
+ * subjects' cached "no scale yet" would be stale); the cuts are the subject's own and change nothing in another subject.
+ */
+export function useSetupSubjectGrading(subjectId: string) {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: SetupGradingInput) => setupGradingRequest(periodId, input),
-    onSuccess: refresh,
+    mutationFn: (input: SetupSubjectGradingInput) => setupSubjectGradingRequest(subjectId, input),
+    onSuccess: async (result) => {
+      await qc.invalidateQueries({
+        queryKey: SUBJECT_GRADES_KEY,
+        predicate: (query) => isGradesOfPeriod(query.state.data, result.profile.periodId),
+      });
+    },
   });
 }
 
@@ -78,16 +87,17 @@ export function useUpdateGradingProfile(periodId: string) {
   });
 }
 
-export function useCreateGradingPeriod(periodId: string) {
-  const refresh = useRefreshPeriodGrades(periodId);
+/** A cut belongs to ONE subject: adding, editing or deleting it refreshes that subject only. */
+export function useCreateGradingPeriod(subjectId: string) {
+  const refresh = useRefreshSubjectGrades(subjectId);
   return useMutation({
-    mutationFn: (input: CreateGradingPeriodInput) => createGradingPeriodRequest(periodId, input),
+    mutationFn: (input: CreateGradingPeriodInput) => createGradingPeriodRequest(subjectId, input),
     onSuccess: refresh,
   });
 }
 
-export function useUpdateGradingPeriod(periodId: string) {
-  const refresh = useRefreshPeriodGrades(periodId);
+export function useUpdateGradingPeriod(subjectId: string) {
+  const refresh = useRefreshSubjectGrades(subjectId);
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateGradingPeriodInput }) =>
       updateGradingPeriodRequest(id, input),
@@ -95,8 +105,8 @@ export function useUpdateGradingPeriod(periodId: string) {
   });
 }
 
-export function useDeleteGradingPeriod(periodId: string) {
-  const refresh = useRefreshPeriodGrades(periodId);
+export function useDeleteGradingPeriod(subjectId: string) {
+  const refresh = useRefreshSubjectGrades(subjectId);
   return useMutation({ mutationFn: deleteGradingPeriodRequest, onSuccess: refresh });
 }
 

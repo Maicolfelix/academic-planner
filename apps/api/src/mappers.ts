@@ -207,6 +207,7 @@ export const toGradingProfileDto = (p: GradingProfileRow): GradingProfile => ({
 export const toGradingPeriodDto = (g: GradingPeriodRow): GradingPeriod => ({
   id: g.id,
   periodId: g.periodId,
+  subjectId: g.subjectId,
   name: g.name,
   position: g.position,
   finalShareBp: g.finalShareBp,

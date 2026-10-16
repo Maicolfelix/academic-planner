@@ -114,7 +114,7 @@ export function cutPresets(type: EducationContext): readonly CutPreset[] {
     Array.from({ length: n }, (_, i) => ({ name: `${term} ${i + 1}`, finalShareBp: 10_000 / n }));
   const noCuts: CutPreset = {
     id: 'NONE',
-    label: 'Sin cortes (una sola nota final)',
+    label: 'Una sola nota (100 %)',
     cuts: [{ name: NO_CUTS_NAME, finalShareBp: 10_000 }],
   };
   if (type === 'UNIVERSITY')
@@ -138,3 +138,36 @@ export function cutPresets(type: EducationContext): readonly CutPreset[] {
 /** The default name of the n-th cut when the student adds one ("Corte 4", "Periodo de evaluación 2", "Etapa 3"). */
 export const defaultCutName = (type: EducationContext, n: number) =>
   `${GRADING_PERIOD_TERMS[type].one} ${n}`;
+
+/** A row of the cuts editor as the student types it: a name and a percentage that may be blank. */
+export interface PercentRow {
+  name: string;
+  percent: string;
+}
+
+/**
+ * The AUTO-REMAINDER, per subject: when exactly one cut has no percentage and the others are valid and leave something over, that
+ * one takes the rest (30 / 30 / blank → 40; 25 / blank / 40 → 35). With two or more blanks nothing is guessed, and a typo is never
+ * "fixed": a non-numeric row is not blank, it is wrong. Returns the index and the percentage (basis points), or null.
+ */
+export function remainderOf(rows: readonly PercentRow[]): { index: number; bp: number } | null {
+  const blanks = rows.flatMap((r, i) => (r.percent.trim() === '' ? [i] : []));
+  if (blanks.length !== 1) return null;
+  let sum = 0;
+  for (const [i, row] of rows.entries()) {
+    if (i === blanks[0]) continue;
+    const bp = percentToBp(row.percent);
+    if (bp === null || bp < 1) return null;
+    sum += bp;
+  }
+  const rest = 10_000 - sum;
+  return rest >= 1 ? { index: blanks[0]!, bp: rest } : null;
+}
+
+/** The same rows with the remainder written into the blank one (unchanged when nothing can be completed). */
+export function withRemainder<T extends PercentRow>(rows: readonly T[]): T[] {
+  const rest = remainderOf(rows);
+  return rows.map((r, i) =>
+    rest && i === rest.index ? { ...r, percent: bpToPercentText(rest.bp) } : r,
+  );
+}

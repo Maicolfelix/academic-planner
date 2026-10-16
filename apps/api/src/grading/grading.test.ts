@@ -45,7 +45,7 @@ async function world(
       cuts.push(
         (
           await agent
-            .post(`/api/periods/${period.id}/grading-periods`)
+            .post(`/api/subjects/${subject.id}/grading-periods`)
             .send({ name, finalShareBp })
             .expect(201)
         ).body.gradingPeriod,
@@ -62,7 +62,6 @@ describe('grading setup', () => {
     const w = await world('a@example.com', { grading: false });
     expect((await w.agent.get(`/api/periods/${w.period.id}/grading`).expect(200)).body).toEqual({
       profile: null,
-      gradingPeriods: [],
     });
     const created = await w.agent
       .post(`/api/periods/${w.period.id}/grading`)
@@ -155,7 +154,7 @@ describe('cuts', () => {
   it('require the scale first', async () => {
     const w = await world('a@example.com', { grading: false });
     const res = await w.agent
-      .post(`/api/periods/${w.period.id}/grading-periods`)
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'Corte 1', finalShareBp: 3000 });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('GRADING_NOT_CONFIGURED');
@@ -164,14 +163,14 @@ describe('cuts', () => {
   it('are numbered by the server and listed in order', async () => {
     const w = await world();
     expect(w.cuts).toHaveLength(3);
-    const list = (await w.agent.get(`/api/periods/${w.period.id}/grading`).expect(200)).body;
+    const list = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
     expect(list.gradingPeriods.map((c: { position: number }) => c.position)).toEqual([1, 2, 3]);
   });
 
   it('cannot add up to more than 100 %', async () => {
     const w = await world(); // already 100 %
     const res = await w.agent
-      .post(`/api/periods/${w.period.id}/grading-periods`)
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'Extra', finalShareBp: 1 });
     expect(res.status).toBe(400);
     expect(res.body.error.details.fields.finalShareBp).toBeDefined();
@@ -190,7 +189,7 @@ describe('cuts', () => {
     const w = await world('a@example.com', { grading: false });
     await w.agent.post(`/api/periods/${w.period.id}/grading`).send(SCALE_05).expect(201);
     await w.agent
-      .post(`/api/periods/${w.period.id}/grading-periods`)
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'Corte 1', finalShareBp: 3000 })
       .expect(201);
   });
@@ -199,7 +198,7 @@ describe('cuts', () => {
     const w = await world('a@example.com', { grading: false });
     await w.agent.post(`/api/periods/${w.period.id}/grading`).send(SCALE_05).expect(201);
     await w.agent
-      .post(`/api/periods/${w.period.id}/grading-periods`)
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'C', finalShareBp })
       .expect(400);
   });
@@ -210,7 +209,7 @@ describe('cuts', () => {
     const results = await Promise.all(
       Array.from({ length: 6 }, (_, i) =>
         w.agent
-          .post(`/api/periods/${w.period.id}/grading-periods`)
+          .post(`/api/subjects/${w.subject.id}/grading-periods`)
           .send({ name: `C${i}`, finalShareBp: 2500 }),
       ),
     );
@@ -258,24 +257,26 @@ describe('evaluations', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('GRADING_NOT_CONFIGURED');
 
-    // A second period with its own cut: the cut of another period is refused.
+    // A cut of ANOTHER subject (even of the same period) is refused: each subject has its own cuts.
     const w = await world('b@example.com');
-    const p2 = (
+    const other = (
       await w.agent
-        .post('/api/periods')
-        .send({ ...periodInput, name: 'Otro', studyTrackId: w.track.id })
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
         .expect(201)
-    ).body.period;
-    await w.agent.post(`/api/periods/${p2.id}/grading`).send(SCALE_05).expect(201);
-    const cut2 = (
+    ).body.subject;
+    const otherCut = (
       await w.agent
-        .post(`/api/periods/${p2.id}/grading-periods`)
+        .post(`/api/subjects/${other.id}/grading-periods`)
         .send({ name: 'C', finalShareBp: 10_000 })
         .expect(201)
     ).body.gradingPeriod;
-    const cross = await evaluation(w.agent, base(w, { gradingPeriodId: cut2.id }));
+    const cross = await evaluation(w.agent, base(w, { gradingPeriodId: otherCut.id }));
     expect(cross.status).toBe(400);
-    expect(cross.body.error.details.fields.gradingPeriodId).toBeDefined();
+    expect(cross.body.error.details.fields.gradingPeriodId).toEqual([
+      'El corte debe ser de esta materia.',
+    ]);
+    expect(await prisma.evaluation.count()).toBe(0);
   });
 
   it('creates with the owner and period derived by the server', async () => {
@@ -315,7 +316,16 @@ describe('evaluations', () => {
     const other = (
       await w.agent.post('/api/subjects').send({ periodId: w.period.id, name: 'Redes' }).expect(201)
     ).body.subject;
-    await evaluation(w.agent, base(w, { subjectId: other.id, periodShareBp: 10_000 })).expect(201);
+    const otherCut = (
+      await w.agent
+        .post(`/api/subjects/${other.id}/grading-periods`)
+        .send({ name: 'Nota final', finalShareBp: 10_000 })
+        .expect(201)
+    ).body.gradingPeriod;
+    await evaluation(
+      w.agent,
+      base(w, { subjectId: other.id, gradingPeriodId: otherCut.id, periodShareBp: 10_000 }),
+    ).expect(201);
   });
 
   it('concurrent evaluations cannot pass 100 %', async () => {
@@ -363,7 +373,7 @@ describe('evaluations', () => {
       .expect(201);
     const cut = (
       await w2.agent
-        .post(`/api/periods/${w2.period.id}/grading-periods`)
+        .post(`/api/subjects/${w2.subject.id}/grading-periods`)
         .send({ name: 'N', finalShareBp: 10_000 })
         .expect(201)
     ).body.gradingPeriod;
@@ -406,7 +416,7 @@ describe('evaluations', () => {
       .expect(201);
     const cut = (
       await w2.agent
-        .post(`/api/periods/${w2.period.id}/grading-periods`)
+        .post(`/api/subjects/${w2.subject.id}/grading-periods`)
         .send({ name: 'N', finalShareBp: 10_000 })
         .expect(201)
     ).body.gradingPeriod;
@@ -663,9 +673,7 @@ describe('deleting around grades', () => {
     const res = await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200);
     expect(res.body.evaluations).toHaveLength(1);
     expect(res.body.profile.passMilli).toBe(3000);
-    expect(
-      (await w.agent.get(`/api/periods/${w.period.id}/grading`).expect(200)).body.gradingPeriods,
-    ).toHaveLength(3);
+    expect(res.body.gradingPeriods).toHaveLength(3);
   });
 
   it('a period without evaluations deletes with its configuration (no orphans)', async () => {
@@ -798,6 +806,72 @@ describe('the database refuses what the service would', () => {
   });
 });
 
+describe('the database keeps each cut inside its subject', () => {
+  it('an evaluation cannot use a cut of another subject, and a cut cannot name a subject of another period', async () => {
+    const w = await world();
+    const other = (
+      await w.agent
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
+        .expect(201)
+    ).body.subject;
+    // same user, same period, but the cut is Farmacología's and the evaluation is Anatomía's
+    await expect(
+      prisma.evaluation.create({
+        data: {
+          userId: w.user.id,
+          periodId: w.period.id,
+          subjectId: other.id,
+          gradingPeriodId: w.cuts[0]!.id,
+          name: 'P',
+          periodShareBp: 1000,
+        },
+      }),
+    ).rejects.toThrow();
+    const p2 = (
+      await w.agent
+        .post('/api/periods')
+        .send({ ...periodInput, name: 'Otro', studyTrackId: w.track.id })
+        .expect(201)
+    ).body.period;
+    await expect(
+      prisma.gradingPeriod.create({
+        data: {
+          userId: w.user.id,
+          periodId: p2.id,
+          subjectId: w.subject.id,
+          name: 'X',
+          position: 9,
+          finalShareBp: 1000,
+        },
+      }),
+    ).rejects.toThrow(); // the subject belongs to another period
+    // (subjectId, position) is unique, but two subjects may both have a "position 1"
+    await prisma.gradingPeriod.create({
+      data: {
+        userId: w.user.id,
+        periodId: w.period.id,
+        subjectId: other.id,
+        name: 'C1',
+        position: 1,
+        finalShareBp: 10_000,
+      },
+    });
+    await expect(
+      prisma.gradingPeriod.create({
+        data: {
+          userId: w.user.id,
+          periodId: w.period.id,
+          subjectId: other.id,
+          name: 'C1 bis',
+          position: 1,
+          finalShareBp: 10,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+});
+
 describe('raw "earned/max" never leaves a stale canonical score', () => {
   const scale17 = { minMilli: 1000, maxMilli: 7000, passMilli: 4000, decimals: 1 };
 
@@ -807,7 +881,7 @@ describe('raw "earned/max" never leaves a stale canonical score', () => {
     await w.agent.post(`/api/periods/${w.period.id}/grading`).send(scale).expect(201);
     const cut = (
       await w.agent
-        .post(`/api/periods/${w.period.id}/grading-periods`)
+        .post(`/api/subjects/${w.subject.id}/grading-periods`)
         .send({ name: 'N', finalShareBp: 10_000 })
         .expect(201)
     ).body.gradingPeriod;
@@ -956,47 +1030,73 @@ describe('maintenance guard: the hand-written Evaluation → Activity key', () =
   });
 });
 
-describe('POST /periods/:id/grading/setup (atomic)', () => {
+describe('POST /subjects/:id/grading/setup (atomic, per subject)', () => {
   const profile = { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 };
   const cuts = [
     { name: 'Corte 1', finalShareBp: 3000 },
     { name: 'Corte 2', finalShareBp: 3000 },
     { name: 'Corte 3', finalShareBp: 4000 },
   ];
+  const setup = (a: Agent, subjectId: string, body: object) =>
+    a.post(`/api/subjects/${subjectId}/grading/setup`).send(body);
 
-  it('creates the scale and the cuts together, numbered in order', async () => {
+  it('the first subject creates the scale of the period and its own cuts, numbered in order', async () => {
     const w = await world('a@example.com', { grading: false });
-    const res = await w.agent
-      .post(`/api/periods/${w.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: cuts })
-      .expect(201);
+    const res = await setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts }).expect(201);
     expect(res.body.profile).toMatchObject(profile);
     expect(res.body.gradingPeriods.map((c: { position: number }) => c.position)).toEqual([1, 2, 3]);
+    expect(
+      res.body.gradingPeriods.every((c: { subjectId: string }) => c.subjectId === w.subject.id),
+    ).toBe(true);
     expect(await prisma.gradingPeriod.count()).toBe(3);
   });
 
-  it('is all or nothing: a second setup, an untracked period and bad weights leave nothing behind', async () => {
+  it('without a scale it needs one; with a scale it does not ask for it again (and ignores a second one)', async () => {
     const w = await world('a@example.com', { grading: false });
-    const over = await w.agent
-      .post(`/api/periods/${w.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: [...cuts, { name: 'Extra', finalShareBp: 1 }] });
+    const missing = await setup(w.agent, w.subject.id, { gradingPeriods: cuts });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.details.fields.profile).toBeDefined();
+    expect(await prisma.gradingPeriod.count()).toBe(0);
+    await setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts }).expect(201);
+
+    const other = (
+      await w.agent
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
+        .expect(201)
+    ).body.subject;
+    const second = await setup(w.agent, other.id, {
+      gradingPeriods: [{ name: 'Nota final', finalShareBp: 10_000 }],
+    }).expect(201);
+    expect(second.body.profile.passMilli).toBe(3000); // the period's scale
+    // a different scale sent by another subject does NOT replace the period's
+    const third = (
+      await w.agent.post('/api/subjects').send({ periodId: w.period.id, name: 'Ética' }).expect(201)
+    ).body.subject;
+    const ignored = await setup(w.agent, third.id, {
+      profile: { minMilli: 0, maxMilli: 100_000, passMilli: 60_000, decimals: 0 },
+      gradingPeriods: [{ name: 'Nota final', finalShareBp: 10_000 }],
+    }).expect(201);
+    expect(ignored.body.profile).toMatchObject(profile);
+    expect(await prisma.gradingProfile.count()).toBe(1);
+  });
+
+  it('is all or nothing: a second setup of the same subject, an untracked period and bad weights leave nothing behind', async () => {
+    const w = await world('a@example.com', { grading: false });
+    const over = await setup(w.agent, w.subject.id, {
+      profile,
+      gradingPeriods: [...cuts, { name: 'Extra', finalShareBp: 1 }],
+    });
     expect(over.status).toBe(400);
     expect(await prisma.gradingProfile.count()).toBe(0);
-    await w.agent
-      .post(`/api/periods/${w.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: cuts })
-      .expect(201);
-    const again = await w.agent
-      .post(`/api/periods/${w.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: cuts });
+    await setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts }).expect(201);
+    const again = await setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe('GRADING_EXISTS');
     expect(await prisma.gradingPeriod.count()).toBe(3);
 
     const u = await world('b@example.com', { tracked: false });
-    const untracked = await u.agent
-      .post(`/api/periods/${u.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: cuts });
+    const untracked = await setup(u.agent, u.subject.id, { profile, gradingPeriods: cuts });
     expect(untracked.status).toBe(409);
     expect(untracked.body.error.code).toBe('PERIOD_NOT_TRACKED');
   });
@@ -1014,9 +1114,7 @@ describe('POST /periods/:id/grading/setup (atomic)', () => {
         };
         return (cb as (t: unknown) => Promise<unknown>)(tx);
       }, opts)) as never);
-    const res = await w.agent
-      .post(`/api/periods/${w.period.id}/grading/setup`)
-      .send({ profile, gradingPeriods: cuts });
+    const res = await setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts });
     vi.restoreAllMocks();
     expect(res.status).toBe(500);
     expect(await prisma.gradingProfile.count()).toBe(0);
@@ -1037,32 +1135,207 @@ describe('POST /periods/:id/grading/setup (atomic)', () => {
       },
     ],
     ['bad scale', { profile: { ...profile, passMilli: 9000 }, gradingPeriods: cuts }],
+    [
+      'cuts that do not reach 100 %',
+      {
+        profile,
+        gradingPeriods: [
+          { name: 'A', finalShareBp: 3000 },
+          { name: 'B', finalShareBp: 3000 },
+          { name: 'C', finalShareBp: 3000 },
+        ],
+      },
+    ],
+    [
+      'cuts over 100 %',
+      {
+        profile,
+        gradingPeriods: [
+          { name: 'A', finalShareBp: 5000 },
+          { name: 'B', finalShareBp: 4000 },
+          { name: 'C', finalShareBp: 2000 },
+        ],
+      },
+    ],
   ])('rejects %s', async (_l, body) => {
     const w = await world('a@example.com', { grading: false });
-    await w.agent.post(`/api/periods/${w.period.id}/grading/setup`).send(body).expect(400);
+    await setup(w.agent, w.subject.id, body).expect(400);
     expect(await prisma.gradingProfile.count()).toBe(0);
   });
-});
 
-describe('the configuration belongs to the period (B2)', () => {
-  it('a second subject of the same period sees the scale and the cuts without configuring anything', async () => {
-    const w = await world();
+  it('two subjects configured at the same time end with ONE scale and their own independent cuts', async () => {
+    const w = await world('a@example.com', { grading: false });
     const other = (
       await w.agent
         .post('/api/subjects')
         .send({ periodId: w.period.id, name: 'Anatomía' })
         .expect(201)
     ).body.subject;
-    const mine = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
-    const theirs = (await w.agent.get(`/api/subjects/${other.id}/grades`).expect(200)).body;
-    expect(theirs.profile).toEqual(mine.profile);
-    expect(theirs.gradingPeriods).toEqual(mine.gradingPeriods);
-    expect(theirs.gradingPeriods).toHaveLength(3);
-    expect(theirs.evaluations).toEqual([]);
-    expect(theirs.summary).not.toBeNull();
+    const results = await Promise.all([
+      setup(w.agent, w.subject.id, { profile, gradingPeriods: cuts }),
+      setup(w.agent, other.id, {
+        profile,
+        gradingPeriods: [{ name: 'Nota final', finalShareBp: 10_000 }],
+      }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([201, 201]);
+    expect(await prisma.gradingProfile.count()).toBe(1);
+    expect(await prisma.gradingPeriod.count({ where: { subjectId: w.subject.id } })).toBe(3);
+    expect(await prisma.gradingPeriod.count({ where: { subjectId: other.id } })).toBe(1);
+  });
+});
+
+describe('each subject has its own cuts; only the scale is the period’s (D36 revised)', () => {
+  const profile = { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 };
+  const setupCuts = (a: Agent, subjectId: string, shares: number[], withProfile = false) =>
+    a
+      .post(`/api/subjects/${subjectId}/grading/setup`)
+      .send({
+        ...(withProfile && { profile }),
+        gradingPeriods: shares.map((finalShareBp, i) => ({ name: `Corte ${i + 1}`, finalShareBp })),
+      })
+      .expect(201);
+  const direct = (a: Agent, subjectId: string, cutId: string, scoreMilli: number) =>
+    a
+      .post('/api/evaluations')
+      .send({ subjectId, gradingPeriodId: cutId, isCutGrade: true, scoreMilli })
+      .expect(201);
+  const grades = async (a: Agent, subjectId: string) =>
+    (await a.get(`/api/subjects/${subjectId}/grades`).expect(200)).body;
+
+  /** Farmacología 30/30/40, Bases de datos 25/35/40, Seminario 100 %: the same period, the same scale. */
+  async function three() {
+    const w = await world('a@example.com', { grading: false });
+    const mk = async (name: string) =>
+      (await w.agent.post('/api/subjects').send({ periodId: w.period.id, name }).expect(201)).body
+        .subject;
+    const bases = await mk('Bases de datos');
+    const seminario = await mk('Seminario');
+    const a = await setupCuts(w.agent, w.subject.id, [3000, 3000, 4000], true);
+    const b = await setupCuts(w.agent, bases.id, [2500, 3500, 4000]);
+    const c = await setupCuts(w.agent, seminario.id, [10_000]);
+    return {
+      w,
+      bases,
+      seminario,
+      a: a.body.gradingPeriods,
+      b: b.body.gradingPeriods,
+      c: c.body.gradingPeriods,
+    };
+  }
+
+  it('three distributions coexist in one period: no shared rows, one shared scale', async () => {
+    const { w, bases, seminario, a, b, c } = await three();
+    expect(await prisma.gradingProfile.count()).toBe(1);
+    expect(new Set([...a, ...b, ...c].map((x: { id: string }) => x.id)).size).toBe(7); // 3 + 3 + 1, none shared
+    const ga = await grades(w.agent, w.subject.id);
+    const gb = await grades(w.agent, bases.id);
+    const gc = await grades(w.agent, seminario.id);
+    expect(ga.gradingPeriods.map((x: { finalShareBp: number }) => x.finalShareBp)).toEqual([
+      3000, 3000, 4000,
+    ]);
+    expect(gb.gradingPeriods.map((x: { finalShareBp: number }) => x.finalShareBp)).toEqual([
+      2500, 3500, 4000,
+    ]);
+    expect(gc.gradingPeriods.map((x: { finalShareBp: number }) => x.finalShareBp)).toEqual([
+      10_000,
+    ]);
+    expect(ga.profile).toEqual(gb.profile);
+    expect(gb.profile).toEqual(gc.profile);
+    // every response carries ONLY the cuts of its own subject
+    for (const [g, subject] of [
+      [ga, w.subject],
+      [gb, bases],
+      [gc, seminario],
+    ] as const)
+      expect(g.gradingPeriods.every((x: { subjectId: string }) => x.subjectId === subject.id)).toBe(
+        true,
+      );
   });
 
-  it('a subject of ANOTHER period of the same study does not (each period has its own scale)', async () => {
+  it('the same grades give each subject its own result (3.91, 3.975, 4.3)', async () => {
+    const { w, bases, seminario, a, b, c } = await three();
+    for (const [subjectId, cuts] of [
+      [w.subject.id, a],
+      [bases.id, b],
+    ] as const)
+      for (const [i, score] of [3200, 4500, 4000].entries())
+        await direct(w.agent, subjectId, cuts[i].id, score);
+    await direct(w.agent, seminario.id, c[0].id, 4300);
+    const sa = (await grades(w.agent, w.subject.id)).summary;
+    const sb = (await grades(w.agent, bases.id)).summary;
+    const sc = (await grades(w.agent, seminario.id)).summary;
+    expect(sa.currentMilli).toBe(3910); // 3.2·30 % + 4.5·30 % + 4.0·40 %
+    expect(sb.currentMilli).toBe(3975); // 3.2·25 % + 4.5·35 % + 4.0·40 % = 0.8 + 1.575 + 1.6
+    expect(sc.currentMilli).toBe(4300);
+    for (const s of [sa, sb, sc])
+      expect(s).toMatchObject({
+        complete: true,
+        remainingWeightUnits: 0,
+        evaluatedWeightUnits: 100_000_000,
+      });
+  });
+
+  it('editing or deleting a cut of one subject never touches another subject', async () => {
+    const { w, bases, a, b } = await three();
+    const before = await grades(w.agent, bases.id);
+    await w.agent
+      .patch(`/api/grading-periods/${a[0].id}`)
+      .send({ name: 'Primero', finalShareBp: 2000 })
+      .expect(200);
+    await w.agent
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
+      .send({ name: 'Extra', finalShareBp: 1000 })
+      .expect(201);
+    await w.agent.delete(`/api/grading-periods/${a[1].id}`).expect(204);
+    expect(await grades(w.agent, bases.id)).toEqual(before);
+    expect(b).toHaveLength(3);
+    // weights are checked PER SUBJECT: Bases de datos is full (100 %), Farmacología has room again
+    await w.agent
+      .post(`/api/subjects/${bases.id}/grading-periods`)
+      .send({ name: 'Más', finalShareBp: 1 })
+      .expect(400);
+  });
+
+  it('a subject can never use, edit or delete a cut of another subject', async () => {
+    const { w, bases, a, b } = await three();
+    const own = await evaluation(w.agent, {
+      subjectId: bases.id,
+      gradingPeriodId: a[0].id,
+      name: 'P',
+      periodShareBp: 1000,
+    });
+    expect(own.status).toBe(400); // a cut of another subject of the same period
+    const directCross = await w.agent
+      .post('/api/evaluations')
+      .send({ subjectId: bases.id, gradingPeriodId: a[0].id, isCutGrade: true, scoreMilli: 4000 });
+    expect(directCross.status).toBe(400);
+    const ev = (await direct(w.agent, bases.id, b[0].id, 3000)).body.evaluation;
+    const move = await w.agent
+      .patch(`/api/evaluations/${ev.id}`)
+      .send({ gradingPeriodId: a[0].id, name: 'x' });
+    expect(move.status).toBe(400);
+    expect(await prisma.evaluation.count()).toBe(1);
+  });
+
+  it('a subject whose cuts are not configured yet asks for them, and a subject keeps its cuts when another one is deleted', async () => {
+    const w = await world('a@example.com');
+    const other = (
+      await w.agent
+        .post('/api/subjects')
+        .send({ periodId: w.period.id, name: 'Anatomía' })
+        .expect(201)
+    ).body.subject;
+    const g = await grades(w.agent, other.id);
+    expect(g.profile).not.toBeNull(); // the scale already exists
+    expect(g.gradingPeriods).toEqual([]); // the 30/30/40 of Farmacología is NOT inherited
+    expect(g.summary).toBeNull();
+    await setupCuts(w.agent, other.id, [5000, 5000]);
+    await w.agent.delete(`/api/subjects/${other.id}`).expect(204); // configuration only: it goes with the subject
+    expect(await prisma.gradingPeriod.count()).toBe(3); // Farmacología's cuts are untouched
+  });
+
+  it('a subject of ANOTHER period of the same study has its own scale', async () => {
     const w = await world();
     const p2 = (
       await w.agent
@@ -1073,7 +1346,7 @@ describe('the configuration belongs to the period (B2)', () => {
     const s2 = (
       await w.agent.post('/api/subjects').send({ periodId: p2.id, name: 'Anatomía' }).expect(201)
     ).body.subject;
-    const res = (await w.agent.get(`/api/subjects/${s2.id}/grades`).expect(200)).body;
+    const res = await grades(w.agent, s2.id);
     expect(res.profile).toBeNull();
     expect(res.gradingPeriods).toEqual([]);
   });
@@ -1236,11 +1509,17 @@ describe('the direct grade of a cut (subject → cut → grade)', () => {
         JSON.stringify(body),
       ).toBe(400);
     }
+    const otherCut = (
+      await w.agent
+        .post(`/api/subjects/${other.id}/grading-periods`)
+        .send({ name: 'Nota final', finalShareBp: 10_000 })
+        .expect(201)
+    ).body.gradingPeriod;
     await w.agent
       .post('/api/evaluations')
       .send({
         subjectId: other.id,
-        gradingPeriodId: w.cuts[0]!.id,
+        gradingPeriodId: otherCut.id,
         isCutGrade: true,
         scoreMilli: 2000,
       })

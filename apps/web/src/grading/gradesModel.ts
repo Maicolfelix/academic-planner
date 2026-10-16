@@ -10,6 +10,7 @@ import {
   formatScore,
   percentToBp,
   pointsToMilli,
+  withRemainder,
   scaleProblems,
   scoreToMilli,
   type CreateEvaluationInput,
@@ -508,9 +509,14 @@ export const rowsFromDrafts = (cuts: readonly CutDraft[]): CutRow[] =>
 export const rowsTotalBp = (rows: readonly CutRow[]) =>
   rows.reduce((sum, r) => sum + (percentToBp(r.percent) ?? 0), 0);
 
+/**
+ * The cuts of ONE subject as typed. ONE blank percentage takes the rest (30 / 30 / blank → 40; 25 / blank / 40 → 35); two or more
+ * blanks are never guessed. The result must add up to EXACTLY 100 %.
+ */
 export function buildCuts(
-  rows: readonly CutRow[],
+  typed: readonly CutRow[],
 ): { cuts: CutDraft[]; errors?: undefined } | { cuts?: undefined; errors: string[] } {
+  const rows = withRemainder(typed);
   const errors: string[] = [];
   if (rows.length === 0) errors.push('Agrega al menos un corte.');
   const cuts: CutDraft[] = [];
@@ -522,8 +528,10 @@ export function buildCuts(
       errors.push(`Escribe un peso entre 0 y 100 % para el corte ${i + 1}.`);
     if (name && bp !== null && bp >= 1) cuts.push({ name, finalShareBp: bp });
   });
-  if (errors.length === 0 && rowsTotalBp(rows) > 10_000)
-    errors.push(`Los cortes suman ${formatPercent(rowsTotalBp(rows))}: no pueden pasar de 100 %.`);
+  if (errors.length === 0 && rowsTotalBp(rows) !== 10_000)
+    errors.push(
+      `Los cortes suman ${formatPercent(rowsTotalBp(rows))}: deben sumar exactamente 100 %.`,
+    );
   return errors.length > 0 ? { errors } : { cuts };
 }
 

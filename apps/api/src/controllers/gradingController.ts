@@ -2,7 +2,7 @@ import {
   createEvaluationSchema,
   createGradingPeriodSchema,
   createGradingProfileSchema,
-  setupGradingSchema,
+  setupSubjectGradingSchema,
   updateEvaluationSchema,
   updateGradingPeriodSchema,
   updateGradingProfileSchema,
@@ -23,11 +23,11 @@ export function createGradingController(service: GradingService) {
       res.status(201).json({ profile: await service.setupProfile(owner(req), periodId, input) });
     }) satisfies RequestHandler,
 
-    /** The scale and the cuts of a period in one atomic request. */
-    setupAll: (async (req, res) => {
-      const periodId = parseIdParam(req.params.id, 'Periodo no encontrado.');
-      const input = setupGradingSchema.parse(req.body ?? {});
-      res.status(201).json(await service.setupGrading(owner(req), periodId, input));
+    /** How a subject splits its final grade (and, the first time, the period's scale) in one atomic request. */
+    setupSubject: (async (req, res) => {
+      const subjectId = parseIdParam(req.params.id, 'Asignatura no encontrada.');
+      const input = setupSubjectGradingSchema.parse(req.body ?? {});
+      res.status(201).json(await service.setupSubjectGrading(owner(req), subjectId, input));
     }) satisfies RequestHandler,
 
     getPeriod: (async (req, res) => {
@@ -42,9 +42,11 @@ export function createGradingController(service: GradingService) {
     }) satisfies RequestHandler,
 
     createCut: (async (req, res) => {
-      const periodId = parseIdParam(req.params.id, 'Periodo no encontrado.');
+      const subjectId = parseIdParam(req.params.id, 'Asignatura no encontrada.');
       const input = createGradingPeriodSchema.parse(req.body ?? {});
-      res.status(201).json({ gradingPeriod: await service.createCut(owner(req), periodId, input) });
+      res
+        .status(201)
+        .json({ gradingPeriod: await service.createCut(owner(req), subjectId, input) });
     }) satisfies RequestHandler,
 
     updateCut: (async (req, res) => {

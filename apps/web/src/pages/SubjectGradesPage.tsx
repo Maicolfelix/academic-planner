@@ -205,10 +205,14 @@ function TrackedGradesView({
                   icon: <SlidersIcon />,
                   onSelect: () => setDialog({ kind: 'scale' }),
                 },
-                {
-                  label: `Agregar ${terms.one.toLowerCase()}`,
-                  onSelect: () => setDialog({ kind: 'cut' }),
-                },
+                ...(grades.gradingPeriods.length > 0
+                  ? [
+                      {
+                        label: `Agregar ${terms.one.toLowerCase()}`,
+                        onSelect: () => setDialog({ kind: 'cut' }),
+                      },
+                    ]
+                  : []),
               ]}
             />
           )
@@ -235,7 +239,7 @@ function TrackedGradesView({
 
       {!profile && (
         <EmptyState
-          title="Configura cómo califican esta materia"
+          title="Configura las notas de esta materia"
           titleAs="h2"
           action={
             <Button variant="primary" onClick={() => setDialog({ kind: 'setup' })}>
@@ -243,7 +247,23 @@ function TrackedGradesView({
             </Button>
           }
         >
-          La escala y {terms.theMany} se comparten con las demás materias de este periodo.
+          Primero la escala, que se comparte con las demás materias de este periodo, y luego cómo se
+          divide la nota final de {subject.name}.
+        </EmptyState>
+      )}
+
+      {profile && grades.gradingPeriods.length === 0 && (
+        <EmptyState
+          title="¿Cómo se divide esta materia?"
+          titleAs="h2"
+          action={
+            <Button variant="primary" onClick={() => setDialog({ kind: 'setup' })}>
+              Configurar {terms.many.toLowerCase()}
+            </Button>
+          }
+        >
+          La escala del periodo ya está configurada. Cada materia tiene sus propios{' '}
+          {terms.many.toLowerCase()} y porcentajes.
         </EmptyState>
       )}
 
@@ -337,23 +357,11 @@ function TrackedGradesView({
           />
         ))}
 
-      {profile && grades.gradingPeriods.length === 0 && (
-        <EmptyState
-          title={`Aún no hay ${terms.many.toLowerCase()}`}
-          titleAs="h2"
-          action={
-            <Button variant="primary" onClick={() => setDialog({ kind: 'cut' })}>
-              Agregar {terms.one.toLowerCase()}
-            </Button>
-          }
-        >
-          Agrega al menos uno para registrar evaluaciones.
-        </EmptyState>
-      )}
-
       {dialog?.kind === 'setup' && (
         <SetupDialog
-          periodId={period.id}
+          subjectId={subject.id}
+          subjectName={subject.name}
+          hasScale={profile !== null}
           studyType={studyType}
           onClose={close}
           onDone={() => done('Notas configuradas.')}
@@ -369,7 +377,7 @@ function TrackedGradesView({
       )}
       {dialog?.kind === 'cut' && profile && (
         <CutDialog
-          periodId={profile.periodId}
+          subjectId={subject.id}
           studyType={studyType}
           cut={dialog.cut}
           defaultName={defaultCutName(studyType, grades.gradingPeriods.length + 1)}
@@ -424,7 +432,6 @@ function TrackedGradesView({
           kind="evaluation"
           id={dialog.evaluation.id}
           name={dialog.evaluation.name}
-          periodId={period.id}
           subjectId={subject.id}
           onClose={close}
           onDone={() => done('Evaluación eliminada.')}
@@ -435,7 +442,6 @@ function TrackedGradesView({
           kind="cut"
           id={dialog.cut.id}
           name={dialog.cut.name}
-          periodId={period.id}
           subjectId={subject.id}
           onClose={close}
           onDone={() => done('Eliminado.')}

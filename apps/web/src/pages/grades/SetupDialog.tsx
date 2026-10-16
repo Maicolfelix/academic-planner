@@ -1,11 +1,12 @@
 import {
   GRADING_PERIOD_TERMS,
   SCALE_PRESETS,
+  bpToPercentText,
   cutPresets,
   defaultCutName,
-  formatPercent,
+  remainderOf,
   type EducationContext,
-  type SetupGradingInput,
+  type SetupSubjectGradingInput,
 } from '@planner/core';
 import { useState, type FormEvent } from 'react';
 import { ApiRequestError } from '../../api/client';
@@ -15,7 +16,7 @@ import { SelectField } from '../../components/SelectField';
 import { Button } from '../../components/ui/Button';
 import { FIELD_LABEL } from '../../components/ui/fieldStyles';
 import { FormActions, FormError } from '../../components/ui/form';
-import { useSetupGrading } from '../../grading/useGrading';
+import { useSetupSubjectGrading } from '../../grading/useGrading';
 import {
   buildCuts,
   buildScale,
@@ -28,8 +29,11 @@ import {
 } from '../../grading/gradesModel';
 
 interface Props {
-  periodId: string;
+  subjectId: string;
+  subjectName: string;
   studyType: EducationContext;
+  /** The period already has its scale: the dialog then only asks how THIS subject splits its final grade. */
+  hasScale: boolean;
   onClose: () => void;
   onDone: () => void;
 }
@@ -84,15 +88,24 @@ function Choices({
 }
 
 /**
- * The first configuration of a period, in two steps and ONE request: the scale, then the cuts. Nothing is saved until the last
- * "Guardar", so closing in the middle leaves nothing half done. Friendly numbers only (3.0, 40 %); the conversions are core's.
+ * The first configuration of a SUBJECT, in one request. The SCALE belongs to the period (shared by its subjects): it is asked only
+ * while the period has none. The CUTS belong to the subject: every subject is asked how ITS final grade is split, with quick
+ * options that are only helps (never an inference from the institution) and a custom editor where ONE blank percentage takes the
+ * rest. Nothing is saved until the last "Guardar", so closing in the middle leaves nothing half done.
  */
-export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
-  const setup = useSetupGrading(periodId);
+export function SetupDialog({
+  subjectId,
+  subjectName,
+  studyType,
+  hasScale,
+  onClose,
+  onDone,
+}: Props) {
+  const setup = useSetupSubjectGrading(subjectId);
   const terms = GRADING_PERIOD_TERMS[studyType];
   const presets = cutPresets(studyType);
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2>(hasScale ? 2 : 1);
   const [scaleChoice, setScaleChoice] = useState<string>(SCALE_PRESETS[0]!.id);
   const [scale, setScale] = useState<ScaleFormValues>(presetValues(SCALE_PRESETS[0]!.id));
   const [scaleErrors, setScaleErrors] = useState<ScaleErrors>({});
@@ -129,97 +142,105 @@ export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
   function save(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
-    const profile = buildScale(scale);
-    if (profile.errors) {
-      setStep(1);
-      return setScaleErrors(profile.errors);
+    let profile: SetupSubjectGradingInput['profile'];
+    if (!hasScale) {
+      const built = buildScale(scale);
+      if (built.errors) {
+        setStep(1);
+        return setScaleErrors(built.errors);
+      }
+      profile = built.profile;
     }
     const cuts = buildCuts(rows);
     if (cuts.errors) return setCutErrors(cuts.errors);
     setCutErrors([]);
-    const input: SetupGradingInput = { profile: profile.profile, gradingPeriods: cuts.cuts };
-    setup.mutate(input, {
-      onSuccess: onDone,
-      onError: (err) =>
-        setFormError(
-          err instanceof ApiRequestError ? gradingErrorText(err.code, err.message) : err.message,
-        ),
-    });
+    setup.mutate(
+      { ...(profile && { profile }), gradingPeriods: cuts.cuts },
+      {
+        onSuccess: onDone,
+        onError: (err) =>
+          setFormError(
+            err instanceof ApiRequestError ? gradingErrorText(err.code, err.message) : err.message,
+          ),
+      },
+    );
   }
 
   const total = rowsTotalBp(rows);
+  const rest = remainderOf(rows);
 
   return (
     <Modal
       title={step === 1 ? 'Configurar notas · Escala' : `Configurar notas · ${terms.many}`}
       onClose={onClose}
     >
-      <p className="mb-4 text-sm text-muted-foreground">
-        La escala y {terms.theMany} se comparten con las demás materias de este periodo.
-      </p>
-
       {step === 1 && (
-        <form onSubmit={next} noValidate className="flex flex-col gap-4">
-          <Choices
-            legend="¿Cómo se califica?"
-            name="scale"
-            value={scaleChoice}
-            onChange={chooseScale}
-            options={[
-              ...SCALE_PRESETS.map((p) => ({ value: p.id, label: p.label })),
-              { value: CUSTOM, label: 'Personalizada' },
-            ]}
-          />
-          {scaleChoice === CUSTOM && (
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                id="scale-min"
-                label="Mínimo"
-                inputMode="decimal"
-                value={scale.min}
-                onChange={(min) => setScale({ ...scale, min })}
-                error={scaleErrors.min}
-              />
-              <FormField
-                id="scale-max"
-                label="Máximo"
-                inputMode="decimal"
-                value={scale.max}
-                onChange={(max) => setScale({ ...scale, max })}
-                error={scaleErrors.max}
-              />
-              <FormField
-                id="scale-pass"
-                label="Aprueba con"
-                inputMode="decimal"
-                value={scale.pass}
-                onChange={(pass) => setScale({ ...scale, pass })}
-                error={scaleErrors.pass}
-              />
-              <SelectField
-                id="scale-decimals"
-                label="Decimales"
-                value={scale.decimals}
-                onChange={(decimals) => setScale({ ...scale, decimals })}
-                options={[0, 1, 2, 3].map((n) => ({ value: String(n), label: String(n) }))}
-                error={scaleErrors.decimals}
-              />
-            </div>
-          )}
-          <FormActions>
-            <Button onClick={onClose}>Cancelar</Button>
-            <Button type="submit" variant="primary">
-              Siguiente
-            </Button>
-          </FormActions>
-        </form>
+        <>
+          <p className="mb-4 text-sm text-muted-foreground">
+            La escala se comparte con las demás materias de este periodo.
+          </p>
+          <form onSubmit={next} noValidate className="flex flex-col gap-4">
+            <Choices
+              legend="¿Cómo se califica?"
+              name="scale"
+              value={scaleChoice}
+              onChange={chooseScale}
+              options={[
+                ...SCALE_PRESETS.map((p) => ({ value: p.id, label: p.label })),
+                { value: CUSTOM, label: 'Personalizada' },
+              ]}
+            />
+            {scaleChoice === CUSTOM && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  id="scale-min"
+                  label="Mínimo"
+                  inputMode="decimal"
+                  value={scale.min}
+                  onChange={(min) => setScale({ ...scale, min })}
+                  error={scaleErrors.min}
+                />
+                <FormField
+                  id="scale-max"
+                  label="Máximo"
+                  inputMode="decimal"
+                  value={scale.max}
+                  onChange={(max) => setScale({ ...scale, max })}
+                  error={scaleErrors.max}
+                />
+                <FormField
+                  id="scale-pass"
+                  label="Aprueba con"
+                  inputMode="decimal"
+                  value={scale.pass}
+                  onChange={(pass) => setScale({ ...scale, pass })}
+                  error={scaleErrors.pass}
+                />
+                <SelectField
+                  id="scale-decimals"
+                  label="Decimales"
+                  value={scale.decimals}
+                  onChange={(decimals) => setScale({ ...scale, decimals })}
+                  options={[0, 1, 2, 3].map((n) => ({ value: String(n), label: String(n) }))}
+                  error={scaleErrors.decimals}
+                />
+              </div>
+            )}
+            <FormActions>
+              <Button onClick={onClose}>Cancelar</Button>
+              <Button type="submit" variant="primary">
+                Siguiente
+              </Button>
+            </FormActions>
+          </form>
+        </>
       )}
 
       {step === 2 && (
         <form onSubmit={save} noValidate className="flex flex-col gap-4">
           {formError && <FormError>{formError}</FormError>}
           <Choices
-            legend={`¿Cómo se reparte la nota final? (${terms.many})`}
+            legend={`¿Cómo se divide ${subjectName}? (${terms.many})`}
             name="cuts"
             value={cutChoice}
             onChange={chooseCuts}
@@ -228,6 +249,9 @@ export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
               { value: CUSTOM, label: 'Personalizar' },
             ]}
           />
+          <p className="text-sm text-muted-foreground">
+            Cada materia tiene su propia distribución: esto solo vale para {subjectName}.
+          </p>
           {cutChoice === CUSTOM && (
             <div className="flex flex-col gap-3">
               {rows.map((row, i) => (
@@ -244,6 +268,7 @@ export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
                     label="Peso (%)"
                     inputMode="decimal"
                     value={row.percent}
+                    placeholder={rest?.index === i ? bpToPercentText(rest.bp) : undefined}
                     onChange={(percent) =>
                       setRows(rows.map((r, j) => (j === i ? { ...r, percent } : r)))
                     }
@@ -274,8 +299,9 @@ export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
                 </Button>
               )}
               <p role="status" className="text-sm text-muted-foreground">
-                Suman {formatPercent(total)}.
-                {total < 10_000 && ' Si falta, tus cálculos se marcarán como estimación.'}
+                {rest
+                  ? `El peso que dejes en blanco tomará el resto: ${bpToPercentText(rest.bp)} %.`
+                  : `Suman ${bpToPercentText(total)} %. Deben sumar 100 %.`}
               </p>
             </div>
           )}
@@ -287,8 +313,8 @@ export function SetupDialog({ periodId, studyType, onClose, onDone }: Props) {
             </ul>
           )}
           <FormActions>
-            <Button onClick={() => setStep(1)} disabled={setup.isPending}>
-              Atrás
+            <Button onClick={() => (hasScale ? onClose() : setStep(1))} disabled={setup.isPending}>
+              {hasScale ? 'Cancelar' : 'Atrás'}
             </Button>
             <Button type="submit" variant="primary" disabled={setup.isPending}>
               {setup.isPending ? 'Guardando…' : 'Guardar'}

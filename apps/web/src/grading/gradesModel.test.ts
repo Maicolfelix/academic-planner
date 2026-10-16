@@ -46,6 +46,7 @@ const profile = (over: Partial<GradingProfile> = {}): GradingProfile => ({
 const cut = (n: number, bp: number): GradingPeriod => ({
   id: U(10 + n),
   periodId: U(2),
+  subjectId: U(3),
   name: `Corte ${n}`,
   position: n,
   finalShareBp: bp,
@@ -249,23 +250,41 @@ describe('the scale and the cuts', () => {
     expect(buildScale({ min: 'a', max: '5', pass: '3', decimals: '1' }).errors?.min).toBeDefined();
   });
 
-  it('custom cuts must be named, weighted and not pass 100 %; under 100 % is allowed', () => {
-    const rows = rowsFromDrafts([
-      { name: 'A', finalShareBp: 6000 },
-      { name: 'B', finalShareBp: 4000 },
-    ]);
-    expect(buildCuts(rows).cuts).toHaveLength(2);
-    expect(buildCuts([{ name: 'A', percent: '60' }]).cuts).toEqual([
-      { name: 'A', finalShareBp: 6000 },
-    ]);
-    expect(
-      buildCuts([
-        { name: 'A', percent: '70' },
-        { name: 'B', percent: '40' },
-      ]).errors?.[0],
-    ).toMatch(/110 %/);
+  const typed = (...p: string[]) => p.map((percent, i) => ({ name: `Corte ${i + 1}`, percent }));
+  const shares = (r: ReturnType<typeof buildCuts>) => r.cuts?.map((c) => c.finalShareBp);
+
+  it('the cuts of a subject add up to EXACTLY 100 %: 30/30/40 is valid, 30/30/30 and 50/40/20 are not', () => {
+    expect(shares(buildCuts(typed('30', '30', '40')))).toEqual([3000, 3000, 4000]);
+    expect(buildCuts(typed('30', '30', '30')).errors?.[0]).toMatch(/suman 90 %.*exactamente 100 %/);
+    expect(buildCuts(typed('50', '40', '20')).errors?.[0]).toMatch(/suman 110 %/);
+    expect(shares(buildCuts(typed('100')))).toEqual([10_000]); // a single grade is a normal case
+    expect(shares(buildCuts(typed('')))).toEqual([10_000]); // a lone blank cut is the whole grade
+  });
+
+  it('ONE blank percentage takes the rest of ITS subject: 30/30/blank → 40, 25/blank/40 → 35, blank/35/40 → 25', () => {
+    expect(shares(buildCuts(typed('30', '30', '')))).toEqual([3000, 3000, 4000]);
+    expect(shares(buildCuts(typed('25', '', '40')))).toEqual([2500, 3500, 4000]);
+    expect(shares(buildCuts(typed('', '35', '40')))).toEqual([2500, 3500, 4000]);
+    expect(shares(buildCuts(typed('50', '')))).toEqual([5000, 5000]);
+  });
+
+  it('never guesses: 30/blank/blank and blank/blank do not save', () => {
+    expect(buildCuts(typed('30', '', '')).errors).toBeDefined();
+    expect(buildCuts(typed('', '')).errors).toBeDefined();
+    expect(buildCuts(typed('60', '40', '')).errors).toBeDefined(); // nothing left for the blank one
+  });
+
+  it('cuts must be named and weighted', () => {
     expect(buildCuts([{ name: '', percent: 'x' }]).errors).toHaveLength(2);
     expect(buildCuts([]).errors).toBeDefined();
+    expect(
+      buildCuts(
+        rowsFromDrafts([
+          { name: 'A', finalShareBp: 6000 },
+          { name: 'B', finalShareBp: 4000 },
+        ]),
+      ).cuts,
+    ).toHaveLength(2);
   });
 
   it('explains a locked scale in words', () => {
