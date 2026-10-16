@@ -455,3 +455,34 @@ test('J · materia → corte → nota: only the second cut graded 4.5, no name a
   await axe(page, 'grades · direct cut grades');
   check();
 });
+
+test('K · the three cuts graded 3.2 / 4.5 / 4.0 is 3.9, fully graded, with nothing to ask', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Farmacología']);
+  await page.goto(gradesUrl(subjects[0]!.id));
+  await configureDefault(page);
+  for (const [cut, grade] of [
+    ['Corte 1', '3.2'],
+    ['Corte 2', '4.5'],
+    ['Corte 3', '4.0'],
+  ] as const) {
+    await page.getByRole('button', { name: `Registrar nota de ${cut}` }).click();
+    const dialog = page.getByRole('dialog', { name: `Nota de ${cut}` });
+    await expect(dialog.getByLabel('Nombre')).toHaveCount(0);
+    await dialog.getByRole('textbox', { name: 'Nota' }).fill(grade);
+    await save(dialog, 'Guardar');
+  }
+  await expect(page.getByTestId('accumulated-grade')).toHaveText('3.9');
+  await expect(page.getByTestId('cuts-with-grade')).toHaveText('3 de 3 cortes con nota');
+  await expect(page.getByTestId('weights-line')).toContainText('Calificado 100 %');
+  await expect(page.getByTestId('weights-line')).toContainText('Pendiente 0 %');
+  await expect(page.getByText('Aporta a la definitiva: 0.96')).toBeVisible();
+  await expect(page.getByText('Aporta a la definitiva: 1.35')).toBeVisible();
+  await expect(page.getByText('Aporta a la definitiva: 1.60')).toBeVisible();
+  await expect(page.getByText('¿Cuánto necesito?')).toHaveCount(0);
+  await expect(page.getByTestId('estimate-note')).toHaveCount(0);
+  await expect(page.getByText(/Peso:/)).toHaveCount(0);
+  check();
+});

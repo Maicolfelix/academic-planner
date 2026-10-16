@@ -294,12 +294,15 @@ function TrackedGradesView({
               Promedio de los {terms.many.toLowerCase()} o evaluaciones que ya tienen nota.
             </p>
           </div>
-          <RequiredBlock
-            summary={summary}
-            decimals={profile.decimals}
-            passMilli={profile.passMilli}
-            estimate={estimateText(summary, groups, terms.many.toLowerCase())}
-          />
+          {/* With nothing left to grade there is nothing to ask: "¿Cuánto necesito?" would have no answer to give. */}
+          {summary.remainingWeightUnits > 0 && (
+            <RequiredBlock
+              summary={summary}
+              decimals={profile.decimals}
+              passMilli={profile.passMilli}
+              estimate={estimateText(summary, groups, terms.many.toLowerCase())}
+            />
+          )}
         </Card>
       )}
 

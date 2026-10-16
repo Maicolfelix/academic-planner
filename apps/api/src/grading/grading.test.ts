@@ -1275,3 +1275,35 @@ describe('the direct grade of a cut (subject → cut → grade)', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('every cut graded directly (QA case)', () => {
+  it('3.2 / 4.5 / 4.0 on 30/30/40: fully graded, nothing pending, no estimate', async () => {
+    const w = await world();
+    for (const [i, scoreMilli] of [3200, 4500, 4000].entries())
+      await w.agent
+        .post('/api/evaluations')
+        .send({
+          subjectId: w.subject.id,
+          gradingPeriodId: w.cuts[i]!.id,
+          isCutGrade: true,
+          scoreMilli,
+        })
+        .expect(201);
+    const res = (await w.agent.get(`/api/subjects/${w.subject.id}/grades`).expect(200)).body;
+    expect(
+      res.evaluations.every(
+        (e: { isCutGrade: boolean; periodShareBp: number }) =>
+          e.isCutGrade && e.periodShareBp === 10_000,
+      ),
+    ).toBe(true);
+    expect(res.summary).toMatchObject({
+      complete: true,
+      undefinedWeightUnits: 0,
+      evaluatedWeightUnits: 100_000_000,
+      remainingWeightUnits: 0,
+      currentMilli: 3910,
+      currentPasses: true,
+      required: { status: 'SECURED' },
+    });
+  });
+});

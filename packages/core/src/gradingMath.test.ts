@@ -227,6 +227,29 @@ describe('requiredScore', () => {
     expect(ceilMilli(2358, 1)).toBe(2400);
   });
 
+  it('EXAMPLE (QA): 30/30/40 with the three cuts graded 3.2 / 4.5 / 4.0 is 3.91, fully graded, nothing left to ask', () => {
+    const items: WeightedScore[] = [
+      { gradingPeriodId: 'c1', periodShareBp: 10_000, scoreMilli: 3200 },
+      { gradingPeriodId: 'c2', periodShareBp: 10_000, scoreMilli: 4500 },
+      { gradingPeriodId: 'c3', periodShareBp: 10_000, scoreMilli: 4000 },
+    ];
+    expect(accumulatedMilli(cuts, items)).toBe(3910); // 3.2·30 % + 4.5·30 % + 4.0·40 % = 3.91 exactly (NOT 1.4)
+    expect(roundMilli(3910, 1)).toBe(3900); // shown 3.9 / 5.0
+    const s = summarizeSubjectGrade(scale05, cuts, items);
+    expect(s.evaluatedWeightUnits).toBe(WEIGHT_UNIT_TOTAL); // 100 % evaluated
+    expect(s.remainingWeightUnits).toBe(0); // 0 % pending
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.complete).toBe(true); // no estimate
+    expect(s.currentMilli).toBe(3910);
+    expect(s.currentPasses).toBe(true);
+    expect([
+      cutContributionMilli(3000, 3200),
+      cutContributionMilli(3000, 4500),
+      cutContributionMilli(4000, 4000),
+    ]).toEqual([960, 1350, 1600]);
+    expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'SECURED' }); // nothing remains to be asked
+  });
+
   it('the contribution of a graded cut to the final grade (4.5 on 30 % → 1.35), not its average', () => {
     expect(cutContributionMilli(3000, 4500)).toBe(1350);
     expect(cutContributionMilli(4000, 3000)).toBe(1200);

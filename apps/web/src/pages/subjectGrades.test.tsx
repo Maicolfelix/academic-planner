@@ -290,6 +290,46 @@ describe('the subject grades page', () => {
     expect(out).not.toContain('lo pendiente cuenta 0'); // not the main explanation of the accumulated grade
   });
 
+  it('QA case: the three cuts graded 3.2 / 4.5 / 4.0 is 3.9 / 5.0, fully graded, with nothing to ask or estimate', () => {
+    const [c1, c2, c3] = [cut(1, 3000), cut(2, 3000), cut(3, 4000)];
+    const direct = (n: number, id: string, scoreMilli: number) =>
+      evaluation(n, id, {
+        periodShareBp: 10_000,
+        scoreMilli,
+        isCutGrade: true,
+        name: `Nota de Corte ${n}`,
+      });
+    const out = render({
+      grades: configured({
+        gradingPeriods: [c1, c2, c3],
+        evaluations: [direct(1, c1.id, 3200), direct(2, c2.id, 4500), direct(3, c3.id, 4000)],
+        summary: summary({
+          complete: true,
+          currentMilli: 3910,
+          currentPasses: true,
+          evaluatedWeightUnits: 100_000_000,
+          remainingWeightUnits: 0,
+          undefinedWeightUnits: 0,
+          required: { status: 'SECURED' },
+        }),
+      }),
+    });
+    expect(out).toMatch(/data-testid="accumulated-grade"[^>]*>3\.9</); // NOT 1.4
+    expect(out).toContain('/ 5.0');
+    expect(out).toContain('3 de 3 cortes con nota');
+    expect(out).toContain('Objetivo para aprobar');
+    expect(out).toContain('Calificado 100 %');
+    expect(out).toContain('Pendiente 0 %');
+    expect(out).toContain('Aporta a la definitiva: 0.96');
+    expect(out).toContain('Aporta a la definitiva: 1.35');
+    expect(out).toContain('Aporta a la definitiva: 1.60');
+    expect(out).not.toContain('¿Cuánto necesito?'); // nothing left to grade
+    expect(out).not.toContain('Estimación');
+    expect(out).not.toContain('Peso:'); // no internal evaluation weights
+    expect(out).not.toContain('Agregar evaluación a');
+    expect(out).not.toMatch(/Nombre/);
+  });
+
   it('a cut broken down into evaluations keeps the detailed rows, with their name and weight', () => {
     const c1 = cut(1, 3000);
     const out = render({
