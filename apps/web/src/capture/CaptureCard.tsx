@@ -14,6 +14,7 @@ import { Card } from '../components/ui/Card';
 import { AlertIcon, CheckIcon, ChevronDownIcon } from '../components/ui/icons';
 import { clockLabel, humanDate } from './format';
 import {
+  agendaBlocked,
   effectiveDate,
   effectiveDescription,
   effectiveSubject,
@@ -118,6 +119,7 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
       (b) => b.field === field && /^(UNRESOLVED_|REFERENCE_AMBIGUOUS)/.test(b.code),
     )?.message;
 
+  const blocked = agendaBlocked(state, p.clientId);
   const notes = p.warnings.filter((w) => w.code !== 'POSSIBLE_DUPLICATE');
 
   return (
@@ -133,7 +135,7 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
               type="checkbox"
               checked={item.selected}
               onChange={(e) => actions.toggle(e.target.checked)}
-              disabled={disabled}
+              disabled={disabled || blocked}
               aria-label={`Incluir ${label}`}
               className="size-5 accent-[var(--accent)]"
             />
@@ -168,6 +170,13 @@ export function CaptureCard({ index, item, state, subjects, actions, level, disa
             <Badge tone="warning">Falta algo</Badge>
           )}
         </header>
+
+        {blocked && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Esta actividad no se añadirá a la Agenda porque la materia elegida pertenece a otro
+            estudio.
+          </p>
+        )}
 
         {item.error && (
           <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink">

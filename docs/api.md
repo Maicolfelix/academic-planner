@@ -197,3 +197,7 @@ Reglas completas, formato de errores y concurrencia: [schedule-import.md](schedu
 ## Rutas que no existen
 
 Cualquier otra ruta bajo `/api` responde un `404` JSON (`NOT_FOUND`), nunca HTML. No hay registro de dispositivos, notificaciones push, correo ni integración con calendarios externos.
+
+### Notas por Captura inteligente (B3)
+
+`POST /api/capture/parse` devuelve además `grades: { suggestions }` (vacío si el texto no habla de notas). `POST /api/capture/confirm` acepta `evaluations` (≤ 20; `clientId`, `action`, `subjectId` y, según la acción, `gradingPeriodId` / `evaluationId` / `name` / `periodShareBp` / `scoreMilli` / `rawEarnedMilli` + `rawMaxMilli` / `expectScoreMilli` / `activityClientId`); responde además `evaluations: [{ clientId, action, evaluation }]`. Errores: `409 EVALUATION_CONFLICT` (ítems `EVALUATION_CONFLICT`, `STALE_EVALUATION`, `DUPLICATE_EVALUATION`; no se guardó nada), 400 con `details.items` por `clientId`. Detalle: [academic.md](academic.md#captura-inteligente-de-notas-b3).

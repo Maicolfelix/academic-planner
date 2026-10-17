@@ -26,6 +26,7 @@ import {
   reconcileSubjects,
   recurrenceOfBlock,
   removeAll,
+  removeGrades,
   removeRecurrences,
   setError,
   type ReviewState,
@@ -134,14 +135,18 @@ function CaptureFlowFor({
     parse.mutate(
       { text, mode },
       {
-        onSuccess: ({ capture }) => {
+        onSuccess: ({ capture, grades }) => {
           if (capture.status !== 'OK') return setInputError(capture.warnings[0]?.message);
-          if (capture.proposals.length === 0 && capture.suggestions.length === 0) {
+          if (
+            capture.proposals.length === 0 &&
+            capture.suggestions.length === 0 &&
+            grades.suggestions.length === 0
+          ) {
             return setInputError(CAPTURE_MESSAGES.NO_ACTIVITIES);
           }
           focusReview.current = true;
           setRestored(false);
-          commit(text, createReview(capture));
+          commit(text, createReview(capture, grades.suggestions));
         },
         // The typed text is kept: the student can try again or go to the manual form.
         onError: () => setInputError(PARSE_ERROR),
@@ -160,13 +165,16 @@ function CaptureFlowFor({
         const doneBlocks = [...result.createdBlocks, ...result.reusedBlocks].map((b) =>
           recurrenceOfBlock(b.clientId),
         );
-        const rest = removeRecurrences(
-          removeAll(review, new Set(result.createdActivities.map((c) => c.clientId))),
-          new Set(doneBlocks),
+        const rest = removeGrades(
+          removeRecurrences(
+            removeAll(review, new Set(result.createdActivities.map((c) => c.clientId))),
+            new Set(doneBlocks),
+          ),
+          new Set(result.evaluations.map((e) => e.clientId)),
         );
         const created = createdMessage(result);
         const blocks = doneBlocks.length > 0;
-        const left = rest.items.length + rest.recurrences.length;
+        const left = rest.items.length + rest.recurrences.length + rest.grades.length;
         setRestored(false);
         if (left === 0) {
           writer.clear();

@@ -1,11 +1,17 @@
 import {
   ACTIVITY_DESCRIPTION_MAX,
+  formatPoints,
+  formatScore,
   normalizeNameKey,
+  resolveGrade,
   type ActivityType,
   type CaptureConfirmRequest,
   type CaptureCorrection,
   type CaptureProposal,
   type CaptureResult,
+  type GradeResolution,
+  type GradeSelection,
+  type GradeSuggestion,
   type RecurrenceSuggestion,
   type Subject,
 } from '@planner/core';
@@ -68,8 +74,23 @@ export interface ReviewRecurrence {
   error?: string;
 }
 
+/**
+ * A grade the engine understood ("Saqué 4.3 en el Corte 2 de Farmacología", "Parcial de Anatomía… vale 40 % del Corte 1") and what
+ * the student decided about it. `selection` only holds the answers to what was in doubt; the rest is what the words settled.
+ */
+export interface ReviewGrade {
+  suggestion: GradeSuggestion;
+  selected: boolean;
+  selectionTouched: boolean;
+  selection: GradeSelection;
+  /** A message from the last attempt to save it. */
+  error?: string;
+}
+
 export interface ReviewState {
   items: ReviewItem[];
+  /** The grades found: scores, cut grades and new evaluations. */
+  grades: ReviewGrade[];
   /** The weekly schedules found (also the ones that cannot be created yet: they are only shown). */
   recurrences: ReviewRecurrence[];
   /** The answers to shared questions: the hour of a time group ('' = no time), the subject of a subject group. */
@@ -84,6 +105,7 @@ export interface ReviewState {
 
 export function createReview(
   result: Pick<CaptureResult, 'proposals' | 'corrections' | 'suggestions' | 'warnings'>,
+  grades: readonly GradeSuggestion[] = [],
 ): ReviewState {
   // The count the student announced does not match what was found: nothing is ticked until they have looked (and what they
   // tick by hand stays as they left it).
@@ -95,6 +117,12 @@ export function createReview(
       selected: mismatch ? false : proposal.selected,
       selectionTouched: mismatch !== undefined,
       allowDuplicate: false,
+    })),
+    grades: grades.map((suggestion) => ({
+      suggestion,
+      selected: mismatch ? false : suggestion.selected && suggestion.status === 'READY',
+      selectionTouched: mismatch !== undefined,
+      selection: {},
     })),
     groupTime: {},
     groupSubject: {},
@@ -196,14 +224,38 @@ export const isComplete = (state: ReviewState, item: ReviewItem) =>
 
 // ───────────────────────── Changes (each returns a new state) ─────────────────────────
 
+/**
+ * The activity of a sentence like "Parcial de Inglés el viernes, vale 40 % de la Etapa 1" is added to the Agenda of HOME. When the
+ * student's chosen subject for the grade belongs to ANOTHER study, that activity would land in the wrong place: it is blocked
+ * (never ticked, never sent), so one sentence is never split across studies.
+ */
+export function agendaBlocked(state: ReviewState, clientId: string): boolean {
+  return state.grades.some((g) => {
+    if (g.suggestion.activityClientId !== clientId) return false;
+    const option = gradeResolution(g).option;
+    return option !== null && !option.subject.isHome;
+  });
+}
+
 /** An item that has not been ticked or unticked by hand follows its completeness: complete = ticked. */
 function settle(state: ReviewState): ReviewState {
   return {
     ...state,
     items: state.items.map((item) => {
+      const blocked = agendaBlocked(state, item.proposal.clientId);
+      // Blocked: unticked, and it forgets any manual tick so that it follows its completeness again once unblocked.
+      if (blocked)
+        return item.selected || item.selectionTouched
+          ? { ...item, selected: false, selectionTouched: false }
+          : item;
       if (item.selectionTouched) return item;
       const wanted = isComplete(state, item) && item.proposal.duplicateOf === null;
       return item.selected === wanted ? item : { ...item, selected: wanted };
+    }),
+    grades: state.grades.map((g) => {
+      if (g.selectionTouched) return g;
+      const wanted = isGradeComplete(g);
+      return g.selected === wanted ? g : { ...g, selected: wanted };
     }),
     recurrences: state.recurrences.map((r) => {
       if (r.selectionTouched || !isCreatable(r)) return r;
@@ -249,10 +301,12 @@ export const toggle = (state: ReviewState, clientId: string, selected: boolean):
     i.proposal.clientId === clientId
       ? {
           ...i,
-          selected,
+          // An activity whose subject-of-grade belongs to another study can never be ticked.
+          selected: selected && !agendaBlocked(state, clientId),
           selectionTouched: true,
           // Ticking a copy of something that already exists is saying "yes, I want it again".
-          allowDuplicate: selected && i.proposal.duplicateOf !== null,
+          allowDuplicate:
+            selected && !agendaBlocked(state, clientId) && i.proposal.duplicateOf !== null,
         }
       : i,
   ),
@@ -269,6 +323,121 @@ export const removeAll = (state: ReviewState, clientIds: ReadonlySet<string>): R
 
 export const remove = (state: ReviewState, clientId: string): ReviewState =>
   removeAll(state, new Set([clientId]));
+
+// ───────────────────────── Grades ─────────────────────────
+
+export const gradeResolution = (g: ReviewGrade): GradeResolution =>
+  resolveGrade(g.suggestion, g.selection);
+export const isGradeComplete = (g: ReviewGrade) => gradeResolution(g).request !== null;
+
+const patchGrade = (state: ReviewState, clientId: string, patch: Partial<GradeSelection>) =>
+  settle({
+    ...state,
+    grades: state.grades.map((g) =>
+      g.suggestion.clientId === clientId
+        ? { ...g, error: undefined, selection: { ...g.selection, ...patch } }
+        : g,
+    ),
+  });
+
+/** Another subject: what depended on the previous one (the cut, the conversion) is asked again. */
+export const setGradeSubject = (s: ReviewState, id: string, optionIndex: number) =>
+  patchGrade(s, id, { optionIndex, choiceIndex: undefined, canonicalMilli: undefined });
+export const setGradeTarget = (s: ReviewState, id: string, choiceIndex: number) =>
+  patchGrade(s, id, { choiceIndex });
+export const setGradeBasis = (s: ReviewState, id: string, basis: 'GRADING_PERIOD' | 'FINAL') =>
+  patchGrade(s, id, { basis });
+export const setGradeCanonical = (s: ReviewState, id: string, canonicalMilli: number | null) =>
+  patchGrade(s, id, { canonicalMilli });
+export const setGradeName = (s: ReviewState, id: string, name: string) =>
+  patchGrade(s, id, { name });
+
+export const toggleGrade = (
+  state: ReviewState,
+  clientId: string,
+  selected: boolean,
+): ReviewState => ({
+  ...state,
+  grades: state.grades.map((g) =>
+    g.suggestion.clientId === clientId ? { ...g, selected, selectionTouched: true } : g,
+  ),
+});
+
+export const removeGrades = (state: ReviewState, clientIds: ReadonlySet<string>): ReviewState => ({
+  ...state,
+  grades: state.grades.filter((g) => !clientIds.has(g.suggestion.clientId)),
+});
+
+export interface GradeView {
+  /** "Farmacología" — or what is still to decide. */
+  subject: string;
+  /** "Corte 2", or null while unknown. */
+  cut: string | null;
+  /** "Nota: 4.3" / "Nota: Pendiente" / null while unknown. */
+  score: string | null;
+  /** "Corte 1 · 40 %" for a new evaluation. */
+  weight: string | null;
+  /** What the card is about: the name of the evaluation, or "Nota del corte". */
+  title: string;
+  /** What this will do, in words ("Se guardará…"). */
+  action: string;
+}
+
+/** The card of a grade in plain words: never an internal term (scoreMilli, basis points, isCutGrade…). */
+export function gradeView(g: ReviewGrade): GradeView {
+  const r = gradeResolution(g);
+  const s = g.suggestion;
+  const decimals = r.option?.profile?.decimals ?? 1;
+  const choice = r.choice;
+  const cut =
+    choice && choice.action !== 'SCORE_EVALUATION'
+      ? choice.cut.name
+      : choice
+        ? choice.evaluation.cutName
+        : null;
+  const points =
+    s.score.kind === 'POINTS' && s.score.rawEarnedMilli !== null && s.score.rawMaxMilli !== null
+      ? formatPoints(s.score.rawEarnedMilli, s.score.rawMaxMilli)
+      : null;
+  const shown = r.scoreMilli !== null ? formatScore(r.scoreMilli, decimals) : null;
+  const score =
+    choice?.action === 'CREATE_EVALUATION' && s.score.kind === 'NONE'
+      ? 'Nota: Pendiente'
+      : shown !== null
+        ? `Nota: ${shown}${points ? ` (${points})` : ''}`
+        : points
+          ? `Nota: ${points}`
+          : null;
+  const pct = s.weight.percentBp === null ? null : `${s.weight.percentBp / 100} %`;
+  const weight =
+    choice?.action === 'CREATE_EVALUATION' && r.periodShareBp !== null
+      ? `${choice.cut.name} · ${r.periodShareBp / 100} %`
+      : s.intent === 'NEW_EVALUATION' && pct
+        ? pct
+        : null;
+  const title =
+    choice?.action === 'SCORE_EVALUATION'
+      ? choice.evaluation.name
+      : s.intent === 'NEW_EVALUATION'
+        ? (g.selection.name ?? s.name ?? 'Evaluación')
+        : 'Nota del corte';
+  const action =
+    choice?.action === 'CREATE_EVALUATION'
+      ? 'Se agregará esta evaluación a la materia.'
+      : choice?.action === 'UPDATE_CUT_GRADE'
+        ? 'Cambiará la nota que ya tenías en este corte.'
+        : choice
+          ? 'Se guardará esta nota.'
+          : 'Falta decidir dónde va.';
+  return {
+    subject: r.option?.subject.name ?? 'Asignatura por decidir',
+    cut,
+    score,
+    weight,
+    title,
+    action,
+  };
+}
 
 // ───────────────────────── Weekly schedules ─────────────────────────
 
@@ -395,6 +564,7 @@ export const recurrenceOfBlock = (blockId: string) => blockId.split(':')[0]!;
 
 export const setError = (state: ReviewState, errors: Record<string, string>): ReviewState => ({
   ...state,
+  grades: state.grades.map((g) => ({ ...g, error: errors[g.suggestion.clientId] })),
   items: state.items.map((i) => ({ ...i, error: errors[i.proposal.clientId] })),
   recurrences: state.recurrences.map((r) => ({
     ...r,
@@ -443,6 +613,10 @@ export interface ReviewSummary {
   incomplete: number;
   /** Not ticked. */
   skipped: number;
+  /** The grades found. */
+  grades: number;
+  /** Ticked and complete grades: what confirming saves. */
+  gradesToCreate: number;
   /** New subjects that confirming will create, once each. */
   newSubjects: string[];
 }
@@ -454,6 +628,14 @@ export function summarize(state: ReviewState): ReviewSummary {
   let needsReview = 0;
   const names = new Map<string, string>();
   let blocksToCreate = 0;
+  let gradesToCreate = 0;
+  for (const g of state.grades) {
+    const complete = isGradeComplete(g);
+    if (!complete) needsReview++;
+    if (!g.selected) skipped++;
+    else if (!complete) incomplete++;
+    else gradesToCreate++;
+  }
   const creatable = state.recurrences.filter(isCreatable);
   for (const r of creatable) {
     if (!isRecurrenceComplete(r)) needsReview++;
@@ -470,8 +652,9 @@ export function summarize(state: ReviewState): ReviewSummary {
     if (subject?.kind === 'NEW') names.set(normalizeNameKey(subject.name), subject.name.trim());
   }
   for (const item of state.items) {
-    if (!isComplete(state, item)) needsReview++;
-    if (!item.selected) {
+    const blocked = agendaBlocked(state, item.proposal.clientId);
+    if (!isComplete(state, item) && !blocked) needsReview++;
+    if (!item.selected || blocked) {
       skipped++;
       continue;
     }
@@ -492,6 +675,8 @@ export function summarize(state: ReviewState): ReviewSummary {
     toCreate,
     incomplete,
     skipped,
+    grades: state.grades.length,
+    gradesToCreate,
     newSubjects: [...names.values()],
   };
 }
@@ -500,8 +685,16 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /** What the button says it will do: "Crear 2 actividades", "Crear horario", "Crear 1 actividad y 2 bloques". */
 export function confirmLabel(summary: ReviewSummary, busy = false): string {
-  const { toCreate, blocksToCreate } = summary;
-  if (busy) return 'Creando…';
+  const { toCreate, blocksToCreate, gradesToCreate } = summary;
+  if (busy) return gradesToCreate > 0 ? 'Guardando…' : 'Creando…';
+  if (gradesToCreate > 0) {
+    const parts = [
+      toCreate > 0 && plural(toCreate, 'actividad', 'actividades'),
+      blocksToCreate > 0 && plural(blocksToCreate, 'bloque', 'bloques'),
+      plural(gradesToCreate, 'nota', 'notas'),
+    ].filter(Boolean);
+    return `${toCreate + blocksToCreate === 0 ? 'Guardar' : 'Crear'} ${parts.join(' y ')}`;
+  }
   if (blocksToCreate === 0) return `Crear ${plural(toCreate, 'actividad', 'actividades')}`;
   if (toCreate === 0) return 'Crear horario';
   return `Crear ${plural(toCreate, 'actividad', 'actividades')} y ${plural(blocksToCreate, 'bloque', 'bloques')}`;
@@ -512,11 +705,18 @@ export function createdMessage(result: {
   count: number;
   createdBlocks: readonly unknown[];
   reusedBlocks: readonly unknown[];
+  evaluations?: readonly { action: string }[];
 }): string {
   const parts: string[] = [];
   if (result.count > 0) {
     parts.push(result.count === 1 ? '1 actividad creada' : `${result.count} actividades creadas`);
   }
+  const grades = result.evaluations ?? [];
+  const added = grades.filter((e) => e.action === 'CREATE_EVALUATION').length;
+  const saved = grades.length - added;
+  if (saved > 0) parts.push(saved === 1 ? '1 nota guardada' : `${saved} notas guardadas`);
+  if (added > 0)
+    parts.push(added === 1 ? '1 evaluación agregada' : `${added} evaluaciones agregadas`);
   const blocks = result.createdBlocks.length;
   if (blocks > 0) {
     parts.push(
@@ -538,6 +738,7 @@ export function createdMessage(result: {
 export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
   const items: CaptureConfirmRequest['items'] = [];
   const blocks: CaptureConfirmRequest['blocks'] = [];
+  const evaluations: NonNullable<CaptureConfirmRequest['evaluations']> = [];
   for (const r of state.recurrences) {
     if (!r.selected || !isRecurrenceComplete(r)) continue;
     const subject = effectiveRecurrenceSubject(r)!;
@@ -559,7 +760,8 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
     }
   }
   for (const item of state.items) {
-    if (!item.selected || !isComplete(state, item)) continue;
+    if (!item.selected || !isComplete(state, item) || agendaBlocked(state, item.proposal.clientId))
+      continue;
     const subject = effectiveSubject(state, item)!;
     const time = effectiveTime(state, item);
     const description = effectiveDescription(item).trim();
@@ -579,5 +781,22 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
       ...(item.allowDuplicate ? { allowDuplicate: true } : {}),
     });
   }
-  return { items, blocks };
+  for (const g of state.grades) {
+    if (!g.selected) continue;
+    const request = gradeResolution(g).request;
+    if (!request) continue;
+    const { activityClientId, ...rest } = request;
+    // The link to the activity of the same sentence only holds while that activity is created for the same subject.
+    const linked = activityClientId
+      ? items.find((i) => i.clientId === activityClientId)
+      : undefined;
+    const sameSubject =
+      linked?.subject.kind === 'EXISTING' && linked.subject.subjectId === request.subjectId;
+    evaluations.push({
+      clientId: g.suggestion.clientId,
+      ...rest,
+      ...(sameSubject ? { activityClientId } : {}),
+    });
+  }
+  return evaluations.length > 0 ? { items, blocks, evaluations } : { items, blocks };
 }

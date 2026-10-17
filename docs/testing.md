@@ -120,3 +120,10 @@ Una migración que reescribe datos no se prueba solo con una base nueva. `apps/a
 ## Falla conocida de las pruebas
 
 `MaxListenersExceededWarning` de Node (11 listeners en `Server`) al correr las pruebas de API: `supertest` añade un listener por solicitud cuando una prueba lanza más de 10 concurrentes sobre la misma aplicación. No afecta al servidor y no se ha corregido ([limitations.md](limitations.md)).
+
+## Captura inteligente de notas (B3)
+
+- Núcleo: `captureGrades.test.ts` (29: nota directa, ordinales y términos por estudio, actualización, puntos con mínimo ≠ 0, base del porcentaje, actividad + evaluación, directa vs desglose, sin configuración, ambigüedad incluido el mismo nombre en dos estudios).
+- API: `capture/captureGrades.test.ts` (21, BD real: parse de notas, crear/actualizar nota de corte, doble confirmación y confirmaciones simultáneas, corte desglosado, corte de otra asignatura, fuera de escala, nota de evaluación pendiente, puntos 18/20, obsoleta, ajena = mismo rechazo que inexistente, actividad + evaluación atómica con retroceso, enlace a otra asignatura, campos internos).
+- Web: `reviewGrades.test.ts` (8: tarjeta en palabras simples, sin términos internos, asignatura ambigua que espera, porcentaje ambiguo, desmarcar, sin configuración, borrador, mensajes).
+- E2E: `e2e/capture-grades.spec.ts` a 360 y 1366 px (nota de corte, actividad + evaluación, puntos sobre evaluación pendiente, asignatura ambigua, mismo nombre en dos estudios).

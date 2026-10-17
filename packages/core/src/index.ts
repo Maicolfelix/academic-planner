@@ -25,3 +25,4 @@ export * from './onboarding.js';
 export * from './gradingMath.js';
 export * from './grading.js';
 export * from './gradingUi.js';
+export * from './captureGrades.js';
