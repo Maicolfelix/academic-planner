@@ -3,6 +3,8 @@ import { dateOnlySchema, subjectNameSchema, subjectSchema, type DateOnly } from 
 import { weekdayOf } from './calendar.js';
 import { activitySchema, createActivitySchema, dueTimeSchema } from './activity.js';
 import { CAPTURE_MAX_BLOCKS, CAPTURE_MAX_PROPOSALS } from './captureProposals.js';
+import { CAPTURE_EVALUATION_ACTIONS, GRADE_CAPTURE_MAX } from './captureGrades.js';
+import { createEvaluationSchema, evaluationSchema } from './grading.js';
 import { SCHEDULE_TITLE_MAX, scheduleBlockSchema } from './schedule.js';
 import type { ExistingClass } from './scheduleImport.js';
 import { toLocalParts } from './time.js';
@@ -75,15 +77,119 @@ export const captureConfirmBlockSchema = z
   });
 export type CaptureConfirmBlock = z.infer<typeof captureConfirmBlockSchema>;
 
+/**
+ * One grade action the student confirmed (B3). The client says WHAT to apply to WHICH of the student's own things; everything
+ * the server can derive is the server's (the owner, the period, a generated name for a direct cut grade). Four actions:
+ *  - SET_CUT_GRADE: the grade of a whole cut of a subject (no name, no weight);
+ *  - UPDATE_CUT_GRADE: change that grade — `expectScoreMilli` is the grade the student SAW, so a newer one is never overwritten;
+ *  - SCORE_EVALUATION: the score of an existing PENDING evaluation (`expectScoreMilli` is null: still pending when confirmed);
+ *  - CREATE_EVALUATION: a new pending evaluation in a cut, optionally linked to an activity of this same request.
+ */
+export const captureConfirmEvaluationSchema = z
+  .strictObject({
+    /** Chosen by the client so an error can be pointed at the card it came from. Never stored. */
+    clientId: z.string().min(1).max(64),
+    action: z.enum(CAPTURE_EVALUATION_ACTIONS),
+    subjectId: z.uuid('Asignatura inválida.'),
+    gradingPeriodId: z.uuid().optional(),
+    evaluationId: z.uuid().optional(),
+    name: createEvaluationSchema.shape.name,
+    periodShareBp: createEvaluationSchema.shape.periodShareBp,
+    scoreMilli: createEvaluationSchema.shape.scoreMilli,
+    rawEarnedMilli: createEvaluationSchema.shape.rawEarnedMilli,
+    rawMaxMilli: createEvaluationSchema.shape.rawMaxMilli,
+    expectScoreMilli: z.number().int().nullable().optional(),
+    /** The `clientId` of an ITEM of this same request: the evaluation is linked to the activity that item creates. */
+    activityClientId: z.string().min(1).max(64).optional(),
+  })
+  .superRefine((v, ctx) => {
+    const need = (key: keyof typeof v, message: string) => {
+      if (v[key] === undefined || v[key] === null)
+        ctx.addIssue({ code: 'custom', path: [key as string], message });
+    };
+    const forbid = (key: keyof typeof v) => {
+      if (v[key] !== undefined)
+        ctx.addIssue({
+          code: 'custom',
+          path: [key as string],
+          message: 'No corresponde a esta acción.',
+        });
+    };
+    const noEarned = v.rawEarnedMilli === undefined || v.rawEarnedMilli === null;
+    const noMax = v.rawMaxMilli === undefined || v.rawMaxMilli === null;
+    if (noEarned !== noMax)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['rawMaxMilli'],
+        message: 'Indica lo obtenido y el máximo juntos.',
+      });
+    if (
+      typeof v.rawEarnedMilli === 'number' &&
+      typeof v.rawMaxMilli === 'number' &&
+      (v.rawMaxMilli <= 0 || v.rawEarnedMilli > v.rawMaxMilli)
+    )
+      ctx.addIssue({ code: 'custom', path: ['rawEarnedMilli'], message: 'Puntos no válidos.' });
+    if (v.action === 'SET_CUT_GRADE') {
+      need('gradingPeriodId', 'Falta el corte.');
+      need('scoreMilli', 'Falta la nota.');
+      for (const k of [
+        'evaluationId',
+        'name',
+        'periodShareBp',
+        'expectScoreMilli',
+        'activityClientId',
+      ] as const)
+        forbid(k);
+    } else if (v.action === 'UPDATE_CUT_GRADE' || v.action === 'SCORE_EVALUATION') {
+      need('evaluationId', 'Falta la evaluación.');
+      need('scoreMilli', 'Falta la nota.');
+      if (v.expectScoreMilli === undefined)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expectScoreMilli'],
+          message: 'Falta la nota que viste.',
+        });
+      if (v.action === 'UPDATE_CUT_GRADE' && v.expectScoreMilli === null)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expectScoreMilli'],
+          message: 'Falta la nota que viste.',
+        });
+      if (v.action === 'SCORE_EVALUATION' && typeof v.expectScoreMilli === 'number')
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expectScoreMilli'],
+          message: 'La evaluación debe estar pendiente.',
+        });
+      for (const k of ['gradingPeriodId', 'name', 'periodShareBp', 'activityClientId'] as const)
+        forbid(k);
+    } else {
+      need('gradingPeriodId', 'Falta el corte.');
+      need('name', 'Falta el nombre.');
+      need('periodShareBp', 'Falta el peso.');
+      for (const k of [
+        'evaluationId',
+        'scoreMilli',
+        'rawEarnedMilli',
+        'rawMaxMilli',
+        'expectScoreMilli',
+      ] as const)
+        forbid(k);
+    }
+  });
+export type CaptureConfirmEvaluation = z.infer<typeof captureConfirmEvaluationSchema>;
+
 export const captureConfirmSchema = z
   .strictObject({
     items: z.array(captureConfirmItemSchema).max(CAPTURE_MAX_PROPOSALS).default([]),
     /** The weekly schedules of the capture, one block per weekday. */
     blocks: z.array(captureConfirmBlockSchema).max(CAPTURE_MAX_BLOCKS).default([]),
+    /** The grade actions of the capture (scores, cut grades, new evaluations). */
+    evaluations: z.array(captureConfirmEvaluationSchema).max(GRADE_CAPTURE_MAX).default([]),
   })
-  .refine((v) => v.items.length + v.blocks.length > 0, {
+  .refine((v) => v.items.length + v.blocks.length + v.evaluations.length > 0, {
     path: ['items'],
-    message: 'Selecciona al menos una actividad o un horario.',
+    message: 'Selecciona al menos una actividad, un horario o una nota.',
   })
   .refine((v) => new Set(v.items.map((i) => i.clientId)).size === v.items.length, {
     path: ['items'],
@@ -91,15 +197,25 @@ export const captureConfirmSchema = z
   })
   .refine(
     (v) =>
-      new Set([...v.items, ...v.blocks].map((i) => i.clientId)).size ===
-      v.items.length + v.blocks.length,
+      new Set([...v.items, ...v.blocks, ...v.evaluations].map((i) => i.clientId)).size ===
+      v.items.length + v.blocks.length + v.evaluations.length,
     { path: ['blocks'], message: 'Hay elementos repetidos en la solicitud.' },
+  )
+  .refine(
+    (v) =>
+      v.evaluations.every(
+        (e) =>
+          e.activityClientId === undefined ||
+          v.items.some((i) => i.clientId === e.activityClientId),
+      ),
+    { path: ['evaluations'], message: 'La actividad enlazada no está en la solicitud.' },
   );
 export type CaptureConfirmInput = z.infer<typeof captureConfirmSchema>;
 /** What the client builds: both lists are always sent (the server defaults a missing one to empty). */
 export type CaptureConfirmRequest = z.input<typeof captureConfirmSchema> & {
   items: z.input<typeof captureConfirmItemSchema>[];
   blocks: z.input<typeof captureConfirmBlockSchema>[];
+  evaluations?: z.input<typeof captureConfirmEvaluationSchema>[];
 };
 
 export const captureConfirmResponseSchema = z.object({
@@ -115,6 +231,16 @@ export const captureConfirmResponseSchema = z.object({
   createdBlocks: z
     .array(z.object({ clientId: z.string(), block: scheduleBlockSchema }))
     .default([]),
+  /** The grade actions applied, in the order of the request (a created or an updated evaluation). */
+  evaluations: z
+    .array(
+      z.object({
+        clientId: z.string(),
+        action: z.enum(CAPTURE_EVALUATION_ACTIONS),
+        evaluation: evaluationSchema,
+      }),
+    )
+    .default([]),
   /** A block that is already in the agenda (same subject, weekday and times): it is reused, never duplicated. */
   reusedBlocks: z
     .array(z.object({ clientId: z.string(), id: z.uuid(), title: z.string() }))
@@ -127,6 +253,9 @@ export const CAPTURE_CONFIRM_ITEM_CODES = [
   'VALIDATION_ERROR',
   'SUBJECT_NOT_FOUND',
   'DUPLICATE_ACTIVITY',
+  'EVALUATION_CONFLICT',
+  'STALE_EVALUATION',
+  'DUPLICATE_EVALUATION',
 ] as const;
 export const captureConfirmItemErrorSchema = z.object({
   clientId: z.string(),
@@ -140,6 +269,8 @@ export const CAPTURE_CONFIRM_MESSAGES = {
   DUPLICATE_ACTIVITY: 'Ya tienes una actividad igual con la misma fecha. No se creó nada.',
   REJECTED: 'Revisa lo marcado: no se creó nada.',
   IN_PROGRESS: 'Ya estamos creando actividades tuyas. Espera a que termine e inténtalo de nuevo.',
+  EVALUATION_CONFLICT:
+    'Algo cambió en tus notas desde que lo viste. Revisa lo marcado: no se creó nada.',
 } as const;
 
 /**

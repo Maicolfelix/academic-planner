@@ -1,5 +1,6 @@
 import {
   CAPTURE_CONFIRM_MESSAGES,
+  normalizeNameKey as nameKeyOf,
   createScheduleBlockSchema,
   dueFromLocal,
   fieldErrorsOf,
@@ -18,12 +19,15 @@ import type { RunInTransaction } from '../db/prisma.js';
 import { AppError } from '../errors/AppError.js';
 import { toDateOnly, toSubjectDto } from '../mappers.js';
 import { createActivityRepository } from '../repositories/activityRepository.js';
-import { createPeriodLookup } from '../repositories/periodRepository.js';
+import { createGradingRepository } from '../repositories/gradingRepository.js';
+import { createPeriodLookup, createPeriodRepository } from '../repositories/periodRepository.js';
+import { createStudyTrackRepository } from '../repositories/studyTrackRepository.js';
 import { createScheduleRepository } from '../repositories/scheduleRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createSubjectRepository } from '../repositories/subjectRepository.js';
 import { createSubjectMaterializer } from './subjectMaterializer.js';
 import { createActivityService, type Actor } from './activityService.js';
+import { createGradingService } from './gradingService.js';
 import { windowOf } from './scheduleOccurrences.js';
 import { createScheduleService } from './scheduleService.js';
 
@@ -95,7 +99,7 @@ export function createCaptureConfirmService(opts: {
 
         // The HOME current period (a general one, else the primary study's), read after the lock: the client never says which.
         const period = await periods.findHomeCurrent(actor.id);
-        if (!period) {
+        if (!period && (input.items.length > 0 || input.blocks.length > 0)) {
           throw new AppError(
             400,
             'NO_CURRENT_PERIOD',
@@ -104,7 +108,7 @@ export function createCaptureConfirmService(opts: {
         }
 
         // 1. Subjects: the ones the items name, resolved or created once each.
-        const existing = await subjects.list(actor.id, period.id);
+        const existing = period ? await subjects.list(actor.id, period.id) : [];
         const byKey = new Map(existing.map((s) => [s.nameKey, s]));
         const known = new Map(existing.map((s) => [s.id, s.name]));
         const usedColors = existing.map((s) => s.color);
@@ -124,7 +128,7 @@ export function createCaptureConfirmService(opts: {
           }
           const { subject, created } = await materializer.createIfAbsent({
             userId: actor.id,
-            periodId: period.id,
+            periodId: period!.id,
             name: item.subject.name,
             nameKey: key,
             color: pickSubjectColor(usedColors),
@@ -241,11 +245,11 @@ export function createCaptureConfirmService(opts: {
         const createdBlocks: CaptureConfirmResponse['createdBlocks'] = [];
         const reusedBlocks: CaptureConfirmResponse['reusedBlocks'] = [];
         if (input.blocks.length > 0) {
-          const days = { from: toDateOnly(period.startDate), to: toDateOnly(period.endDate) };
+          const days = { from: toDateOnly(period!.startDate), to: toDateOnly(period!.endDate) };
           const rows = await scheduleRepo.candidates(actor.id, {
             ...windowOf(days, actor.timezone),
             types: ['CLASS', 'STUDY'],
-            periodId: period.id,
+            periodId: period!.id,
           });
           const inAgenda: ExistingClass[] = rows.map((r) => ({
             id: r.id,
@@ -341,7 +345,155 @@ export function createCaptureConfirmService(opts: {
           }
         }
 
+        // 5. The grade actions (B3): scores, cut grades and new evaluations, through the very same Grading service as the grades
+        // screen (ownership, same-subject cut, weight sums, scale, direct-vs-breakdown), bound to this transaction.
+        const evaluations: CaptureConfirmResponse['evaluations'] = [];
+        if (input.evaluations.length > 0) {
+          // The weight sums are checked under the user's study lock (the same one the grades routes take).
+          await createStudyTrackRepository(tx).lockUser(actor.id);
+          const gradingRepo = createGradingRepository(tx);
+          const gradingService = createGradingService({
+            grading: gradingRepo,
+            subjects,
+            activities: activityRepo,
+            periods: createPeriodRepository(tx),
+            studyTracks: createStudyTrackRepository(tx),
+            runInTransaction: (fn) => fn(tx),
+            clock,
+          });
+          const activityOf = new Map(createdActivities.map((c) => [c.clientId, c.activity]));
+          const refuse = (
+            clientId: string,
+            code: CaptureConfirmItemError['code'],
+            message: string,
+            fields = {},
+          ) => refused.push({ clientId, code, message, fields });
+
+          for (const e of input.evaluations) {
+            // The subject must be the student's own (any CURRENT period: a grade is not tied to the home period).
+            if (!(await subjects.findOwned(actor.id, e.subjectId))) {
+              refuse(e.clientId, 'SUBJECT_NOT_FOUND', 'Asignatura no encontrada.', {
+                subject: ['Asignatura no encontrada.'],
+              });
+              continue;
+            }
+            try {
+              if (e.action === 'SET_CUT_GRADE') {
+                evaluations.push({
+                  clientId: e.clientId,
+                  action: e.action,
+                  evaluation: await gradingService.createEvaluationInTx(tx, actor.id, {
+                    subjectId: e.subjectId,
+                    gradingPeriodId: e.gradingPeriodId!,
+                    isCutGrade: true,
+                    scoreMilli: e.scoreMilli,
+                    rawEarnedMilli: e.rawEarnedMilli,
+                    rawMaxMilli: e.rawMaxMilli,
+                  }),
+                });
+              } else if (e.action === 'CREATE_EVALUATION') {
+                // A copy of an evaluation the subject already has in that cut (a retry, a double tap): never created twice.
+                const same = (await gradingRepo.listForSubject(actor.id, e.subjectId)).some(
+                  (x) =>
+                    x.gradingPeriodId === e.gradingPeriodId &&
+                    nameKeyOf(x.name) === nameKeyOf(e.name!),
+                );
+                if (same) {
+                  refuse(
+                    e.clientId,
+                    'DUPLICATE_EVALUATION',
+                    'Ya existe una evaluación con ese nombre en ese corte.',
+                  );
+                  continue;
+                }
+                let activityId: string | undefined;
+                if (e.activityClientId !== undefined) {
+                  const linked = activityOf.get(e.activityClientId);
+                  if (!linked || linked.subjectId !== e.subjectId) {
+                    refuse(
+                      e.clientId,
+                      'EVALUATION_CONFLICT',
+                      'La actividad enlazada debe ser de la misma asignatura.',
+                    );
+                    continue;
+                  }
+                  activityId = linked.id;
+                }
+                evaluations.push({
+                  clientId: e.clientId,
+                  action: e.action,
+                  evaluation: await gradingService.createEvaluationInTx(tx, actor.id, {
+                    subjectId: e.subjectId,
+                    gradingPeriodId: e.gradingPeriodId!,
+                    name: e.name!,
+                    periodShareBp: e.periodShareBp!,
+                    ...(activityId && { activityId }),
+                  }),
+                });
+              } else {
+                // An update is only applied to what the student SAW: if the evaluation is gone, is not that subject's or its
+                // score changed since, a newer score is never overwritten and the student is told.
+                const current = await gradingRepo.findEvaluation(actor.id, e.evaluationId!);
+                const stale =
+                  !current ||
+                  current.subjectId !== e.subjectId ||
+                  current.scoreMilli !== (e.expectScoreMilli ?? null) ||
+                  current.isCutGrade !== (e.action === 'UPDATE_CUT_GRADE');
+                if (stale) {
+                  refuse(
+                    e.clientId,
+                    'STALE_EVALUATION',
+                    'Esa nota cambió desde que la viste. Revisa y vuelve a intentarlo.',
+                  );
+                  continue;
+                }
+                evaluations.push({
+                  clientId: e.clientId,
+                  action: e.action,
+                  evaluation: await gradingService.updateEvaluationInTx(
+                    tx,
+                    actor.id,
+                    e.evaluationId!,
+                    {
+                      scoreMilli: e.scoreMilli,
+                      rawEarnedMilli: e.rawEarnedMilli,
+                      rawMaxMilli: e.rawMaxMilli,
+                    },
+                  ),
+                });
+              }
+            } catch (err) {
+              // A rule of the Grading service about this action (a cut that is broken down, a weight over 100 %, a scale…).
+              if (err instanceof AppError && err.status < 500) {
+                refuse(
+                  e.clientId,
+                  err.code === 'VALIDATION_ERROR' ? 'VALIDATION_ERROR' : 'EVALUATION_CONFLICT',
+                  err.message,
+                  (err.details as { fields?: Record<string, string[]> } | undefined)?.fields ?? {},
+                );
+                continue;
+              }
+              throw err;
+            }
+          }
+        }
+
         if (refused.length > 0) {
+          const evaluationOnly = refused.every(
+            (r) =>
+              r.code === 'EVALUATION_CONFLICT' ||
+              r.code === 'STALE_EVALUATION' ||
+              r.code === 'DUPLICATE_EVALUATION',
+          );
+          if (evaluationOnly)
+            throw new AppError(
+              409,
+              'EVALUATION_CONFLICT',
+              CAPTURE_CONFIRM_MESSAGES.EVALUATION_CONFLICT,
+              {
+                items: refused,
+              },
+            );
           const copiesOnly = refused.every((r) => r.code === 'DUPLICATE_ACTIVITY');
           throw new AppError(
             copiesOnly ? 409 : 400,
@@ -358,6 +510,7 @@ export function createCaptureConfirmService(opts: {
           createdSubjects: createdRows.map(toSubjectDto),
           reusedSubjects: [...reused].map((id) => ({ id, name: known.get(id) ?? '' })),
           count: createdActivities.length,
+          evaluations,
           createdBlocks,
           reusedBlocks,
         };

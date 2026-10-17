@@ -98,6 +98,8 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/api/src/repositories/periodRepository.ts', // a period belongs to a study or to none; the home and current lookups
       'apps/api/src/repositories/studyTrackRepository.ts',
       'apps/api/src/routes/studyTracks.ts',
+      'apps/api/src/services/captureConfirmService.ts', // B3: the user's study lock for the weight sums (a lock, no behaviour)
+      'apps/api/src/services/captureService.ts', // B3: the label and the kind of study of a subject, to word the grade options (a READ)
       'apps/api/src/services/currentPeriods.ts', // the one reader of all the current periods (with their study)
       'apps/api/src/services/gradingService.ts', // D36: grading needs a period WITH a study (a READ of studyTrackId) and takes the user's study lock
       'apps/api/src/services/onboardingService.ts', // P0.5-5: completing the onboarding creates / adopts the first study (explicit endpoint)

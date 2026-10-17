@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { AlertIcon } from '../components/ui/icons';
 import { CaptureCard, Heading, SubjectQuestion, TimeAsk, type CardActions } from './CaptureCard';
+import { GradeCard, type GradeActions } from './GradeCard';
 import { RecurrenceCard, type RecurrenceActions } from './RecurrenceCard';
 import { shortDate } from './format';
 import {
@@ -12,9 +13,16 @@ import {
   effectiveDate,
   effectiveTitle,
   isCreatable,
+  isGradeComplete,
   pendingOf,
   recurrencePendingOf,
   remove,
+  removeGrades,
+  setGradeBasis,
+  setGradeCanonical,
+  setGradeSubject,
+  setGradeTarget,
+  toggleGrade,
   removeRecurrences,
   setDate,
   setDescription,
@@ -91,6 +99,15 @@ export function CaptureReview({
     remove: () => onChange(removeRecurrences(state, new Set([clientId]))),
   });
 
+  const gradeActions = (clientId: string): GradeActions => ({
+    setSubject: (v) => onChange(setGradeSubject(state, clientId, v)),
+    setTarget: (v) => onChange(setGradeTarget(state, clientId, v)),
+    setBasis: (v) => onChange(setGradeBasis(state, clientId, v)),
+    setCanonical: (v) => onChange(setGradeCanonical(state, clientId, v)),
+    toggle: (v) => onChange(toggleGrade(state, clientId, v)),
+    remove: () => onChange(removeGrades(state, new Set([clientId]))),
+  });
+
   // Shared questions still open: the hour of a group, the subject of a group.
   const stillOpen = (c: ReviewState['corrections'][number]) =>
     state.items.filter(
@@ -117,7 +134,8 @@ export function CaptureReview({
     const first =
       state.items.find((i) => pendingOf(state, i).length > 0)?.proposal.clientId ??
       state.recurrences.find((r) => isCreatable(r) && recurrencePendingOf(r).length > 0)?.suggestion
-        .clientId;
+        .clientId ??
+      state.grades.find((g) => !isGradeComplete(g))?.suggestion.clientId;
     if (!first) return;
     const target = document.getElementById(`capture-${first}-title`);
     target?.scrollIntoView({ block: 'center' });
@@ -125,15 +143,16 @@ export function CaptureReview({
     target?.focus({ preventScroll: true });
   };
 
-  const count = summary.toCreate + summary.blocksToCreate;
+  const count = summary.toCreate + summary.blocksToCreate + summary.gradesToCreate;
   const label = confirmLabel(summary);
   const waiting = summary.incomplete;
-  const found = summary.total + summary.schedules;
+  const found = summary.total + summary.schedules + summary.grades;
   const headingParts = [
     summary.total > 0 &&
       `${summary.total} ${summary.total === 1 ? 'actividad encontrada' : 'actividades encontradas'}`,
     summary.schedules > 0 &&
       `${summary.schedules} ${summary.schedules === 1 ? 'horario semanal' : 'horarios semanales'}`,
+    summary.grades > 0 && `${summary.grades} ${summary.grades === 1 ? 'nota' : 'notas'}`,
     summary.unsupported > 0 &&
       `${summary.unsupported} ${summary.unsupported === 1 ? 'actividad que se repite' : 'actividades que se repiten'}`,
   ].filter(Boolean);
@@ -148,7 +167,7 @@ export function CaptureReview({
           className="text-lg font-semibold outline-none"
         >
           {headingParts.length === 0
-            ? 'Sin actividades'
+            ? 'Nada que crear'
             : [headingParts.slice(0, -1).join(', '), headingParts.at(-1)]
                 .filter(Boolean)
                 .join(' y ')}
@@ -242,6 +261,15 @@ export function CaptureReview({
             state={state}
             subjects={subjects}
             actions={actionsFor(item.proposal.clientId)}
+            level={(level + 1) as 3 | 4}
+            disabled={pending}
+          />
+        ))}
+        {state.grades.map((g) => (
+          <GradeCard
+            key={g.suggestion.clientId}
+            grade={g}
+            actions={gradeActions(g.suggestion.clientId)}
             level={(level + 1) as 3 | 4}
             disabled={pending}
           />

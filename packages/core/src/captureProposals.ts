@@ -3,6 +3,7 @@ import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
 import { titlesAreRelated, ACADEMIC_CUES } from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
+import { gradeCaptureSchema } from './captureGrades.js';
 import { describeTokens, maskMetaText } from './captureContext.js';
 import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
@@ -311,6 +312,8 @@ export type CaptureRequest = z.input<typeof captureRequestSchema>;
 export const captureResponseSchema = z.object({
   capture: captureResultSchema,
   period: periodSchema.nullable(),
+  /** What the same words say about grades (B3): scores, cut grades and new evaluations. Empty when they say nothing. */
+  grades: gradeCaptureSchema.default({ suggestions: [] }),
 });
 export type CaptureResponse = z.infer<typeof captureResponseSchema>;
 

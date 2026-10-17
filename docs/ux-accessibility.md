@@ -399,3 +399,7 @@ Rutas secundarias con carga diferida (`React.lazy`), precacheadas por el service
 1. Safari → Compartir → Agregar a pantalla de inicio; confirmar la ayuda «En Safari, usa Compartir…» en el Dashboard.
 2. Abrir desde el icono: pantalla completa; **zonas seguras** (muesca y barra inferior) sin contenido tapado.
 3. Mismos pasos 3–9 de Android; además: el selector de fecha/hora nativo, y subir una foto del horario desde la cámara/galería en «Importar horario».
+
+## Notas en la Captura inteligente (B3)
+
+La experiencia de captura no cambia: se escribe una vez, se revisa y se confirma una vez. Una nota se muestra en palabras simples («Farmacología · Corte 2 · Nota: 4.3»; «Anatomía · Parcial · Corte 1 · 40 % · Nota: Pendiente») y **nunca** muestra términos internos (milésimas, puntos básicos, `isCutGrade`). Solo pregunta lo que falta: la asignatura (con la etiqueta del estudio cuando el nombre se repite), el corte o la evaluación, «¿El 40 % corresponde al corte o a la nota final?» y la nota en la escala cuando los puntos no se pueden convertir. Sin configuración de notas ofrece «Configurar notas». La tarjeta tiene casilla con `aria-label`, estado «Lista» / «Falta algo» con texto y descartar; el botón dice «Guardar N notas» o «Crear … y N notas». Las sugerencias de notas viven en el mismo borrador persistente (recargar o navegar no las pierde).
