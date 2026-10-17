@@ -186,6 +186,60 @@ for (const viewport of [
       check();
     });
 
+    test('same name in HOME and a secondary study: the secondary choice blocks the HOME activity, HOME restores it', async ({
+      page,
+    }) => {
+      const check = watch(page);
+      await start(page);
+      const [home] = await study(page, 'Medicina', ['Farmacología'], [5000, 5000]);
+      const [other] = await study(page, 'Diplomado', ['Farmacología'], [5000, 5000]);
+      await write(page, 'Parcial de Farmacología el viernes, vale 40% del Corte 1');
+      await expect(quick(page).getByText('¿A cuál asignatura te refieres?')).toBeVisible();
+      const activityBox = quick(page).getByRole('checkbox', {
+        name: /^Incluir Parcial del/,
+      });
+      const noteButton = quick(page).getByRole('button', { name: /^(Guardar|Crear) 1 nota$/ });
+
+      await quick(page).getByRole('button', { name: 'Farmacología · Diplomado' }).click();
+      await expect(activityBox).toBeDisabled();
+      await expect(activityBox).not.toBeChecked();
+      await expect(
+        quick(page).getByText(/no se añadirá a la Agenda porque la materia elegida/),
+      ).toBeVisible();
+      await expect(noteButton).toBeVisible();
+
+      // changing the mind: HOME brings the activity back, and both are created together
+      await quick(page).getByRole('button', { name: 'Cambiar a Farmacología · Medicina' }).click();
+      await expect(activityBox).toBeEnabled();
+      await expect(activityBox).toBeChecked();
+      await quick(page).getByRole('button', { name: 'Crear 1 actividad y 1 nota' }).click();
+      await expect(quick(page).getByText(/1 actividad creada/)).toBeVisible();
+      const ev = await gradesOf(page, home!.id);
+      expect(ev).toHaveLength(1);
+      expect(ev[0]!.activityId).not.toBeNull();
+      expect(await gradesOf(page, other!.id)).toHaveLength(0);
+      check();
+    });
+
+    test('choosing the secondary study saves only the grade: no activity in HOME', async ({
+      page,
+    }) => {
+      const check = watch(page);
+      await start(page);
+      const [home] = await study(page, 'Medicina', ['Farmacología'], [5000, 5000]);
+      const [other] = await study(page, 'Diplomado', ['Farmacología'], [5000, 5000]);
+      await write(page, 'Parcial de Farmacología el viernes, vale 40% del Corte 1');
+      await quick(page).getByRole('button', { name: 'Farmacología · Diplomado' }).click();
+      await quick(page)
+        .getByRole('button', { name: /^(Guardar|Crear) 1 nota$/ })
+        .click();
+      await expect(quick(page).getByText(/1 evaluación agregada/)).toBeVisible();
+      expect((await (await page.request.get('/api/activities')).json()).activities).toHaveLength(0);
+      expect(await gradesOf(page, other!.id)).toHaveLength(1);
+      expect(await gradesOf(page, home!.id)).toHaveLength(0);
+      check();
+    });
+
     test('an ambiguous subject is asked, then the grade is saved', async ({ page }) => {
       const check = watch(page);
       await start(page);

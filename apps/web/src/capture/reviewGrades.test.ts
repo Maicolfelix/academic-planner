@@ -11,6 +11,7 @@ import {
   setGradeBasis,
   setGradeSubject,
   summarize,
+  toggle,
   toggleGrade,
 } from './reviewModel';
 
@@ -196,6 +197,78 @@ describe('review of grades', () => {
     expect(reqOther.items).toHaveLength(0); // never splits one sentence across studies
     expect(reqOther.evaluations![0]!.subjectId).toBe(other.id);
     expect(reqOther.evaluations![0]).not.toHaveProperty('activityClientId');
+  });
+
+  describe('a blocked activity (grade subject in another study) can never come back by hand', () => {
+    const home = subject(1, 'Farmacología', 'Medicina');
+    const other = { ...subject(2, 'Farmacología', 'Diplomado'), isHome: false };
+    const g = interpretGrades(
+      'Parcial de Farmacología el viernes, vale 40% del Corte 1',
+      ctx(home, other),
+    ).suggestions[0]!;
+    const proposal = {
+      clientId: 'p1',
+      selected: true,
+      duplicateOf: null,
+      subject: { kind: 'EXISTING', id: home.id, name: 'Farmacología' },
+      title: { value: 'Parcial', withoutSubject: null },
+      type: { value: 'EXAM' },
+      date: { value: '2026-10-16', certainty: 'EXACT', alternatives: [] },
+      time: { value: null, certainty: 'MISSING', groupKey: null },
+      description: { value: null },
+      blockingIssues: [],
+      warnings: [],
+    };
+    const base = createReview(
+      { proposals: [proposal as never], corrections: [], suggestions: [], warnings: [] },
+      [{ ...g, activityClientId: 'p1' }],
+    );
+    const homeAt = g.options.findIndex((o) => o.subject.isHome);
+    const otherAt = g.options.findIndex((o) => !o.subject.isHome);
+    const withTarget = (st: typeof base) => ({
+      ...st,
+      grades: st.grades.map((x) => ({ ...x, selection: { ...x.selection, choiceIndex: 0 } })),
+    });
+
+    it('before choosing the subject it is a question and nothing is blocked', () => {
+      expect(base.grades[0]!.selected).toBe(false);
+      expect(agendaBlocked(base, 'p1')).toBe(false);
+    });
+
+    it('choosing the secondary subject unticks it, blocks it and the summary does not count it', () => {
+      const st = withTarget(setGradeSubject(toggle(base, 'p1', true), g.clientId, otherAt));
+      expect(agendaBlocked(st, 'p1')).toBe(true);
+      expect(st.items[0]!.selected).toBe(false);
+      const sum = summarize(st);
+      expect(sum.toCreate).toBe(0);
+      expect(sum.gradesToCreate).toBe(1);
+      expect(confirmLabel(sum)).toBe('Guardar 1 nota');
+    });
+
+    it('ticking it by hand does not work', () => {
+      const st = withTarget(setGradeSubject(base, g.clientId, otherAt));
+      expect(toggle(st, 'p1', true).items[0]!.selected).toBe(false);
+    });
+
+    it('an impossible state (blocked and ticked) still sends no activity, only the evaluation', () => {
+      const st = withTarget(setGradeSubject(base, g.clientId, otherAt));
+      const forged = toggleOn(st);
+      const req = buildConfirmRequest(forged);
+      expect(req.items).toEqual([]);
+      expect(req.evaluations![0]!.subjectId).toBe(other.id);
+      expect(summarize(forged).toCreate).toBe(0);
+    });
+
+    it('choosing HOME again restores the valid activity + evaluation flow', () => {
+      const blocked = withTarget(setGradeSubject(base, g.clientId, otherAt));
+      const back = setGradeSubject(blocked, g.clientId, homeAt);
+      const st = withTarget(back);
+      expect(agendaBlocked(st, 'p1')).toBe(false);
+      expect(toggle(st, 'p1', true).items[0]!.selected).toBe(true);
+      const req = buildConfirmRequest(toggleOn(st));
+      expect(req.items).toHaveLength(1);
+      expect(req.evaluations![0]).toMatchObject({ subjectId: home.id, activityClientId: 'p1' });
+    });
   });
 
   it('messages: scores saved and evaluations added', () => {

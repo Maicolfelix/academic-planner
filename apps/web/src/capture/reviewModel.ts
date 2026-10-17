@@ -243,7 +243,11 @@ function settle(state: ReviewState): ReviewState {
     ...state,
     items: state.items.map((item) => {
       const blocked = agendaBlocked(state, item.proposal.clientId);
-      if (blocked) return item.selected ? { ...item, selected: false } : item;
+      // Blocked: unticked, and it forgets any manual tick so that it follows its completeness again once unblocked.
+      if (blocked)
+        return item.selected || item.selectionTouched
+          ? { ...item, selected: false, selectionTouched: false }
+          : item;
       if (item.selectionTouched) return item;
       const wanted = isComplete(state, item) && item.proposal.duplicateOf === null;
       return item.selected === wanted ? item : { ...item, selected: wanted };
@@ -297,10 +301,12 @@ export const toggle = (state: ReviewState, clientId: string, selected: boolean):
     i.proposal.clientId === clientId
       ? {
           ...i,
-          selected,
+          // An activity whose subject-of-grade belongs to another study can never be ticked.
+          selected: selected && !agendaBlocked(state, clientId),
           selectionTouched: true,
           // Ticking a copy of something that already exists is saying "yes, I want it again".
-          allowDuplicate: selected && i.proposal.duplicateOf !== null,
+          allowDuplicate:
+            selected && !agendaBlocked(state, clientId) && i.proposal.duplicateOf !== null,
         }
       : i,
   ),

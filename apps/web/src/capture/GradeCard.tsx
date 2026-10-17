@@ -121,6 +121,28 @@ export function GradeCard({ grade, actions, level, disabled, agendaNote }: Props
           </div>
         )}
 
+        {option && s.options.length > 1 && (
+          <div
+            className="flex flex-wrap items-center gap-2 text-sm"
+            role="group"
+            aria-label="Cambiar de asignatura"
+          >
+            {s.options.map((x, i) =>
+              x === option ? null : (
+                <Button
+                  key={x.subject.id}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => actions.setSubject(i)}
+                  disabled={disabled}
+                >
+                  Cambiar a {optionLabel(x)}
+                </Button>
+              ),
+            )}
+          </div>
+        )}
+
         {r.missing.includes('CONFIG') && option && (
           <div className={askClass} role="group" aria-label="Notas sin configurar">
             <p className="font-medium">Esta materia todavía no tiene configuradas sus notas.</p>
