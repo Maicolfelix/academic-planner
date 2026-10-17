@@ -375,10 +375,12 @@ describe('activity + evaluation — "Parcial de Anatomía el viernes, vale 40% d
     expect(merged.capture.proposals).toHaveLength(0);
     expect(merged.grades.suggestions[0]!.activityClientId).toBeNull();
   });
-  it('a subject outside the period where activities go keeps an evaluation but no link', () => {
+  it('a subject of another study keeps the evaluation but the activity is NOT left alive in HOME', () => {
     const away = { ...anatomia, isHome: false };
     const merged = mergeGradeCapture(capture, interpretGrades(text, ctx(away)), new Set());
     expect(merged.grades.suggestions[0]!.activityClientId).toBeNull();
+    expect(merged.grades.suggestions[0]!.activityNote).toBe('OTHER_STUDY');
+    expect(merged.capture.proposals).toHaveLength(0);
   });
 });
 
@@ -458,5 +460,124 @@ describe('ambiguity is asked, never guessed', () => {
     expect(interpretGrades('Tarea de Redes para el 15 de octubre', ctx(farma)).suggestions).toEqual(
       [],
     );
+  });
+});
+
+describe('a weight and a score in the same sentence', () => {
+  const text = 'Parcial de Anatomía el viernes, vale 40% del Corte 1 y saqué 4.2';
+  it('keeps both: a new evaluation worth 40 % of Corte 1, already scored', () => {
+    const s = first(text, ctx(anatomiaBase));
+    expect(s.intent).toBe('NEW_EVALUATION');
+    expect(s.weight).toMatchObject({ basis: 'GRADING_PERIOD', percentBp: 4000 });
+    expect(s.score).toMatchObject({ kind: 'DECIMAL', scoreMilli: 4200 });
+    expect(resolved(s).request).toMatchObject({
+      action: 'CREATE_EVALUATION',
+      periodShareBp: 4000,
+      scoreMilli: 4200,
+      gradingPeriodId: anatomiaBase.cuts[0]!.id,
+    });
+  });
+  it('the activity engine reads ONLY the activity phrase', () => {
+    const g = interpretGrades(text, ctx(anatomiaBase));
+    expect(g.maskedText.trim()).toBe('Parcial de Anatomía el viernes,');
+    expect(g.maskedText).not.toMatch(/saqu|4.2|40|Corte|vale/);
+  });
+  it('without a date and with the score first it still keeps both', () => {
+    const s = first('Parcial de Anatomía vale 40% del Corte 1, saqué 4.2', ctx(anatomiaBase));
+    expect(resolved(s).request).toMatchObject({ periodShareBp: 4000, scoreMilli: 4200 });
+  });
+  it('18/20 on a scale that starts at 0: canonical derived and the raw points kept', () => {
+    const s = first('Parcial de Bioquímica vale 30% del Corte 2 y saqué 18/20', ctx(bioBase));
+    expect(resolved(s).request).toMatchObject({
+      action: 'CREATE_EVALUATION',
+      periodShareBp: 3000,
+      scoreMilli: 4500,
+      rawEarnedMilli: 18000,
+      rawMaxMilli: 20000,
+    });
+  });
+  it('18/20 on a scale that does not start at 0: the raw is kept and the grade is asked', () => {
+    const c = subject(6, 'Cálculo', { profile: SCALE17 });
+    const s = first('Parcial de Cálculo vale 30% del Corte 2 y saqué 18/20', ctx(c));
+    const r = resolved(s);
+    expect(r.request).toBeNull();
+    expect(r.missing).toContain('CANONICAL');
+    const done = resolved(s, { canonicalMilli: 6000 });
+    expect(done.request).toMatchObject({
+      scoreMilli: 6000,
+      rawEarnedMilli: 18000,
+      rawMaxMilli: 20000,
+    });
+  });
+  it('a score outside the scale is never silently dropped to pending', () => {
+    const s = first('Parcial de Anatomía vale 40% del Corte 1 y saqué 9.5', ctx(anatomiaBase));
+    const r = resolved(s);
+    expect(r.request).toBeNull();
+    expect(r.missing).toContain('CANONICAL');
+  });
+});
+
+describe('one sentence is never split across studies', () => {
+  const eng = subject(7, 'Inglés', {
+    cutNames: ['Etapa 1', 'Etapa 2'],
+    shares: [5000, 5000],
+    studyName: 'Diplomado',
+    studyType: 'OTHER_ACADEMIC',
+    isHome: false,
+  });
+  const proposal = (subjectName: string) =>
+    ({
+      clientId: 'p1',
+      rawSegment: 'Parcial de ' + subjectName + ' el viernes',
+      date: { value: '2026-10-16', certainty: 'EXACT', alternatives: [] },
+      subject: {
+        kind: 'UNRESOLVED',
+        reason: 'UNKNOWN_NAME',
+        suggestedName: subjectName,
+        candidates: [],
+      },
+      blockingIssues: [],
+      warnings: [],
+      duplicateOf: null,
+    }) as unknown as CaptureResult['proposals'][number];
+  const capture = (p: CaptureResult['proposals'][number]) =>
+    ({
+      status: 'OK',
+      proposals: [p],
+      suggestions: [],
+      corrections: [],
+      warnings: [],
+      stats: { characters: 1, found: 1, collapsed: 0, expected: null },
+    }) as CaptureResult;
+
+  it('a subject that only exists in a secondary study: the evaluation stays, no HOME activity, no HOME subject', () => {
+    const text = 'Parcial de Inglés el viernes, vale 40% de la Etapa 1';
+    const g = interpretGrades(text, ctx(farma, eng));
+    const merged = mergeGradeCapture(capture(proposal('Inglés')), g, new Set([farma.id]));
+    expect(merged.capture.proposals).toEqual([]);
+    const s = merged.grades.suggestions[0]!;
+    expect(s.activityClientId).toBeNull();
+    expect(s.activityNote).toBe('OTHER_STUDY');
+    expect(resolved(s).request).toMatchObject({
+      action: 'CREATE_EVALUATION',
+      subjectId: eng.id,
+      periodShareBp: 4000,
+    });
+  });
+  it('the same name in HOME and in a secondary study: linked to the HOME option, never to the other', () => {
+    const home = subject(8, 'Farmacología');
+    const other = subject(9, 'Farmacología', { studyName: 'Diplomado', isHome: false });
+    const g = interpretGrades(
+      'Parcial de Farmacología el viernes, vale 40% del Corte 1',
+      ctx(home, other),
+    );
+    const merged = mergeGradeCapture(capture(proposal('Farmacología')), g, new Set([home.id]));
+    const s = merged.grades.suggestions[0]!;
+    expect(s.activityClientId).toBe('p1'); // kept for the HOME option
+    expect(s.options.map((o) => o.subject.isHome).sort()).toEqual([false, true]);
+    expect(
+      resolved(s, { optionIndex: s.options.findIndex((o) => !o.subject.isHome), choiceIndex: 0 })
+        .request,
+    ).toMatchObject({ subjectId: other.id });
   });
 });

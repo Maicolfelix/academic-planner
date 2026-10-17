@@ -224,11 +224,26 @@ export const isComplete = (state: ReviewState, item: ReviewItem) =>
 
 // ───────────────────────── Changes (each returns a new state) ─────────────────────────
 
+/**
+ * The activity of a sentence like "Parcial de Inglés el viernes, vale 40 % de la Etapa 1" is added to the Agenda of HOME. When the
+ * student's chosen subject for the grade belongs to ANOTHER study, that activity would land in the wrong place: it is blocked
+ * (never ticked, never sent), so one sentence is never split across studies.
+ */
+export function agendaBlocked(state: ReviewState, clientId: string): boolean {
+  return state.grades.some((g) => {
+    if (g.suggestion.activityClientId !== clientId) return false;
+    const option = gradeResolution(g).option;
+    return option !== null && !option.subject.isHome;
+  });
+}
+
 /** An item that has not been ticked or unticked by hand follows its completeness: complete = ticked. */
 function settle(state: ReviewState): ReviewState {
   return {
     ...state,
     items: state.items.map((item) => {
+      const blocked = agendaBlocked(state, item.proposal.clientId);
+      if (blocked) return item.selected ? { ...item, selected: false } : item;
       if (item.selectionTouched) return item;
       const wanted = isComplete(state, item) && item.proposal.duplicateOf === null;
       return item.selected === wanted ? item : { ...item, selected: wanted };
@@ -380,7 +395,7 @@ export function gradeView(g: ReviewGrade): GradeView {
       : null;
   const shown = r.scoreMilli !== null ? formatScore(r.scoreMilli, decimals) : null;
   const score =
-    choice?.action === 'CREATE_EVALUATION'
+    choice?.action === 'CREATE_EVALUATION' && s.score.kind === 'NONE'
       ? 'Nota: Pendiente'
       : shown !== null
         ? `Nota: ${shown}${points ? ` (${points})` : ''}`
@@ -631,8 +646,9 @@ export function summarize(state: ReviewState): ReviewSummary {
     if (subject?.kind === 'NEW') names.set(normalizeNameKey(subject.name), subject.name.trim());
   }
   for (const item of state.items) {
-    if (!isComplete(state, item)) needsReview++;
-    if (!item.selected) {
+    const blocked = agendaBlocked(state, item.proposal.clientId);
+    if (!isComplete(state, item) && !blocked) needsReview++;
+    if (!item.selected || blocked) {
       skipped++;
       continue;
     }
@@ -738,7 +754,8 @@ export function buildConfirmRequest(state: ReviewState): CaptureConfirmRequest {
     }
   }
   for (const item of state.items) {
-    if (!item.selected || !isComplete(state, item)) continue;
+    if (!item.selected || !isComplete(state, item) || agendaBlocked(state, item.proposal.clientId))
+      continue;
     const subject = effectiveSubject(state, item)!;
     const time = effectiveTime(state, item);
     const description = effectiveDescription(item).trim();

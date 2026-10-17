@@ -2,6 +2,7 @@ import { interpretGrades, type GradeCaptureContext } from '@planner/core';
 import { describe, expect, it } from 'vitest';
 import { toCaptureDraft, captureDraftSchema } from './captureDraft';
 import {
+  agendaBlocked,
   buildConfirmRequest,
   confirmLabel,
   createdMessage,
@@ -34,6 +35,11 @@ const subject = (n: number, name: string, studyName: string | null = 'Medicina')
   evaluations: [],
 });
 const ctx = (...subjects: GradeCaptureContext['subjects']): GradeCaptureContext => ({ subjects });
+const toggleOn = (st: ReturnType<typeof createReview>) => ({
+  ...st,
+  items: st.items.map((i) => ({ ...i, selected: true })),
+  grades: st.grades.map((g) => ({ ...g, selected: true })),
+});
 const reviewOf = (text: string, c: GradeCaptureContext) =>
   createReview(
     { proposals: [], corrections: [], suggestions: [], warnings: [] },
@@ -126,6 +132,70 @@ describe('review of grades', () => {
     const old = JSON.parse(JSON.stringify(draft));
     delete old.review.grades;
     expect(captureDraftSchema.parse(old).review!.grades).toEqual([]);
+  });
+  it('a new evaluation that comes scored previews its score, not "Pendiente"', () => {
+    const state = reviewOf(
+      'Parcial de Farmacología vale 40% del Corte 1 y saqué 4.2',
+      ctx(subject(1, 'Farmacología')),
+    );
+    const view = gradeView(state.grades[0]!);
+    expect(view.score).toBe('Nota: 4.2');
+    expect(view.weight).toBe('Corte 1 · 40 %');
+    expect(buildConfirmRequest(state).evaluations![0]).toMatchObject({
+      action: 'CREATE_EVALUATION',
+      periodShareBp: 4000,
+      scoreMilli: 4200,
+    });
+  });
+
+  it('choosing the secondary-study subject blocks the HOME activity of the same sentence; choosing HOME keeps both', () => {
+    const home = subject(1, 'Farmacología', 'Medicina');
+    const other = { ...subject(2, 'Farmacología', 'Diplomado'), isHome: false };
+    const g = interpretGrades(
+      'Parcial de Farmacología el viernes, vale 40% del Corte 1',
+      ctx(home, other),
+    ).suggestions[0]!;
+    const proposal = {
+      clientId: 'p1',
+      selected: true,
+      duplicateOf: null,
+      subject: { kind: 'EXISTING', id: home.id, name: 'Farmacología' },
+      title: { value: 'Parcial', withoutSubject: null },
+      type: { value: 'EXAM' },
+      date: { value: '2026-10-16', certainty: 'EXACT', alternatives: [] },
+      time: { value: null, certainty: 'MISSING', groupKey: null },
+      description: { value: null },
+      blockingIssues: [],
+      warnings: [],
+    };
+    const base = createReview(
+      { proposals: [proposal as never], corrections: [], suggestions: [], warnings: [] },
+      [{ ...g, activityClientId: 'p1' }],
+    );
+    const gid = g.clientId;
+    const pickedHome = setGradeSubject(
+      base,
+      gid,
+      g.options.findIndex((o) => o.subject.isHome),
+    );
+    const pickedOther = setGradeSubject(
+      base,
+      gid,
+      g.options.findIndex((o) => !o.subject.isHome),
+    );
+    expect(agendaBlocked(pickedHome, 'p1')).toBe(false);
+    expect(agendaBlocked(pickedOther, 'p1')).toBe(true);
+    const sel = (st: typeof base) => ({
+      ...st,
+      grades: st.grades.map((x) => ({ ...x, selection: { ...x.selection, choiceIndex: 0 } })),
+    });
+    const reqHome = buildConfirmRequest(toggleOn(sel(pickedHome)));
+    expect(reqHome.items).toHaveLength(1);
+    expect(reqHome.evaluations![0]).toMatchObject({ activityClientId: 'p1' });
+    const reqOther = buildConfirmRequest(toggleOn(sel(pickedOther)));
+    expect(reqOther.items).toHaveLength(0); // never splits one sentence across studies
+    expect(reqOther.evaluations![0]!.subjectId).toBe(other.id);
+    expect(reqOther.evaluations![0]).not.toHaveProperty('activityClientId');
   });
 
   it('messages: scores saved and evaluations added', () => {

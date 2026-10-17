@@ -167,14 +167,10 @@ export const captureConfirmEvaluationSchema = z
       need('gradingPeriodId', 'Falta el corte.');
       need('name', 'Falta el nombre.');
       need('periodShareBp', 'Falta el peso.');
-      for (const k of [
-        'evaluationId',
-        'scoreMilli',
-        'rawEarnedMilli',
-        'rawMaxMilli',
-        'expectScoreMilli',
-      ] as const)
-        forbid(k);
+      for (const k of ['evaluationId', 'expectScoreMilli'] as const) forbid(k);
+      // A new evaluation may come already scored (the grades rules apply on the server).
+      if (v.rawEarnedMilli != null && v.scoreMilli == null)
+        ctx.addIssue({ code: 'custom', path: ['scoreMilli'], message: 'Falta la nota.' });
     }
   });
 export type CaptureConfirmEvaluation = z.infer<typeof captureConfirmEvaluationSchema>;

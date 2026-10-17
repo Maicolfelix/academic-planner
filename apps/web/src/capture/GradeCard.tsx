@@ -22,6 +22,8 @@ interface Props {
   actions: GradeActions;
   level: 3 | 4;
   disabled?: boolean;
+  /** The activity of the same sentence will not be added to the Agenda: its subject belongs to another study. */
+  agendaNote?: boolean;
 }
 
 const NOTICES: Record<string, (cut: string | null) => string> = {
@@ -38,7 +40,7 @@ const NOTICES: Record<string, (cut: string | null) => string> = {
  * A grade the app understood, in plain words ("Farmacología · Corte 2 · Nota: 4.3"). It asks only what is missing: the subject,
  * the cut or evaluation, what the percentage is of, the grade on the scale of the subject. Never an internal term.
  */
-export function GradeCard({ grade, actions, level, disabled }: Props) {
+export function GradeCard({ grade, actions, level, disabled, agendaNote }: Props) {
   const id = `capture-${grade.suggestion.clientId}`;
   const r = gradeResolution(grade);
   const v = gradeView(grade);
@@ -92,6 +94,13 @@ export function GradeCard({ grade, actions, level, disabled }: Props) {
             <Badge tone="warning">Falta algo</Badge>
           )}
         </header>
+
+        {agendaNote && (
+          <p role="status" className="text-sm text-muted-foreground">
+            La actividad de esta frase no se añadirá a la agenda desde esta captura: esa materia es
+            de otro estudio. Se guardará solo la evaluación.
+          </p>
+        )}
 
         {grade.error && (
           <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink">

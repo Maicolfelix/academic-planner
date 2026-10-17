@@ -427,6 +427,11 @@ export function createCaptureConfirmService(opts: {
                     gradingPeriodId: e.gradingPeriodId!,
                     name: e.name!,
                     periodShareBp: e.periodShareBp!,
+                    ...(e.scoreMilli !== undefined && {
+                      scoreMilli: e.scoreMilli,
+                      rawEarnedMilli: e.rawEarnedMilli,
+                      rawMaxMilli: e.rawMaxMilli,
+                    }),
                     ...(activityId && { activityId }),
                   }),
                 });

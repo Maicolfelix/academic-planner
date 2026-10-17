@@ -410,6 +410,71 @@ describe('confirm: activity + evaluation, atomically', () => {
     expect(res.status).toBe(409);
     expect(await prisma.activity.count()).toBe(0);
   });
+  it('a new evaluation comes already scored: weight + score in one sentence, one confirmation', async () => {
+    const w = await world();
+    await w.agent
+      .patch(`/api/evaluations/${w.parcial.id}`)
+      .send({ name: 'Taller', periodShareBp: 5000 })
+      .expect(200);
+    const res = await parse(
+      w.agent,
+      'Parcial 2 de Anatomía el viernes, vale 40% del Corte 1 y saqué 18/20',
+    );
+    expect(res.capture.proposals).toHaveLength(1);
+    const p = res.capture.proposals[0]!;
+    const items = [
+      {
+        clientId: p.clientId,
+        title: 'Parcial 2',
+        type: 'EXAM',
+        priority: 'MEDIUM',
+        dueDate: p.date.value!,
+        subject: { kind: 'EXISTING', subjectId: w.anatomia.id },
+      },
+    ];
+    const out = await confirm(w.agent, {
+      items,
+      blocks: [],
+      evaluations: evaluationsOf(res.grades.suggestions),
+    }).expect(201);
+    expect(out.body.evaluations[0].evaluation).toMatchObject({
+      scoreMilli: 4500,
+      rawEarnedMilli: 18_000,
+      rawMaxMilli: 20_000,
+      periodShareBp: 4000,
+    });
+    expect(out.body.evaluations[0].evaluation.activityId).toBe(
+      out.body.createdActivities[0].activity.id,
+    );
+  });
+
+  it('an invalid score on the new evaluation rolls the activity back', async () => {
+    const w = await world();
+    await w.agent
+      .patch(`/api/evaluations/${w.parcial.id}`)
+      .send({ name: 'Taller', periodShareBp: 5000 })
+      .expect(200);
+    const body = await request(w, false);
+    body.evaluations = [{ ...body.evaluations[0]!, scoreMilli: 9000 } as never];
+    const res = await confirm(w.agent, body);
+    expect(res.status).toBe(400);
+    expect(await prisma.activity.count()).toBe(0);
+    expect(await prisma.evaluation.count({ where: { subjectId: w.anatomia.id } })).toBe(1);
+  });
+
+  it('an invalid activity rolls the scored evaluation back', async () => {
+    const w = await world();
+    await w.agent
+      .patch(`/api/evaluations/${w.parcial.id}`)
+      .send({ name: 'Taller', periodShareBp: 5000 })
+      .expect(200);
+    const body = await request(w);
+    body.evaluations = [{ ...body.evaluations[0]!, scoreMilli: 4200 } as never];
+    body.items[0]!.subject = { kind: 'EXISTING', subjectId: randomUUID() } as never;
+    const res = await confirm(w.agent, body);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(await prisma.evaluation.count({ where: { subjectId: w.anatomia.id } })).toBe(1);
+  });
 
   it('the contract refuses an activityClientId that is not an item of the request, and a client-chosen user or period', async () => {
     const w = await world();

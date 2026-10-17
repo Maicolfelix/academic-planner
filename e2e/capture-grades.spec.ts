@@ -24,8 +24,9 @@ async function study(
   name: string,
   subjectNames: string[],
   shares = [3000, 3000, 4000],
+  type: 'UNIVERSITY' | 'OTHER_ACADEMIC' = 'UNIVERSITY',
 ) {
-  const st = (await post(page, '/api/study-tracks', { name, type: 'UNIVERSITY' })).studyTrack;
+  const st = (await post(page, '/api/study-tracks', { name, type })).studyTrack;
   const period = (
     await post(page, '/api/periods', { name: `P ${name}`, ...dates, studyTrackId: st.id })
   ).period;
@@ -35,7 +36,10 @@ async function study(
       .subject;
     const setup = await post(page, `/api/subjects/${subject.id}/grading/setup`, {
       profile: SCALE,
-      gradingPeriods: shares.map((finalShareBp, i) => ({ name: `Corte ${i + 1}`, finalShareBp })),
+      gradingPeriods: shares.map((finalShareBp, i) => ({
+        name: `${type === 'UNIVERSITY' ? 'Corte' : 'Etapa'} ${i + 1}`,
+        finalShareBp,
+      })),
     });
     out.push({ id: subject.id, name: subjectName, cuts: setup.gradingPeriods });
   }
@@ -136,6 +140,49 @@ for (const viewport of [
         rawEarnedMilli: 18_000,
         rawMaxMilli: 20_000,
       });
+      check();
+    });
+
+    test('weight and score in one sentence: activity + evaluation created already scored', async ({
+      page,
+    }) => {
+      const check = watch(page);
+      await start(page);
+      const [anat] = await study(page, 'Medicina', ['Anatomía'], [5000, 5000]);
+      await write(page, 'Parcial de Anatomía el viernes, vale 40% del Corte 1 y saqué 4.2');
+      await expect(cards(page)).toHaveCount(2);
+      await expect(quick(page).getByText('Nota: 4.2')).toBeVisible();
+      await expect(quick(page).getByText('Nota: Pendiente')).toHaveCount(0);
+      await quick(page).getByRole('button', { name: 'Crear 1 actividad y 1 nota' }).click();
+      await expect(quick(page).getByText(/1 actividad creada/)).toBeVisible();
+      const ev = await gradesOf(page, anat!.id);
+      expect(ev).toHaveLength(1);
+      expect(ev[0]).toMatchObject({ scoreMilli: 4200, periodShareBp: 4000 });
+      expect(ev[0]!.activityId).not.toBeNull();
+      const activities = (await (await page.request.get('/api/activities')).json()).activities;
+      expect(activities).toHaveLength(1);
+      check();
+    });
+
+    test('a subject of a secondary study never creates an activity in HOME', async ({ page }) => {
+      const check = watch(page);
+      await start(page);
+      await study(page, 'Medicina', ['Anatomía'], [5000, 5000]);
+      const [ingles] = await study(page, 'Diplomado', ['Inglés'], [5000, 5000], 'OTHER_ACADEMIC');
+      await write(page, 'Parcial de Inglés el viernes, vale 40% de la Etapa 1');
+      await expect(cards(page)).toHaveCount(1); // only the evaluation
+      await expect(quick(page).getByText(/no se añadirá a la agenda/)).toBeVisible();
+      await quick(page)
+        .getByRole('button', { name: 'Crear 1 nota' })
+        .or(quick(page).getByRole('button', { name: 'Guardar 1 nota' }))
+        .click();
+      await expect(quick(page).getByText(/1 evaluación agregada/)).toBeVisible();
+      expect(await gradesOf(page, ingles!.id)).toHaveLength(1);
+      expect((await (await page.request.get('/api/activities')).json()).activities).toHaveLength(0);
+      const subjects = (await (await page.request.get('/api/subjects')).json()).subjects as {
+        name: string;
+      }[];
+      expect(subjects.filter((x) => x.name === 'Inglés')).toHaveLength(1);
       check();
     });
 

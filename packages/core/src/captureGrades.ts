@@ -170,6 +170,8 @@ export const gradeSuggestionSchema = z.object({
   }),
   /** The activity of this same capture the evaluation is linked to (set by `mergeGradeCapture`). */
   activityClientId: z.string().nullable(),
+  /** The sentence also had an activity, but its subject belongs to ANOTHER study: that part is not added from this capture. */
+  activityNote: z.enum(['OTHER_STUDY']).nullable().default(null),
 });
 export type GradeSuggestion = z.infer<typeof gradeSuggestionSchema>;
 
@@ -258,7 +260,12 @@ function findWeight(n: string): Found<{
   if (!bare) return null;
   const percent = num(bare[1]!);
   if (!(percent > 0) || percent > 100) return null;
-  const tail = (bare[2] ?? '').trim();
+  const rawTail = bare[2] ?? '';
+  const stop =
+    /\s+(?:y|e|pero|con)\s|\b(?:saque|saco|sacamos|obtuve|obtuvo|tuve|me fue|me fueron|nota|calificacion)\s+(?:de\s+|fue\s+|un\s+|una\s+)*\d/.exec(
+      rawTail,
+    );
+  const tail = (stop ? rawTail.slice(0, stop.index) : rawTail).trim();
   const basis = /\b(?:nota final|definitiva|nota definitiva|calificacion final|total)\b/.test(tail)
     ? 'FINAL'
     : /\b(?:corte|periodo|etapa)\b/.test(tail)
@@ -267,7 +274,7 @@ function findWeight(n: string): Found<{
   return {
     value: { percentBp: Math.round(percent * 100), basis, tail },
     start: bare.index,
-    end: bare.index + bare[0].length,
+    end: bare.index + bare[0].length - (stop ? rawTail.length - stop.index : 0),
   };
 }
 
@@ -362,8 +369,8 @@ function readClause(clause: Clause, subjects: GradeSubjectCtx[]): Reading | null
   const mention = findCutMention(n);
   const hasVerb = GRADE_VERB.test(n);
   // A score is a grade only with its words: a verb, or a cut and a colon. "viernes 3/10" or "a las 18" are not grades.
-  const points = weight || !(hasVerb || mention) ? null : findPoints(n);
-  const decimal = weight || points ? null : findDecimal(n, mention !== null);
+  const points = !(hasVerb || mention) ? null : findPoints(n);
+  const decimal = points ? null : findDecimal(n, mention !== null);
   if (!weight && !points && !decimal) return null;
 
   const score: GradeSuggestion['score'] = points
@@ -402,9 +409,19 @@ function readClause(clause: Clause, subjects: GradeSubjectCtx[]): Reading | null
   }
   const subjectMentions = matchSubject(tokens, buildSubjectEntries(subjects));
 
+  // A sentence that is only a score is wholly spoken for. With a weight, the activity engine keeps the rest ("Parcial de
+  // Anatomía el viernes"): the weight phrase, the score and the "y" that joins them are blanked.
+  const scoreAt = points ?? decimal;
   const blank: [number, number][] = weight
     ? [[clause.start + weight.start, clause.start + weight.end]]
     : [[clause.start, clause.end]];
+  if (weight && scoreAt) {
+    // The score takes with it its words ("y saqué") so the activity engine is left with the activity phrase only.
+    const lead = new RegExp(
+      String.raw`(?:\s+(?:y|e|pero|con))?\s*(?:\b(?:saque|saco|sacamos|obtuve|obtuvo|tuve|me fue|me fueron|nota|calificacion)\b(?:\s+(?:de|fue|un|una|el|la))*)?\s*:?\s*$`,
+    ).exec(n.slice(0, scoreAt.start));
+    blank.push([clause.start + (lead ? lead.index : scoreAt.start), clause.start + scoreAt.end]);
+  }
   return {
     clause,
     score,
@@ -614,6 +631,7 @@ export function interpretGrades(text: string, context: GradeCaptureContext): Gra
           : null,
       weight: reading.weight,
       activityClientId: null,
+      activityNote: null,
     };
     const resolved = resolveGrade(suggestion, {});
     suggestion.status = resolved.missing.length === 0 ? 'READY' : 'NEEDS_REVIEW';
@@ -737,7 +755,7 @@ export function resolveGrade(s: GradeSuggestion, sel: GradeSelection): GradeReso
 
   // The grade in the scale of the period.
   let scoreMilli: number | null = null;
-  if (choice.action !== 'CREATE_EVALUATION') {
+  if (choice.action !== 'CREATE_EVALUATION' || s.score.kind !== 'NONE') {
     scoreMilli = option.scoreMilli ?? sel.canonicalMilli ?? null;
     if (s.score.kind === 'NONE') missing.push('SCORE');
     else if (option.scoreProblem) missing.push('CANONICAL');
@@ -817,6 +835,7 @@ export function resolveGrade(s: GradeSuggestion, sel: GradeSelection): GradeReso
         name:
           (sel.name ?? s.name ?? 'Evaluación').trim().slice(0, GRADING_NAME_MAX) || 'Evaluación',
         periodShareBp: periodShareBp!,
+        ...(s.score.kind !== 'NONE' ? withScore : {}),
         ...(s.activityClientId && option.subject.isHome
           ? { activityClientId: s.activityClientId }
           : {}),
@@ -863,7 +882,11 @@ export function mergeGradeCapture(
       o.subject.isHome &&
       homeSubjectIds.has(o.subject.id) &&
       (subjectId === null || subjectId === o.subject.id);
-    if (!s.options.some(fits)) return s;
+    if (!s.options.some(fits)) {
+      // Every subject this could mean belongs to another study: the Agenda part would land in HOME. It is not added.
+      removed.add(match.clientId);
+      return { ...s, activityNote: 'OTHER_STUDY' as const };
+    }
     return { ...s, activityClientId: match.clientId };
   });
   const keep = proposals.filter((p) => !removed.has(p.clientId));

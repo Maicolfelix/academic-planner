@@ -7,6 +7,7 @@ import { GradeCard, type GradeActions } from './GradeCard';
 import { RecurrenceCard, type RecurrenceActions } from './RecurrenceCard';
 import { shortDate } from './format';
 import {
+  agendaBlocked,
   chooseGroupSubject,
   chooseGroupTime,
   confirmLabel,
@@ -272,6 +273,11 @@ export function CaptureReview({
             actions={gradeActions(g.suggestion.clientId)}
             level={(level + 1) as 3 | 4}
             disabled={pending}
+            agendaNote={
+              g.suggestion.activityNote === 'OTHER_STUDY' ||
+              (g.suggestion.activityClientId !== null &&
+                agendaBlocked(state, g.suggestion.activityClientId))
+            }
           />
         ))}
         {state.recurrences.map((r) => (
