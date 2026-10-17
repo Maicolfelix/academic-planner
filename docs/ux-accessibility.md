@@ -323,6 +323,8 @@ Para quien estudia (universidad, colegio u otro estudio y aún no montó un estu
 
 ## Notas de una asignatura (B2)
 
+**DONE: fusionado (PR #45) con QA real en iPhone aprobada por el mantenedor, sin incidencias reportadas** (entorno local por red local; no es QA de release, y HTTPS y la PWA instalada no se validaron).
+
 Ruta `/subjects/:subjectId/grades` (fuera de `RequirePeriod`, como `/subjects`: la asignatura —y con ella su periodo— la resuelve la API; una ajena o inexistente es el mismo 404 amistoso, nunca el onboarding). Entrada: el botón «Notas» de cada `SubjectCard` (acción secundaria; no reemplaza «Editar» ni «Eliminar»; la fila de acciones parte en dos renglones a 320 px).
 
 - **Materia → corte → nota (QA real en iPhone):** el camino principal NO pide evaluaciones. Cada corte es una tarjeta con su peso en la nota final y su **nota** («Pendiente» + «Registrar nota», o la nota + «Aporta a la definitiva: 1.35» + «Editar nota»). El diálogo de la nota de un corte **nunca pide nombre, peso ni corte**: solo la nota (o «Puntos» si la escala empieza en 0). **Desglosar evaluaciones** es la acción secundaria (menú del corte): nombre, peso dentro del corte, nota y actividad, como antes; un corte es **o** nota directa **o** desglose (para desglosar uno con nota directa se pregunta y se quita esa nota). Internamente la nota de un corte es una `Evaluation` con `isCutGrade` (100 % del corte, nombre generado, sin actividad); no se muestra como fila redundante.
