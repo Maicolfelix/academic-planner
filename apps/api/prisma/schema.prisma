@@ -173,6 +173,8 @@ model Subject {
   scheduleBlocks   ScheduleBlock[]
   // NoAction: a subject with evaluations cannot be deleted silently (the API answers 409).
   evaluations      Evaluation[]
+  // The cuts of THIS subject (D36): configuration only, so they go with the subject when it has no evaluations.
+  gradingPeriods   GradingPeriod[]
 
   @@unique([periodId, nameKey])
   // Redundant as a key (id is already unique) but required: it is the target of Activity's composite foreign key,
@@ -352,12 +354,14 @@ model GradingProfile {
   @@index([userId])
 }
 
-// A "corte" / school evaluation period / stage, shared by every subject of the period. `finalShareBp` = its weight in the FINAL
-// grade (basis points: 3000 = 30 %); the sum over a period is at most 10000 (checked by the service under a lock).
+// A "corte" / school evaluation period / stage OF ONE SUBJECT (D36, revised after real QA: two subjects of the same period can have
+// 30/30/40, 25/35/40, 50/50 or a single grade; only the SCALE is shared by the period). `finalShareBp` = its weight in the FINAL grade
+// (basis points: 3000 = 30 %); the sum over a subject is at most 10000 (checked by the service under a lock).
 model GradingPeriod {
   id           String         @id @default(uuid()) @db.Uuid
   userId       String         @db.Uuid
   periodId     String         @db.Uuid
+  subjectId    String         @db.Uuid
   name         String
   // Assigned by the server on creation (1, 2, 3…); the cuts are listed in this order.
   position     Int
@@ -366,13 +370,16 @@ model GradingPeriod {
   updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   period       AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  // Composite: the cut's subject and period must correspond (the database refuses otherwise). Cascade: the configuration alone
+  // (cuts without evaluations) goes with its subject; a subject WITH evaluations is never deleted (Evaluation -> Subject is NoAction).
+  subject      Subject        @relation(fields: [subjectId, periodId], references: [id, periodId], onDelete: Cascade)
   // NoAction: a cut with evaluations cannot be deleted silently (the API answers 409).
   evaluations  Evaluation[]
   // Also in the migration SQL: CHECK (finalShareBp between 1 and 10000; position >= 1; name has 1..80 characters and is trimmed)
 
-  // The target of Evaluation's composite foreign key (a cut of another period is refused by the database).
-  @@unique([id, periodId])
-  @@unique([periodId, position])
+  // The target of Evaluation's composite foreign key: an evaluation can only use a cut OF ITS OWN SUBJECT.
+  @@unique([id, subjectId])
+  @@unique([subjectId, position])
   @@index([userId, periodId])
 }
 
@@ -395,18 +402,21 @@ model Evaluation {
   rawEarnedMilli  Int?
   rawMaxMilli     Int?
   scoredAt        DateTime?      @db.Timestamptz(3)
+  // The student's grade of a whole cut for this subject, with no breakdown (always 100 % of the cut, always scored, no activity).
+  isCutGrade      Boolean        @default(false)
   createdAt       DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   period          AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction)
   // Composite: the subject and the cut must both belong to this evaluation's period (the database refuses otherwise).
   subject         Subject        @relation(fields: [subjectId, periodId], references: [id, periodId], onDelete: NoAction)
-  gradingPeriod   GradingPeriod  @relation(fields: [gradingPeriodId, periodId], references: [id, periodId], onDelete: NoAction)
+  gradingPeriod   GradingPeriod  @relation(fields: [gradingPeriodId, subjectId], references: [id, subjectId], onDelete: NoAction)
   // Also in the migration SQL (Prisma cannot express them):
   //  - FOREIGN KEY ("activityId", "subjectId") -> "Activity"("id", "subjectId") ON DELETE SET NULL ("activityId")
   //  - CHECK (periodShareBp between 1 and 10000; scoreMilli between 0 and 100000; name has 1..80 characters and is trimmed)
   //  - CHECK (the raw pair is both-or-none, needs a score, rawMaxMilli > 0 and rawEarnedMilli between 0 and rawMaxMilli)
   //  - CHECK (scoredAt is set exactly while scoreMilli is)
+  //  - CHECK (isCutGrade implies periodShareBp = 10000, no activity and a score) and a partial unique index (subjectId, gradingPeriodId) WHERE isCutGrade
 
   @@index([userId, periodId])
   @@index([subjectId])

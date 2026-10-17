@@ -241,6 +241,7 @@ export function createApp(deps: AppDeps): Express {
       subjects: subjectRepository,
       activities: activityRepository,
       periods: periodRepository,
+      studyTracks: createStudyTrackRepository(prisma),
       runInTransaction,
       clock,
     }),

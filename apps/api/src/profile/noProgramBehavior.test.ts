@@ -357,6 +357,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/web/src/api/studyTracks.ts',
       'apps/web/src/pages/OnboardingPage.tsx', // READS how many studies exist (to preview what completing does); the server creates it
       'apps/web/src/pages/StudiesPage.tsx', // Mis estudios
+      'apps/web/src/pages/SubjectGradesPage.tsx', // B2: READS the study of the subject's period (its type names the cuts; no type changes any rule)
       'apps/web/src/pages/SubjectsPage.tsx', // reads the study of the period it shows (its title); never sends one
       'apps/web/src/pages/progress/ProgressByPeriod.tsx', // one progress line per study
       'apps/web/src/pages/studies/AddStudyDialog.tsx',

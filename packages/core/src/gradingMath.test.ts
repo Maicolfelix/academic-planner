@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   WEIGHT_UNIT_TOTAL,
+  accumulatedMilli,
   ceilMilli,
+  cutContributionMilli,
   projectedFinalMilli,
   rawToScoreMilli,
   requiredScore,
@@ -67,9 +69,32 @@ describe('summarizeSubjectGrade', () => {
       { gradingPeriodId: 'c3', periodShareBp: 10_000, scoreMilli: null },
     ];
     const s = summarizeSubjectGrade(scale05, cuts, items);
+    // c1 is only half described (15 % of the 30 % cut is defined); c2 has NO evaluations (fully defined, pending); c3 is 100 %.
     expect(s.complete).toBe(false);
-    expect(s.definedWeightUnits).toBe(0.15 * WEIGHT_UNIT_TOTAL + 0.4 * WEIGHT_UNIT_TOTAL);
-    expect(s.undefinedWeightUnits).toBe(0.45 * WEIGHT_UNIT_TOTAL);
+    expect(s.definedWeightUnits).toBe(
+      0.15 * WEIGHT_UNIT_TOTAL + 0.3 * WEIGHT_UNIT_TOTAL + 0.4 * WEIGHT_UNIT_TOTAL,
+    );
+    expect(s.undefinedWeightUnits).toBe(0.15 * WEIGHT_UNIT_TOTAL);
+  });
+
+  it('cuts without evaluations are NOT undefined weight: 30/30/40 with nothing detailed is fully defined', () => {
+    const s = summarizeSubjectGrade(scale05, cuts, []);
+    expect(s.complete).toBe(true);
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.remainingWeightUnits).toBe(WEIGHT_UNIT_TOTAL);
+  });
+
+  it('cuts whose own weights do not add up to 100 % are not fully defined (the cuts, not the evaluations)', () => {
+    const s = summarizeSubjectGrade(
+      scale05,
+      [
+        { id: 'c1', finalShareBp: 3000 },
+        { id: 'c2', finalShareBp: 3000 },
+      ],
+      [],
+    );
+    expect(s.complete).toBe(false);
+    expect(s.undefinedWeightUnits).toBe(0.4 * WEIGHT_UNIT_TOTAL);
   });
 
   it('an evaluation of an unknown cut weighs nothing', () => {
@@ -85,6 +110,29 @@ describe('summarizeSubjectGrade', () => {
     expect(roundMilli(s.currentMilli!, 1)).toBe(3000); // what a student may see…
     expect(s.currentPasses).toBe(false); // …never changes the verdict
     expect(summarizeSubjectGrade(scale05, cuts, full([3000, 3000, 3000])).currentPasses).toBe(true);
+  });
+});
+
+describe('accumulatedMilli (what the graded evaluations already add to the final grade)', () => {
+  it('is not the average of what was graded: 4.5 on 30 % accumulates 1.35 (shown 1.4 with one decimal)', () => {
+    const items = full([4500, null, null]);
+    expect(summarizeSubjectGrade(scale05, cuts, items).currentMilli).toBe(4500); // the average of the graded part
+    expect(accumulatedMilli(cuts, items)).toBe(1350); // the accumulated, over the whole final grade
+  });
+  it('adds the cuts: 4.0·30 % + 3.0·30 % + 5.0·40 % = 4.1', () => {
+    expect(accumulatedMilli(cuts, full([4000, 3000, 5000]))).toBe(4100);
+  });
+  it('nothing graded: null; pending counts 0 while something is', () => {
+    expect(accumulatedMilli(cuts, full([null, null, null]))).toBeNull();
+    expect(accumulatedMilli(cuts, full([5000, null, null]))).toBe(1500);
+  });
+  it('a 100 % grade accumulates the score itself', () => {
+    expect(
+      accumulatedMilli(
+        [{ id: 'c1', finalShareBp: 10_000 }],
+        [{ gradingPeriodId: 'c1', periodShareBp: 10_000, scoreMilli: 3700 }],
+      ),
+    ).toBe(3700);
   });
 });
 
@@ -154,7 +202,58 @@ describe('requiredScore', () => {
     ];
     // 4.0 · 30 % = 120; need 300; remaining 70 % → 180/70 = 2.5714… → 2572
     expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'NEEDED', requiredMilli: 2572 });
-    expect(summarizeSubjectGrade(scale05, cuts, items).complete).toBe(false);
+    // c2 and c3 have no evaluations: their weight is defined (just pending). Only a cut described to less than 100 % is an estimate.
+    expect(summarizeSubjectGrade(scale05, cuts, items).complete).toBe(true);
+    const partial: WeightedScore[] = [
+      { gradingPeriodId: 'c1', periodShareBp: 7000, scoreMilli: 4000 },
+    ];
+    expect(summarizeSubjectGrade(scale05, cuts, partial).complete).toBe(false); // 30 % of the cut has no description
+  });
+
+  it('EXAMPLE: 30/30/40 with only the second cut graded 4.5 as a direct cut grade', () => {
+    const items: WeightedScore[] = [
+      { gradingPeriodId: 'c2', periodShareBp: 10_000, scoreMilli: 4500 },
+    ];
+    const s = summarizeSubjectGrade(scale05, cuts, items);
+    expect(accumulatedMilli(cuts, items)).toBe(1350); // exactly 1.35
+    expect(s.complete).toBe(true); // NOT an estimate: the weights are defined, the grades are missing
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.evaluatedWeightUnits).toBe(0.3 * WEIGHT_UNIT_TOTAL);
+    expect(s.remainingWeightUnits).toBe(0.7 * WEIGHT_UNIT_TOTAL);
+    expect(s.currentMilli).toBe(4500); // the average of what is registered
+    expect(roundMilli(accumulatedMilli(cuts, items)!, 1)).toBe(1400); // shown 1.4 with one decimal
+    // (3.0 − 1.35) / 0.70 = 2.357142… → needed 2358 milli, shown 2.4 (rounded UP), never 2.8
+    expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'NEEDED', requiredMilli: 2358 });
+    expect(ceilMilli(2358, 1)).toBe(2400);
+  });
+
+  it('EXAMPLE (QA): 30/30/40 with the three cuts graded 3.2 / 4.5 / 4.0 is 3.91, fully graded, nothing left to ask', () => {
+    const items: WeightedScore[] = [
+      { gradingPeriodId: 'c1', periodShareBp: 10_000, scoreMilli: 3200 },
+      { gradingPeriodId: 'c2', periodShareBp: 10_000, scoreMilli: 4500 },
+      { gradingPeriodId: 'c3', periodShareBp: 10_000, scoreMilli: 4000 },
+    ];
+    expect(accumulatedMilli(cuts, items)).toBe(3910); // 3.2·30 % + 4.5·30 % + 4.0·40 % = 3.91 exactly (NOT 1.4)
+    expect(roundMilli(3910, 1)).toBe(3900); // shown 3.9 / 5.0
+    const s = summarizeSubjectGrade(scale05, cuts, items);
+    expect(s.evaluatedWeightUnits).toBe(WEIGHT_UNIT_TOTAL); // 100 % evaluated
+    expect(s.remainingWeightUnits).toBe(0); // 0 % pending
+    expect(s.undefinedWeightUnits).toBe(0);
+    expect(s.complete).toBe(true); // no estimate
+    expect(s.currentMilli).toBe(3910);
+    expect(s.currentPasses).toBe(true);
+    expect([
+      cutContributionMilli(3000, 3200),
+      cutContributionMilli(3000, 4500),
+      cutContributionMilli(4000, 4000),
+    ]).toEqual([960, 1350, 1600]);
+    expect(requiredScore(scale05, cuts, items)).toEqual({ status: 'SECURED' }); // nothing remains to be asked
+  });
+
+  it('the contribution of a graded cut to the final grade (4.5 on 30 % → 1.35), not its average', () => {
+    expect(cutContributionMilli(3000, 4500)).toBe(1350);
+    expect(cutContributionMilli(4000, 3000)).toBe(1200);
+    expect(cutContributionMilli(10_000, 3700)).toBe(3700);
   });
 
   it('a custom target works the same way', () => {
@@ -231,5 +330,42 @@ describe('grading schemas', () => {
     ).toBe(true);
     expect(updateEvaluationSchema.safeParse({ subjectId: UUID }).success).toBe(false);
     expect(updateEvaluationSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('each subject has its own cuts (D36 revised)', () => {
+  const grade = (shares: number[], scores: number[]) => {
+    const subjectCuts: CutWeight[] = shares.map((finalShareBp, i) => ({
+      id: `s${i}`,
+      finalShareBp,
+    }));
+    const items: WeightedScore[] = scores.map((scoreMilli, i) => ({
+      gradingPeriodId: `s${i}`,
+      periodShareBp: 10_000,
+      scoreMilli,
+    }));
+    return {
+      cuts: subjectCuts,
+      items,
+      accumulated: accumulatedMilli(subjectCuts, items),
+      summary: summarizeSubjectGrade(scale05, subjectCuts, items),
+    };
+  };
+
+  it('the same grades give different results with different distributions, each exact', () => {
+    expect(grade([3000, 3000, 4000], [3200, 4500, 4000]).accumulated).toBe(3910); // 30/30/40 → 3.91 → 3.9
+    const b = grade([2500, 3500, 4000], [3200, 4500, 4000]);
+    expect(b.accumulated).toBe(3975); // 0.8 + 1.575 + 1.6 = 3.975
+    expect(roundMilli(3975, 1)).toBe(4000); // shown 4.0 with one decimal
+    expect(b.summary.complete).toBe(true);
+    expect(grade([5000, 5000], [3000, 4000]).accumulated).toBe(3500); // 50/50
+  });
+
+  it('a single grade of 100 % is a normal case: 4.3 accumulates 4.3, nothing pending, nothing to ask', () => {
+    const c = grade([10_000], [4300]);
+    expect(c.accumulated).toBe(4300);
+    expect(c.summary.remainingWeightUnits).toBe(0);
+    expect(c.summary.complete).toBe(true);
+    expect(requiredScore(scale05, c.cuts, c.items)).toEqual({ status: 'SECURED' });
   });
 });

@@ -7,7 +7,7 @@
  *
  * With K = Σ score × weight (graded), E = Σ weight (graded) and R = total − E (still to be graded):
  *   current = K / E · final with the rest scored p = (K + R·p) / total · needed p for a target T = (T·total − K) / R.
- * When the weights do not add up to 100 % (`complete` false) every figure is an ESTIMATE: the undefined part counts as "still
+ * When the split of the final grade is not fully defined (`complete` false) every figure is an ESTIMATE: the undefined part counts as "still
  * to be graded".
  */
 
@@ -63,27 +63,39 @@ interface Totals {
   k: bigint;
   /** Σ weight, graded only. */
   e: bigint;
-  /** Σ weight, every evaluation. */
+  /** The weight (units) whose split is DEFINED: see `totals`. */
   defined: bigint;
 }
 
 const TOTAL = BigInt(WEIGHT_UNIT_TOTAL);
 
+/**
+ * What is DEFINED is how the final grade is split, not how much is graded:
+ *  - a cut WITHOUT evaluations is fully defined — its whole weight is simply pending (nobody has to describe anything);
+ *  - a cut whose evaluations add up to 100 % is fully defined;
+ *  - a cut whose evaluations add up to LESS than 100 % is only partly defined (the rest of that cut has no description yet).
+ * So three cuts of 30/30/40 are fully defined even when none has a grade.
+ */
 function totals(cuts: readonly CutWeight[], items: readonly WeightedScore[]): Totals {
   const share = new Map(cuts.map((c) => [c.id, BigInt(c.finalShareBp)]));
+  const described = new Map<string, bigint>(); // Σ periodShareBp of the evaluations of each cut
   let k = 0n;
   let e = 0n;
-  let defined = 0n;
   for (const item of items) {
     const cut = share.get(item.gradingPeriodId);
     if (cut === undefined) continue; // an evaluation of a cut that is not in the list weighs nothing
-    const weight = cut * BigInt(item.periodShareBp);
-    defined += weight;
+    described.set(
+      item.gradingPeriodId,
+      (described.get(item.gradingPeriodId) ?? 0n) + BigInt(item.periodShareBp),
+    );
     if (item.scoreMilli !== null) {
+      const weight = cut * BigInt(item.periodShareBp);
       e += weight;
       k += BigInt(item.scoreMilli) * weight;
     }
   }
+  let defined = 0n;
+  for (const [id, cut] of share) defined += cut * (described.get(id) ?? 10_000n);
   return { k, e, defined };
 }
 
@@ -106,6 +118,19 @@ export function summarizeSubjectGrade(
     currentMilli: e === 0n ? null : Number(divRound(k, e)),
     currentPasses: e === 0n ? null : k >= BigInt(scale.passMilli) * e,
   };
+}
+
+/**
+ * The ACCUMULATED grade: what the graded evaluations have already contributed to the FINAL grade, with everything still pending
+ * counting as 0 for now (K / total). It is NOT the average of what was graded (that is `currentMilli`): 4.5 on 30 % of the final
+ * grade accumulates 1.35. Rounded for display only; null while nothing is graded.
+ */
+export function accumulatedMilli(
+  cuts: readonly CutWeight[],
+  items: readonly WeightedScore[],
+): number | null {
+  const { k, e } = totals(cuts, items);
+  return e === 0n ? null : Number(divRound(k, TOTAL));
 }
 
 /** The final grade (milli, rounded for display) if everything still to be graded scored `assumedMilli`. */
@@ -161,4 +186,12 @@ export function rawToScoreMilli(
 ): number | null {
   if (scale.minMilli !== 0 || rawMaxMilli <= 0) return null;
   return Number(divRound(BigInt(rawEarnedMilli) * BigInt(scale.maxMilli), BigInt(rawMaxMilli)));
+}
+
+/**
+ * What a cut that has a grade adds to the FINAL grade: its grade × its weight in the final grade (4.5 on a 30 % cut → 1.35).
+ * It is not the average of the cut. Milli, half up; for display only, never stored.
+ */
+export function cutContributionMilli(finalShareBp: number, gradeMilli: number): number {
+  return Number(divRound(BigInt(gradeMilli) * BigInt(finalShareBp), 10_000n));
 }

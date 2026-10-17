@@ -35,6 +35,7 @@ const ScheduleImportPage = named(() => import('./pages/ScheduleImportPage'), 'Sc
 const StatusPage = named(() => import('./pages/StatusPage'), 'StatusPage');
 const StudiesPage = named(() => import('./pages/StudiesPage'), 'StudiesPage');
 const SubjectsPage = named(() => import('./pages/SubjectsPage'), 'SubjectsPage');
+const SubjectGradesPage = named(() => import('./pages/SubjectGradesPage'), 'SubjectGradesPage');
 
 export function App() {
   return (
@@ -61,6 +62,8 @@ export function App() {
             <Route element={<AppShell />}>
               <Route path="/settings/studies" element={<StudiesPage />} />
               <Route path="/subjects" element={<SubjectsPage />} />
+              {/* Like /subjects it needs no HOME: the subject (and so its period) is resolved by the API, owned or 404. */}
+              <Route path="/subjects/:subjectId/grades" element={<SubjectGradesPage />} />
             </Route>
             <Route element={<RequirePeriod />}>
               <Route element={<AppShell />}>

@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { INVALID_CHARACTERS, hasNoNul, type EducationContext } from './academic.js';
+import {
+  INVALID_CHARACTERS,
+  educationContextSchema,
+  hasNoNul,
+  type EducationContext,
+} from './academic.js';
 import { WEIGHT_UNIT_TOTAL } from './gradingMath.js';
 
 /**
@@ -119,19 +124,52 @@ function checkRaw(
   }
 }
 
-/** The subject, the cut, the link to an activity and the weight come from the client; the owner and the period never do. */
+/**
+ * The subject, the cut, the link to an activity and the weight come from the client; the owner and the period never do.
+ * Two shapes:
+ *  - a DETAILED evaluation: `name` and `periodShareBp` are required;
+ *  - a DIRECT CUT GRADE (`isCutGrade: true`): the student's grade of the whole cut. The name (generated) and the weight (100 % of
+ *    the cut) are the server's, so sending them, or an activity, is refused; a score (or the points) is required.
+ */
 export const createEvaluationSchema = z
   .strictObject({
     subjectId: z.uuid(),
     gradingPeriodId: z.uuid(),
     activityId: z.uuid().nullable().optional(),
-    name: nameSchema,
-    periodShareBp: weightBp,
+    name: nameSchema.optional(),
+    periodShareBp: weightBp.optional(),
+    isCutGrade: z.boolean().optional(),
     scoreMilli: scoreMilli.nullable().optional(),
     rawEarnedMilli: rawField.nullable().optional(),
     rawMaxMilli: rawField.nullable().optional(),
   })
-  .superRefine(checkRaw);
+  .superRefine((v, ctx) => {
+    checkRaw(v, ctx);
+    if (v.isCutGrade) {
+      for (const key of ['name', 'periodShareBp', 'activityId'] as const)
+        if (v[key] !== undefined)
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'No se envía en la nota de un corte.',
+          });
+      if ((v.scoreMilli ?? null) === null && (v.rawEarnedMilli ?? null) === null)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['scoreMilli'],
+          message: 'Escribe la nota del corte.',
+        });
+    } else {
+      if (v.name === undefined)
+        ctx.addIssue({ code: 'custom', path: ['name'], message: 'Ingresa el nombre.' });
+      if (v.periodShareBp === undefined)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['periodShareBp'],
+          message: 'Ingresa un porcentaje.',
+        });
+    }
+  });
 export type CreateEvaluationInput = z.infer<typeof createEvaluationSchema>;
 
 /** The subject never changes (move = delete + create). Sending the raw pair needs both of its halves. */
@@ -166,6 +204,8 @@ export type GradingProfile = z.infer<typeof gradingProfileSchema>;
 export const gradingPeriodSchema = z.object({
   id: z.uuid(),
   periodId: z.uuid(),
+  /** The cuts belong to a SUBJECT: two subjects of the same period can split the final grade differently. */
+  subjectId: z.uuid(),
   name: z.string(),
   position: z.number(),
   finalShareBp: z.number(),
@@ -186,15 +226,16 @@ export const evaluationSchema = z.object({
   rawEarnedMilli: z.number().nullable(),
   rawMaxMilli: z.number().nullable(),
   scoredAt: z.string().nullable(),
+  /** The student's grade of the whole cut (no breakdown): its name is generated, it weighs 100 % of the cut. */
+  isCutGrade: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Evaluation = z.infer<typeof evaluationSchema>;
 
-/** The configuration of one period: null profile = not configured (the period may still be graded later). */
+/** The SCALE of one period (shared by its subjects): null = not configured yet. The cuts are each subject's own. */
 export const periodGradingResponseSchema = z.object({
   profile: gradingProfileSchema.nullable(),
-  gradingPeriods: z.array(gradingPeriodSchema),
 });
 export type PeriodGradingResponse = z.infer<typeof periodGradingResponseSchema>;
 
@@ -219,9 +260,25 @@ export const subjectGradeSummarySchema = z.object({
 export type SubjectGradeSummaryDto = z.infer<typeof subjectGradeSummarySchema>;
 
 /** GET /api/subjects/:id/grades. `profile` null = the subject's period has no grading configured (no summary then). */
+export const gradesPeriodContextSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  /** null = the period belongs to no study: it cannot be graded. */
+  studyTrackId: z.uuid().nullable(),
+});
+export const gradesStudyContextSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  type: educationContextSchema,
+  status: z.enum(['ACTIVE', 'ARCHIVED']),
+});
+
 export const subjectGradesResponseSchema = z.object({
   subjectId: z.uuid(),
   periodId: z.uuid(),
+  /** The period and its study, derived by the server (the screen never has to look them up, nor guess a type). */
+  period: gradesPeriodContextSchema,
+  studyTrack: gradesStudyContextSchema.nullable(),
   profile: gradingProfileSchema.nullable(),
   gradingPeriods: z.array(gradingPeriodSchema),
   evaluations: z.array(evaluationSchema),
@@ -229,12 +286,49 @@ export const subjectGradesResponseSchema = z.object({
 });
 export type SubjectGradesResponse = z.infer<typeof subjectGradesResponseSchema>;
 
+/** The generated name of a direct cut grade: internal, never typed by the student ("Nota de Corte 1"). */
+export const cutGradeName = (cutName: string): string =>
+  `Nota de ${cutName}`.slice(0, GRADING_NAME_MAX);
+
 /** What the interface calls a `GradingPeriod`, by the type of the study: nothing else may depend on this. */
 export const GRADING_PERIOD_TERMS = {
-  UNIVERSITY: { one: 'Corte', many: 'Cortes' },
-  SCHOOL: { one: 'Periodo de evaluación', many: 'Periodos de evaluación' },
-  OTHER_ACADEMIC: { one: 'Etapa', many: 'Etapas' },
-} as const satisfies Record<EducationContext, { one: string; many: string }>;
+  UNIVERSITY: { one: 'Corte', many: 'Cortes', theMany: 'los cortes' },
+  SCHOOL: {
+    one: 'Periodo de evaluación',
+    many: 'Periodos de evaluación',
+    theMany: 'los periodos de evaluación',
+  },
+  OTHER_ACADEMIC: { one: 'Etapa', many: 'Etapas', theMany: 'las etapas' },
+} as const satisfies Record<EducationContext, { one: string; many: string; theMany: string }>;
 
 /** The weights of one subject, as a percentage for display (units → 0..100). */
 export const unitsToPercent = (units: number) => (units / WEIGHT_UNIT_TOTAL) * 100;
+
+/**
+ * `POST /api/subjects/:id/grading/setup`: how the FINAL grade of ONE subject is split (its cuts), in one request, all or nothing.
+ * The SCALE belongs to the period and is shared by its subjects: `profile` is needed only while the period has none (the first
+ * subject configured creates it); once it exists a `profile` sent again is ignored and the existing one is returned, so two subjects
+ * configured at the same time cannot fight over it. The cuts add up to EXACTLY 100 % (a single grade is one cut of 100 %).
+ */
+export const GRADING_PERIODS_MAX = 12;
+export const setupSubjectGradingSchema = z
+  .strictObject({
+    profile: createGradingProfileSchema.optional(),
+    gradingPeriods: z.array(createGradingPeriodSchema).min(1).max(GRADING_PERIODS_MAX),
+  })
+  .superRefine((v, ctx) => {
+    const total = v.gradingPeriods.reduce((sum, c) => sum + c.finalShareBp, 0);
+    if (total !== WEIGHT_BP_MAX)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['gradingPeriods'],
+        message: 'Los cortes de una materia deben sumar exactamente 100 %.',
+      });
+  });
+export type SetupSubjectGradingInput = z.infer<typeof setupSubjectGradingSchema>;
+
+export const setupSubjectGradingResponseSchema = z.object({
+  profile: gradingProfileSchema,
+  gradingPeriods: z.array(gradingPeriodSchema),
+});
+export type SetupSubjectGradingResponse = z.infer<typeof setupSubjectGradingResponseSchema>;

@@ -12,6 +12,8 @@ export interface EvaluationData {
   gradingPeriodId: string;
   activityId: string | null;
   name: string;
+  /** The student's grade of the whole cut (no breakdown). */
+  isCutGrade?: boolean;
   periodShareBp: number;
   scoreMilli: number | null;
   rawEarnedMilli: number | null;
@@ -34,20 +36,23 @@ export function createGradingRepository(db: Db) {
       db.gradingProfile.update({ where: { id, userId }, data }),
 
     // ── Cuts ──
-    listCuts: (userId: string, periodId: string) =>
-      db.gradingPeriod.findMany({ where: { userId, periodId }, orderBy: { position: 'asc' } }),
+    /** The cuts of ONE subject (each subject splits its final grade its own way). */
+    listCuts: (userId: string, subjectId: string) =>
+      db.gradingPeriod.findMany({ where: { userId, subjectId }, orderBy: { position: 'asc' } }),
+    countCutsOfSubject: (userId: string, subjectId: string) =>
+      db.gradingPeriod.count({ where: { userId, subjectId } }),
     findCut: (userId: string, id: string) => db.gradingPeriod.findFirst({ where: { id, userId } }),
-    async nextCutPosition(periodId: string): Promise<number> {
+    async nextCutPosition(subjectId: string): Promise<number> {
       const last = await db.gradingPeriod.aggregate({
-        where: { periodId },
+        where: { subjectId },
         _max: { position: true },
       });
       return (last._max.position ?? 0) + 1;
     },
-    /** Σ finalShareBp of the period's cuts, leaving one out (the one being edited). */
-    async sumCutShares(userId: string, periodId: string, exceptId?: string): Promise<number> {
+    /** Σ finalShareBp of the SUBJECT's cuts, leaving one out (the one being edited). */
+    async sumCutShares(userId: string, subjectId: string, exceptId?: string): Promise<number> {
       const sum = await db.gradingPeriod.aggregate({
-        where: { userId, periodId, ...(exceptId && { id: { not: exceptId } }) },
+        where: { userId, subjectId, ...(exceptId && { id: { not: exceptId } }) },
         _sum: { finalShareBp: true },
       });
       return sum._sum.finalShareBp ?? 0;
@@ -55,8 +60,9 @@ export function createGradingRepository(db: Db) {
     createCut: (
       userId: string,
       periodId: string,
+      subjectId: string,
       data: { name: string; finalShareBp: number; position: number },
-    ) => db.gradingPeriod.create({ data: { userId, periodId, ...data } }),
+    ) => db.gradingPeriod.create({ data: { userId, periodId, subjectId, ...data } }),
     updateCut: (userId: string, id: string, data: { name?: string; finalShareBp?: number }) =>
       db.gradingPeriod.update({ where: { id, userId }, data }),
     deleteCut: async (userId: string, id: string) =>
@@ -104,6 +110,14 @@ export function createGradingRepository(db: Db) {
         db.gradingPeriod.count({ where: { userId, periodId } }),
       ]);
       return profiles > 0 || cuts > 0;
+    },
+    /** How many evaluations this subject has in this cut, and whether one of them is the direct grade of the whole cut. */
+    async cutUsage(userId: string, subjectId: string, gradingPeriodId: string) {
+      const [total, direct] = await Promise.all([
+        db.evaluation.count({ where: { userId, subjectId, gradingPeriodId } }),
+        db.evaluation.count({ where: { userId, subjectId, gradingPeriodId, isCutGrade: true } }),
+      ]);
+      return { total, direct: direct > 0 };
     },
     countEvaluationsOfSubject: (userId: string, subjectId: string) =>
       db.evaluation.count({ where: { userId, subjectId } }),

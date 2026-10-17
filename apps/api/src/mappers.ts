@@ -207,6 +207,7 @@ export const toGradingProfileDto = (p: GradingProfileRow): GradingProfile => ({
 export const toGradingPeriodDto = (g: GradingPeriodRow): GradingPeriod => ({
   id: g.id,
   periodId: g.periodId,
+  subjectId: g.subjectId,
   name: g.name,
   position: g.position,
   finalShareBp: g.finalShareBp,
@@ -226,6 +227,7 @@ export const toEvaluationDto = (e: EvaluationRow): Evaluation => ({
   rawEarnedMilli: e.rawEarnedMilli,
   rawMaxMilli: e.rawMaxMilli,
   scoredAt: e.scoredAt?.toISOString() ?? null,
+  isCutGrade: e.isCutGrade,
   createdAt: e.createdAt.toISOString(),
   updatedAt: e.updatedAt.toISOString(),
 });
