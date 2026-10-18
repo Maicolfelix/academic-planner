@@ -42,6 +42,14 @@ const dayName = (plusDays: number) => {
   return DAY_NAMES[(d + 6) % 7]!;
 };
 
+/**
+ * The teacher's message of the Inbox scenario. Its two days are RELATIVE to today (4 and 5 days ahead), never "el jueves" /
+ * "el viernes": a fixed weekday is "today, before 8 a. m." on some days of the week and then the quiz would be sooner than
+ * "Taller express" (due in 6 hours), changing "¿Qué hago ahora?" with the hour the suite happens to run (TEST-REL-1).
+ */
+const teacherMessage = (greeting = '') =>
+  `${greeting}El ${dayName(4)} tendremos quiz de Bases de Datos a las 8 a. m. y el ${dayName(5)} deben entregar el taller de Bioestadística.`;
+
 interface Api {
   activities: {
     id: string;
@@ -255,9 +263,7 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
   await page.goto('/inbox');
   await page
     .getByLabel('Mensaje del profesor o instrucción académica')
-    .fill(
-      'Buenas tardes. El jueves tendremos quiz de Bases de Datos a las 8 a. m. y el viernes deben entregar el taller de Bioestadística.',
-    );
+    .fill(teacherMessage('Buenas tardes. '));
   await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
   await expect(page.getByRole('article')).toHaveCount(2);
   await page.getByRole('button', { name: 'Crear 2 actividades' }).click();
@@ -727,11 +733,7 @@ test.describe('failures injected into the network', () => {
     test.setTimeout(120_000);
     await newStudent(page);
     await page.goto('/inbox');
-    await page
-      .getByLabel('Mensaje del profesor o instrucción académica')
-      .fill(
-        'El jueves tendremos quiz de Bases de Datos a las 8 a. m. y el viernes deben entregar el taller de Bioestadística.',
-      );
+    await page.getByLabel('Mensaje del profesor o instrucción académica').fill(teacherMessage());
     await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
     await expect(page.getByRole('article')).toHaveCount(2);
     await page.route(/\/api\/capture\/confirm$/, (route) =>
@@ -951,3 +953,16 @@ async function _unused(_b: Browser) {
   /* keeps the Browser type import used when a scenario above is skipped */
 }
 void _unused;
+
+// Regression for TEST-REL-1: whatever day and hour the suite runs, both days of the Inbox message start more than two days
+// away, so they can never beat "Taller express" (due in 6 hours) once "Lectura atrasada" is finished.
+test('TEST-REL-1 · the MASTER message never competes with an activity due in 6 hours', () => {
+  for (const hoursFromNow of [0, 3, 7, 12, 20, 23, 30]) {
+    const now = Date.now() + hoursFromNow * 3600e3;
+    for (const n of [4, 5]) {
+      const startOfDay = new Date(`${bogotaToday(n)}T00:00:00-05:00`).getTime();
+      expect(startOfDay - now).toBeGreaterThan(2 * 24 * 3600e3);
+    }
+  }
+  expect(teacherMessage()).toContain(dayName(4));
+});

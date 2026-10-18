@@ -102,7 +102,9 @@ Reglas de producto que se mantienen: no inventar fechas ni asignaturas; crear un
 
 **Deuda de endurecimiento (futura, no iniciada): FK `(periodId, userId) → AcademicPeriod(id, userId)`.** Se decidió **no** añadirla en F1-0 (razonamiento en [activities.md](activities.md#el-periodo-sí-se-guarda-en-activity-la-asignatura-es-opcional-f1)): el cliente no envía `periodId`, el servidor lo deriva y todo repositorio filtra por `userId`; ponerla solo en `Activity` sería incoherente con `Subject` y `ScheduleBlock`. Si se retoma, se aplica a las tres tablas a la vez.
 
-#### Deuda de fiabilidad de pruebas: TEST-REL-1 (futura, no iniciada)
+#### Deuda de fiabilidad de pruebas: TEST-REL-1 (resuelta, pendiente de fusión)
+
+**Resolución (pendiente de fusión):** `MASTER` ya no usa «el jueves»/«el viernes» en el mensaje de la Bandeja sino días relativos (a 4 y 5 días), de modo que nunca compiten con «Taller express» (a 6 horas) a ninguna hora ni día; es un cambio solo de la prueba, sin tocar el producto. Una prueba de regresión comprueba la separación para varias horas de ejecución. Texto original de la deuda:
 
 **Cuándo resolverla:** antes del piloto controlado (o, a más tardar, antes de un release candidate final): hasta entonces cada pasada completa puede dar una falsa alarma en `MASTER` según la hora. La prueba `MASTER` de `e2e/system-validation.spec.ts` depende de la hora: corrida un jueves antes de las 8:00 (Bogotá), el «Quiz» que la Bandeja crea para «el jueves a las 8 a. m.» supera a «Taller express» y la aserción de «¿Qué hago ahora?» falla. Está **reproducida en `d23f8b6`** (previa a UX1-2.5/2.75) y **no está arreglada**: pasa o falla según la hora de ejecución. Es deuda de pruebas (**KNOWN PRE-EXISTING / TEST RELIABILITY DEBT**), no un defecto del producto; se corregirá, si el mantenedor lo aprueba, en una fase propia (fijar el reloj o el fixture), nunca de pasada.
 
