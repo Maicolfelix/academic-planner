@@ -124,3 +124,7 @@ Una migración que reescribe datos no se prueba solo con una base nueva. `apps/a
 ## Cobertura de rutas derivada (seguridad)
 
 `apps/api/src/security/routeCoverage.security.test.ts` deriva el inventario de rutas de los routers (y de sus montajes en `app.ts`) y exige, para **cada** ruta: 401 sin sesión (salvo health y las tres de sesión), `Cache-Control: no-store`, y —si tiene `:id`— una fila en la matriz de propiedad. Una ruta nueva olvidada en las matrices hace fallar la prueba.
+
+## Aislamiento de la base de datos de pruebas
+
+Las pruebas solo pueden escribir en una base cuyo nombre termine en `_test` y distinta de `DATABASE_URL` (`getTestDatabaseUrl`); `truncateAll` vuelve a comprobar el nombre real de la base conectada. Además, `playwright.config.ts` y `playwright.security.config.ts` llaman a `assertPortsFree` (3000/5173 y 4300): si algo ya escucha allí —un `npm run dev` olvidado o su vigilante `node --watch`, que revive la API contra la base de **desarrollo**— el arranque falla con un mensaje que nombra los puertos, en vez de dejar que la verificación de salud la conteste un proceso viejo. Pruebas de las guardas: `apps/api/src/db/testDbGuard.test.ts`.

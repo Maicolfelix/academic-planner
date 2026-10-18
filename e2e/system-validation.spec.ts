@@ -37,10 +37,23 @@ const localTime = (iso: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
-const dayName = (plusDays: number) => {
-  const d = new Date(`${bogotaToday(plusDays)}T12:00:00Z`).getUTCDay();
+/** The Bogotá calendar day (YYYY-MM-DD) `plusDays` after the instant `now`. Bogotá is UTC-5 all year (no daylight saving). */
+const bogotaDayAt = (now: Date, plusDays: number): string =>
+  new Date(now.getTime() - 5 * 3600e3 + plusDays * 86_400_000).toISOString().slice(0, 10);
+const dayNameAt = (now: Date, plusDays: number) => {
+  const d = new Date(`${bogotaDayAt(now, plusDays)}T12:00:00Z`).getUTCDay();
   return DAY_NAMES[(d + 6) % 7]!;
 };
+const dayName = (plusDays: number) => dayNameAt(new Date(), plusDays);
+
+/**
+ * The teacher's message of the Inbox scenario. Its two days are RELATIVE to today (4 and 5 days ahead), never "el jueves" /
+ * "el viernes": a fixed weekday is "today, before 8 a. m." on some days of the week and then the quiz would be sooner than
+ * "Taller express" (due in 6 hours), changing "¿Qué hago ahora?" with the hour the suite happens to run (TEST-REL-1).
+ */
+const teacherMessageAt = (now: Date, greeting = '') =>
+  `${greeting}El ${dayNameAt(now, 4)} tendremos quiz de Bases de Datos a las 8 a. m. y el ${dayNameAt(now, 5)} deben entregar el taller de Bioestadística.`;
+const teacherMessage = (greeting = '') => teacherMessageAt(new Date(), greeting);
 
 interface Api {
   activities: {
@@ -255,9 +268,7 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
   await page.goto('/inbox');
   await page
     .getByLabel('Mensaje del profesor o instrucción académica')
-    .fill(
-      'Buenas tardes. El jueves tendremos quiz de Bases de Datos a las 8 a. m. y el viernes deben entregar el taller de Bioestadística.',
-    );
+    .fill(teacherMessage('Buenas tardes. '));
   await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
   await expect(page.getByRole('article')).toHaveCount(2);
   await page.getByRole('button', { name: 'Crear 2 actividades' }).click();
@@ -727,11 +738,7 @@ test.describe('failures injected into the network', () => {
     test.setTimeout(120_000);
     await newStudent(page);
     await page.goto('/inbox');
-    await page
-      .getByLabel('Mensaje del profesor o instrucción académica')
-      .fill(
-        'El jueves tendremos quiz de Bases de Datos a las 8 a. m. y el viernes deben entregar el taller de Bioestadística.',
-      );
+    await page.getByLabel('Mensaje del profesor o instrucción académica').fill(teacherMessage());
     await page.getByRole('button', { name: 'Interpretar mensaje' }).click();
     await expect(page.getByRole('article')).toHaveCount(2);
     await page.route(/\/api\/capture\/confirm$/, (route) =>
@@ -951,3 +958,29 @@ async function _unused(_b: Browser) {
   /* keeps the Browser type import used when a scenario above is skipped */
 }
 void _unused;
+
+// Regression for TEST-REL-1, with EXPLICIT instants (the real clock is never read): at any hour of the day, the two days of the
+// Inbox message start well after "Taller express", which is due 6 hours after the moment the scenario starts.
+test('TEST-REL-1 · the MASTER message never competes with an activity due in 6 hours', () => {
+  const instants = [
+    '2026-10-15T07:30:00-05:00', // a Thursday, before the 8 a. m. of the old "el jueves" message
+    '2026-10-15T23:30:00-05:00', // the same Thursday, late at night
+    '2026-10-16T00:00:00-05:00', // midnight, Friday
+    '2026-10-18T12:00:00-05:00', // a Sunday, noon
+  ];
+  for (const iso of instants) {
+    const now = new Date(iso);
+    const tallerExpress = now.getTime() + 6 * 3600e3;
+    for (const n of [4, 5]) {
+      const startOfDay = new Date(`${bogotaDayAt(now, n)}T00:00:00-05:00`).getTime();
+      expect(startOfDay - tallerExpress, `${iso} +${n}`).toBeGreaterThan(24 * 3600e3);
+    }
+    // the message names exactly those two days, never a fixed weekday of the week
+    expect(teacherMessageAt(now)).toContain(`El ${dayNameAt(now, 4)} tendremos quiz`);
+    expect(teacherMessageAt(now)).toContain(`y el ${dayNameAt(now, 5)} deben entregar`);
+  }
+  // the old message ("el jueves") on that Thursday morning was the failing case; the relative one says Monday and Tuesday
+  const thursday = new Date('2026-10-15T07:30:00-05:00');
+  expect(dayNameAt(thursday, 4)).toBe('lunes');
+  expect(dayNameAt(thursday, 5)).toBe('martes');
+});

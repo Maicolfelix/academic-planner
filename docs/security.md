@@ -135,6 +135,8 @@ Restricciones que PostgreSQL hace cumplir por sí mismo (probadas con escrituras
 
 ## 15. Dependencias (`npm audit`)
 
+**Actualización (octubre 2026):** `npm audit fix` sin `--force` (solo `package-lock.json`: `prisma`/`@prisma/client` 7.10.0 → 7.10.1 con `@prisma/config` → `deepmerge-ts` 8.0.2 y `mysql2` 3.24.4; `concurrently` 10.0.6 → `shell-quote` 1.12.0) dejó `npm audit` y `npm audit --omit=dev` en **0 vulnerabilidades**. Los hallazgos descritos abajo son el historial previo (ninguno era alcanzable en ejecución); suites completas verdes tras el cambio.
+
 **Antes de la fase: 4 vulnerabilidades altas. Después: 4 (sin cambio, por decisión).** Todas son de **una sola cadena**: `prisma@7.10.0` (CLI) → `@prisma/config` → `deepmerge-ts`, y `prisma` → `mysql2`.
 
 **Actualización posterior al candidato `1.0.0-rc.1` (2026-10-06):** la base de avisos de npm añadió `shell-quote` 1.8.4–1.10.0 (**crítica**, inyección de comandos en `quote()` ante un terminador de línea tras un token de comentario; GHSA-pqg4-j6r4-53mv), que llega por `concurrently` 10 (**solo `devDependencies`**: lo usan los scripts `dev` y `dev:e2e` con comandos fijos escritos en el repositorio, no recibe entradas de usuarios). `npm audit` pasó a **6 (4 altas + 2 críticas)**; con `npm audit --omit=dev` siguen siendo las **4 altas** de la cadena de Prisma, así que **no hay ningún aviso nuevo en lo que se instala para ejecutar la aplicación**. No se actualizó nada ni se usó `--force` (npm propone `concurrently@9.2.1`, un cambio con rotura); queda como riesgo aceptado de herramientas de desarrollo y pendiente de revisar con la siguiente actualización de dependencias.
