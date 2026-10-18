@@ -17,11 +17,19 @@ import {
   useCreateGradingPeriod,
   useDeleteEvaluation,
   useDeleteGradingPeriod,
+  useReplaceCutWeights,
   useUpdateGradingPeriod,
   useUpdateGradingProfile,
 } from '../../grading/useGrading';
 import {
   buildScale,
+  distributionFrom,
+  distributionRequest,
+  distributionShown,
+  distributionSummary,
+  editDistribution,
+  setDistributionAuto,
+  type DistRow,
   gradingErrorText,
   scaleFormFrom,
   type ScaleErrors,
@@ -241,6 +249,93 @@ export function ConfirmRemoveDialog({
           {remove.isPending ? 'Eliminando…' : 'Eliminar'}
         </Button>
       </FormActions>
+    </Modal>
+  );
+}
+
+/**
+ * How the final grade of a subject is split, edited TOGETHER: every cut and its percentage in view, the total always shown, and one
+ * "automatic" cut that takes whatever the others leave. It only saves when the cuts add up to exactly 100 %; nothing changes behind
+ * the student's back and the other cuts are never redistributed.
+ */
+export function DistributionDialog({
+  subjectId,
+  cuts,
+  term,
+  onClose,
+  onDone,
+}: {
+  subjectId: string;
+  cuts: readonly GradingPeriod[];
+  term: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const replace = useReplaceCutWeights(subjectId);
+  const [rows, setRows] = useState<DistRow[]>(() => distributionFrom(cuts));
+  const [formError, setFormError] = useState<string>();
+  const summary = distributionSummary(rows);
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    setFormError(undefined);
+    const input = distributionRequest(rows);
+    if (!input) return;
+    replace.mutate(input, { onSuccess: onDone, onError: (err) => setFormError(errorText(err)) });
+  }
+
+  return (
+    <Modal title="Editar distribución" onClose={onClose}>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Los {term.toLowerCase()}s de esta materia deben sumar exactamente 100 %. Un corte puede
+        completarse solo con lo que falte; los demás no se mueven.
+      </p>
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        {formError && <FormError>{formError}</FormError>}
+        <ul className="flex flex-col gap-3">
+          {rows.map((row) => (
+            <li key={row.id} className="flex flex-col gap-2 rounded-control border border-line p-3">
+              <FormField
+                id={`dist-${row.id}`}
+                label={`${row.name} (%)`}
+                inputMode="decimal"
+                value={distributionShown(rows, row.id)}
+                onChange={(text) => setRows(editDistribution(rows, row.id, text))}
+                hint={row.auto ? 'Se completa solo con lo que falte.' : undefined}
+              />
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={row.auto}
+                  onChange={(e) => setRows(setDistributionAuto(rows, row.id, e.target.checked))}
+                  aria-label={`Completar automáticamente: ${row.name}`}
+                  className="size-5 accent-[var(--accent)]"
+                />
+                Completar automáticamente
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div role="status" className="flex flex-col gap-0.5 text-sm">
+          <p>
+            Total definido: <strong>{summary.defined}</strong> · Restante:{' '}
+            <strong>{summary.remaining}</strong>
+          </p>
+          {summary.messages.map((m) => (
+            <p key={m.text} className={m.tone === 'ok' ? 'text-success-ink' : 'text-warning-ink'}>
+              {m.text}
+            </p>
+          ))}
+        </div>
+        <FormActions>
+          <Button onClick={onClose} disabled={replace.isPending}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant="primary" disabled={replace.isPending || !summary.canSave}>
+            {replace.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </FormActions>
+      </form>
     </Modal>
   );
 }

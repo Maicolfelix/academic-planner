@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateEvaluationInput,
   CreateGradingPeriodInput,
+  ReplaceCutWeightsInput,
   SetupSubjectGradingInput,
   UpdateEvaluationInput,
   UpdateGradingPeriodInput,
@@ -14,6 +15,7 @@ import {
   deleteGradingPeriodRequest,
   fetchSubject,
   fetchSubjectGrades,
+  replaceCutWeightsRequest,
   setupSubjectGradingRequest,
   updateEvaluationRequest,
   updateGradingPeriodRequest,
@@ -101,6 +103,14 @@ export function useUpdateGradingPeriod(subjectId: string) {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateGradingPeriodInput }) =>
       updateGradingPeriodRequest(id, input),
+    onSuccess: refresh,
+  });
+}
+
+export function useReplaceCutWeights(subjectId: string) {
+  const refresh = useRefreshSubjectGrades(subjectId);
+  return useMutation({
+    mutationFn: (input: ReplaceCutWeightsInput) => replaceCutWeightsRequest(subjectId, input),
     onSuccess: refresh,
   });
 }

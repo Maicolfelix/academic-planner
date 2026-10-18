@@ -38,7 +38,12 @@ import {
   type CutGroup,
 } from '../grading/gradesModel';
 import { useSubject, useSubjectGrades } from '../grading/useGrading';
-import { ConfirmRemoveDialog, CutDialog, ScaleEditDialog } from './grades/ConfigDialogs';
+import {
+  ConfirmRemoveDialog,
+  CutDialog,
+  DistributionDialog,
+  ScaleEditDialog,
+} from './grades/ConfigDialogs';
 import { BreakdownDialog, CutGradeDialog } from './grades/CutGradeDialogs';
 import { EvaluationDialog, QuickGradeDialog } from './grades/EvaluationDialogs';
 import { SetupDialog } from './grades/SetupDialog';
@@ -46,6 +51,7 @@ import { SetupDialog } from './grades/SetupDialog';
 type Dialog =
   | { kind: 'setup' }
   | { kind: 'scale' }
+  | { kind: 'distribution' }
   | { kind: 'cut'; cut?: GradingPeriod }
   | { kind: 'cut-grade'; cut: GradingPeriod; evaluation?: Evaluation }
   | { kind: 'breakdown'; cut: GradingPeriod; direct: Evaluation }
@@ -197,24 +203,31 @@ function TrackedGradesView({
         description={description}
         actions={
           profile && (
-            <ActionMenu
-              label="Configurar notas"
-              items={[
-                {
-                  label: 'Escala de notas',
-                  icon: <SlidersIcon />,
-                  onSelect: () => setDialog({ kind: 'scale' }),
-                },
-                ...(grades.gradingPeriods.length > 0
-                  ? [
-                      {
-                        label: `Agregar ${terms.one.toLowerCase()}`,
-                        onSelect: () => setDialog({ kind: 'cut' }),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {grades.gradingPeriods.length > 1 && (
+                <Button onClick={() => setDialog({ kind: 'distribution' })}>
+                  Editar distribución
+                </Button>
+              )}
+              <ActionMenu
+                label="Configurar notas"
+                items={[
+                  {
+                    label: 'Escala de notas',
+                    icon: <SlidersIcon />,
+                    onSelect: () => setDialog({ kind: 'scale' }),
+                  },
+                  ...(grades.gradingPeriods.length > 0
+                    ? [
+                        {
+                          label: `Agregar ${terms.one.toLowerCase()}`,
+                          onSelect: () => setDialog({ kind: 'cut' }),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
           )
         }
       />
@@ -373,6 +386,15 @@ function TrackedGradesView({
           profile={profile}
           onClose={close}
           onDone={() => done('Escala actualizada.')}
+        />
+      )}
+      {dialog?.kind === 'distribution' && profile && (
+        <DistributionDialog
+          subjectId={subject.id}
+          cuts={grades.gradingPeriods}
+          term={terms.one}
+          onClose={close}
+          onDone={() => done('Distribución guardada.')}
         />
       )}
       {dialog?.kind === 'cut' && profile && (

@@ -221,6 +221,13 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
         a.post(`/api/subjects/${id}/grading-periods`).send({ name: 'Robado', finalShareBp: 100 }),
     ],
     [
+      'POST /subjects/:id/grading-periods/distribution',
+      (a, id) =>
+        a.post(`/api/subjects/${id}/grading-periods/distribution`).send({
+          gradingPeriods: [{ id: '00000000-0000-4000-8000-000000000001', finalShareBp: 10000 }],
+        }),
+    ],
+    [
       'PATCH /grading-periods/:id',
       (a, id) => a.patch(`/api/grading-periods/${id}`).send({ name: 'Hackeado' }),
     ],

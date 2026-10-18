@@ -2,6 +2,7 @@ import {
   createEvaluationSchema,
   createGradingPeriodSchema,
   createGradingProfileSchema,
+  replaceCutWeightsSchema,
   setupSubjectGradingSchema,
   updateEvaluationSchema,
   updateGradingPeriodSchema,
@@ -53,6 +54,13 @@ export function createGradingController(service: GradingService) {
       const id = parseIdParam(req.params.id, 'Corte no encontrado.');
       const input = updateGradingPeriodSchema.parse(req.body ?? {});
       res.json({ gradingPeriod: await service.updateCut(owner(req), id, input) });
+    }) satisfies RequestHandler,
+
+    /** The joint "Editar distribución": every cut of the subject, exactly 100 %, all or nothing. */
+    replaceCutWeights: (async (req, res) => {
+      const subjectId = parseIdParam(req.params.id, 'Asignatura no encontrada.');
+      const input = replaceCutWeightsSchema.parse(req.body ?? {});
+      res.json(await service.replaceCutWeights(owner(req), subjectId, input));
     }) satisfies RequestHandler,
 
     removeCut: (async (req, res) => {

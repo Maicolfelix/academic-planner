@@ -15,6 +15,11 @@ export function gradingRouter(
   router.patch('/periods/:id/grading', requireAuth, controller.updateProfile);
   router.post('/subjects/:id/grading/setup', requireAuth, controller.setupSubject);
   router.post('/subjects/:id/grading-periods', requireAuth, controller.createCut);
+  router.post(
+    '/subjects/:id/grading-periods/distribution',
+    requireAuth,
+    controller.replaceCutWeights,
+  );
   router.patch('/grading-periods/:id', requireAuth, controller.updateCut);
   router.delete('/grading-periods/:id', requireAuth, controller.removeCut);
   router.post('/evaluations', requireAuth, controller.createEvaluation);

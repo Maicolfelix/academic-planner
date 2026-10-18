@@ -8,6 +8,7 @@ import {
   type CreateEvaluationInput,
   type CreateGradingPeriodInput,
   type CreateGradingProfileInput,
+  type ReplaceCutWeightsInput,
   type SetupSubjectGradingInput,
   type SubjectGradesResponse,
   type UpdateEvaluationInput,
@@ -416,6 +417,29 @@ export function createGradingService(deps: {
         return toGradingPeriodDto(
           await repo.createCut(userId, subject.periodId, subject.id, { ...input, position }),
         );
+      });
+    },
+
+    /**
+     * The weights of ALL the cuts of ONE subject, replaced in one transaction under the study lock (so two edits at the same time
+     * are serialized and the total is never left different from 100 %). The cuts must be exactly the subject's own.
+     */
+    async replaceCutWeights(userId: string, subjectId: string, input: ReplaceCutWeightsInput) {
+      const subject = await subjects.findOwned(userId, subjectId);
+      if (!subject) throw subjectNotFound();
+      return write(userId, async (tx, repo) => {
+        await trackedPeriod(tx, userId, subject.periodId);
+        const cuts = await repo.listCuts(userId, subject.id);
+        const own = new Set(cuts.map((c) => c.id));
+        // A cut of another subject (or that does not exist) looks the same: not found.
+        if (input.gradingPeriods.some((c) => !own.has(c.id))) throw cutNotFound();
+        if (input.gradingPeriods.length !== cuts.length)
+          throw validationError({ gradingPeriods: ['Incluye todos los cortes de la materia.'] });
+        for (const c of input.gradingPeriods)
+          await repo.updateCut(userId, c.id, { finalShareBp: c.finalShareBp });
+        return {
+          gradingPeriods: (await repo.listCuts(userId, subject.id)).map(toGradingPeriodDto),
+        };
       });
     },
 

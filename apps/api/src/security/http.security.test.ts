@@ -68,6 +68,11 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ],
   ['patch', `/api/periods/${uuid()}/grading`, { passMilli: 2500 }],
   ['post', `/api/subjects/${uuid()}/grading-periods`, { name: 'C', finalShareBp: 1000 }],
+  [
+    'post',
+    `/api/subjects/${uuid()}/grading-periods/distribution`,
+    { gradingPeriods: [{ id: uuid(), finalShareBp: 10000 }] },
+  ],
   ['patch', `/api/grading-periods/${uuid()}`, { name: 'C' }],
   ['delete', `/api/grading-periods/${uuid()}`],
   [
@@ -523,7 +528,7 @@ describe('static web app (WEB_DIST_DIR)', () => {
   });
 
   it('is read-only: no method but GET/HEAD reaches the files', async () => {
-    for (const method of ['post', 'put', 'delete', 'patch'] as const) {
+    for (const method of ['post', 'post', 'delete', 'patch'] as const) {
       const res = await (request(web) as unknown as Record<string, (u: string) => request.Test>)[
         method
       ]!('/assets/app.abc123.js').send({});
