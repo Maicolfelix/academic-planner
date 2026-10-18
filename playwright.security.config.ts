@@ -1,9 +1,15 @@
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { ensureTestDatabaseSync, getTestDatabaseUrl, loadRootEnv } from './apps/api/test/testDb';
+import {
+  assertPortsFree,
+  ensureTestDatabaseSync,
+  getTestDatabaseUrl,
+  loadRootEnv,
+} from './apps/api/test/testDb';
 
 loadRootEnv();
 ensureTestDatabaseSync();
+assertPortsFree([4300]);
 
 const PORT = 4300;
 
