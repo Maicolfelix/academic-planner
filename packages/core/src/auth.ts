@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INVALID_CHARACTERS, hasNoNul } from './academic.js';
 
 /**
  * Password policy: length over composition (NIST SP 800-63B). Minimum 8, no mandatory symbols/digits.
@@ -20,7 +21,8 @@ export const registerSchema = z.strictObject({
     .string({ error: 'Ingresa tu nombre.' })
     .trim()
     .min(1, 'Ingresa tu nombre.')
-    .max(80, 'El nombre es demasiado largo (máximo 80 caracteres).'),
+    .max(80, 'El nombre es demasiado largo (máximo 80 caracteres).')
+    .refine(hasNoNul, INVALID_CHARACTERS),
   email: emailSchema,
   password: z
     .string({ error: 'Ingresa una contraseña.' })
