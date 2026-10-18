@@ -54,6 +54,34 @@ export function ensureTestDatabaseSync(): void {
   process.env.PLANNER_TEST_DB_READY = '1';
 }
 
+/**
+ * Browser tests start their OWN stack on fixed ports. If something already listens there (a leftover `npm run dev`, or its
+ * `node --watch` watcher reviving the API on the DEVELOPMENT database), the test stack's health check can be answered by that
+ * old process and the whole run would write to development data. Fail fast, before anything starts, naming the ports.
+ * Once per run (workers inherit the flag).
+ */
+export function assertPortsFree(ports: readonly number[]): void {
+  if (process.env.PLANNER_TEST_PORTS_FREE) return;
+  const out = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      fileURLToPath(new URL('./probePorts.ts', import.meta.url)),
+      ...ports.map(String),
+    ],
+    { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8' },
+  );
+  const busy = out.split(/\r?\n/).filter(Boolean);
+  if (busy.length > 0)
+    throw new Error(
+      `Refusing to start the browser tests: something is already listening on port(s) ${busy.join(', ')}. ` +
+        'It may be a leftover dev stack (or its node --watch watcher) wired to the DEVELOPMENT database. ' +
+        'Stop the whole process tree (taskkill /PID <npm> /T /F) and check with netstat.',
+    );
+  process.env.PLANNER_TEST_PORTS_FREE = '1';
+}
+
 /** Creates the test database if missing, then applies every migration to it (never the dev DB). */
 export async function prepareTestDatabase(): Promise<void> {
   const url = getTestDatabaseUrl();
