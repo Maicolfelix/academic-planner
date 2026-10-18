@@ -133,7 +133,7 @@ Objetivo: conocer al usuario desde el registro, de forma **corta, opcional, prog
 
 #### P0.5 — Base multi-estudio
 
-**P0.5 DONE** (P0.5-1 … P0.5-5, PR #39–#43). El siguiente bloque de producto es notas / cortes / evaluaciones: no se inicia sin aprobación explícita.
+**P0.5 DONE** (P0.5-1 … P0.5-5, PR #39–#43). El bloque de producto siguiente, notas / cortes / evaluaciones, se aprobó y avanza como B1/B2 (DONE, ver más abajo); lo demás de notas no se inicia sin aprobación explícita.
 
 Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, colegio + técnico…). `primaryUse` **no** se convierte en lista: la entidad es `StudyTrack` ([D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)). El _discovery_ recomendó hacerlo **antes de Notas** (la escala, la nota mínima y el promedio pertenecen a un estudio). Orden propuesto, un PR cada uno y **cada uno con aprobación explícita**:
 

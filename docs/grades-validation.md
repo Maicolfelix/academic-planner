@@ -92,7 +92,7 @@
 
 ## MVP congelado (reconfirmado)
 
-`GradingProfile → AcademicPeriod`; `GradingPeriod → Subject` (revisado en la QA real; antes `→ AcademicPeriod`); `Evaluation → Subject`; la evaluación exige `GradingPeriod`; una `Activity` tiene 0..N evaluaciones; `scoreMilli` canónico; `rawEarnedMilli`/`rawMaxMilli` aparte; solo escalas numéricas; cortes compartidos por `AcademicPeriod`; sin pesos de corte por materia; sin puntos extra; sin letras; sin fórmulas arbitrarias.
+`GradingProfile → AcademicPeriod`; `GradingPeriod → Subject` (revisado en la QA real; antes `→ AcademicPeriod`); `Evaluation → Subject`; la evaluación exige `GradingPeriod`; una `Activity` tiene 0..N evaluaciones; `scoreMilli` canónico; `rawEarnedMilli`/`rawMaxMilli` aparte; solo escalas numéricas; cortes propios de cada materia (`GradingPeriod → Subject`), con sus propios pesos; la escala sí es del `AcademicPeriod`; sin puntos extra; sin letras; sin fórmulas arbitrarias.
 
 ## Pendiente antes de cerrar la UX de Notas
 
