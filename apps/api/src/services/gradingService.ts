@@ -102,6 +102,10 @@ const weightExceeded = (field: string, what: string) =>
  * Reads that only learn an immutable fact (a row's period) happen before the lock; everything that decides a write is re-read
  * after it.
  */
+const WEIGHTS_TOGETHER_MESSAGE = 'Edita los porcentajes desde la distribución de la materia.';
+const CUT_STRUCTURE_MESSAGE =
+  'Los cortes de una materia deben sumar siempre 100 %: la cantidad de cortes se define al configurar la materia y los porcentajes se editan desde «Editar distribución».';
+
 export function createGradingService(deps: {
   grading: GradingRepository;
   subjects: SubjectRepository;
@@ -411,8 +415,9 @@ export function createGradingService(deps: {
       return write(userId, async (tx, repo) => {
         await trackedPeriod(tx, userId, subject.periodId);
         if (!(await repo.findProfile(userId, subject.periodId))) throw notConfigured();
-        if ((await repo.sumCutShares(userId, subject.id)) + input.finalShareBp > WEIGHT_BP_MAX)
-          throw weightExceeded('finalShareBp', 'Los cortes');
+        // The cuts of a configured subject always add up to exactly 100 %: a cut can only be added if the total stays exact.
+        if ((await repo.sumCutShares(userId, subject.id)) + input.finalShareBp !== WEIGHT_BP_MAX)
+          throw validationError({ finalShareBp: [CUT_STRUCTURE_MESSAGE] });
         const position = await repo.nextCutPosition(subject.id);
         return toGradingPeriodDto(
           await repo.createCut(userId, subject.periodId, subject.id, { ...input, position }),
@@ -449,20 +454,22 @@ export function createGradingService(deps: {
       return write(userId, async (tx, repo) => {
         await trackedPeriod(tx, userId, cut.periodId);
         if (!(await repo.findCut(userId, id))) throw cutNotFound();
-        if (
-          input.finalShareBp !== undefined &&
-          (await repo.sumCutShares(userId, cut.subjectId, id)) + input.finalShareBp > WEIGHT_BP_MAX
-        )
-          throw weightExceeded('finalShareBp', 'Los cortes');
-        return toGradingPeriodDto(await repo.updateCut(userId, id, input));
+        // The weights of the cuts are edited only TOGETHER (replaceCutWeights): one cut alone can never break the 100 %.
+        if (input.finalShareBp !== undefined)
+          throw validationError({ finalShareBp: [WEIGHTS_TOGETHER_MESSAGE] });
+        return toGradingPeriodDto(await repo.updateCut(userId, id, { name: input.name }));
       });
     },
 
     /** Never cascades: a cut with evaluations is refused; the evaluations are removed (or moved) first. */
     async removeCut(userId: string, id: string) {
-      if (!(await grading.findCut(userId, id))) throw cutNotFound();
+      const cut = await grading.findCut(userId, id);
+      if (!cut) throw cutNotFound();
       await write(userId, async (_tx, repo) => {
         if ((await repo.countEvaluationsInCut(userId, id)) > 0) throw cutNotEmpty();
+        // Removing one of several cuts would leave the subject below 100 %: only the last cut (back to "not configured") can go.
+        if ((await repo.countCutsOfSubject(userId, cut.subjectId)) > 1)
+          throw validationError({ gradingPeriods: [CUT_STRUCTURE_MESSAGE] });
         try {
           if (!(await repo.deleteCut(userId, id))) throw cutNotFound();
         } catch (err) {

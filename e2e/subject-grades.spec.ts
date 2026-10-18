@@ -652,3 +652,61 @@ test('M · Editar distribución: 30/30/40 → 40/30/30 with the last cut automat
   await expectNoHorizontalOverflow(page);
   check();
 });
+
+test('N · Editar corte only renames: the weight lives in Editar distribución and the 100 % holds', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Ciberseguridad']);
+  await post(page, `/api/subjects/${subjects[0]!.id}/grading/setup`, {
+    profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
+    gradingPeriods: [
+      { name: 'Corte 1', finalShareBp: 3000 },
+      { name: 'Corte 2', finalShareBp: 3000 },
+      { name: 'Corte 3', finalShareBp: 4000 },
+    ],
+  });
+  const shares = async () =>
+    (
+      await (await page.request.get(`/api/subjects/${subjects[0]!.id}/grades`)).json()
+    ).gradingPeriods.map((c: { name: string; finalShareBp: number }) => [c.name, c.finalShareBp]);
+  await page.goto(gradesUrl(subjects[0]!.id));
+
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await page.getByRole('menuitem', { name: 'Editar corte' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar corte' });
+  await expect(dialog.getByLabel('Peso en la nota final (%)')).toHaveCount(0);
+  await expect(
+    dialog.getByText('Para cambiar porcentajes usa «Editar distribución».'),
+  ).toBeVisible();
+  // one of several cuts cannot be deleted (it would leave the total below 100 %), and there is no "add a cut" either
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await expect(page.getByRole('menuitem', { name: /^Eliminar/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await page.getByRole('menuitem', { name: 'Editar corte' }).click();
+  const again = page.getByRole('dialog', { name: 'Editar corte' });
+  await again.getByLabel('Nombre').fill('Primer corte');
+  await save(again, 'Guardar');
+  await expect(page.getByRole('region', { name: 'Primer corte' })).toBeVisible();
+  expect(await shares()).toEqual([
+    ['Primer corte', 3000],
+    ['Corte 2', 3000],
+    ['Corte 3', 4000],
+  ]);
+
+  await page.getByRole('button', { name: 'Editar distribución' }).click();
+  const dist = page.getByRole('dialog', { name: 'Editar distribución' });
+  await dist.getByLabel('Primer corte (%)').fill('40');
+  await expect(dist.getByLabel('Corte 3 (%)')).toHaveValue('30');
+  await save(dist, 'Guardar');
+  await expect(page.getByText('Distribución guardada.')).toBeVisible();
+  expect(await shares()).toEqual([
+    ['Primer corte', 4000],
+    ['Corte 2', 3000],
+    ['Corte 3', 3000],
+  ]);
+  check();
+});

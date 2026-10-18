@@ -1,7 +1,5 @@
 import {
   GRADING_PERIOD_TERMS,
-  bpToPercentText,
-  percentToBp,
   type EducationContext,
   type GradingPeriod,
   type GradingProfile,
@@ -14,7 +12,6 @@ import { SelectField } from '../../components/SelectField';
 import { Button } from '../../components/ui/Button';
 import { FormActions, FormError } from '../../components/ui/form';
 import {
-  useCreateGradingPeriod,
   useDeleteEvaluation,
   useDeleteGradingPeriod,
   useReplaceCutWeights,
@@ -122,58 +119,42 @@ export function ScaleEditDialog({
   );
 }
 
-/** Add or edit ONE cut of the period (name and weight over the final grade). */
+/**
+ * Rename ONE cut of a subject. Its weight is NOT edited here: the cuts of a subject always add up to exactly 100 %, so the
+ * percentages are edited together, from "Editar distribución".
+ */
 export function CutDialog({
-  subjectId,
   studyType,
   cut,
-  defaultName,
+  subjectId,
   onClose,
   onDone,
 }: {
   subjectId: string;
   studyType: EducationContext;
-  cut?: GradingPeriod;
-  defaultName: string;
+  cut: GradingPeriod;
   onClose: () => void;
   onDone: () => void;
 }) {
   const term = GRADING_PERIOD_TERMS[studyType].one;
-  const create = useCreateGradingPeriod(subjectId);
   const update = useUpdateGradingPeriod(subjectId);
-  const pending = create.isPending || update.isPending;
-  const [name, setName] = useState(cut?.name ?? defaultName);
-  const [weight, setWeight] = useState(cut ? bpToPercentText(cut.finalShareBp) : '');
-  const [errors, setErrors] = useState<{ name?: string; weight?: string }>({});
+  const [name, setName] = useState(cut.name);
+  const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
 
   function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
-    const found: { name?: string; weight?: string } = {};
-    const bp = percentToBp(weight);
-    if (!name.trim()) found.name = 'Escribe el nombre.';
-    if (bp === null || bp < 1) found.weight = 'Escribe un peso entre 0 y 100 %.';
-    setErrors(found);
-    if (found.name || found.weight) return;
-    const input = { name: name.trim(), finalShareBp: bp as number };
-    const handlers = {
-      onSuccess: onDone,
-      onError: (err: Error) => {
-        if (err instanceof ApiRequestError && err.fieldErrors.finalShareBp)
-          setErrors({ weight: err.fieldErrors.finalShareBp[0] });
-        else setFormError(errorText(err));
-      },
-    };
-    if (cut) update.mutate({ id: cut.id, input }, handlers);
-    else create.mutate(input, handlers);
+    if (!name.trim()) return setNameError('Escribe el nombre.');
+    setNameError(undefined);
+    update.mutate(
+      { id: cut.id, input: { name: name.trim() } },
+      { onSuccess: onDone, onError: (err) => setFormError(errorText(err)) },
+    );
   }
 
   return (
-    <Modal
-      title={cut ? `Editar ${term.toLowerCase()}` : `Agregar ${term.toLowerCase()}`}
-      onClose={onClose}
-    >
+    <Modal title={`Editar ${term.toLowerCase()}`} onClose={onClose}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         {formError && <FormError>{formError}</FormError>}
         <FormField
@@ -182,23 +163,17 @@ export function CutDialog({
           value={name}
           maxLength={80}
           onChange={setName}
-          error={errors.name}
+          error={nameError}
         />
-        <FormField
-          id="cut-weight"
-          label="Peso en la nota final (%)"
-          inputMode="decimal"
-          value={weight}
-          onChange={setWeight}
-          error={errors.weight}
-          hint="Los pesos de los cortes de esta materia no pueden pasar de 100 %."
-        />
+        <p className="text-sm text-muted-foreground">
+          Para cambiar porcentajes usa «Editar distribución».
+        </p>
         <FormActions>
-          <Button onClick={onClose} disabled={pending}>
+          <Button onClick={onClose} disabled={update.isPending}>
             Cancelar
           </Button>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? 'Guardando…' : 'Guardar'}
+          <Button type="submit" variant="primary" disabled={update.isPending}>
+            {update.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
         </FormActions>
       </form>

@@ -37,20 +37,18 @@ async function world(
   const cuts: { id: string }[] = [];
   if (opts.grading !== false && opts.tracked !== false) {
     await agent.post(`/api/periods/${period.id}/grading`).send(SCALE_05).expect(201);
-    for (const [name, finalShareBp] of [
-      ['Corte 1', 3000],
-      ['Corte 2', 3000],
-      ['Corte 3', 4000],
-    ] as const) {
-      cuts.push(
-        (
-          await agent
-            .post(`/api/subjects/${subject.id}/grading-periods`)
-            .send({ name, finalShareBp })
-            .expect(201)
-        ).body.gradingPeriod,
-      );
-    }
+    // The cuts of a subject are born together and add up to exactly 100 %.
+    const setup = await agent
+      .post(`/api/subjects/${subject.id}/grading/setup`)
+      .send({
+        gradingPeriods: [
+          { name: 'Corte 1', finalShareBp: 3000 },
+          { name: 'Corte 2', finalShareBp: 3000 },
+          { name: 'Corte 3', finalShareBp: 4000 },
+        ],
+      })
+      .expect(201);
+    cuts.push(...setup.body.gradingPeriods);
   }
   return { agent, user, track, period, subject, cuts };
 }
@@ -167,30 +165,76 @@ describe('cuts', () => {
     expect(list.gradingPeriods.map((c: { position: number }) => c.position)).toEqual([1, 2, 3]);
   });
 
-  it('cannot add up to more than 100 %', async () => {
-    const w = await world(); // already 100 %
-    const res = await w.agent
-      .post(`/api/subjects/${w.subject.id}/grading-periods`)
-      .send({ name: 'Extra', finalShareBp: 1 });
-    expect(res.status).toBe(400);
-    expect(res.body.error.details.fields.finalShareBp).toBeDefined();
-    const grow = await w.agent
-      .patch(`/api/grading-periods/${w.cuts[0]!.id}`)
-      .send({ finalShareBp: 3001 });
-    expect(grow.status).toBe(400);
+  const sharesOf = async (subjectId: string) =>
+    (
+      await prisma.gradingPeriod.findMany({ where: { subjectId }, orderBy: { position: 'asc' } })
+    ).map((c) => c.finalShareBp);
+
+  it('one cut alone can never change its weight: 30/30/40 stays 100 % (PATCH with finalShareBp is refused)', async () => {
+    const w = await world();
+    for (const finalShareBp of [2000, 3001, 4000]) {
+      const res = await w.agent
+        .patch(`/api/grading-periods/${w.cuts[0]!.id}`)
+        .send({ finalShareBp });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details.fields.finalShareBp[0]).toBe(
+        'Edita los porcentajes desde la distribución de la materia.',
+      );
+    }
+    // even together with a name, nothing is applied
     await w.agent
       .patch(`/api/grading-periods/${w.cuts[0]!.id}`)
-      .send({ finalShareBp: 2000, name: 'Primero' })
-      .expect(200);
-    expect(await prisma.gradingPeriod.count()).toBe(3);
+      .send({ name: 'X', finalShareBp: 2000 })
+      .expect(400);
+    expect(await sharesOf(w.subject.id)).toEqual([3000, 3000, 4000]);
+    expect(
+      (await prisma.gradingPeriod.findUniqueOrThrow({ where: { id: w.cuts[0]!.id } })).name,
+    ).toBe('Corte 1');
   });
 
-  it('under 100 % is allowed (incomplete is an estimate, not an error)', async () => {
+  it('renaming a cut still works and keeps the weights', async () => {
+    const w = await world();
+    const res = await w.agent
+      .patch(`/api/grading-periods/${w.cuts[0]!.id}`)
+      .send({ name: 'Primer corte' })
+      .expect(200);
+    expect(res.body.gradingPeriod).toMatchObject({ name: 'Primer corte', finalShareBp: 3000 });
+    expect(await sharesOf(w.subject.id)).toEqual([3000, 3000, 4000]);
+  });
+
+  it('a new cut that leaves the total different from 100 % is refused', async () => {
+    const w = await world(); // already 100 %
+    for (const finalShareBp of [1, 5000]) {
+      const res = await w.agent
+        .post(`/api/subjects/${w.subject.id}/grading-periods`)
+        .send({ name: 'Extra', finalShareBp });
+      expect(res.status).toBe(400);
+    }
+    expect(await sharesOf(w.subject.id)).toEqual([3000, 3000, 4000]);
+  });
+
+  it('the joint distribution is the way to change weights: 30/30/40 → 40/30/30', async () => {
+    const w = await world();
+    await w.agent
+      .post(`/api/subjects/${w.subject.id}/grading-periods/distribution`)
+      .send({
+        gradingPeriods: w.cuts.map((c, i) => ({ id: c.id, finalShareBp: [4000, 3000, 3000][i] })),
+      })
+      .expect(200);
+    expect(await sharesOf(w.subject.id)).toEqual([4000, 3000, 3000]);
+  });
+
+  it('a single 100 % cut can be added to a subject with no cuts, and nothing less', async () => {
     const w = await world('a@example.com', { grading: false });
     await w.agent.post(`/api/periods/${w.period.id}/grading`).send(SCALE_05).expect(201);
     await w.agent
       .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'Corte 1', finalShareBp: 3000 })
+      .expect(400); // 30 % alone would persist an invalid total
+    expect(await prisma.gradingPeriod.count()).toBe(0);
+    await w.agent
+      .post(`/api/subjects/${w.subject.id}/grading-periods`)
+      .send({ name: 'Nota final', finalShareBp: 10_000 })
       .expect(201);
   });
 
@@ -203,25 +247,22 @@ describe('cuts', () => {
       .expect(400);
   });
 
-  it('concurrent creations cannot pass 100 %', async () => {
+  it('concurrent creations of a whole 100 % cut: exactly one wins', async () => {
     const w = await world('a@example.com', { grading: false });
     await w.agent.post(`/api/periods/${w.period.id}/grading`).send(SCALE_05).expect(201);
     const results = await Promise.all(
-      Array.from({ length: 6 }, (_, i) =>
+      Array.from({ length: 4 }, (_, i) =>
         w.agent
           .post(`/api/subjects/${w.subject.id}/grading-periods`)
-          .send({ name: `C${i}`, finalShareBp: 2500 }),
+          .send({ name: `C${i}`, finalShareBp: 10_000 }),
       ),
     );
-    expect(results.filter((r) => r.status === 201)).toHaveLength(4);
-    expect(results.filter((r) => r.status === 400)).toHaveLength(2);
+    expect(results.filter((r) => r.status === 201)).toHaveLength(1);
     const sum = await prisma.gradingPeriod.aggregate({ _sum: { finalShareBp: true } });
     expect(sum._sum.finalShareBp).toBe(10_000);
-    const positions = (await prisma.gradingPeriod.findMany()).map((c) => c.position).sort();
-    expect(positions).toEqual([1, 2, 3, 4]);
   });
 
-  it('a cut with evaluations is not deleted (409); an empty one is', async () => {
+  it('a cut with evaluations is not deleted (409); deleting one of several cuts would break the 100 % and is refused', async () => {
     const w = await world();
     await evaluation(w.agent, {
       subjectId: w.subject.id,
@@ -232,8 +273,20 @@ describe('cuts', () => {
     const res = await w.agent.delete(`/api/grading-periods/${w.cuts[0]!.id}`);
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('GRADING_PERIOD_NOT_EMPTY');
-    await w.agent.delete(`/api/grading-periods/${w.cuts[1]!.id}`).expect(204);
-    expect(await prisma.gradingPeriod.count()).toBe(2);
+    const empty = await w.agent.delete(`/api/grading-periods/${w.cuts[1]!.id}`);
+    expect(empty.status).toBe(400);
+    expect(await sharesOf(w.subject.id)).toEqual([3000, 3000, 4000]);
+    // the last cut of a subject can go (back to "not configured")
+    const solo = await world('c@example.com', { grading: false });
+    await solo.agent.post(`/api/periods/${solo.period.id}/grading`).send(SCALE_05).expect(201);
+    const one = (
+      await solo.agent
+        .post(`/api/subjects/${solo.subject.id}/grading-periods`)
+        .send({ name: 'Nota final', finalShareBp: 10_000 })
+        .expect(201)
+    ).body.gradingPeriod;
+    await solo.agent.delete(`/api/grading-periods/${one.id}`).expect(204);
+    expect(await prisma.gradingPeriod.count({ where: { subjectId: solo.subject.id } })).toBe(0);
   });
 });
 
@@ -1279,18 +1332,15 @@ describe('each subject has its own cuts; only the scale is the period’s (D36 r
   it('editing or deleting a cut of one subject never touches another subject', async () => {
     const { w, bases, a, b } = await three();
     const before = await grades(w.agent, bases.id);
-    await w.agent
-      .patch(`/api/grading-periods/${a[0].id}`)
-      .send({ name: 'Primero', finalShareBp: 2000 })
-      .expect(200);
+    await w.agent.patch(`/api/grading-periods/${a[0].id}`).send({ name: 'Primero' }).expect(200);
     await w.agent
       .post(`/api/subjects/${w.subject.id}/grading-periods`)
       .send({ name: 'Extra', finalShareBp: 1000 })
-      .expect(201);
-    await w.agent.delete(`/api/grading-periods/${a[1].id}`).expect(204);
+      .expect(400);
+    await w.agent.delete(`/api/grading-periods/${a[1].id}`).expect(400);
     expect(await grades(w.agent, bases.id)).toEqual(before);
     expect(b).toHaveLength(3);
-    // weights are checked PER SUBJECT: Bases de datos is full (100 %), Farmacología has room again
+    // weights are checked PER SUBJECT: Bases de datos is full (100 %) and cannot take a cut either
     await w.agent
       .post(`/api/subjects/${bases.id}/grading-periods`)
       .send({ name: 'Más', finalShareBp: 1 })

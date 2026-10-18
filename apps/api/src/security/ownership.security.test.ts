@@ -87,10 +87,13 @@ async function world() {
       .post(`/api/periods/${period.id}/grading`)
       .send({ minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 });
     const cut = (
-      await who.agent
-        .post(`/api/subjects/${subject.id}/grading-periods`)
-        .send({ name: `Corte secreto de ${label}`, finalShareBp: 5000 })
-    ).body.gradingPeriod as { id: string };
+      await who.agent.post(`/api/subjects/${subject.id}/grading/setup`).send({
+        gradingPeriods: [
+          { name: `Corte secreto de ${label}`, finalShareBp: 5000 },
+          { name: `Otro corte de ${label}`, finalShareBp: 5000 },
+        ],
+      })
+    ).body.gradingPeriods[0] as { id: string };
     const evaluation = (
       await who.agent.post('/api/evaluations').send({
         subjectId: subject.id,

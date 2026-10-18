@@ -43,8 +43,8 @@ export function useSubjectGrades(subjectId: string) {
 }
 
 /**
- * The scale and the cuts belong to ONE period, so every subject OF THAT PERIOD shows them: changing them refreshes the cached
- * grades whose response says that period (never those of another period or study). An evaluation belongs to one subject, so only
+ * The SCALE belongs to ONE period, so every subject OF THAT PERIOD shows it: changing it refreshes the cached grades whose
+ * response says that period (never those of another period or study). The cuts and the evaluations belong to one SUBJECT, so only
  * that subject's grades are refreshed. Nothing else in the app reads grades yet, so nothing else is invalidated.
  */
 export const isGradesOfPeriod = (data: unknown, periodId: string) =>
