@@ -435,15 +435,29 @@ describe('confirm: all or nothing', () => {
 
   it('a failure of the DATABASE after some writes also leaves nothing behind (and is not a client error)', async () => {
     const { agent } = await userWithoutSubjects('dbfail@example.com');
-    // The schema accepts a NUL character; PostgreSQL refuses it in text. The first class is written before the
-    // second one blows up, so this proves the rollback of real rows, not only of validation.
+    // A trigger makes the database refuse the second class AFTER the first one was written, so this proves the rollback of
+    // real rows (a NUL in a title is now refused by the schema before reaching the database).
+    await prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION schedule_import_test_fail() RETURNS trigger AS $$
+      BEGIN IF NEW."title" = 'boom' THEN RAISE EXCEPTION 'fails on purpose'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
+      CREATE TRIGGER schedule_import_test_fail BEFORE INSERT ON "ScheduleBlock"
+        FOR EACH ROW EXECUTE FUNCTION schedule_import_test_fail();
+    `);
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const res = await confirm(
-      agent,
-      cls({ clientId: 'ok', subject: NEW('Nueva') }),
-      cls({ clientId: 'boom', weekday: 2, title: 'a\u0000b', subject: NEW('Otra') }),
-    );
-    quiet.mockRestore();
+    let res;
+    try {
+      res = await confirm(
+        agent,
+        cls({ clientId: 'ok', subject: NEW('Nueva') }),
+        cls({ clientId: 'boom', weekday: 2, title: 'boom', subject: NEW('Otra') }),
+      );
+    } finally {
+      quiet.mockRestore();
+      await prisma.$executeRawUnsafe(
+        `DROP TRIGGER IF EXISTS schedule_import_test_fail ON "ScheduleBlock"`,
+      );
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS schedule_import_test_fail()`);
+    }
     expect(res.status).toBe(500);
     expect(res.body.error.code).toBe('INTERNAL_ERROR');
     expect(JSON.stringify(res.body)).not.toMatch(/NUL|0x00|byte sequence/i); // nothing internal leaks
