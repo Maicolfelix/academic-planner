@@ -120,3 +120,7 @@ Una migración que reescribe datos no se prueba solo con una base nueva. `apps/a
 ## Falla conocida de las pruebas
 
 `MaxListenersExceededWarning` de Node (11 listeners en `Server`) al correr las pruebas de API: `supertest` añade un listener por solicitud cuando una prueba lanza más de 10 concurrentes sobre la misma aplicación. No afecta al servidor y no se ha corregido ([limitations.md](limitations.md)).
+
+## Cobertura de rutas derivada (seguridad)
+
+`apps/api/src/security/routeCoverage.security.test.ts` deriva el inventario de rutas de los routers (y de sus montajes en `app.ts`) y exige, para **cada** ruta: 401 sin sesión (salvo health y las tres de sesión), `Cache-Control: no-store`, y —si tiene `:id`— una fila en la matriz de propiedad. Una ruta nueva olvidada en las matrices hace fallar la prueba.

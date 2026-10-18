@@ -179,6 +179,7 @@ describe('a foreign id is indistinguishable from an id that does not exist', () 
         a.patch(`/api/reminders/${id}`).send({ remindDate: '2026-10-09', remindTime: '08:00' }),
     ],
     ['DELETE /reminders/:id', (a, id) => a.delete(`/api/reminders/${id}`)],
+    ['GET /periods/:id', (a, id) => a.get(`/api/periods/${id}`)],
     ['PATCH /periods/:id', (a, id) => a.patch(`/api/periods/${id}`).send({ name: 'Hackeado' })],
     ['DELETE /periods/:id', (a, id) => a.delete(`/api/periods/${id}`)],
     [
