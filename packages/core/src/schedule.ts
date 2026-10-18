@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { dateOnlySchema, isRealDateOnly, type DateOnly } from './academic.js';
+import {
+  INVALID_CHARACTERS,
+  dateOnlySchema,
+  hasNoNul,
+  isRealDateOnly,
+  type DateOnly,
+} from './academic.js';
 import { dueTimeSchema } from './activity.js';
 import { addDays, daysBetween, maxDate, minDate } from './calendar.js';
 import { localDayBounds, toLocalParts, zonedTimeToUtc } from './time.js';
@@ -178,7 +184,8 @@ const title = z
   .max(
     SCHEDULE_TITLE_MAX,
     `El título es demasiado largo (máximo ${SCHEDULE_TITLE_MAX} caracteres).`,
-  );
+  )
+  .refine(hasNoNul, INVALID_CHARACTERS);
 
 /**
  * The only repetition supported today: every week, on the weekday of the first occurrence, until a day.
