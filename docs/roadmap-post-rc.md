@@ -102,9 +102,9 @@ Reglas de producto que se mantienen: no inventar fechas ni asignaturas; crear un
 
 **Deuda de endurecimiento (futura, no iniciada): FK `(periodId, userId) → AcademicPeriod(id, userId)`.** Se decidió **no** añadirla en F1-0 (razonamiento en [activities.md](activities.md#el-periodo-sí-se-guarda-en-activity-la-asignatura-es-opcional-f1)): el cliente no envía `periodId`, el servidor lo deriva y todo repositorio filtra por `userId`; ponerla solo en `Activity` sería incoherente con `Subject` y `ScheduleBlock`. Si se retoma, se aplica a las tres tablas a la vez.
 
-#### Deuda de fiabilidad de pruebas: TEST-REL-1 (resuelta, pendiente de fusión)
+#### Deuda de fiabilidad de pruebas: TEST-REL-1 (resuelta)
 
-**Resolución (pendiente de fusión):** `MASTER` ya no usa «el jueves»/«el viernes» en el mensaje de la Bandeja sino días relativos (a 4 y 5 días), de modo que nunca compiten con «Taller express» (a 6 horas) a ninguna hora ni día; es un cambio solo de la prueba, sin tocar el producto. Una prueba de regresión comprueba la separación para varias horas de ejecución. Texto original de la deuda:
+**Resolución (PR #47, fusionado):** `MASTER` ya no usa «el jueves»/«el viernes» en el mensaje de la Bandeja sino días relativos (a 4 y 5 días), de modo que nunca compiten con «Taller express» (a 6 horas) a ninguna hora ni día; es un cambio solo de la prueba, sin tocar el producto. Una prueba de regresión comprueba la separación para varias horas de ejecución. Texto original de la deuda:
 
 **Cuándo resolverla:** antes del piloto controlado (o, a más tardar, antes de un release candidate final): hasta entonces cada pasada completa puede dar una falsa alarma en `MASTER` según la hora. La prueba `MASTER` de `e2e/system-validation.spec.ts` depende de la hora: corrida un jueves antes de las 8:00 (Bogotá), el «Quiz» que la Bandeja crea para «el jueves a las 8 a. m.» supera a «Taller express» y la aserción de «¿Qué hago ahora?» falla. Está **reproducida en `d23f8b6`** (previa a UX1-2.5/2.75) y **no está arreglada**: pasa o falla según la hora de ejecución. Es deuda de pruebas (**KNOWN PRE-EXISTING / TEST RELIABILITY DEBT**), no un defecto del producto; se corregirá, si el mantenedor lo aprueba, en una fase propia (fijar el reloj o el fixture), nunca de pasada.
 
@@ -135,7 +135,7 @@ Objetivo: conocer al usuario desde el registro, de forma **corta, opcional, prog
 
 #### P0.5 — Base multi-estudio
 
-**P0.5 DONE** (P0.5-1 … P0.5-5, PR #39–#43). El siguiente bloque de producto es notas / cortes / evaluaciones: no se inicia sin aprobación explícita.
+**P0.5 DONE** (P0.5-1 … P0.5-5, PR #39–#43). El bloque de producto siguiente, notas / cortes / evaluaciones, se aprobó y avanza como B1/B2 (DONE, ver más abajo); lo demás de notas no se inicia sin aprobación explícita.
 
 Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, colegio + técnico…). `primaryUse` **no** se convierte en lista: la entidad es `StudyTrack` ([D31](decisions.md#d31-studytrack-una-formación-que-el-usuario-cursa-p05-1)). El _discovery_ recomendó hacerlo **antes de Notas** (la escala, la nota mínima y el promedio pertenecen a un estudio). Orden propuesto, un PR cada uno y **cada uno con aprobación explícita**:
 
