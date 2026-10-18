@@ -37,18 +37,23 @@ const localTime = (iso: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
-const dayName = (plusDays: number) => {
-  const d = new Date(`${bogotaToday(plusDays)}T12:00:00Z`).getUTCDay();
+/** The Bogotá calendar day (YYYY-MM-DD) `plusDays` after the instant `now`. Bogotá is UTC-5 all year (no daylight saving). */
+const bogotaDayAt = (now: Date, plusDays: number): string =>
+  new Date(now.getTime() - 5 * 3600e3 + plusDays * 86_400_000).toISOString().slice(0, 10);
+const dayNameAt = (now: Date, plusDays: number) => {
+  const d = new Date(`${bogotaDayAt(now, plusDays)}T12:00:00Z`).getUTCDay();
   return DAY_NAMES[(d + 6) % 7]!;
 };
+const dayName = (plusDays: number) => dayNameAt(new Date(), plusDays);
 
 /**
  * The teacher's message of the Inbox scenario. Its two days are RELATIVE to today (4 and 5 days ahead), never "el jueves" /
  * "el viernes": a fixed weekday is "today, before 8 a. m." on some days of the week and then the quiz would be sooner than
  * "Taller express" (due in 6 hours), changing "¿Qué hago ahora?" with the hour the suite happens to run (TEST-REL-1).
  */
-const teacherMessage = (greeting = '') =>
-  `${greeting}El ${dayName(4)} tendremos quiz de Bases de Datos a las 8 a. m. y el ${dayName(5)} deben entregar el taller de Bioestadística.`;
+const teacherMessageAt = (now: Date, greeting = '') =>
+  `${greeting}El ${dayNameAt(now, 4)} tendremos quiz de Bases de Datos a las 8 a. m. y el ${dayNameAt(now, 5)} deben entregar el taller de Bioestadística.`;
+const teacherMessage = (greeting = '') => teacherMessageAt(new Date(), greeting);
 
 interface Api {
   activities: {
@@ -954,15 +959,28 @@ async function _unused(_b: Browser) {
 }
 void _unused;
 
-// Regression for TEST-REL-1: whatever day and hour the suite runs, both days of the Inbox message start more than two days
-// away, so they can never beat "Taller express" (due in 6 hours) once "Lectura atrasada" is finished.
+// Regression for TEST-REL-1, with EXPLICIT instants (the real clock is never read): at any hour of the day, the two days of the
+// Inbox message start well after "Taller express", which is due 6 hours after the moment the scenario starts.
 test('TEST-REL-1 · the MASTER message never competes with an activity due in 6 hours', () => {
-  for (const hoursFromNow of [0, 3, 7, 12, 20, 23, 30]) {
-    const now = Date.now() + hoursFromNow * 3600e3;
+  const instants = [
+    '2026-10-15T07:30:00-05:00', // a Thursday, before the 8 a. m. of the old "el jueves" message
+    '2026-10-15T23:30:00-05:00', // the same Thursday, late at night
+    '2026-10-16T00:00:00-05:00', // midnight, Friday
+    '2026-10-18T12:00:00-05:00', // a Sunday, noon
+  ];
+  for (const iso of instants) {
+    const now = new Date(iso);
+    const tallerExpress = now.getTime() + 6 * 3600e3;
     for (const n of [4, 5]) {
-      const startOfDay = new Date(`${bogotaToday(n)}T00:00:00-05:00`).getTime();
-      expect(startOfDay - now).toBeGreaterThan(2 * 24 * 3600e3);
+      const startOfDay = new Date(`${bogotaDayAt(now, n)}T00:00:00-05:00`).getTime();
+      expect(startOfDay - tallerExpress, `${iso} +${n}`).toBeGreaterThan(24 * 3600e3);
     }
+    // the message names exactly those two days, never a fixed weekday of the week
+    expect(teacherMessageAt(now)).toContain(`El ${dayNameAt(now, 4)} tendremos quiz`);
+    expect(teacherMessageAt(now)).toContain(`y el ${dayNameAt(now, 5)} deben entregar`);
   }
-  expect(teacherMessage()).toContain(dayName(4));
+  // the old message ("el jueves") on that Thursday morning was the failing case; the relative one says Monday and Tuesday
+  const thursday = new Date('2026-10-15T07:30:00-05:00');
+  expect(dayNameAt(thursday, 4)).toBe('lunes');
+  expect(dayNameAt(thursday, 5)).toBe('martes');
 });
