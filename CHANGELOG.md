@@ -6,6 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ### Added
 
+- **Dependency audit: 0 findings.** `npm audit fix` (lockfile only, no major bump, no `--force`): `prisma`/`@prisma/client` 7.10.1, `deepmerge-ts` 8.0.2, `mysql2` 3.24.4, `concurrently` 10.0.6, `shell-quote` 1.12.0. `npm audit` and `npm audit --omit=dev` = 0; all suites green.
 - **Test database isolation.** The browser test configs now fail fast (`assertPortsFree`) when something already listens on their ports (a leftover dev stack or its `node --watch` watcher wired to the development database) instead of letting the old process answer the health check; guard tests for `getTestDatabaseUrl`, `truncateAll` and the port check.
 - **Persisted text hardening.** A NUL (\u0000) in the schedule block title and in the registration name reached PostgreSQL and answered 500; both are now a clear 400 (`El texto tiene caracteres no válidos.`) like every other persisted text, and a probe test walks all the writing endpoints with a NUL in each text field.
 - **B2 closed.** Real-iPhone QA of B2 was approved by the maintainer with no issues reported (local/development environment over the LAN: not a release QA, no HTTPS or installed-PWA validation). Still not implemented: Smart Capture of grades, grades in the Radar and in the Progress, copying the previous period, grade notifications.
