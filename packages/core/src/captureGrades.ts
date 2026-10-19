@@ -172,6 +172,13 @@ export const gradeSuggestionSchema = z.object({
   activityClientId: z.string().nullable(),
   /** The sentence also had an activity, but its subject belongs to ANOTHER study: that part is not added from this capture. */
   activityNote: z.enum(['OTHER_STUDY']).nullable().default(null),
+  /**
+   * The words put something in the place of the subject ("... de Farmacología") that matches NONE of the student's current
+   * subjects. It is kept as written: nothing else is offered in its place and nothing is created. null = no subject was written.
+   */
+  explicitUnknownSubjectText: z.string().nullable().default(null),
+  /** The cut as the words named it ("Corte 2"), to keep showing what was understood when the subject is unknown. */
+  cutText: z.string().nullable().default(null),
 });
 export type GradeSuggestion = z.infer<typeof gradeSuggestionSchema>;
 
@@ -359,8 +366,96 @@ interface Reading {
   nounWords: string[];
   evalType: (typeof ACTIVITY_TYPES)[number] | null;
   subjectMentions: ReturnType<typeof matchSubject>;
+  /** What stands in the place of the subject when it matches no current subject ("de Farmacología"); null if nothing does. */
+  explicitSubject: string | null;
+  cutText: string | null;
   /** Character ranges of the clause the activity engine must NOT read. */
   blank: [number, number][];
+}
+
+/** Words that end a subject-like phrase or cannot start one: articles, connectors, weight/score words, cuts and dates. */
+const NOT_A_SUBJECT = new Set([
+  'el',
+  'la',
+  'los',
+  'las',
+  'un',
+  'una',
+  'mi',
+  'mis',
+  'su',
+  'sus',
+  'y',
+  'e',
+  'o',
+  'pero',
+  'con',
+  'para',
+  'por',
+  'que',
+  'se',
+  'al',
+  'de',
+  'del',
+  'en',
+  'a',
+  'vale',
+  'valen',
+  'pesa',
+  'pesan',
+  'corte',
+  'periodo',
+  'etapa',
+  'nota',
+  'final',
+  'definitiva',
+  'total',
+  'hoy',
+  'manana',
+  'pasado',
+  'lunes',
+  'martes',
+  'miercoles',
+  'jueves',
+  'viernes',
+  'sabado',
+  'domingo',
+  'semana',
+  'mes',
+  'proxima',
+  'proximo',
+  'esta',
+  'este',
+  'ese',
+  'esa',
+  'clase',
+]);
+
+/**
+ * The words right after the cut or after the evaluation noun ("Corte 2 de Farmacología", "el parcial de Anatomía") that stand in
+ * the place of the subject: up to four free words after "de / del / en". Only that structural place counts — a loose word is never
+ * taken for a subject, and a weight, a score, an article or a date ends it. Returns the text as written, or null.
+ */
+function explicitSubjectText(
+  tokens: Token[],
+  clauseText: string,
+  anchors: number[],
+): string | null {
+  for (const anchor of anchors) {
+    const at = tokens.findIndex((t) => t.start >= anchor);
+    if (at < 0) continue;
+    const lead = tokens[at]!;
+    if (!['de', 'del', 'en'].includes(lead.norm) || lead.used) continue;
+    const words: Token[] = [];
+    for (let i = at + 1; i < tokens.length && words.length < 4; i++) {
+      const t = tokens[i]!;
+      if (t.used || /\d/.test(t.norm) || NOT_A_SUBJECT.has(t.norm)) break;
+      words.push(t);
+    }
+    if (words.length === 0) continue;
+    return clauseText.slice(words[0]!.start, words.at(-1)!.end).trim();
+  }
+  return null;
 }
 
 function readClause(clause: Clause, subjects: GradeSubjectCtx[]): Reading | null {
@@ -408,6 +503,18 @@ function readClause(clause: Clause, subjects: GradeSubjectCtx[]): Reading | null
     use(tokens, type.start, type.length + (number ? 1 : 0));
   }
   const subjectMentions = matchSubject(tokens, buildSubjectEntries(subjects));
+  // Where a subject would be written: right after the cut or after the evaluation noun.
+  let nounEnd: number | null = null;
+  if (type) {
+    const lastNoun = tokens[type.start + type.length - 1];
+    const nextNumber = tokens[type.start + type.length];
+    nounEnd =
+      (nextNumber && /^\d{1,2}$/.test(nextNumber.norm) ? nextNumber : lastNoun)?.end ?? null;
+  }
+  const anchors = [mention?.end ?? null, nounEnd].filter((x): x is number => x !== null);
+  const explicitSubject =
+    subjectMentions.kind === 'none' ? explicitSubjectText(tokens, clause.text, anchors) : null;
+  const cutText = mention ? clause.text.slice(mention.start, mention.end).trim() : null;
 
   // A sentence that is only a score is wholly spoken for. With a weight, the activity engine keeps the rest ("Parcial de
   // Anatomía el viernes"): the weight phrase, the score and the "y" that joins them are blanked.
@@ -433,6 +540,8 @@ function readClause(clause: Clause, subjects: GradeSubjectCtx[]): Reading | null
     nounWords,
     evalType: type ? type.type : null,
     subjectMentions,
+    explicitSubject,
+    cutText,
     blank,
   };
 }
@@ -609,7 +718,8 @@ export function interpretGrades(text: string, context: GradeCaptureContext): Gra
     const pool = mentioned
       ? context.subjects.filter((s) => candidates.includes(s.id))
       : context.subjects;
-    const options = pool.map((s) => optionFor(s, reading));
+    const unknownSubject = reading.explicitSubject !== null && !mentioned;
+    const options = unknownSubject ? [] : pool.map((s) => optionFor(s, reading));
     // A subject the words did not name: only the readings that could fit (a cut or an evaluation that exists) are offered.
     const fitting = options.filter((o) => o.choices.length > 0);
     const shown = mentioned ? options : fitting.length > 0 ? fitting : options;
@@ -632,6 +742,8 @@ export function interpretGrades(text: string, context: GradeCaptureContext): Gra
       weight: reading.weight,
       activityClientId: null,
       activityNote: null,
+      explicitUnknownSubjectText: unknownSubject ? reading.explicitSubject : null,
+      cutText: reading.cutText,
     };
     const resolved = resolveGrade(suggestion, {});
     suggestion.status = resolved.missing.length === 0 ? 'READY' : 'NEEDS_REVIEW';

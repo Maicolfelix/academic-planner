@@ -24,6 +24,8 @@ interface Props {
   disabled?: boolean;
   /** The activity of the same sentence will not be added to the Agenda: its subject belongs to another study. */
   agendaNote?: boolean;
+  /** Back to the text (the way out when the subject written does not exist). */
+  onBack?: () => void;
 }
 
 const NOTICES: Record<string, (cut: string | null) => string> = {
@@ -40,7 +42,7 @@ const NOTICES: Record<string, (cut: string | null) => string> = {
  * A grade the app understood, in plain words ("Farmacología · Corte 2 · Nota: 4.3"). It asks only what is missing: the subject,
  * the cut or evaluation, what the percentage is of, the grade on the scale of the subject. Never an internal term.
  */
-export function GradeCard({ grade, actions, level, disabled, agendaNote }: Props) {
+export function GradeCard({ grade, actions, level, disabled, agendaNote, onBack }: Props) {
   const id = `capture-${grade.suggestion.clientId}`;
   const r = gradeResolution(grade);
   const v = gradeView(grade);
@@ -108,7 +110,25 @@ export function GradeCard({ grade, actions, level, disabled, agendaNote }: Props
           </p>
         )}
 
-        {r.missing.includes('SUBJECT') && (
+        {s.explicitUnknownSubjectText !== null && s.options.length === 0 && (
+          <div className={askClass} role="group" aria-label="Asignatura no encontrada">
+            <p className="font-medium">
+              No encontré «{s.explicitUnknownSubjectText}» entre tus materias actuales.
+            </p>
+            <p className="text-muted-foreground">
+              No se guardó nada. Revisa cómo la escribiste o créala primero en Mis asignaturas.
+            </p>
+            {onBack && (
+              <div>
+                <Button size="sm" onClick={onBack} disabled={disabled}>
+                  Volver al texto
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {r.missing.includes('SUBJECT') && s.options.length > 0 && (
           <div className={askClass} role="group" aria-label="Asignatura por decidir">
             <p className="font-medium">¿A cuál asignatura te refieres?</p>
             <div className="flex flex-wrap gap-2">

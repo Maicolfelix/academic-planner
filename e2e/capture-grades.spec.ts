@@ -240,13 +240,58 @@ for (const viewport of [
       check();
     });
 
+    test('a subject written that does not exist offers no unrelated subject; without one, it asks; with a real one, it saves', async ({
+      page,
+    }) => {
+      const check = watch(page);
+      await start(page);
+      const [, ciber] = await study(page, 'Ingeniería', [
+        'Base de datos SQL - NOSQL',
+        'Ciberseguridad',
+      ]);
+      const interpret = async (text: string) => {
+        await quick(page).getByLabel('Escribe lo que tienes pendiente').fill(text);
+        await quick(page).getByRole('button', { name: 'Interpretar', exact: true }).click();
+        await expect(quick(page).locator('#capture-review-title')).toBeVisible();
+      };
+
+      await page.goto('/dashboard');
+      await interpret('Saqué 4.3 en Corte 2 de Farmacología');
+      await expect(
+        quick(page).getByText('No encontré «Farmacología» entre tus materias actuales.'),
+      ).toBeVisible();
+      await expect(quick(page).getByText('1 nota', { exact: true }).first()).toBeVisible();
+      await expect(quick(page).getByText('1 necesita revisión')).toBeVisible();
+      await expect(
+        quick(page).getByRole('button', { name: /SQL - NOSQL|Ciberseguridad/ }),
+      ).toHaveCount(0);
+      await expect(
+        quick(page).getByRole('button', { name: 'Resolver antes de guardar' }),
+      ).toBeDisabled();
+      await expect(quick(page).getByRole('button', { name: /Crear 0/ })).toHaveCount(0);
+
+      await quick(page).getByRole('button', { name: 'Volver al texto' }).first().click();
+      await interpret('Saqué 4.3 en Corte 2');
+      await expect(quick(page).getByText('¿A cuál asignatura te refieres?')).toBeVisible();
+      await expect(quick(page).getByRole('button', { name: 'Ciberseguridad' })).toBeVisible();
+
+      await quick(page).getByRole('button', { name: 'Volver al texto' }).first().click();
+      await interpret('Saqué 4.3 en Corte 2 de Ciberseguridad');
+      await quick(page).getByRole('button', { name: 'Guardar 1 nota' }).click();
+      await expect(quick(page).getByText('1 nota guardada')).toBeVisible();
+      expect(await gradesOf(page, ciber!.id)).toHaveLength(1);
+      check();
+    });
+
     test('an ambiguous subject is asked, then the grade is saved', async ({ page }) => {
       const check = watch(page);
       await start(page);
       const [farma, anat] = await study(page, 'Medicina', ['Farmacología', 'Anatomía']);
       await write(page, 'Saqué 4.5 en Corte 2');
       await expect(quick(page).getByText('¿A cuál asignatura te refieres?')).toBeVisible();
-      await expect(quick(page).getByRole('button', { name: /^Crear 0/ })).toBeDisabled();
+      await expect(
+        quick(page).getByRole('button', { name: 'Resolver antes de guardar' }),
+      ).toBeDisabled();
       await quick(page)
         .getByRole('button', { name: /^Farmacología/ })
         .click();

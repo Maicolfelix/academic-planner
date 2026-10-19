@@ -394,12 +394,17 @@ export function gradeView(g: ReviewGrade): GradeView {
       ? choice.cut.name
       : choice
         ? choice.evaluation.cutName
-        : null;
+        : s.cutText;
   const points =
     s.score.kind === 'POINTS' && s.score.rawEarnedMilli !== null && s.score.rawMaxMilli !== null
       ? formatPoints(s.score.rawEarnedMilli, s.score.rawMaxMilli)
       : null;
-  const shown = r.scoreMilli !== null ? formatScore(r.scoreMilli, decimals) : null;
+  // Without a resolved subject the grade written is still shown as understood.
+  const written =
+    r.scoreMilli === null && s.score.kind === 'DECIMAL' && s.score.scoreMilli !== null
+      ? formatScore(s.score.scoreMilli, decimals)
+      : null;
+  const shown = r.scoreMilli !== null ? formatScore(r.scoreMilli, decimals) : written;
   const score =
     choice?.action === 'CREATE_EVALUATION' && s.score.kind === 'NONE'
       ? 'Nota: Pendiente'
@@ -430,7 +435,9 @@ export function gradeView(g: ReviewGrade): GradeView {
           ? 'Se guardará esta nota.'
           : 'Falta decidir dónde va.';
   return {
-    subject: r.option?.subject.name ?? 'Asignatura por decidir',
+    subject:
+      r.option?.subject.name ??
+      (s.explicitUnknownSubjectText ? 'Asignatura no encontrada' : 'Asignatura por decidir'),
     cut,
     score,
     weight,
@@ -684,9 +691,14 @@ export function summarize(state: ReviewState): ReviewSummary {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** What the button says it will do: "Crear 2 actividades", "Crear horario", "Crear 1 actividad y 2 bloques". */
+export const RESOLVE_FIRST_LABEL = 'Resolver antes de guardar';
+
 export function confirmLabel(summary: ReviewSummary, busy = false): string {
   const { toCreate, blocksToCreate, gradesToCreate } = summary;
   if (busy) return gradesToCreate > 0 ? 'Guardando…' : 'Creando…';
+  // Nothing is ready but something still needs the student: never "Crear 0 actividades".
+  if (toCreate + blocksToCreate + gradesToCreate === 0 && summary.needsReview > 0)
+    return RESOLVE_FIRST_LABEL;
   if (gradesToCreate > 0) {
     const parts = [
       toCreate > 0 && plural(toCreate, 'actividad', 'actividades'),

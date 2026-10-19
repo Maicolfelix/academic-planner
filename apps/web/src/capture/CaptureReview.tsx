@@ -11,6 +11,7 @@ import {
   chooseGroupSubject,
   chooseGroupTime,
   confirmLabel,
+  RESOLVE_FIRST_LABEL,
   effectiveDate,
   effectiveTitle,
   isCreatable,
@@ -173,11 +174,12 @@ export function CaptureReview({
                 .filter(Boolean)
                 .join(' y ')}
         </Heading>
-        {found > 1 && (
+        {(found > 1 || summary.needsReview > 0) && (
           <p className="text-sm font-medium">
-            {found - summary.needsReview} {found - summary.needsReview === 1 ? 'lista' : 'listas'}
+            {found - summary.needsReview > 0 &&
+              `${found - summary.needsReview} ${found - summary.needsReview === 1 ? 'lista' : 'listas'}`}
             {summary.needsReview > 0 &&
-              `, ${summary.needsReview} ${summary.needsReview === 1 ? 'necesita' : 'necesitan'} revisión`}
+              `${found - summary.needsReview > 0 ? ', ' : ''}${summary.needsReview} ${summary.needsReview === 1 ? 'necesita' : 'necesitan'} revisión`}
           </p>
         )}
         {state.notice && (
@@ -190,7 +192,9 @@ export function CaptureReview({
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          Nada se guarda hasta que pulses «{label}». Lo que no tiene dudas ya está listo.
+          {label === RESOLVE_FIRST_LABEL
+            ? 'Nada se guarda hasta que resuelvas lo que falta.'
+            : `Nada se guarda hasta que pulses «${label}». Lo que no tiene dudas ya está listo.`}
         </p>
         {summary.needsReview > 0 && found > 4 && (
           <div>
@@ -273,6 +277,7 @@ export function CaptureReview({
             actions={gradeActions(g.suggestion.clientId)}
             level={(level + 1) as 3 | 4}
             disabled={pending}
+            onBack={onBack}
             agendaNote={
               g.suggestion.activityNote === 'OTHER_STUDY' ||
               (g.suggestion.activityClientId !== null &&

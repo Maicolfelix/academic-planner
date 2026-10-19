@@ -581,3 +581,63 @@ describe('one sentence is never split across studies', () => {
     ).toMatchObject({ subjectId: other.id });
   });
 });
+
+describe('a subject written but not found (QA real)', () => {
+  const bd = subject(20, 'Base de datos SQL - NOSQL');
+  const ciber = subject(21, 'Ciberseguridad');
+  const context = ctx(bd, ciber);
+
+  it('"... de Farmacología" with no such subject offers NOTHING else and keeps what was written', () => {
+    const s = first('Saqué 4.3 en Corte 2 de Farmacología', context);
+    expect(s.explicitUnknownSubjectText).toBe('Farmacología');
+    expect(s.cutText).toBe('Corte 2');
+    expect(s.score).toMatchObject({ kind: 'DECIMAL', scoreMilli: 4300 });
+    expect(s.options).toEqual([]);
+    expect(s.autoOption).toBeNull();
+    expect(s.status).toBe('NEEDS_REVIEW');
+    expect(s.selected).toBe(false);
+    const r = resolved(s);
+    expect(r.request).toBeNull();
+    expect(r.missing).toContain('SUBJECT');
+  });
+
+  it('works the same for an evaluation noun ("el parcial de Farmacología")', () => {
+    const s = first('Saqué 4.2 en el parcial de Farmacología', context);
+    expect(s.explicitUnknownSubjectText).toBe('Farmacología');
+    expect(s.options).toEqual([]);
+  });
+
+  it('no subject written at all: the subject is not mentioned and current subjects may be offered', () => {
+    const s = first('Saqué 4.3 en Corte 2', context);
+    expect(s.explicitUnknownSubjectText).toBeNull();
+    expect(s.subjectMentioned).toBe(false);
+    expect(s.options.length).toBeGreaterThan(0);
+  });
+
+  it('an existing subject still resolves normally', () => {
+    const s = first('Saqué 4.3 en Corte 2 de Ciberseguridad', context);
+    expect(s.explicitUnknownSubjectText).toBeNull();
+    expect(s.options).toHaveLength(1);
+    expect(s.options[0]!.subject.name).toBe('Ciberseguridad');
+    expect(s.status).toBe('READY');
+  });
+
+  it('the same name in two studies asks between THOSE two only', () => {
+    const other = subject(22, 'Ciberseguridad', { studyName: 'Diplomado', isHome: false });
+    const s = first('Saqué 4.3 en Corte 2 de Ciberseguridad', ctx(bd, ciber, other));
+    expect(s.explicitUnknownSubjectText).toBeNull();
+    expect(s.options.map((o) => o.subject.name)).toEqual(['Ciberseguridad', 'Ciberseguridad']);
+    expect(s.autoOption).toBeNull();
+  });
+
+  it('a weight, a date or an article after the cut is never taken for a subject', () => {
+    for (const text of [
+      'Parcial vale 40% del Corte 1',
+      'Saqué 4.5 en el Corte 2 el viernes',
+      'Saqué 4.5 en el Corte 2 de la nota final',
+    ]) {
+      const s = interpretGrades(text, context).suggestions[0];
+      expect(s?.explicitUnknownSubjectText ?? null, text).toBeNull();
+    }
+  });
+});

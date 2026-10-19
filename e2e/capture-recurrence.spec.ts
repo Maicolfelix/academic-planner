@@ -124,7 +124,7 @@ test('B. "Veo Redes todos los lunes a las 7 am": only "¿Hasta qué hora?" is as
   await expect(quick(page).getByText('¿Hasta qué hora?')).toHaveCount(1);
   await expect(quick(page).getByText('Falta algo')).toBeVisible();
   await expect(cards(page).first().getByRole('checkbox')).not.toBeChecked();
-  await expect(button(page, /^Crear/)).toBeDisabled();
+  await expect(button(page, /^(Crear|Resolver antes de guardar)/)).toBeDisabled();
   expect(await week(page)).toHaveLength(0);
 
   await quick(page).getByLabel('Hora final', { exact: true }).fill('09:00');
