@@ -49,7 +49,7 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 | A1  | Schedule Import crea las asignaturas faltantes al confirmar (**fusionado**, PR #18)                                                                                                |
 | A4  | Integración con calendario externo: **A4.1** «Añadir al calendario» (`.ics` por actividad; implementado en su PR); **A4.2** feed sincronizado (**diferido** hasta tener evidencia) |
 | A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida)                                                                                      |
-| A2  | Importación de un archivo `.ics`                                                                                                                                                   |
+| A2  | Importación de un archivo `.ics` — **IN REVIEW** (PR abierto; sin QA real; [ics-import.md](ics-import.md))                                                                         |
 | A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))                                                                                          |
 
 ### Etapa UX — Base visual y ajustes (orden aprobado en la revisión del roadmap)

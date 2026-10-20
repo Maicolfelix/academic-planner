@@ -46,6 +46,7 @@ const TITLES: [prefix: string, title: string][] = [
   ['/dashboard', 'Inicio'],
   ['/subjects', 'Asignaturas'],
   ['/activities', 'Actividades'],
+  ['/calendar/import-ics', 'Importar calendario'],
   ['/calendar/import', 'Importar horario'],
   ['/calendar', 'Agenda'],
   ['/radar', 'Radar académico'],

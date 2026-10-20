@@ -102,6 +102,7 @@ describe('a study track describes: only periods belong to one, and no behaviour 
       'apps/api/src/services/captureService.ts', // B3: the label and the kind of study of a subject, to word the grade options (a READ)
       'apps/api/src/services/currentPeriods.ts', // the one reader of all the current periods (with their study)
       'apps/api/src/services/gradingService.ts', // D36: grading needs a period WITH a study (a READ of studyTrackId) and takes the user's study lock
+      'apps/api/src/services/icsImportService.ts', // A2: the study NAME of each subject choice, to tell two equal names apart (a READ, no behaviour)
       'apps/api/src/services/onboardingService.ts', // P0.5-5: completing the onboarding creates / adopts the first study (explicit endpoint)
       'apps/api/src/services/periodService.ts', // create / move a period, one current per scope
       'apps/api/src/services/profileService.ts', // P0.5-5: with any study, the profile's program is no longer editable (a READ of the count)

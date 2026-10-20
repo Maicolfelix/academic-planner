@@ -59,6 +59,7 @@ describe('main navigation', () => {
     ['/activities', 'Actividades'],
     ['/calendar', 'Agenda'],
     ['/calendar/import', 'Agenda'],
+    ['/calendar/import-ics', 'Agenda'],
     ['/subjects', 'Asignaturas'],
   ])('at %s only "%s" is the current page (aria-current, not just color)', (path, label) => {
     const current = links(shell(path)).filter((l) => l.current);
@@ -136,6 +137,7 @@ describe('sliding indicator of the phone bar', () => {
     ['/activities', 1],
     ['/calendar', 2],
     ['/calendar/import', 2],
+    ['/calendar/import-ics', 2],
     ['/subjects', 3],
   ])('at %s it sits under destination %i (the same rule as aria-current)', (path, index) => {
     const i = indicator(path);
