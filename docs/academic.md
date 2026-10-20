@@ -145,4 +145,4 @@ Sale de la QA real: quien ajusta un corte espera que la nota final de la materia
 
 ## Importador de calendarios `.ics` (A2)
 
-Un `.ics` se interpreta en propuestas (actividad, clase semanal o no soportado) que el estudiante revisa y confirma en una sola solicitud, con las asignaturas de todos los estudios actuales (la ambigüedad entre estudios se resuelve preguntando solo entre las candidatas; nunca se adivina ni se crea una asignatura). Subir el archivo no crea nada. Subconjunto exacto, límites y decisiones: [ics-import.md](ics-import.md). **EN REVISIÓN: sin QA real.**
+Un `.ics` se interpreta en propuestas (actividad, clase semanal o no soportado) que el estudiante revisa y confirma en una sola solicitud, con las asignaturas de todos los estudios actuales (la ambigüedad entre estudios se resuelve preguntando solo entre las candidatas; nunca se adivina ni se crea una asignatura). Subir el archivo no crea nada. Subconjunto exacto, límites y decisiones: [ics-import.md](ics-import.md). **DONE (PR #56 fusionado); QA real funcional en dispositivo en entorno local/LAN HTTP.**

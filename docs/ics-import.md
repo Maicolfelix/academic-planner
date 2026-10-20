@@ -1,6 +1,6 @@
 # Importador de calendarios `.ics` (A2)
 
-**Estado: EN REVISIÓN (IN REVIEW).** Implementado y probado de forma automática; **sin QA real** en dispositivo. No se afirma validación con estudiantes, HTTPS, PWA instalada ni producción.
+**Estado: DONE (PR #56 fusionado).** QA real funcional en dispositivo aprobada por el mantenedor (entorno local/de desarrollo por red local, HTTP; **no** es QA de release ni valida HTTPS, la PWA instalada, producción, a estudiantes ni compatibilidad con cualquier `.ics`). Solo se soporta el subconjunto descrito abajo.
 
 Un archivo `.ics` (Google Calendar, Outlook, calendarios de universidad u otros) se convierte en **propuestas** que el estudiante revisa y confirma **una sola vez**. Flujo: CAPTURAR → INTERPRETAR → PROPONER → CONFIRMAR. **Subir un `.ics` no crea nada.**
 
