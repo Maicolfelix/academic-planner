@@ -179,9 +179,8 @@ test('a file that is not a calendar is refused with a message and creates nothin
   expect((await (await page.request.get('/api/activities')).json()).activities).toHaveLength(0);
 });
 
-test('two studies with the same subject name: the student chooses between exactly those two', async ({
-  page,
-}) => {
+/** Two current studies, each with a subject called "Ciberseguridad", plus an unrelated "Cálculo". */
+async function twoStudiesWithSameSubject(page: Page) {
   await register(page, uniqueEmail());
   await expect(page).toHaveURL(/\/onboarding$/);
   const ing = (await post(page, '/api/study-tracks', { name: 'Ingeniería', type: 'UNIVERSITY' }))
@@ -196,6 +195,12 @@ test('two studies with the same subject name: the student chooses between exactl
   await post(page, '/api/subjects', { periodId: pi.id, name: 'Ciberseguridad' });
   await post(page, '/api/subjects', { periodId: pd.id, name: 'Ciberseguridad' });
   await post(page, '/api/subjects', { periodId: pi.id, name: 'Cálculo' });
+}
+
+test('two studies with the same subject name: the student chooses between exactly those two', async ({
+  page,
+}) => {
+  await twoStudiesWithSameSubject(page);
 
   await page.goto('/calendar/import-ics');
   await picker(page).setInputFiles(file('clase.ics', ics([weeklyEvent()])));
@@ -220,4 +225,77 @@ test('two studies with the same subject name: the student chooses between exactl
     await page.request.get(`/api/schedule?from=${nextTuesday()}&to=${nextTuesday()}`)
   ).json();
   expect(week.occurrences.map((o: { title: string }) => o.title)).toContain('Ciberseguridad');
+});
+
+const ensayo = () => [
+  'UID:ensayo@uni',
+  'SUMMARY:Entrega de ensayo',
+  `DTSTART;TZID=America/Bogota:${compact(bogotaToday(12))}T180000`,
+  `DTEND;TZID=America/Bogota:${compact(bogotaToday(12))}T190000`,
+];
+
+test('a ticked unresolved class blocks the ready activity too: one request, everything or nothing', async ({
+  page,
+}) => {
+  await twoStudiesWithSameSubject(page);
+  let requests = 0;
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes('/api/ics-import/confirm')) requests++;
+  });
+  await page.goto('/calendar/import-ics');
+  await picker(page).setInputFiles(file('mixto.ics', ics([ensayo(), weeklyEvent()])));
+  await page.getByRole('button', { name: 'Leer calendario' }).click();
+  await expect(results(page)).toBeVisible({ timeout: 30_000 });
+
+  // The activity is ready and ticked; the ambiguous class starts unticked, so the activity alone can go.
+  await expect(page.getByRole('button', { name: 'Importar 1 actividad' })).toBeEnabled();
+  // The student decides to import the class too, without choosing its subject yet.
+  await page.getByRole('checkbox', { name: 'Importar Ciberseguridad' }).check();
+  const blocked = page.getByRole('button', { name: 'Resolver antes de importar' });
+  await expect(blocked).toBeDisabled();
+  expect(requests).toBe(0);
+
+  await cardOf(page, 'Ciberseguridad')
+    .getByLabel('Asignatura')
+    .selectOption({ label: 'Ciberseguridad · Diplomado' });
+  await page.getByRole('button', { name: 'Importar 1 actividad y 1 clase' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: '1 actividad creada y 1 clase creada' }),
+  ).toBeVisible();
+  expect(requests).toBe(1);
+});
+
+test('EXDATE undecided blocks everything; skipping the class lets the activity go alone', async ({
+  page,
+}) => {
+  await register(page, uniqueEmail());
+  await completeOnboarding(page, 'Semestre de prueba', period());
+  await addSubjectViaUi(page, 'Ciberseguridad');
+  const second = new Date(`${nextTuesday()}T12:00:00Z`);
+  second.setUTCDate(second.getUTCDate() + 7);
+  const withExdate = [
+    ...weeklyEvent(),
+    `EXDATE;TZID=America/Bogota:${compact(second.toISOString().slice(0, 10))}T070000`,
+  ];
+  await page.goto('/calendar/import-ics');
+  await picker(page).setInputFiles(file('exdate.ics', ics([ensayo(), withExdate])));
+  await page.getByRole('button', { name: 'Leer calendario' }).click();
+  await expect(results(page)).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('checkbox', { name: 'Importar Ciberseguridad' }).check();
+  await expect(page.getByRole('button', { name: 'Resolver antes de importar' })).toBeDisabled();
+
+  // Series or single resolves the class; skipping it releases the activity alone.
+  const card = cardOf(page, 'Ciberseguridad');
+  await card.getByLabel('Importar solo la primera clase, sin repetición').check();
+  await expect(page.getByRole('button', { name: 'Importar 1 actividad y 1 clase' })).toBeEnabled();
+  await card.getByLabel('No importar este evento').check();
+  const only = page.getByRole('button', { name: 'Importar 1 actividad' });
+  await expect(only).toBeEnabled();
+  await only.click();
+  await expect(page.getByRole('status').filter({ hasText: '1 actividad creada' })).toBeVisible();
+  const week = await (
+    await page.request.get(`/api/schedule?from=${nextTuesday()}&to=${nextTuesday()}`)
+  ).json();
+  expect(week.occurrences).toHaveLength(0);
 });

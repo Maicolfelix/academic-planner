@@ -9,6 +9,7 @@ import { Link } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import {
   buildConfirmRequest,
+  canConfirm,
   confirmLabel,
   createRows,
   createdMessage,
@@ -109,12 +110,14 @@ export function IcsImportPage() {
 
   async function confirm() {
     if (importing.current || !result) return; // a double click must not import twice
+    const request = buildConfirmRequest(rows);
+    if (!request) return; // something ticked is still unresolved: all or nothing
     importing.current = true;
     setCreating(true);
     setSummary(undefined);
     setSubmitError(undefined);
     try {
-      const out = await confirmImport.mutateAsync(buildConfirmRequest(rows));
+      const out = await confirmImport.mutateAsync(request);
       const done = new Set(
         [...out.createdActivities, ...out.createdBlocks, ...out.reusedBlocks].map(
           (c) => c.clientId,
@@ -284,7 +287,7 @@ export function IcsImportPage() {
               <button
                 type="button"
                 onClick={() => void confirm()}
-                disabled={creating || stats.toCreate === 0}
+                disabled={creating || !canConfirm(rows)}
                 className={primary}
               >
                 {confirmLabel(stats, creating)}

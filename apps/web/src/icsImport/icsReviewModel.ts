@@ -122,8 +122,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export function confirmLabel(s: IcsReviewSummary, busy = false): string {
   if (busy) return 'Importando…';
-  if (s.toCreate === 0)
-    return s.incomplete > 0 ? 'Resolver antes de importar' : 'Nada que importar';
+  if (s.incomplete > 0) return 'Resolver antes de importar';
+  if (s.toCreate === 0) return 'Nada que importar';
   const parts = [
     s.activities > 0 && plural(s.activities, 'actividad', 'actividades'),
     s.blocks > 0 && plural(s.blocks, 'clase', 'clases'),
@@ -131,8 +131,18 @@ export function confirmLabel(s: IcsReviewSummary, busy = false): string {
   return `Importar ${parts.join(' y ')}`;
 }
 
-/** The request for what is ticked and complete. Only data the server cannot derive; the server re-checks every id. */
-export function buildConfirmRequest(rows: readonly ReviewRow[]): ConfirmIcsImportRequest {
+/** Everything ticked is resolved and there is something to create: all or nothing, never a silent subset. */
+export const canConfirm = (rows: readonly ReviewRow[]) => {
+  const s = summarize(rows);
+  return s.incomplete === 0 && s.toCreate > 0;
+};
+
+/**
+ * The request for EVERYTHING ticked, or null when any ticked row is still unresolved (or nothing is ticked): the builder never
+ * drops an unfinished row to send the rest. Only data the server cannot derive; the server re-checks every id.
+ */
+export function buildConfirmRequest(rows: readonly ReviewRow[]): ConfirmIcsImportRequest | null {
+  if (!canConfirm(rows)) return null;
   return {
     items: rows.filter(isReady).map((r) => {
       const p = r.proposal;

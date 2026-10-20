@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { IcsRowCard } from '../pages/icsImport/IcsRowCard';
 import {
   buildConfirmRequest,
+  canConfirm,
   confirmLabel,
   createRows,
   createdMessage,
@@ -107,24 +108,54 @@ describe('ics review model', () => {
     expect(summarize(patchRow([row!], 'w', { endTime: '09:00' })).toCreate).toBe(1);
   });
 
-  it('exceptions are never ignored silently: undecided blocks, each choice resolves differently', () => {
-    const [row] = createRows(parsed(weekly({ exceptions: 2 })));
-    expect(row!.exceptionChoice).toBe('UNDECIDED');
-    expect(summarize([row!]).incomplete).toBe(1);
-    const series = patchRow([row!], 'w', { exceptionChoice: 'SERIES' });
-    expect(buildConfirmRequest(series).items[0]).toMatchObject({ weekly: true });
-    const single = patchRow([row!], 'w', { exceptionChoice: 'SINGLE' });
-    expect(buildConfirmRequest(single).items[0]).toMatchObject({ weekly: false });
-    const skip = patchRow([row!], 'w', { exceptionChoice: 'SKIP' });
-    expect(buildConfirmRequest(skip).items).toEqual([]);
+  it('exceptions are never ignored silently: undecided blocks everything, each choice resolves differently', () => {
+    const rows = createRows(parsed(proposal(), weekly({ exceptions: 2 })));
+    expect(rows[1]!.exceptionChoice).toBe('UNDECIDED');
+    expect(summarize(rows)).toMatchObject({ toCreate: 1, incomplete: 1 });
+    expect(canConfirm(rows)).toBe(false);
+    expect(buildConfirmRequest(rows)).toBeNull();
+    expect(confirmLabel(summarize(rows))).toBe('Resolver antes de importar');
+    const series = patchRow(rows, 'w', { exceptionChoice: 'SERIES' });
+    expect(buildConfirmRequest(series)!.items[1]).toMatchObject({ weekly: true });
+    const single = patchRow(rows, 'w', { exceptionChoice: 'SINGLE' });
+    expect(buildConfirmRequest(single)!.items[1]).toMatchObject({ weekly: false });
+    // "No importar" through the exception question stops blocking: only the activity goes.
+    const skip = patchRow(rows, 'w', { exceptionChoice: 'SKIP' });
+    expect(buildConfirmRequest(skip)!.items.map((i) => i.clientId)).toEqual(['a']);
+    expect(confirmLabel(summarize(skip))).toBe('Importar 1 actividad');
   });
 
-  it('changing the kind to "No importar" unselects; the request only has ticked, complete rows', () => {
+  it('any ticked unresolved row blocks the whole confirmation: no silent partial request', () => {
+    const rows = createRows(parsed(proposal(), weekly({ endTime: null })));
+    expect(summarize(rows)).toMatchObject({ toCreate: 1, incomplete: 1 });
+    expect(canConfirm(rows)).toBe(false);
+    expect(buildConfirmRequest(rows)).toBeNull();
+    expect(confirmLabel(summarize(rows))).toBe('Resolver antes de importar');
+    // Resolving it releases ONE request with both.
+    const solved = patchRow(rows, 'w', { endTime: '09:00' });
+    expect(canConfirm(solved)).toBe(true);
+    expect(confirmLabel(summarize(solved))).toBe('Importar 1 actividad y 1 clase');
+    expect(buildConfirmRequest(solved)!.items).toHaveLength(2);
+  });
+
+  it('unticked or "No importar" rows never block, however unfinished they are', () => {
+    const rows = createRows(parsed(proposal(), weekly({ endTime: null })));
+    const unticked = patchRow(rows, 'w', { selected: false });
+    expect(buildConfirmRequest(unticked)!.items.map((i) => i.clientId)).toEqual(['a']);
+    expect(confirmLabel(summarize(unticked))).toBe('Importar 1 actividad');
+    const skipped = setKind(rows, 'w', 'SKIP');
+    expect(buildConfirmRequest(skipped)!.items.map((i) => i.clientId)).toEqual(['a']);
+  });
+
+  it('nothing ticked: nothing to import, no request', () => {
+    const rows = setKind(createRows(parsed(proposal())), 'a', 'SKIP');
+    expect(buildConfirmRequest(rows)).toBeNull();
+    expect(confirmLabel(summarize(rows))).toBe('Nada que importar');
+  });
+
+  it('the request carries everything ticked and complete', () => {
     const rows = createRows(parsed(proposal(), weekly()));
-    expect(buildConfirmRequest(setKind(rows, 'a', 'SKIP')).items.map((i) => i.clientId)).toEqual([
-      'w',
-    ]);
-    const req = buildConfirmRequest(rows);
+    const req = buildConfirmRequest(rows)!;
     expect(req.items).toHaveLength(2);
     expect(req.items[0]).toMatchObject({ kind: 'ACTIVITY', subjectId: ING.id, date: '2026-10-23' });
   });
