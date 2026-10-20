@@ -1,6 +1,8 @@
 import {
   GRADE_MILLI_MAX,
   accumulatedMilli,
+  bpToPercentText,
+  distributeWeights,
   cutContributionMilli,
   formatUnitsPercent,
   RAW_MILLI_MAX,
@@ -15,6 +17,8 @@ import {
   scoreToMilli,
   type CreateEvaluationInput,
   type CutDraft,
+  type DistributionResult,
+  type ReplaceCutWeightsInput,
   type Evaluation,
   type GradingPeriod,
   type GradingProfile,
@@ -555,4 +559,118 @@ export function evaluationServerErrors(fields: Record<string, string[]>): FormEr
   if (fields.activityId) out.activityId = fields.activityId[0];
   if (fields.name) out.name = fields.name[0];
   return Object.keys(out).length > 0 ? out : null;
+}
+
+// ── Editing how the final grade is split (the joint "Editar distribución") ─────────────────────────────────────────────────
+
+/** One cut as typed. `auto`: the ONE cut that takes whatever the others leave (its `percent` is ignored). */
+export interface DistRow {
+  id: string;
+  name: string;
+  percent: string;
+  auto: boolean;
+}
+
+/** The current weights, the LAST cut automatic (a student who changes one cut sees the last one absorb the difference). */
+export const distributionFrom = (cuts: readonly GradingPeriod[]): DistRow[] =>
+  cuts.map((c, i) => ({
+    id: c.id,
+    name: c.name,
+    percent: bpToPercentText(c.finalShareBp),
+    auto: cuts.length > 1 && i === cuts.length - 1,
+  }));
+
+export const evaluateDistribution = (rows: readonly DistRow[]): DistributionResult =>
+  distributeWeights(rows.map((r) => ({ key: r.id, bp: percentToBp(r.percent), auto: r.auto })));
+
+/** What the field of a row shows: its typed text, or the figure the automatic cut takes. */
+export function distributionShown(rows: readonly DistRow[], id: string): string {
+  const row = rows.find((r) => r.id === id);
+  if (!row) return '';
+  if (!row.auto) return row.percent;
+  const bp = evaluateDistribution(rows).rows.find((r) => r.key === id)?.bp;
+  return bp == null ? '' : bpToPercentText(bp);
+}
+
+/**
+ * The student types in a cut. That cut stops being automatic (nothing else is moved behind their back); if that leaves exactly ONE
+ * empty cut and no automatic one, the empty one becomes the automatic cut. One pass: no field ever changes another in a chain.
+ */
+export function editDistribution(rows: readonly DistRow[], id: string, text: string): DistRow[] {
+  const next = rows.map((r) => (r.id === id ? { ...r, percent: text, auto: false } : r));
+  if (next.some((r) => r.auto)) return next;
+  const empty = next.filter((r) => r.percent.trim() === '');
+  return empty.length === 1 ? next.map((r) => (r === empty[0] ? { ...r, auto: true } : r)) : next;
+}
+
+/** "Completar automáticamente": that cut takes the rest (any other automatic cut becomes manual, keeping its figure). */
+export function setDistributionAuto(rows: readonly DistRow[], id: string, on: boolean): DistRow[] {
+  const shown = (r: DistRow) => distributionShown(rows, r.id);
+  return rows.map((r) =>
+    r.id === id
+      ? on
+        ? { ...r, auto: true }
+        : { ...r, auto: false, percent: shown(r) }
+      : on && r.auto
+        ? { ...r, auto: false, percent: shown(r) }
+        : r,
+  );
+}
+
+export interface DistributionMessage {
+  tone: 'ok' | 'warn';
+  text: string;
+}
+
+/** What to say under the cuts: always the total defined and what is left, and whether it can be saved. */
+export function distributionSummary(rows: readonly DistRow[]): {
+  defined: string;
+  remaining: string;
+  messages: DistributionMessage[];
+  canSave: boolean;
+} {
+  const r = evaluateDistribution(rows);
+  const defined = formatPercent(r.definedBp);
+  const remaining = formatPercent(Math.max(r.remainingBp, 0));
+  const messages: DistributionMessage[] = [];
+  switch (r.status) {
+    case 'COMPLETE':
+      messages.push(
+        { tone: 'ok', text: 'Total: 100 %' },
+        { tone: 'ok', text: '✓ Distribución completa' },
+      );
+      break;
+    case 'OVER_100':
+      messages.push(
+        { tone: 'warn', text: `Total: ${defined}` },
+        { tone: 'warn', text: `Te pasaste por ${formatPercent(r.definedBp - 10_000)}.` },
+        { tone: 'warn', text: 'Los cortes no pueden superar el 100 %.' },
+      );
+      break;
+    case 'UNDER_100':
+      messages.push(
+        { tone: 'warn', text: `Total: ${defined}` },
+        { tone: 'warn', text: `Falta distribuir ${remaining}.` },
+        { tone: 'warn', text: 'Cambia un corte o márcalo como «Completar automáticamente».' },
+      );
+      break;
+    case 'AUTO_NO_ROOM':
+      messages.push({
+        tone: 'warn',
+        text: 'Los demás cortes ya suman 100 %: no queda nada para el corte automático.',
+      });
+      break;
+    default:
+      messages.push({ tone: 'warn', text: 'Escribe un porcentaje válido en cada corte.' });
+  }
+  return { defined, remaining, messages, canSave: r.status === 'COMPLETE' };
+}
+
+/** The request, only while the distribution is complete (the server checks it all again). */
+export function distributionRequest(rows: readonly DistRow[]): ReplaceCutWeightsInput | null {
+  const r = evaluateDistribution(rows);
+  if (r.status !== 'COMPLETE') return null;
+  return {
+    gradingPeriods: r.rows.map((x) => ({ id: x.key, finalShareBp: x.bp as number })),
+  };
 }

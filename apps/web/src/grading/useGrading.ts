@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateEvaluationInput,
   CreateGradingPeriodInput,
+  ReplaceCutWeightsInput,
   SetupSubjectGradingInput,
   UpdateEvaluationInput,
   UpdateGradingPeriodInput,
@@ -14,6 +15,7 @@ import {
   deleteGradingPeriodRequest,
   fetchSubject,
   fetchSubjectGrades,
+  replaceCutWeightsRequest,
   setupSubjectGradingRequest,
   updateEvaluationRequest,
   updateGradingPeriodRequest,
@@ -41,8 +43,8 @@ export function useSubjectGrades(subjectId: string) {
 }
 
 /**
- * The scale and the cuts belong to ONE period, so every subject OF THAT PERIOD shows them: changing them refreshes the cached
- * grades whose response says that period (never those of another period or study). An evaluation belongs to one subject, so only
+ * The SCALE belongs to ONE period, so every subject OF THAT PERIOD shows it: changing it refreshes the cached grades whose
+ * response says that period (never those of another period or study). The cuts and the evaluations belong to one SUBJECT, so only
  * that subject's grades are refreshed. Nothing else in the app reads grades yet, so nothing else is invalidated.
  */
 export const isGradesOfPeriod = (data: unknown, periodId: string) =>
@@ -101,6 +103,14 @@ export function useUpdateGradingPeriod(subjectId: string) {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateGradingPeriodInput }) =>
       updateGradingPeriodRequest(id, input),
+    onSuccess: refresh,
+  });
+}
+
+export function useReplaceCutWeights(subjectId: string) {
+  const refresh = useRefreshSubjectGrades(subjectId);
+  return useMutation({
+    mutationFn: (input: ReplaceCutWeightsInput) => replaceCutWeightsRequest(subjectId, input),
     onSuccess: refresh,
   });
 }

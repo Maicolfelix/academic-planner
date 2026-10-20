@@ -1,7 +1,6 @@
 import {
   GRADING_PERIOD_TERMS,
   accumulatedMilli,
-  defaultCutName,
   formatPercent,
   formatScore,
   formatUnitsPercent,
@@ -38,7 +37,12 @@ import {
   type CutGroup,
 } from '../grading/gradesModel';
 import { useSubject, useSubjectGrades } from '../grading/useGrading';
-import { ConfirmRemoveDialog, CutDialog, ScaleEditDialog } from './grades/ConfigDialogs';
+import {
+  ConfirmRemoveDialog,
+  CutDialog,
+  DistributionDialog,
+  ScaleEditDialog,
+} from './grades/ConfigDialogs';
 import { BreakdownDialog, CutGradeDialog } from './grades/CutGradeDialogs';
 import { EvaluationDialog, QuickGradeDialog } from './grades/EvaluationDialogs';
 import { SetupDialog } from './grades/SetupDialog';
@@ -46,7 +50,8 @@ import { SetupDialog } from './grades/SetupDialog';
 type Dialog =
   | { kind: 'setup' }
   | { kind: 'scale' }
-  | { kind: 'cut'; cut?: GradingPeriod }
+  | { kind: 'distribution' }
+  | { kind: 'cut'; cut: GradingPeriod }
   | { kind: 'cut-grade'; cut: GradingPeriod; evaluation?: Evaluation }
   | { kind: 'breakdown'; cut: GradingPeriod; direct: Evaluation }
   | { kind: 'evaluation'; evaluation?: Evaluation; cutId: string }
@@ -57,8 +62,8 @@ type Dialog =
 export const isNotFound = (err: unknown) => err instanceof ApiRequestError && err.status === 404;
 
 /**
- * The grades of ONE subject. The scale and the cuts belong to the PERIOD (so they are shared with the other subjects of it); the
- * evaluations belong to the subject. Everything comes from `GET /api/subjects/:id/grades` (the exact figures are the server's),
+ * The grades of ONE subject. The SCALE (GradingProfile) belongs to the PERIOD and is shared by its subjects; the cuts (GradingPeriod) and
+ * the evaluations belong to the SUBJECT. Everything comes from `GET /api/subjects/:id/grades` (the exact figures are the server's),
  * and ownership is the API's: a subject that is not yours looks exactly like one that does not exist.
  */
 export function SubjectGradesPage() {
@@ -197,24 +202,23 @@ function TrackedGradesView({
         description={description}
         actions={
           profile && (
-            <ActionMenu
-              label="Configurar notas"
-              items={[
-                {
-                  label: 'Escala de notas',
-                  icon: <SlidersIcon />,
-                  onSelect: () => setDialog({ kind: 'scale' }),
-                },
-                ...(grades.gradingPeriods.length > 0
-                  ? [
-                      {
-                        label: `Agregar ${terms.one.toLowerCase()}`,
-                        onSelect: () => setDialog({ kind: 'cut' }),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {grades.gradingPeriods.length > 1 && (
+                <Button onClick={() => setDialog({ kind: 'distribution' })}>
+                  Editar distribución
+                </Button>
+              )}
+              <ActionMenu
+                label="Configurar notas"
+                items={[
+                  {
+                    label: 'Escala de notas',
+                    icon: <SlidersIcon />,
+                    onSelect: () => setDialog({ kind: 'scale' }),
+                  },
+                ]}
+              />
+            </div>
           )
         }
       />
@@ -348,7 +352,11 @@ function TrackedGradesView({
                 : setDialog({ kind: 'evaluation', cutId: group.cut.id })
             }
             onEditCut={() => setDialog({ kind: 'cut', cut: group.cut })}
-            onRemoveCut={() => setDialog({ kind: 'remove-cut', cut: group.cut })}
+            onRemoveCut={
+              grades.gradingPeriods.length === 1
+                ? () => setDialog({ kind: 'remove-cut', cut: group.cut })
+                : undefined
+            }
             onQuick={(evaluation) => setDialog({ kind: 'quick', evaluation })}
             onEdit={(evaluation) =>
               setDialog({ kind: 'evaluation', evaluation, cutId: evaluation.gradingPeriodId })
@@ -375,12 +383,20 @@ function TrackedGradesView({
           onDone={() => done('Escala actualizada.')}
         />
       )}
+      {dialog?.kind === 'distribution' && profile && (
+        <DistributionDialog
+          subjectId={subject.id}
+          cuts={grades.gradingPeriods}
+          term={terms.one}
+          onClose={close}
+          onDone={() => done('Distribución guardada.')}
+        />
+      )}
       {dialog?.kind === 'cut' && profile && (
         <CutDialog
           subjectId={subject.id}
           studyType={studyType}
           cut={dialog.cut}
-          defaultName={defaultCutName(studyType, grades.gradingPeriods.length + 1)}
           onClose={close}
           onDone={() => done('Cambios guardados.')}
         />
@@ -521,7 +537,8 @@ function CutSection({
   onRemoveGrade: () => void;
   onBreakdown: () => void;
   onEditCut: () => void;
-  onRemoveCut: () => void;
+  /** Only the last cut of a subject can go: removing one of several would leave the total below 100 %. */
+  onRemoveCut?: () => void;
   onQuick: (e: Evaluation) => void;
   onEdit: (e: Evaluation) => void;
   onRemove: (e: Evaluation) => void;
@@ -535,13 +552,17 @@ function CutSection({
 
   const cutItems = [
     { label: `Editar ${termOne.toLowerCase()}`, icon: <PencilIcon />, onSelect: onEditCut },
-    {
-      label: `Eliminar ${termOne.toLowerCase()}`,
-      ariaLabel: `Eliminar ${cut.name}`,
-      icon: <TrashIcon />,
-      danger: true,
-      onSelect: onRemoveCut,
-    },
+    ...(onRemoveCut
+      ? [
+          {
+            label: `Eliminar ${termOne.toLowerCase()}`,
+            ariaLabel: `Eliminar ${cut.name}`,
+            icon: <TrashIcon />,
+            danger: true,
+            onSelect: onRemoveCut,
+          },
+        ]
+      : []),
   ];
   const items = breakdown
     ? cutItems

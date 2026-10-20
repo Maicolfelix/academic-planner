@@ -7,6 +7,12 @@ import type {
 import { describe, expect, it } from 'vitest';
 import {
   accumulatedText,
+  distributionFrom,
+  distributionRequest,
+  distributionShown,
+  distributionSummary,
+  editDistribution,
+  setDistributionAuto,
   buildCuts,
   buildEvaluation,
   buildQuickGrade,
@@ -469,5 +475,92 @@ describe('cuts and rows', () => {
     expect(rawText(e)).toBe('18 / 20');
     expect(scoreText(ev(2, cuts[0]!.id, 100, null), 1)).toBeNull();
     expect(rawText(ev(2, cuts[0]!.id, 100, null))).toBeNull();
+  });
+});
+
+describe('editing the distribution of the cuts (Editar distribución)', () => {
+  const rowsOf = (...bps: number[]) =>
+    distributionFrom(
+      bps.map((finalShareBp, i) => ({
+        id: `c${i + 1}`,
+        name: `Corte ${i + 1}`,
+        finalShareBp,
+      })) as never,
+    );
+  const shown = (rows: ReturnType<typeof rowsOf>) => rows.map((r) => distributionShown(rows, r.id));
+
+  it('starts 30 / 30 / 40 with the last cut automatic', () => {
+    const rows = rowsOf(3000, 3000, 4000);
+    expect(rows.map((r) => r.auto)).toEqual([false, false, true]);
+    expect(shown(rows)).toEqual(['30', '30', '40']);
+  });
+
+  it('changing the first cut moves ONLY the automatic one: 40 → 30, 20 → 50', () => {
+    let rows = editDistribution(rowsOf(3000, 3000, 4000), 'c1', '40');
+    expect(shown(rows)).toEqual(['40', '30', '30']);
+    rows = editDistribution(rows, 'c1', '20');
+    expect(shown(rows)).toEqual(['20', '30', '50']);
+    expect(distributionSummary(rows).canSave).toBe(true);
+  });
+
+  it('typing in the automatic cut makes it manual: nothing else changes behind the back', () => {
+    const rows = editDistribution(rowsOf(3000, 3000, 4000), 'c3', '45');
+    expect(rows.map((r) => r.auto)).toEqual([false, false, false]);
+    expect(shown(rows)).toEqual(['30', '30', '45']);
+    const s = distributionSummary(rows);
+    expect(s.canSave).toBe(false);
+    expect(s.messages.map((m) => m.text)).toContain('Te pasaste por 5 %.');
+  });
+
+  it('60 / 50 / auto never goes negative and cannot be saved', () => {
+    const rows = editDistribution(
+      editDistribution(rowsOf(3000, 3000, 4000), 'c1', '60'),
+      'c2',
+      '50',
+    );
+    expect(distributionShown(rows, 'c3')).toBe('');
+    const s = distributionSummary(rows);
+    expect(s.canSave).toBe(false);
+    expect(s.messages.map((m) => m.text)).toEqual(
+      expect.arrayContaining([
+        'Total: 110 %',
+        'Te pasaste por 10 %.',
+        'Los cortes no pueden superar el 100 %.',
+      ]),
+    );
+    expect(distributionRequest(rows)).toBeNull();
+  });
+
+  it('all manual 30 / 30 / 30: 10 % left, not placed anywhere, save disabled until one is automatic', () => {
+    let rows = setDistributionAuto(rowsOf(3000, 3000, 4000), 'c3', false);
+    rows = editDistribution(rows, 'c3', '30');
+    const s = distributionSummary(rows);
+    expect(s.remaining).toBe('10 %');
+    expect(s.canSave).toBe(false);
+    expect(s.messages.map((m) => m.text)).toContain('Falta distribuir 10 %.');
+    const fixed = setDistributionAuto(rows, 'c2', true);
+    expect(shown(fixed)).toEqual(['30', '40', '30']);
+    expect(distributionSummary(fixed).canSave).toBe(true);
+  });
+
+  it('only ONE automatic cut at a time; the one it replaces keeps its figure', () => {
+    const rows = setDistributionAuto(rowsOf(3000, 3000, 4000), 'c1', true);
+    expect(rows.map((r) => r.auto)).toEqual([true, false, false]);
+    expect(shown(rows)).toEqual(['30', '30', '40']);
+  });
+
+  it('emptying one cut with no automatic cut makes it the automatic one (one pass, no chain)', () => {
+    let rows = setDistributionAuto(rowsOf(3000, 3000, 4000), 'c3', false);
+    rows = editDistribution(rows, 'c1', '');
+    expect(rows.map((r) => r.auto)).toEqual([true, false, false]);
+    expect(shown(rows)).toEqual(['30', '30', '40']);
+  });
+
+  it('builds the exact request only when complete; a single 100 % grade is complete', () => {
+    const rows = editDistribution(rowsOf(3000, 3000, 4000), 'c1', '40');
+    expect(distributionRequest(rows)?.gradingPeriods.map((c) => c.finalShareBp)).toEqual([
+      4000, 3000, 3000,
+    ]);
+    expect(distributionSummary(rowsOf(10000)).canSave).toBe(true);
   });
 });

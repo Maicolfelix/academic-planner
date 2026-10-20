@@ -327,6 +327,34 @@ export const setupSubjectGradingSchema = z
   });
 export type SetupSubjectGradingInput = z.infer<typeof setupSubjectGradingSchema>;
 
+/**
+ * The weights of ALL the cuts of a subject, replaced together (the joint "Editar distribución"): every cut of the subject exactly
+ * once, each between 0.01 % and 100 %, adding up to EXACTLY 100 %. The server checks all of it again; nothing is a client's say-so.
+ */
+export const replaceCutWeightsSchema = z
+  .strictObject({
+    gradingPeriods: z
+      .array(z.strictObject({ id: z.uuid(), finalShareBp: weightBp }))
+      .min(1)
+      .max(GRADING_PERIODS_MAX),
+  })
+  .superRefine((v, ctx) => {
+    if (new Set(v.gradingPeriods.map((c) => c.id)).size !== v.gradingPeriods.length)
+      ctx.addIssue({ code: 'custom', path: ['gradingPeriods'], message: 'Hay cortes repetidos.' });
+    const total = v.gradingPeriods.reduce((sum, c) => sum + c.finalShareBp, 0);
+    if (total !== WEIGHT_BP_MAX)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['gradingPeriods'],
+        message: 'Los cortes de una materia deben sumar exactamente 100 %.',
+      });
+  });
+export type ReplaceCutWeightsInput = z.infer<typeof replaceCutWeightsSchema>;
+
+export const replaceCutWeightsResponseSchema = z.object({
+  gradingPeriods: z.array(gradingPeriodSchema),
+});
+
 export const setupSubjectGradingResponseSchema = z.object({
   profile: gradingProfileSchema,
   gradingPeriods: z.array(gradingPeriodSchema),

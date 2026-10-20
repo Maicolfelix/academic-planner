@@ -598,3 +598,115 @@ test('K · the three cuts graded 3.2 / 4.5 / 4.0 is 3.9, fully graded, with noth
   await expect(page.getByText(/Peso:/)).toHaveCount(0);
   check();
 });
+
+test('M · Editar distribución: 30/30/40 → 40/30/30 with the last cut automatic, visible before saving, other subject untouched', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Ciberseguridad', 'Redes']);
+  const [ciber, redes] = subjects;
+  const split = async (id: string, shares: number[], withScale: boolean) =>
+    post(page, `/api/subjects/${id}/grading/setup`, {
+      ...(withScale && { profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 } }),
+      gradingPeriods: shares.map((finalShareBp, i) => ({ name: `Corte ${i + 1}`, finalShareBp })),
+    });
+  await split(ciber!.id, [3000, 3000, 4000], true);
+  await split(redes!.id, [5000, 5000], false);
+
+  await page.goto(gradesUrl(ciber!.id));
+  await page.getByRole('button', { name: 'Editar distribución' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar distribución' });
+  await expect(dialog.getByLabel('Corte 3 (%)')).toHaveValue('40');
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Completar automáticamente: Corte 3' }),
+  ).toBeChecked();
+
+  await dialog.getByLabel('Corte 1 (%)').fill('40');
+  // Everything is visible BEFORE saving
+  await expect(dialog.getByLabel('Corte 1 (%)')).toHaveValue('40');
+  await expect(dialog.getByLabel('Corte 2 (%)')).toHaveValue('30');
+  await expect(dialog.getByLabel('Corte 3 (%)')).toHaveValue('30');
+  await expect(dialog.getByText('✓ Distribución completa')).toBeVisible();
+  await expect(dialog.getByText('Total: 100 %')).toBeVisible();
+
+  // Over 100 %: warned, cannot save, the automatic cut is never negative
+  await dialog.getByLabel('Corte 1 (%)').fill('80');
+  await dialog.getByLabel('Corte 2 (%)').fill('50');
+  await expect(dialog.getByText('Te pasaste por 30 %.')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+  await axe(page, 'grades · distribution dialog');
+
+  await dialog.getByLabel('Corte 1 (%)').fill('40');
+  await dialog.getByLabel('Corte 2 (%)').fill('30');
+  await expect(dialog.getByLabel('Corte 3 (%)')).toHaveValue('30');
+  await save(dialog, 'Guardar');
+  await expect(page.getByText('Distribución guardada.')).toBeVisible();
+
+  await page.reload();
+  const shares = async (id: string) =>
+    (await (await page.request.get(`/api/subjects/${id}/grades`)).json()).gradingPeriods.map(
+      (c: { finalShareBp: number }) => c.finalShareBp,
+    );
+  expect(await shares(ciber!.id)).toEqual([4000, 3000, 3000]);
+  expect(await shares(redes!.id)).toEqual([5000, 5000]);
+  await expectNoHorizontalOverflow(page);
+  check();
+});
+
+test('N · Editar corte only renames: the weight lives in Editar distribución and the 100 % holds', async ({
+  page,
+}) => {
+  const check = watch(page);
+  const { subjects } = await account(page, 'UNIVERSITY', ['Ciberseguridad']);
+  await post(page, `/api/subjects/${subjects[0]!.id}/grading/setup`, {
+    profile: { minMilli: 0, maxMilli: 5000, passMilli: 3000, decimals: 1 },
+    gradingPeriods: [
+      { name: 'Corte 1', finalShareBp: 3000 },
+      { name: 'Corte 2', finalShareBp: 3000 },
+      { name: 'Corte 3', finalShareBp: 4000 },
+    ],
+  });
+  const shares = async () =>
+    (
+      await (await page.request.get(`/api/subjects/${subjects[0]!.id}/grades`)).json()
+    ).gradingPeriods.map((c: { name: string; finalShareBp: number }) => [c.name, c.finalShareBp]);
+  await page.goto(gradesUrl(subjects[0]!.id));
+
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await page.getByRole('menuitem', { name: 'Editar corte' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar corte' });
+  await expect(dialog.getByLabel('Peso en la nota final (%)')).toHaveCount(0);
+  await expect(
+    dialog.getByText('Para cambiar porcentajes usa «Editar distribución».'),
+  ).toBeVisible();
+  // one of several cuts cannot be deleted (it would leave the total below 100 %), and there is no "add a cut" either
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await expect(page.getByRole('menuitem', { name: /^Eliminar/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Más acciones: Corte 1' }).click();
+  await page.getByRole('menuitem', { name: 'Editar corte' }).click();
+  const again = page.getByRole('dialog', { name: 'Editar corte' });
+  await again.getByLabel('Nombre').fill('Primer corte');
+  await save(again, 'Guardar');
+  await expect(page.getByRole('region', { name: 'Primer corte' })).toBeVisible();
+  expect(await shares()).toEqual([
+    ['Primer corte', 3000],
+    ['Corte 2', 3000],
+    ['Corte 3', 4000],
+  ]);
+
+  await page.getByRole('button', { name: 'Editar distribución' }).click();
+  const dist = page.getByRole('dialog', { name: 'Editar distribución' });
+  await dist.getByLabel('Primer corte (%)').fill('40');
+  await expect(dist.getByLabel('Corte 3 (%)')).toHaveValue('30');
+  await save(dist, 'Guardar');
+  await expect(page.getByText('Distribución guardada.')).toBeVisible();
+  expect(await shares()).toEqual([
+    ['Primer corte', 4000],
+    ['Corte 2', 3000],
+    ['Corte 3', 3000],
+  ]);
+  check();
+});

@@ -4,6 +4,7 @@ import {
   CAPTURE_ENGINE_VERSION,
   captureCorrectionSchema,
   captureProposalSchema,
+  gradeSuggestionSchema,
   recurrenceSuggestionSchema,
   type CaptureMode,
 } from '@planner/core';
@@ -39,6 +40,22 @@ const reviewSchema = z.object({
       description: z.string().max(ACTIVITY_DESCRIPTION_MAX).optional(),
     }),
   ),
+  grades: z
+    .array(
+      z.object({
+        suggestion: gradeSuggestionSchema,
+        selected: z.boolean(),
+        selectionTouched: z.boolean(),
+        selection: z.object({
+          optionIndex: z.number().int().optional(),
+          choiceIndex: z.number().int().optional(),
+          basis: z.enum(['GRADING_PERIOD', 'FINAL']).optional(),
+          canonicalMilli: z.number().int().nullable().optional(),
+          name: z.string().max(200).optional(),
+        }),
+      }),
+    )
+    .default([]),
   groupTime: z.record(z.string(), z.string()),
   groupSubject: z.record(z.string(), subjectChoice),
   corrections: z.array(captureCorrectionSchema),
@@ -80,6 +97,7 @@ export function toCaptureDraft(text: string, review: ReviewState | null): Captur
     text,
     review: review && {
       items: review.items.map(({ error: _error, ...item }) => item),
+      grades: review.grades.map(({ error: _error, ...g }) => g),
       groupTime: review.groupTime,
       groupSubject: review.groupSubject,
       corrections: review.corrections,

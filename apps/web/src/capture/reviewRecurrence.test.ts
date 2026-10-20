@@ -208,6 +208,8 @@ describe('the words around the confirmation', () => {
       incomplete: 0,
       skipped: 0,
       newSubjects: [],
+      grades: 0,
+      gradesToCreate: 0,
     };
     const label = (toCreate: number, blocksToCreate: number) =>
       confirmLabel({ ...base, toCreate, blocksToCreate });

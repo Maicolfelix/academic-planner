@@ -2,6 +2,7 @@ import {
   evaluationResponseSchema,
   gradingPeriodResponseSchema,
   gradingProfileResponseSchema,
+  replaceCutWeightsResponseSchema,
   setupSubjectGradingResponseSchema,
   subjectGradesResponseSchema,
   subjectResponseSchema,
@@ -10,6 +11,7 @@ import {
   type Evaluation,
   type GradingPeriod,
   type GradingProfile,
+  type ReplaceCutWeightsInput,
   type SetupSubjectGradingInput,
   type SetupSubjectGradingResponse,
   type Subject,
@@ -40,6 +42,17 @@ export const setupSubjectGradingRequest = (
     method: 'POST',
     body: input,
     schema: setupSubjectGradingResponseSchema,
+  });
+
+/** The weights of ALL the cuts of a subject, replaced together and adding up to exactly 100 % (all or nothing). */
+export const replaceCutWeightsRequest = (
+  subjectId: string,
+  input: ReplaceCutWeightsInput,
+): Promise<{ gradingPeriods: GradingPeriod[] }> =>
+  apiFetch(`/api/subjects/${subjectId}/grading-periods/distribution`, {
+    method: 'POST',
+    body: input,
+    schema: replaceCutWeightsResponseSchema,
   });
 
 export async function updateGradingProfileRequest(

@@ -28,9 +28,13 @@ const createButton = (page: Page, n?: number) =>
   quick(page).getByRole('button', {
     name:
       n === undefined
-        ? /^Crear \d+ actividades?$/
+        ? /^(Crear \d+ actividades?|Resolver antes de guardar)$/
         : `Crear ${n} ${n === 1 ? 'actividad' : 'actividades'}`,
   });
+
+/** Nothing is ready and something still needs the student (an open question): the button does not say "Crear 0 actividades". */
+const resolveButton = (page: Page) =>
+  quick(page).getByRole('button', { name: 'Resolver antes de guardar' });
 
 async function newUser(page: Page, subjects: string[] = ['Redes de Computadores']) {
   const email = uniqueEmail();
@@ -263,7 +267,7 @@ test('6. days sharing one ambiguous hour: ONE question answers all of them', asy
 
   await expect(quick(page).getByText('Una sola respuesta para 3 actividades')).toBeVisible();
   await expect(quick(page).getByRole('button', { name: '7:30 p. m.' })).toHaveCount(1);
-  await expect(createButton(page, 0)).toBeDisabled();
+  await expect(resolveButton(page)).toBeDisabled();
   await quick(page).getByRole('button', { name: '7:30 p. m.' }).click();
 
   await expect(quick(page).getByText('Una sola respuesta')).toHaveCount(0);

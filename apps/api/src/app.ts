@@ -157,7 +157,13 @@ export function createApp(deps: AppDeps): Express {
     createAcademicInboxService(periodRepository, subjectRepository, activityRepository, clock),
   );
   const captureController = createCaptureController(
-    createCaptureService(periodRepository, subjectRepository, activityRepository, clock),
+    createCaptureService(
+      periodRepository,
+      subjectRepository,
+      activityRepository,
+      createGradingRepository(prisma),
+      clock,
+    ),
     createCaptureConfirmService({ runInTransaction, clock }),
   );
   const quickCaptureController = createQuickCaptureController(

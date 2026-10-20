@@ -8,6 +8,7 @@ import {
   type CreateEvaluationInput,
   type CreateGradingPeriodInput,
   type CreateGradingProfileInput,
+  type ReplaceCutWeightsInput,
   type SetupSubjectGradingInput,
   type SubjectGradesResponse,
   type UpdateEvaluationInput,
@@ -31,7 +32,10 @@ import {
   createStudyTrackRepository,
   type StudyTrackRepository,
 } from '../repositories/studyTrackRepository.js';
-import type { SubjectRepository } from '../repositories/subjectRepository.js';
+import {
+  createSubjectRepository,
+  type SubjectRepository,
+} from '../repositories/subjectRepository.js';
 
 const periodNotFound = () => notFound('Periodo no encontrado.');
 const subjectNotFound = () => notFound('Asignatura no encontrada.');
@@ -98,6 +102,10 @@ const weightExceeded = (field: string, what: string) =>
  * Reads that only learn an immutable fact (a row's period) happen before the lock; everything that decides a write is re-read
  * after it.
  */
+const WEIGHTS_TOGETHER_MESSAGE = 'Edita los porcentajes desde la distribución de la materia.';
+const CUT_STRUCTURE_MESSAGE =
+  'Los cortes de una materia deben sumar siempre 100 %: la cantidad de cortes se define al configurar la materia y los porcentajes se editan desde «Editar distribución».';
+
 export function createGradingService(deps: {
   grading: GradingRepository;
   subjects: SubjectRepository;
@@ -167,6 +175,157 @@ export function createGradingService(deps: {
       throw validationError({ scoreMilli: ['La nota está fuera de la escala del periodo.'] });
     return result;
   }
+
+  type Tx = Prisma.TransactionClient;
+
+  /**
+   * The insert of an evaluation, inside a transaction that ALREADY holds the user's study lock (so the weight sums cannot race).
+   * The routes reach it through `write`; the capture confirmation reaches it from its own transaction (`createEvaluationInTx`).
+   */
+  const insertEvaluation = async (
+    tx: Tx,
+    repo: GradingRepository,
+    userId: string,
+    input: CreateEvaluationInput,
+    subject: { id: string; periodId: string },
+  ) => {
+    await trackedPeriod(tx, userId, subject.periodId);
+    const profile = await repo.findProfile(userId, subject.periodId);
+    if (!profile) throw notConfigured();
+
+    const cut = await repo.findCut(userId, input.gradingPeriodId);
+    if (!cut) throw cutNotFound();
+    if (cut.subjectId !== subject.id)
+      throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
+
+    // A DIRECT CUT GRADE is the grade of the whole cut; a cut is either that or broken down, never both.
+    const isCutGrade = input.isCutGrade === true;
+    const usage = await repo.cutUsage(userId, subject.id, cut.id);
+    if (isCutGrade) {
+      if (usage.direct) throw cutGradeExists();
+      if (usage.total > 0) throw cutHasEvaluations();
+    } else if (usage.direct) throw cutHasDirectGrade();
+    const name = isCutGrade ? cutGradeName(cut.name) : (input.name as string);
+    const share = isCutGrade ? 10_000 : (input.periodShareBp as number);
+
+    const activityId = isCutGrade ? null : (input.activityId ?? null);
+    if (activityId !== null) await checkActivity(tx, userId, activityId, subject.id);
+
+    if ((await repo.sumEvaluationShares(userId, subject.id, cut.id)) + share > WEIGHT_BP_MAX)
+      throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
+
+    const score = resolveScore(
+      profile,
+      input.scoreMilli,
+      { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
+      null,
+    );
+    const hasRaw = typeof input.rawEarnedMilli === 'number';
+    if ((hasRaw || isCutGrade) && score === null)
+      throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
+    return toEvaluationDto(
+      await repo.createEvaluation(userId, subject.periodId, {
+        subjectId: subject.id,
+        gradingPeriodId: cut.id,
+        activityId,
+        name,
+        isCutGrade,
+        periodShareBp: share,
+        scoreMilli: score,
+        rawEarnedMilli: hasRaw ? (input.rawEarnedMilli as number) : null,
+        rawMaxMilli: hasRaw ? (input.rawMaxMilli as number) : null,
+        scoredAt: score === null ? null : clock(),
+      }),
+    );
+  };
+
+  /** The update of an evaluation, inside a transaction that already holds the user's study lock. */
+  const updateEvaluationIn = async (
+    tx: Tx,
+    repo: GradingRepository,
+    userId: string,
+    id: string,
+    input: UpdateEvaluationInput,
+    found: { periodId: string },
+  ) => {
+    await trackedPeriod(tx, userId, found.periodId);
+    const current = await repo.findEvaluation(userId, id);
+    if (!current) throw evaluationNotFound();
+    const profile = await repo.findProfile(userId, current.periodId);
+    if (!profile) throw notConfigured();
+
+    // The grade of a whole cut only changes its score (its name, weight, cut and activity are not the student's to set).
+    if (current.isCutGrade) {
+      const fixed = (['name', 'periodShareBp', 'gradingPeriodId', 'activityId'] as const).filter(
+        (k) => input[k] !== undefined,
+      );
+      if (fixed.length > 0)
+        throw validationError(
+          Object.fromEntries(fixed.map((k) => [k, ['La nota de un corte solo cambia su nota.']])),
+        );
+      if (input.scoreMilli === null)
+        throw validationError({
+          scoreMilli: ['Escribe la nota o quita la nota del corte.'],
+        });
+    }
+
+    let cutId = current.gradingPeriodId;
+    if (input.gradingPeriodId !== undefined && input.gradingPeriodId !== cutId) {
+      const cut = await repo.findCut(userId, input.gradingPeriodId);
+      if (!cut) throw cutNotFound();
+      if (cut.subjectId !== current.subjectId)
+        throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
+      if ((await repo.cutUsage(userId, current.subjectId, cut.id)).direct)
+        throw cutHasDirectGrade();
+      cutId = cut.id;
+    }
+    const share = input.periodShareBp ?? current.periodShareBp;
+    if (
+      (input.periodShareBp !== undefined || cutId !== current.gradingPeriodId) &&
+      (await repo.sumEvaluationShares(userId, current.subjectId, cutId, id)) + share > WEIGHT_BP_MAX
+    )
+      throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
+
+    if (input.activityId) await checkActivity(tx, userId, input.activityId, current.subjectId);
+
+    // The score: absent = unchanged (an "earned/max" pair without a score converts on a 0-based scale); null = clear it,
+    // which clears the raw pair with it (a raw pair without a score cannot exist).
+    let score: number | null;
+    let rawEarned = current.rawEarnedMilli;
+    let rawMax = current.rawMaxMilli;
+    if (input.scoreMilli === null) {
+      score = null;
+      rawEarned = null;
+      rawMax = null;
+    } else {
+      score = resolveScore(
+        profile,
+        input.scoreMilli,
+        { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
+        current.scoreMilli,
+      );
+      if (input.rawEarnedMilli !== undefined) {
+        rawEarned = input.rawEarnedMilli;
+        rawMax = input.rawMaxMilli ?? null;
+      }
+      if (rawEarned !== null && score === null)
+        throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
+    }
+    const scoredAt =
+      score === null ? null : score !== current.scoreMilli ? clock() : current.scoredAt;
+    return toEvaluationDto(
+      await repo.updateEvaluation(userId, id, {
+        ...(cutId !== current.gradingPeriodId && { gradingPeriodId: cutId }),
+        ...(input.activityId !== undefined && { activityId: input.activityId }),
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.periodShareBp !== undefined && { periodShareBp: input.periodShareBp }),
+        scoreMilli: score,
+        rawEarnedMilli: rawEarned,
+        rawMaxMilli: rawMax,
+        scoredAt,
+      }),
+    );
+  };
 
   return {
     async setupProfile(userId: string, periodId: string, input: CreateGradingProfileInput) {
@@ -256,12 +415,36 @@ export function createGradingService(deps: {
       return write(userId, async (tx, repo) => {
         await trackedPeriod(tx, userId, subject.periodId);
         if (!(await repo.findProfile(userId, subject.periodId))) throw notConfigured();
-        if ((await repo.sumCutShares(userId, subject.id)) + input.finalShareBp > WEIGHT_BP_MAX)
-          throw weightExceeded('finalShareBp', 'Los cortes');
+        // The cuts of a configured subject always add up to exactly 100 %: a cut can only be added if the total stays exact.
+        if ((await repo.sumCutShares(userId, subject.id)) + input.finalShareBp !== WEIGHT_BP_MAX)
+          throw validationError({ finalShareBp: [CUT_STRUCTURE_MESSAGE] });
         const position = await repo.nextCutPosition(subject.id);
         return toGradingPeriodDto(
           await repo.createCut(userId, subject.periodId, subject.id, { ...input, position }),
         );
+      });
+    },
+
+    /**
+     * The weights of ALL the cuts of ONE subject, replaced in one transaction under the study lock (so two edits at the same time
+     * are serialized and the total is never left different from 100 %). The cuts must be exactly the subject's own.
+     */
+    async replaceCutWeights(userId: string, subjectId: string, input: ReplaceCutWeightsInput) {
+      const subject = await subjects.findOwned(userId, subjectId);
+      if (!subject) throw subjectNotFound();
+      return write(userId, async (tx, repo) => {
+        await trackedPeriod(tx, userId, subject.periodId);
+        const cuts = await repo.listCuts(userId, subject.id);
+        const own = new Set(cuts.map((c) => c.id));
+        // A cut of another subject (or that does not exist) looks the same: not found.
+        if (input.gradingPeriods.some((c) => !own.has(c.id))) throw cutNotFound();
+        if (input.gradingPeriods.length !== cuts.length)
+          throw validationError({ gradingPeriods: ['Incluye todos los cortes de la materia.'] });
+        for (const c of input.gradingPeriods)
+          await repo.updateCut(userId, c.id, { finalShareBp: c.finalShareBp });
+        return {
+          gradingPeriods: (await repo.listCuts(userId, subject.id)).map(toGradingPeriodDto),
+        };
       });
     },
 
@@ -271,20 +454,22 @@ export function createGradingService(deps: {
       return write(userId, async (tx, repo) => {
         await trackedPeriod(tx, userId, cut.periodId);
         if (!(await repo.findCut(userId, id))) throw cutNotFound();
-        if (
-          input.finalShareBp !== undefined &&
-          (await repo.sumCutShares(userId, cut.subjectId, id)) + input.finalShareBp > WEIGHT_BP_MAX
-        )
-          throw weightExceeded('finalShareBp', 'Los cortes');
-        return toGradingPeriodDto(await repo.updateCut(userId, id, input));
+        // The weights of the cuts are edited only TOGETHER (replaceCutWeights): one cut alone can never break the 100 %.
+        if (input.finalShareBp !== undefined)
+          throw validationError({ finalShareBp: [WEIGHTS_TOGETHER_MESSAGE] });
+        return toGradingPeriodDto(await repo.updateCut(userId, id, { name: input.name }));
       });
     },
 
     /** Never cascades: a cut with evaluations is refused; the evaluations are removed (or moved) first. */
     async removeCut(userId: string, id: string) {
-      if (!(await grading.findCut(userId, id))) throw cutNotFound();
+      const cut = await grading.findCut(userId, id);
+      if (!cut) throw cutNotFound();
       await write(userId, async (_tx, repo) => {
         if ((await repo.countEvaluationsInCut(userId, id)) > 0) throw cutNotEmpty();
+        // Removing one of several cuts would leave the subject below 100 %: only the last cut (back to "not configured") can go.
+        if ((await repo.countCutsOfSubject(userId, cut.subjectId)) > 1)
+          throw validationError({ gradingPeriods: [CUT_STRUCTURE_MESSAGE] });
         try {
           if (!(await repo.deleteCut(userId, id))) throw cutNotFound();
         } catch (err) {
@@ -299,56 +484,9 @@ export function createGradingService(deps: {
       const subject = await subjects.findOwned(userId, input.subjectId);
       if (!subject) throw subjectNotFound();
       try {
-        return await write(userId, async (tx, repo) => {
-          await trackedPeriod(tx, userId, subject.periodId);
-          const profile = await repo.findProfile(userId, subject.periodId);
-          if (!profile) throw notConfigured();
-
-          const cut = await repo.findCut(userId, input.gradingPeriodId);
-          if (!cut) throw cutNotFound();
-          if (cut.subjectId !== subject.id)
-            throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
-
-          // A DIRECT CUT GRADE is the grade of the whole cut; a cut is either that or broken down, never both.
-          const isCutGrade = input.isCutGrade === true;
-          const usage = await repo.cutUsage(userId, subject.id, cut.id);
-          if (isCutGrade) {
-            if (usage.direct) throw cutGradeExists();
-            if (usage.total > 0) throw cutHasEvaluations();
-          } else if (usage.direct) throw cutHasDirectGrade();
-          const name = isCutGrade ? cutGradeName(cut.name) : (input.name as string);
-          const share = isCutGrade ? 10_000 : (input.periodShareBp as number);
-
-          const activityId = isCutGrade ? null : (input.activityId ?? null);
-          if (activityId !== null) await checkActivity(tx, userId, activityId, subject.id);
-
-          if ((await repo.sumEvaluationShares(userId, subject.id, cut.id)) + share > WEIGHT_BP_MAX)
-            throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
-
-          const score = resolveScore(
-            profile,
-            input.scoreMilli,
-            { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
-            null,
-          );
-          const hasRaw = typeof input.rawEarnedMilli === 'number';
-          if ((hasRaw || isCutGrade) && score === null)
-            throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
-          return toEvaluationDto(
-            await repo.createEvaluation(userId, subject.periodId, {
-              subjectId: subject.id,
-              gradingPeriodId: cut.id,
-              activityId,
-              name,
-              isCutGrade,
-              periodShareBp: share,
-              scoreMilli: score,
-              rawEarnedMilli: hasRaw ? (input.rawEarnedMilli as number) : null,
-              rawMaxMilli: hasRaw ? (input.rawMaxMilli as number) : null,
-              scoredAt: score === null ? null : clock(),
-            }),
-          );
-        });
+        return await write(userId, (tx, repo) =>
+          insertEvaluation(tx, repo, userId, input, subject),
+        );
       } catch (err) {
         // A foreign key can fail for the cut, the activity or the subject, and the failed transaction is gone: look again at
         // what the request named and report the one that vanished (never "the cut" by default).
@@ -364,88 +502,21 @@ export function createGradingService(deps: {
     async updateEvaluation(userId: string, id: string, input: UpdateEvaluationInput) {
       const found = await grading.findEvaluation(userId, id);
       if (!found) throw evaluationNotFound();
-      return write(userId, async (tx, repo) => {
-        await trackedPeriod(tx, userId, found.periodId);
-        const current = await repo.findEvaluation(userId, id);
-        if (!current) throw evaluationNotFound();
-        const profile = await repo.findProfile(userId, current.periodId);
-        if (!profile) throw notConfigured();
+      return write(userId, (tx, repo) => updateEvaluationIn(tx, repo, userId, id, input, found));
+    },
 
-        // The grade of a whole cut only changes its score (its name, weight, cut and activity are not the student's to set).
-        if (current.isCutGrade) {
-          const fixed = (
-            ['name', 'periodShareBp', 'gradingPeriodId', 'activityId'] as const
-          ).filter((k) => input[k] !== undefined);
-          if (fixed.length > 0)
-            throw validationError(
-              Object.fromEntries(
-                fixed.map((k) => [k, ['La nota de un corte solo cambia su nota.']]),
-              ),
-            );
-          if (input.scoreMilli === null)
-            throw validationError({
-              scoreMilli: ['Escribe la nota o quita la nota del corte.'],
-            });
-        }
+    /** For a caller already inside a transaction that holds the user's study lock (the capture confirmation). */
+    async createEvaluationInTx(tx: Tx, userId: string, input: CreateEvaluationInput) {
+      const subject = await createSubjectRepository(tx).findOwned(userId, input.subjectId);
+      if (!subject) throw subjectNotFound();
+      return insertEvaluation(tx, createGradingRepository(tx), userId, input, subject);
+    },
 
-        let cutId = current.gradingPeriodId;
-        if (input.gradingPeriodId !== undefined && input.gradingPeriodId !== cutId) {
-          const cut = await repo.findCut(userId, input.gradingPeriodId);
-          if (!cut) throw cutNotFound();
-          if (cut.subjectId !== current.subjectId)
-            throw validationError({ gradingPeriodId: ['El corte debe ser de esta materia.'] });
-          if ((await repo.cutUsage(userId, current.subjectId, cut.id)).direct)
-            throw cutHasDirectGrade();
-          cutId = cut.id;
-        }
-        const share = input.periodShareBp ?? current.periodShareBp;
-        if (
-          (input.periodShareBp !== undefined || cutId !== current.gradingPeriodId) &&
-          (await repo.sumEvaluationShares(userId, current.subjectId, cutId, id)) + share >
-            WEIGHT_BP_MAX
-        )
-          throw weightExceeded('periodShareBp', 'Las evaluaciones de este corte');
-
-        if (input.activityId) await checkActivity(tx, userId, input.activityId, current.subjectId);
-
-        // The score: absent = unchanged (an "earned/max" pair without a score converts on a 0-based scale); null = clear it,
-        // which clears the raw pair with it (a raw pair without a score cannot exist).
-        let score: number | null;
-        let rawEarned = current.rawEarnedMilli;
-        let rawMax = current.rawMaxMilli;
-        if (input.scoreMilli === null) {
-          score = null;
-          rawEarned = null;
-          rawMax = null;
-        } else {
-          score = resolveScore(
-            profile,
-            input.scoreMilli,
-            { earned: input.rawEarnedMilli, max: input.rawMaxMilli },
-            current.scoreMilli,
-          );
-          if (input.rawEarnedMilli !== undefined) {
-            rawEarned = input.rawEarnedMilli;
-            rawMax = input.rawMaxMilli ?? null;
-          }
-          if (rawEarned !== null && score === null)
-            throw validationError({ scoreMilli: ['Indica la nota para guardar lo obtenido.'] });
-        }
-        const scoredAt =
-          score === null ? null : score !== current.scoreMilli ? clock() : current.scoredAt;
-        return toEvaluationDto(
-          await repo.updateEvaluation(userId, id, {
-            ...(cutId !== current.gradingPeriodId && { gradingPeriodId: cutId }),
-            ...(input.activityId !== undefined && { activityId: input.activityId }),
-            ...(input.name !== undefined && { name: input.name }),
-            ...(input.periodShareBp !== undefined && { periodShareBp: input.periodShareBp }),
-            scoreMilli: score,
-            rawEarnedMilli: rawEarned,
-            rawMaxMilli: rawMax,
-            scoredAt,
-          }),
-        );
-      });
+    async updateEvaluationInTx(tx: Tx, userId: string, id: string, input: UpdateEvaluationInput) {
+      const repo = createGradingRepository(tx);
+      const found = await repo.findEvaluation(userId, id);
+      if (!found) throw evaluationNotFound();
+      return updateEvaluationIn(tx, repo, userId, id, input, found);
     },
 
     async removeEvaluation(userId: string, id: string) {

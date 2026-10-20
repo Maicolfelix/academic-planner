@@ -98,6 +98,34 @@ export function createGradingRepository(db: Db) {
     deleteEvaluation: async (userId: string, id: string) =>
       (await db.evaluation.deleteMany({ where: { id, userId } })).count > 0,
 
+    /**
+     * Everything the grade interpreter of the capture needs about SEVERAL periods at once (the student's current ones): the scales,
+     * the cuts and the evaluations of every subject, with the title of the activity each one is linked to. Four queries,
+     * all scoped by user.
+     */
+    async captureContext(userId: string, periodIds: readonly string[]) {
+      const where = { userId, periodId: { in: [...periodIds] } };
+      const [profiles, cuts, evaluations] = await Promise.all([
+        db.gradingProfile.findMany({ where }),
+        db.gradingPeriod.findMany({ where, orderBy: { position: 'asc' } }),
+        db.evaluation.findMany({ where, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+      ]);
+      const activityIds = evaluations.flatMap((e) => (e.activityId ? [e.activityId] : []));
+      const titles =
+        activityIds.length === 0
+          ? []
+          : await db.activity.findMany({
+              where: { userId, id: { in: activityIds } },
+              select: { id: true, title: true },
+            });
+      return {
+        profiles,
+        cuts,
+        evaluations,
+        activityTitles: new Map(titles.map((t) => [t.id, t.title])),
+      };
+    },
+
     // ── Facts the rules ask about a whole period / subject ──
     async hasScores(userId: string, periodId: string): Promise<boolean> {
       return (
