@@ -5,7 +5,15 @@ import {
   weekdayOf,
   type IcsParseResponse,
 } from '@planner/core';
-import { isWeekly, pendingOf, type ReviewRow, type RowKind } from '../../icsImport/icsReviewModel';
+import {
+  NO_SUBJECT,
+  isWeekly,
+  pendingOf,
+  subjectPatch,
+  subjectValue,
+  type ReviewRow,
+  type RowKind,
+} from '../../icsImport/icsReviewModel';
 
 const button =
   'min-h-11 rounded-md border border-slate-400 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
@@ -135,24 +143,22 @@ export function IcsRowCard({
                 </label>
                 <select
                   id={`${id}-subject`}
-                  value={row.subjectId}
+                  value={subjectValue(row)}
                   disabled={disabled}
-                  onChange={(e) =>
-                    onPatch({
-                      subjectId: e.target.value,
-                      ...(e.target.value ? { selected: true } : {}),
-                    })
-                  }
+                  onChange={(e) => onPatch(subjectPatch(e.target.value))}
                   className={field}
                 >
-                  <option value="">
-                    {row.kind === 'ACTIVITY' ? 'Sin asignatura' : 'Elige una asignatura'}
-                  </option>
+                  {(row.kind === 'BLOCK' || p.subject.kind === 'AMBIGUOUS') && (
+                    <option value="">Elige una asignatura</option>
+                  )}
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.studyName ? `${s.name} · ${s.studyName}` : s.name}
                     </option>
                   ))}
+                  {row.kind === 'ACTIVITY' && (
+                    <option value={NO_SUBJECT}>Importar sin asignatura</option>
+                  )}
                 </select>
               </div>
               {row.kind === 'ACTIVITY' && (

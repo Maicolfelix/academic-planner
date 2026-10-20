@@ -15,12 +15,21 @@ export type RowKind = 'ACTIVITY' | 'BLOCK' | 'SKIP';
 /** What to do with a repeating class that has calendar exceptions (EXDATE): never ignored silently. */
 export type ExceptionChoice = 'UNDECIDED' | 'SERIES' | 'SINGLE' | 'SKIP';
 
+/**
+ * The subject decision, explicit: UNRESOLVED = "not chosen yet" (an ambiguous name waiting for an answer, or a class without one),
+ * NONE = "import it without a subject" (an activity only), SUBJECT = `subjectId`. An empty string never means two things.
+ */
+export type SubjectChoice = 'UNRESOLVED' | 'NONE' | 'SUBJECT';
+/** The value of the "import without a subject" option in the subject select. */
+export const NO_SUBJECT = '__none';
+
 export interface ReviewRow {
   proposal: IcsProposal;
   selected: boolean;
   kind: RowKind;
   title: string;
-  /** '' = no subject. */
+  subjectChoice: SubjectChoice;
+  /** The chosen subject when `subjectChoice` is SUBJECT, else ''. */
   subjectId: string;
   /** 'HH:mm' or ''. */
   endTime: string;
@@ -42,6 +51,14 @@ export function createRows(result: Pick<IcsParseResponse, 'proposals'>): ReviewR
     selected: proposal.selected && proposal.kindProposal !== 'UNSUPPORTED',
     kind: initialKind(proposal),
     title: proposal.title,
+    subjectChoice:
+      proposal.subject.kind === 'EXISTING'
+        ? 'SUBJECT'
+        : proposal.subject.kind === 'AMBIGUOUS'
+          ? 'UNRESOLVED'
+          : proposal.kindProposal === 'ACTIVITY'
+            ? 'NONE'
+            : 'UNRESOLVED',
     subjectId: proposal.subject.kind === 'EXISTING' ? proposal.subject.id : '',
     endTime: proposal.endTime ?? '',
     exceptionChoice:
@@ -74,7 +91,7 @@ export function pendingOf(
   const out: ReturnType<typeof pendingOf> = [];
   if (row.title.trim() === '') out.push('title');
   if (row.kind === 'BLOCK') {
-    if (row.subjectId === '') out.push('subject');
+    if (row.subjectChoice !== 'SUBJECT') out.push('subject');
     if (row.proposal.startTime === null) out.push('time');
     if (row.endTime === '' || (row.proposal.startTime && row.endTime <= row.proposal.startTime))
       out.push('endTime');
@@ -84,7 +101,7 @@ export function pendingOf(
       row.exceptionChoice === 'UNDECIDED'
     )
       out.push('exceptions');
-  } else if (row.proposal.subject.kind === 'AMBIGUOUS' && row.subjectId === '') {
+  } else if (row.subjectChoice === 'UNRESOLVED') {
     out.push('subject');
   }
   return out;
@@ -149,7 +166,7 @@ export function buildConfirmRequest(rows: readonly ReviewRow[]): ConfirmIcsImpor
       const common = {
         clientId: p.clientId,
         title: r.title.trim(),
-        subjectId: r.subjectId === '' ? null : r.subjectId,
+        subjectId: r.subjectChoice === 'SUBJECT' ? r.subjectId : null,
         date: p.date!,
       };
       if (r.kind === 'ACTIVITY') {
@@ -176,11 +193,18 @@ export function buildConfirmRequest(rows: readonly ReviewRow[]): ConfirmIcsImpor
 }
 
 export const setKind = (rows: readonly ReviewRow[], clientId: string, kind: RowKind): ReviewRow[] =>
-  rows.map((r) =>
-    r.proposal.clientId === clientId
-      ? { ...r, kind, error: undefined, selected: kind === 'SKIP' ? false : true }
-      : r,
-  );
+  rows.map((r) => {
+    if (r.proposal.clientId !== clientId) return r;
+    // A class needs a subject, an activity does not: a class nobody matched becomes "without subject" when turned into an
+    // activity (only a genuinely ambiguous name keeps asking).
+    const subjectChoice =
+      kind === 'ACTIVITY' &&
+      r.subjectChoice === 'UNRESOLVED' &&
+      r.proposal.subject.kind !== 'AMBIGUOUS'
+        ? 'NONE'
+        : r.subjectChoice;
+    return { ...r, kind, subjectChoice, error: undefined, selected: kind !== 'SKIP' };
+  });
 
 export const patchRow = (
   rows: readonly ReviewRow[],
@@ -209,3 +233,20 @@ export function createdMessage(r: { activities: number; blocks: number; reused: 
   ].filter(Boolean);
   return `${parts.join(' y ')}.`;
 }
+
+/** What choosing an option of the subject select does to the row. Choosing anything but "not yet" also ticks the row. */
+export function subjectPatch(value: string): Pick<ReviewRow, 'subjectChoice' | 'subjectId'> & {
+  selected?: true;
+} {
+  if (value === '') return { subjectChoice: 'UNRESOLVED', subjectId: '' };
+  if (value === NO_SUBJECT) return { subjectChoice: 'NONE', subjectId: '', selected: true };
+  return { subjectChoice: 'SUBJECT', subjectId: value, selected: true };
+}
+
+/** The select's value for a row: a class has no "none", so a NONE left from an activity shows as "choose one". */
+export const subjectValue = (row: ReviewRow) =>
+  row.subjectChoice === 'SUBJECT'
+    ? row.subjectId
+    : row.subjectChoice === 'NONE' && row.kind === 'ACTIVITY'
+      ? NO_SUBJECT
+      : '';

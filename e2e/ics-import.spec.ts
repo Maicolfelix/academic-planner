@@ -299,3 +299,51 @@ test('EXDATE undecided blocks everything; skipping the class lets the activity g
   ).json();
   expect(week.occurrences).toHaveLength(0);
 });
+
+test('an ambiguous activity can be imported explicitly without a subject (QA regression)', async ({
+  page,
+}) => {
+  await twoStudiesWithSameSubject(page);
+  await page.goto('/calendar/import-ics');
+  const entrega = [
+    'UID:entrega-qa@uni',
+    'SUMMARY:Entrega final Ciberseguridad',
+    `DTSTART;VALUE=DATE:${compact(bogotaToday(14))}`,
+    `DTEND;VALUE=DATE:${compact(bogotaToday(15))}`,
+  ];
+  await picker(page).setInputFiles(file('entrega.ics', ics([entrega])));
+  await page.getByRole('button', { name: 'Leer calendario' }).click();
+  await expect(results(page)).toBeVisible({ timeout: 30_000 });
+
+  const card = cardOf(page, 'Entrega final Ciberseguridad');
+  const subject = card.getByLabel('Asignatura (opcional)');
+  // Not answered yet: the ambiguity blocks, and the options say the difference between "not yet" and "without".
+  await page.getByRole('checkbox', { name: 'Importar Entrega final Ciberseguridad' }).check();
+  await expect(subject).toHaveValue('');
+  await expect(subject.locator('option')).toHaveText([
+    'Elige una asignatura',
+    'Ciberseguridad · Ingeniería',
+    'Ciberseguridad · Diplomado',
+    'Importar sin asignatura',
+  ]);
+  await expect(page.getByRole('button', { name: 'Resolver antes de importar' })).toBeDisabled();
+
+  await subject.selectOption({ label: 'Importar sin asignatura' });
+  const confirm = page.getByRole('button', { name: 'Importar 1 actividad' });
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  await expect(page.getByRole('status').filter({ hasText: '1 actividad creada' })).toBeVisible();
+
+  const acts = (await (await page.request.get('/api/activities')).json()).activities as {
+    title: string;
+    subjectId: string | null;
+    dueAt: string;
+  }[];
+  expect(acts).toHaveLength(1);
+  expect(acts[0]!.title).toBe('Entrega final Ciberseguridad');
+  expect(acts[0]!.subjectId).toBeNull();
+  const local = new Date(new Date(acts[0]!.dueAt).getTime() - 5 * 3600_000)
+    .toISOString()
+    .slice(0, 10);
+  expect(local).toBe(bogotaToday(14));
+});

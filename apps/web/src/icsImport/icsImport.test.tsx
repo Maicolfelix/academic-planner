@@ -4,15 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { IcsRowCard } from '../pages/icsImport/IcsRowCard';
 import {
   buildConfirmRequest,
+  NO_SUBJECT,
   canConfirm,
   confirmLabel,
   createRows,
   createdMessage,
   patchRow,
+  pendingOf,
   removeRows,
   setErrors,
   setKind,
   subjectOptions,
+  subjectPatch,
+  subjectValue,
   summarize,
 } from './icsReviewModel';
 
@@ -83,8 +87,8 @@ describe('ics review model', () => {
     expect([u!.kind, u!.selected]).toEqual(['SKIP', false]);
   });
 
-  it('an ambiguous subject offers only its candidates and blocks until chosen', () => {
-    const p = proposal({
+  const ambiguous = (over: Partial<IcsProposal> = {}) =>
+    proposal({
       subject: {
         kind: 'AMBIGUOUS',
         candidates: [
@@ -93,12 +97,59 @@ describe('ics review model', () => {
         ],
       },
       status: 'NEEDS_REVIEW',
+      ...over,
     });
-    const [row] = createRows(parsed(p));
+
+  it('an ambiguous activity offers only its candidates and blocks until answered', () => {
+    const [row] = createRows(parsed(ambiguous()));
+    expect(row!.subjectChoice).toBe('UNRESOLVED');
     expect(subjectOptions(row!, [ING, DIP, OTHER]).map((s) => s.id)).toEqual([ING.id, DIP.id]);
     expect(summarize([row!])).toMatchObject({ toCreate: 0, incomplete: 1 });
-    const chosen = patchRow([row!], 'a', { subjectId: DIP.id });
-    expect(summarize(chosen).toCreate).toBe(1);
+    expect(confirmLabel(summarize([row!]))).toBe('Resolver antes de importar');
+  });
+
+  it('an ambiguous activity can be imported WITHOUT a subject, explicitly (subjectId null)', () => {
+    const [row] = createRows(parsed(ambiguous()));
+    const none = patchRow([row!], 'a', subjectPatch(NO_SUBJECT));
+    expect(none[0]!.subjectChoice).toBe('NONE');
+    expect(subjectValue(none[0]!)).toBe(NO_SUBJECT);
+    expect(canConfirm(none)).toBe(true);
+    expect(buildConfirmRequest(none)!.items[0]).toMatchObject({
+      kind: 'ACTIVITY',
+      subjectId: null,
+    });
+    // Going back to "choose one" blocks again: "not yet" and "none" are different answers.
+    expect(canConfirm(patchRow(none, 'a', subjectPatch('')))).toBe(false);
+  });
+
+  it('an ambiguous activity can be assigned to one of the candidates', () => {
+    const [row] = createRows(parsed(ambiguous()));
+    const chosen = patchRow([row!], 'a', subjectPatch(DIP.id));
+    expect(buildConfirmRequest(chosen)!.items[0]).toMatchObject({ subjectId: DIP.id });
+  });
+
+  it('a class always needs a subject: "none" does not exist for it and an empty choice blocks', () => {
+    const [row] = createRows(parsed(weekly({ subject: { kind: 'NONE' } })));
+    expect(row!.subjectChoice).toBe('UNRESOLVED');
+    expect(summarize([row!]).incomplete).toBe(1);
+    // An activity turned into a class keeps no "none": the class asks again.
+    const [act] = createRows(parsed(proposal({ subject: { kind: 'NONE' } })));
+    expect(act!.subjectChoice).toBe('NONE');
+    expect(canConfirm([act!])).toBe(true);
+    const asBlock = setKind([act!], 'a', 'BLOCK');
+    expect(subjectValue(asBlock[0]!)).toBe('');
+    expect(pendingOf(asBlock[0]!)).toContain('subject');
+    // And a class nobody matched, turned into an activity, no longer waits for a subject it cannot be asked for.
+    const [cls] = createRows(parsed(weekly({ subject: { kind: 'NONE' } })));
+    expect(canConfirm(setKind([cls!], 'w', 'ACTIVITY'))).toBe(true);
+  });
+
+  it('an activity nobody matched imports without a subject by default; an exact match is preselected', () => {
+    const [none, exact] = createRows(
+      parsed(proposal({ subject: { kind: 'NONE' } }), proposal({ clientId: 'b' })),
+    );
+    expect(buildConfirmRequest([none!])!.items[0]).toMatchObject({ subjectId: null });
+    expect(buildConfirmRequest([exact!])!.items[0]).toMatchObject({ subjectId: ING.id });
   });
 
   it('a weekly class without end time waits for one; an end before the start is not valid', () => {
@@ -198,6 +249,30 @@ describe('IcsRowCard', () => {
     expect(html).toContain('Cada martes, 7:00 a. m. – 9:00 a. m.');
     expect(html).toContain('Importar solo la primera clase');
     expect(html).toContain('Este evento tiene fechas excluidas');
+  });
+
+  it('ambiguous activity: placeholder, candidates and an explicit "Importar sin asignatura"; a class has no such option', () => {
+    const [act] = createRows(
+      parsed(
+        proposal({
+          subject: {
+            kind: 'AMBIGUOUS',
+            candidates: [
+              { id: ING.id, name: ING.name, periodId: ING.periodId },
+              { id: DIP.id, name: DIP.name, periodId: DIP.periodId },
+            ],
+          },
+        }),
+      ),
+    );
+    const html = card(act!);
+    expect(html).toContain('Elige una asignatura');
+    expect(html).toContain('Importar sin asignatura');
+    expect(html).toContain('Asignatura (opcional)');
+    const cls = card(createRows(parsed(weekly()))[0]!);
+    expect(cls).toContain('Elige una asignatura');
+    expect(cls).not.toContain('Importar sin asignatura');
+    expect(cls).not.toContain('(opcional)');
   });
 
   it('unsupported: says why, cannot be ticked', () => {
