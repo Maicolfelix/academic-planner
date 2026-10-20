@@ -24,6 +24,7 @@ export * from './studyTrack.js';
 export * from './onboarding.js';
 export * from './gradeContext.js';
 export * from './icsImport.js';
+export * from './shareTarget.js';
 export * from './gradingDistribution.js';
 export * from './gradingMath.js';
 export * from './grading.js';

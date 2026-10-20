@@ -1,0 +1,79 @@
+import {
+  SHARE_NOTICE_MESSAGES,
+  SHARE_TTL_MS,
+  type ComposedShare,
+  type ShareNotice,
+} from '@planner/core';
+
+/**
+ * The hand-off between `/share` (where the OS delivers title/text/url in the URL) and the Quick Capture box. The shared content
+ * stays in THIS tab only: `sessionStorage`, never `localStorage`, never the server, never the URL after the hand-off. It expires
+ * in ten minutes and is taken once: after `consumeShared` it is gone, and a reload does not bring it back.
+ */
+export const SHARED_CAPTURE_KEY = 'academic-planner:shared-capture';
+
+export interface SharedCapture {
+  text: string;
+  notices: ShareNotice[];
+  receivedAt: number;
+  source: 'share-target';
+}
+
+function store(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.sessionStorage;
+  } catch {
+    return null; // blocked storage throws on access
+  }
+}
+
+const NOTICES: readonly string[] = Object.keys(SHARE_NOTICE_MESSAGES);
+
+/** Keeps what `/share` composed until the capture box takes it. A new share replaces an older one that was never taken. */
+export function stashShared(share: ComposedShare, now = Date.now()): void {
+  const payload: SharedCapture = {
+    text: share.text,
+    notices: share.notices,
+    receivedAt: now,
+    source: 'share-target',
+  };
+  try {
+    store()?.setItem(SHARED_CAPTURE_KEY, JSON.stringify(payload));
+  } catch {
+    // full or blocked storage: the share is simply not carried
+  }
+}
+
+/** Reads without taking (safe to call while rendering). Expired or malformed content is ignored. */
+export function peekShared(now = Date.now()): SharedCapture | null {
+  try {
+    const raw = store()?.getItem(SHARED_CAPTURE_KEY) ?? null;
+    if (raw === null) return null;
+    const v = JSON.parse(raw) as Partial<SharedCapture> | null;
+    if (
+      !v ||
+      v.source !== 'share-target' ||
+      typeof v.text !== 'string' ||
+      typeof v.receivedAt !== 'number' ||
+      !Array.isArray(v.notices) ||
+      !v.notices.every((n) => typeof n === 'string' && NOTICES.includes(n))
+    )
+      return null;
+    if (now - v.receivedAt > SHARE_TTL_MS || v.receivedAt > now + 60_000) return null;
+    return v as SharedCapture;
+  } catch {
+    return null;
+  }
+}
+
+/** Takes it: removes the stored share (also when it was expired or corrupt). */
+export function consumeShared(): void {
+  try {
+    store()?.removeItem(SHARED_CAPTURE_KEY);
+  } catch {
+    // nothing to do
+  }
+}
+
+export const sharedNoticeText = (notices: readonly ShareNotice[]) =>
+  notices.map((n) => SHARE_NOTICE_MESSAGES[n]).join(' ');

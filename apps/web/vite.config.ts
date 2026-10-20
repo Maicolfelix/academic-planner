@@ -33,6 +33,13 @@ export default defineConfig(({ mode }) => {
           theme_color: '#0f172a',
           background_color: '#ffffff',
           categories: ['education', 'productivity'],
+          // A5: the OS "Share" menu can send text, a title and a link to /share (GET: nothing is uploaded, nothing is created). It
+          // opens the Quick Capture box; files and images are not accepted.
+          share_target: {
+            action: '/share',
+            method: 'GET',
+            params: { title: 'title', text: 'text', url: 'url' },
+          },
           icons: [
             { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

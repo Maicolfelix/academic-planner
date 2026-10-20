@@ -12,6 +12,7 @@ import { useMe } from '../auth/useAuth';
 import { Button } from '../components/ui/Button';
 import { fieldControl } from '../components/ui/fieldStyles';
 import { readDraft, useDraftWriter } from '../lib/drafts';
+import { consumeShared, peekShared, sharedNoticeText } from '../share/sharedCapture';
 import { CaptureReview } from './CaptureReview';
 import {
   captureDraftScope,
@@ -92,7 +93,16 @@ function CaptureFlowFor({
     const stored = readDraft(userId, scope, captureDraftSchema);
     return stored ? fromCaptureDraft(stored.payload) : null;
   });
-  const [text, setText] = useState(initial?.text ?? '');
+  // Something shared from another app (Quick Capture only): read here, taken once in the effect below. It never overwrites an
+  // unfinished draft without asking.
+  const [shared] = useState(() => (mode === 'QUICK' ? peekShared() : null));
+  const hasDraft = initial !== null && (initial.text.trim() !== '' || initial.review !== null);
+  const sharedText = shared && shared.text !== '' ? shared.text : null;
+  const [offer, setOffer] = useState(sharedText !== null && hasDraft ? sharedText : null);
+  const shareNotice =
+    shared && (sharedText === null || !hasDraft) ? sharedNoticeText(shared.notices) : '';
+  const preload = sharedText !== null && !hasDraft;
+  const [text, setText] = useState(preload ? sharedText : (initial?.text ?? ''));
   const [rawReview, setReview] = useState<ReviewState | null>(initial?.review ?? null);
   const [restored, setRestored] = useState(initial !== null);
   // A subject the student had chosen may have been deleted meanwhile: it becomes a question again.
@@ -112,6 +122,18 @@ function CaptureFlowFor({
     setReview(nextReview);
     writer.save(toCaptureDraft(nextText, nextReview));
   }
+
+  // The share is taken once: gone from storage as soon as this box has it (a reload does not bring it back). A preloaded text is
+  // kept as a normal draft from then on.
+  useEffect(() => {
+    if (!shared) return;
+    consumeShared();
+    if (preload) {
+      writer.save(toCaptureDraft(sharedText, null));
+      inputRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
 
   useEffect(() => {
     if (review && focusReview.current) {
@@ -211,6 +233,15 @@ function CaptureFlowFor({
     });
   }
 
+  function useShared() {
+    if (offer === null) return;
+    commit(offer, null);
+    setOffer(null);
+    setRestored(false);
+    setInputError(undefined);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
   function backToText() {
     commit(text, null);
     setConfirmError(undefined);
@@ -245,6 +276,33 @@ function CaptureFlowFor({
             </>
           )}
         </p>
+      )}
+
+      {shareNotice && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {shareNotice}
+        </p>
+      )}
+
+      {offer !== null && (
+        <div
+          role="group"
+          aria-labelledby="shared-draft-title"
+          className="flex flex-col gap-2 rounded-control border border-border bg-surface-muted p-3"
+        >
+          <p id="shared-draft-title" className="text-sm font-medium text-foreground">
+            Tienes un borrador en Captura rápida.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Llegó texto compartido desde otra aplicación. No se reemplazó nada todavía.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={useShared}>
+              Usar lo compartido
+            </Button>
+            <Button onClick={() => setOffer(null)}>Mantener mi borrador</Button>
+          </div>
+        </div>
       )}
 
       {restored && (

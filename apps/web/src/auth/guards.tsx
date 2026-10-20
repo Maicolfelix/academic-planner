@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Outlet } from 'react-router';
+import { safeReturnTo } from '@planner/core';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { homeGate } from '../academic/homeGate';
 import { useHomePeriod } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
@@ -54,12 +55,18 @@ export function RetryMessage({
 /** To the login; when the server ended the session, the login says so. */
 function RedirectToLogin() {
   const [expired] = useState(sessionExpiredPending);
+  const { pathname, search } = useLocation();
   useEffect(() => clearSessionExpired(), []);
+  // Where to come back to after logging in: an internal path only (checked again by the login).
+  const from = safeReturnTo(`${pathname}${search}`);
   return (
     <Navigate
       to="/login"
       replace
-      state={expired ? { warning: SESSION_EXPIRED_MESSAGE } : undefined}
+      state={{
+        ...(expired ? { warning: SESSION_EXPIRED_MESSAGE } : {}),
+        ...(from ? { from } : {}),
+      }}
     />
   );
 }
@@ -90,10 +97,12 @@ export function RequireAuth() {
 /** Login/register are for signed-out users; signed-in users go straight to the app. */
 export function PublicOnly() {
   const me = useMe();
+  const state = useLocation().state as { from?: unknown } | null;
 
   if (me.isPending) return <FullPageMessage>Cargando…</FullPageMessage>;
   // If the session check failed (server down) still show the form: submitting will report the error.
-  return me.data ? <Navigate to="/dashboard" replace /> : <Outlet />;
+  const from = safeReturnTo(state?.from);
+  return me.data ? <Navigate to={from ?? '/dashboard'} replace /> : <Outlet />;
 }
 
 /**
