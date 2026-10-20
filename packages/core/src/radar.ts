@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { activitySchema, type ActivityStatus, type RadarStatus } from './activity.js';
 import { dueRelativeLabel } from './dashboard.js';
 import { periodSchema } from './academic.js';
+import { gradeContextSchema } from './gradeContext.js';
 import { currentPeriodContextSchema } from './studyTrack.js';
 
 /**
@@ -156,6 +157,15 @@ export const radarActivitySchema = activitySchema.extend({
   subject: z.object({ id: z.uuid(), name: z.string(), color: z.string() }).nullable(),
 });
 
+/**
+ * An activity of the Radar. `gradeContext` exists ONLY when evaluations are linked to it: it is information (what it weighs in
+ * the final grade, its score) and NEVER changes the order or the category, which stay purely temporal.
+ */
+export const radarGroupActivitySchema = radarActivitySchema.extend({
+  gradeContext: gradeContextSchema.optional(),
+});
+export type RadarGroupActivity = z.infer<typeof radarGroupActivitySchema>;
+
 const perStatus = <T extends z.ZodType>(shape: T) =>
   z.object({
     overdue: shape,
@@ -177,7 +187,7 @@ export const radarSchema = z.object({
   period: periodSchema.nullable(),
   periods: z.array(currentPeriodContextSchema),
   summary: perStatus(count),
-  groups: perStatus(z.array(radarActivitySchema)),
+  groups: perStatus(z.array(radarGroupActivitySchema)),
 });
 
 export const radarResponseSchema = z.object({ radar: radarSchema });

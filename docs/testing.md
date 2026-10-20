@@ -139,3 +139,7 @@ Núcleo `gradingDistribution.test.ts` (11); API `grading/distribution.test.ts` (
 ## Aislamiento de la base de datos de pruebas
 
 Las pruebas solo pueden escribir en una base cuyo nombre termine en `_test` y distinta de `DATABASE_URL` (`getTestDatabaseUrl`); `truncateAll` vuelve a comprobar el nombre real de la base conectada. Además, `playwright.config.ts` y `playwright.security.config.ts` llaman a `assertPortsFree` (3000/5173 y 4300): si algo ya escucha allí —un `npm run dev` olvidado o su vigilante `node --watch`, que revive la API contra la base de **desarrollo**— el arranque falla con un mensaje que nombra los puertos, en vez de dejar que la verificación de salud la conteste un proceso viejo. Pruebas de las guardas: `apps/api/src/db/testDbGuard.test.ts`.
+
+## Notas en el Radar y en el Progreso
+
+Núcleo `gradeContext.test.ts` (14: peso efectivo 12 % / 10 % / 30 % directo / 7.5 %, varias evaluaciones, el Radar temporal, `grade` null / parcial / completa / desglose / distintas distribuciones); API `grading/radarProgressGrades.test.ts` (11: sin evaluación, una, varias, con y sin nota, orden independiente del peso, dos estudios, otra cuenta, estudio archivado, materia sin configurar, parcial y completa, mismo nombre en dos estudios, 401) más el conteo de consultas constante del Progreso; web `gradeProgressRadar.test.tsx` (la línea del Radar y la sección «Notas»: parcial, completa, sin notas, sin configurar, estimación, nombre largo, sin juicios); e2e `radar-progress-grades.spec.ts` (360/1366, y 768 con revisión de desborde).

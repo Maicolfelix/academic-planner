@@ -338,6 +338,7 @@ describe('the progress by study', () => {
         name: 'Farmacología',
         color: '#3B82F6',
         ...summary(2, 1),
+        grade: null,
       },
       {
         id: uuid(2),
@@ -345,6 +346,7 @@ describe('the progress by study', () => {
         name: 'Redes',
         color: '#EF4444',
         ...summary(3, 0),
+        grade: null,
       },
     ];
     const origin = (id: string | undefined) => originLabelOf(byPeriod, id ?? '');

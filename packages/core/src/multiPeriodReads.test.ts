@@ -90,7 +90,9 @@ describe('every summary keeps its HOME `period` and adds `periods`', () => {
       period,
       general: summary,
       byPeriod: [{ period, studyTrack: study, general: summary }],
-      subjects: [{ id: U(3), periodId: U(1), name: 'Redes', color: '#3B82F6', ...summary }],
+      subjects: [
+        { id: U(3), periodId: U(1), name: 'Redes', color: '#3B82F6', ...summary, grade: null },
+      ],
     };
     expect(progressSchema.safeParse(ok).success).toBe(true);
     expect(progressSchema.safeParse({ ...ok, byPeriod: undefined }).success).toBe(false);

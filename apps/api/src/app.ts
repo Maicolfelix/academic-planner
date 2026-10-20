@@ -171,14 +171,19 @@ export function createApp(deps: AppDeps): Express {
   );
   const insightsRepository = createInsightsRepository(prisma);
   const progressController = createProgressController(
-    createProgressService(insightsRepository, periodRepository, clock),
+    createProgressService(
+      insightsRepository,
+      periodRepository,
+      createGradingRepository(prisma),
+      clock,
+    ),
   );
   const workloadController = createWorkloadController(
     createWorkloadService(insightsRepository, scheduleRepository, periodRepository, clock),
   );
   const radarRepository = createRadarRepository(prisma);
   const radarController = createRadarController(
-    createRadarService(radarRepository, periodRepository, clock),
+    createRadarService(radarRepository, periodRepository, createGradingRepository(prisma), clock),
   );
   const attentionController = createAttentionController(
     createAttentionService(radarRepository, periodRepository, clock),

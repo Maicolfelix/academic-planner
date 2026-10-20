@@ -1,4 +1,10 @@
-import { buildProgress, type Progress, type StatusCounts } from '@planner/core';
+import {
+  buildProgress,
+  buildSubjectGradeProgress,
+  type Progress,
+  type StatusCounts,
+} from '@planner/core';
+import type { GradingRepository } from '../repositories/gradingRepository.js';
 import type { InsightsRepository } from '../repositories/insightsRepository.js';
 import type { PeriodRepository } from '../repositories/periodRepository.js';
 import type { Actor } from './activityService.js';
@@ -18,11 +24,14 @@ const STATUS_KEY = {
  * shown as one mixed semester), and `subjects` lists every subject of those periods with the period it belongs to.
  * 4 queries (the current periods, then subjects + counts by period/subject/status + overdue counts in parallel), whatever the
  * data or the number of periods. The arithmetic is core's `buildProgress`, once per period and once overall; nothing is stored.
- * A count of activities, never a grade or an average.
+ * The counts are of activities, never a grade or an average. Each subject also carries its academic grade (`grade`, apart from
+ * the activities: they are never merged into one figure), from 3 more queries for ALL the subjects, and null when its period has
+ * no scale or the subject has no cuts.
  */
 export function createProgressService(
   insights: InsightsRepository,
   periods: PeriodRepository,
+  grading: GradingRepository,
   clock: () => Date,
 ) {
   return {
@@ -35,10 +44,11 @@ export function createProgressService(
         return { generatedAt, period: null, general, byPeriod: [], subjects: [] };
       }
 
-      const [subjects, statusRows, overdueRows] = await Promise.all([
+      const [subjects, statusRows, overdueRows, gradeData] = await Promise.all([
         insights.subjects(actor.id, current.ids),
         insights.statusCounts(actor.id, current.ids),
         insights.overdueCounts(actor.id, current.ids, now),
+        grading.progressData(actor.id, current.ids),
       ]);
 
       // The general activities (no subject) have no row of their own: they only weigh in the general progress (overall and
@@ -94,7 +104,27 @@ export function createProgressService(
             generalOf.get(context.period.id) ?? noSubject(),
           ).general,
         })),
-        subjects: overall.subjects.map((s) => ({ ...s, periodId: periodOf.get(s.id)! })),
+        subjects: overall.subjects.map((s) => {
+          const periodId = periodOf.get(s.id)!;
+          const scale = gradeData.profiles.find((p) => p.periodId === periodId) ?? null;
+          return {
+            ...s,
+            periodId,
+            // Each subject is read with ITS OWN cuts and evaluations (two subjects, even of one period, split differently).
+            grade: buildSubjectGradeProgress(
+              scale,
+              gradeData.cuts.filter((c) => c.subjectId === s.id),
+              gradeData.evaluations
+                .filter((e) => e.subjectId === s.id)
+                .map((e) => ({
+                  gradingPeriodId: e.gradingPeriodId,
+                  periodShareBp: e.periodShareBp,
+                  scoreMilli: e.scoreMilli,
+                  isCutGrade: e.isCutGrade,
+                })),
+            ),
+          };
+        }),
       };
     },
   };
