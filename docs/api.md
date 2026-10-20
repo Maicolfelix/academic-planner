@@ -194,6 +194,13 @@ Confirmar una propuesta de **Captura rápida o Bandeja** es una llamada normal a
 
 Reglas completas, formato de errores y concurrencia: [schedule-import.md](schedule-import.md#previsualización-y-confirmación).
 
+| Ruta                           | Qué hace                                                                            | Cuerpo                                                                                                                                                                                                                                           | Respuesta                                                  | Errores                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/ics-import/parse`   | Leer un `.ics` y proponer actividades y clases (no crea nada, no guarda el archivo) | `multipart/form-data`, un archivo en el campo `file` (≤ 1 MB, ≤ 500 eventos)                                                                                                                                                                     | `200` `{ fileName, proposals, summary, subjects }`         | 400 `VALIDATION_ERROR` (vacío, no es calendario, binario/NUL), 413 `FILE_TOO_LARGE`, 429                                        |
+| `POST /api/ics-import/confirm` | Crear, **todo o nada**, lo revisado (una transacción, un bloqueo por usuario)       | JSON `{ items: [{ clientId, kind: 'ACTIVITY' \| 'BLOCK', title, subjectId \| null, date, startTime?, endTime?, type?, description?, weekly?, until? }] }`, 1–500; el periodo lo deriva el servidor de la asignatura (cualquier otro campo → 400) | `201` `{ createdActivities, createdBlocks, reusedBlocks }` | 400 `VALIDATION_ERROR` (con `details.items` por elemento), 404 (asignatura inexistente, ajena o de un estudio no actual: igual) |
+
+Detalle y subconjunto soportado: [ics-import.md](ics-import.md).
+
 ## Rutas que no existen
 
 Cualquier otra ruta bajo `/api` responde un `404` JSON (`NOT_FOUND`), nunca HTML. No hay registro de dispositivos, notificaciones push, correo ni integración con calendarios externos.

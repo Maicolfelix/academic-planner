@@ -105,6 +105,22 @@ const MUTATING: [method: 'post' | 'patch' | 'delete', path: string, body?: objec
   ],
   ['post', '/api/academic-inbox/parse', { text: 'parcial' }],
   ['post', '/api/schedule-import/parse'],
+  ['post', '/api/ics-import/parse'],
+  [
+    'post',
+    '/api/ics-import/confirm',
+    {
+      items: [
+        {
+          clientId: 'a',
+          kind: 'ACTIVITY',
+          title: 'X',
+          subjectId: null,
+          date: '2026-10-23',
+        },
+      ],
+    },
+  ],
   [
     'post',
     '/api/schedule-import/confirm',

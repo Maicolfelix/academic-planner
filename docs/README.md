@@ -43,6 +43,7 @@
 | [capture-proposals.md](capture-proposals.md)         | Captura inteligente: motor, confirmación en lote y revisión (F1-2b → F1-2cdp) |
 | [drafts.md](drafts.md)                               | Borradores persistentes (captura y formularios de actividad)                  |
 | [schedule-import.md](schedule-import.md)             | Importación de horario (OCR)                                                  |
+| [ics-import.md](ics-import.md)                       | Importador de calendarios `.ics` (A2)                                         |
 | [pwa.md](pwa.md)                                     | PWA instalable                                                                |
 | [ux-accessibility.md](ux-accessibility.md)           | UX, accesibilidad y diseño adaptable                                          |
 

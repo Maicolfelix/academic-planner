@@ -98,6 +98,9 @@ export function CalendarPage() {
           <Link to="/calendar/import" className={`${secondary} inline-flex items-center`}>
             Importar horario
           </Link>
+          <Link to="/calendar/import-ics" className={`${secondary} inline-flex items-center`}>
+            Importar calendario (.ics)
+          </Link>
           <button type="button" onClick={() => setEditing('new')} className={primary}>
             Agregar bloque
           </button>

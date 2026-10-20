@@ -51,6 +51,8 @@ B2: QA real en iPhone aprobada por el mantenedor, sin incidencias reportadas (en
 
 `packages/core/src/scheduleImport.test.ts` (interpretación sobre palabras con posición), `apps/api/src/scheduleImport/scheduleImport.test.ts` (validación de archivos, OCR real sobre imágenes sintéticas, PDF con texto y escaneado, límites, tiempo máximo) y `e2e/schedule-import.spec.ts`. Los archivos de prueba son **sintéticos** y se generan en el código (`apps/api/test/scheduleImportFixtures.ts`).
 
+**Importador `.ics` (A2):** `packages/core/src/icsImport.test.ts`, `apps/api/src/ics/parseIcs.test.ts`, `apps/api/src/ics/icsImport.test.ts`, `apps/web/src/icsImport/icsImport.test.tsx` y `e2e/ics-import.spec.ts`; los calendarios se escriben en el código (sin archivos reales). Ver [ics-import.md](ics-import.md).
+
 ### Validación de sistema
 
 `apps/api/src/systemValidation/system.test.ts` (coherencia entre módulos con reloj fijo, medianoche, bordes del periodo, errores, reinicio del servidor) y `e2e/system-validation.spec.ts` (un semestre completo de un estudiante, dos usuarios, fallos de red inyectados con recuperación, `Asia/Tokyo`, teclado, 768 px, inventario de rutas). Nota técnica: para inyectar fallos con `page.route` hay que bloquear el service worker (`serviceWorkers: 'block'`).

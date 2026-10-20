@@ -29,6 +29,7 @@ import { createQuickCaptureController } from './controllers/quickCaptureControll
 import { createRadarController } from './controllers/radarController.js';
 import { createReminderController } from './controllers/reminderController.js';
 import { createScheduleController } from './controllers/scheduleController.js';
+import { createIcsImportController } from './controllers/icsImportController.js';
 import { createScheduleImportController } from './controllers/scheduleImportController.js';
 import { createSubjectController } from './controllers/subjectController.js';
 import { createActivityRepository } from './repositories/activityRepository.js';
@@ -59,6 +60,7 @@ import { studyTracksRouter } from './routes/studyTracks.js';
 import { radarRouter } from './routes/radar.js';
 import { remindersRouter } from './routes/reminders.js';
 import { scheduleRouter } from './routes/schedule.js';
+import { icsImportRouter } from './routes/icsImport.js';
 import { scheduleImportRouter } from './routes/scheduleImport.js';
 import { subjectsRouter } from './routes/subjects.js';
 import { createAcademicInboxService } from './services/academicInboxService.js';
@@ -81,6 +83,8 @@ import {
   createScheduleImportService,
   type ImportLogEvent,
 } from './services/scheduleImportService.js';
+import { createIcsImportConfirmService } from './services/icsImportConfirmService.js';
+import { createIcsImportService } from './services/icsImportService.js';
 import { createScheduleImportConfirmService } from './services/scheduleImportConfirmService.js';
 import { createScheduleService } from './services/scheduleService.js';
 import type { ExtractionDeps } from './scheduleImport/pipeline.js';
@@ -215,6 +219,19 @@ export function createApp(deps: AppDeps): Express {
       lockTimeoutMs: importOptions.confirmLockTimeoutMs,
     }),
   );
+  const icsImportController = createIcsImportController(
+    createIcsImportService({
+      periods: periodRepository,
+      subjects: subjectRepository,
+      activities: activityRepository,
+      schedule: scheduleRepository,
+    }),
+    createIcsImportConfirmService({
+      runInTransaction,
+      clock,
+      lockTimeoutMs: importOptions.confirmLockTimeoutMs,
+    }),
+  );
   // 10 imports per 10 minutes per client: OCR is the most expensive thing the API does.
   const importLimiter = createLimiter({
     windowMs: importOptions.windowMs ?? 10 * 60 * 1000,
@@ -266,7 +283,10 @@ export function createApp(deps: AppDeps): Express {
   app.use(cors({ origin: corsOrigins, credentials: true }));
   // Cheapest checks first: a forged origin or an odd content type is refused before any body is read.
   app.use('/api', originCheck(corsOrigins));
-  app.use('/api', requireKnownBodyType({ multipartPaths: ['/schedule-import/parse'] }));
+  app.use(
+    '/api',
+    requireKnownBodyType({ multipartPaths: ['/schedule-import/parse', '/ics-import/parse'] }),
+  );
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 
@@ -293,6 +313,7 @@ export function createApp(deps: AppDeps): Express {
     '/api/schedule-import',
     scheduleImportRouter(scheduleImportController, requireAuth, importLimiter),
   );
+  app.use('/api/ics-import', icsImportRouter(icsImportController, requireAuth));
   app.use('/api/reminders', remindersRouter(reminderController, requireAuth));
 
   if (deps.webDistDir) app.use(staticWeb(deps.webDistDir));
