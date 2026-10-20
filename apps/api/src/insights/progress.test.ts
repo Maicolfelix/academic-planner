@@ -342,7 +342,7 @@ describe('efficiency: a constant number of queries, whatever the amount of data'
     expect(large.progress.general.total).toBe(505);
     expect(large.progress.subjects).toHaveLength(20);
     expect(large.count).toBe(small.count);
-    expect(large.count).toBeLessThanOrEqual(6); // session + period + subjects + 2 grouped counts (+ lastUsedAt touch)
+    expect(large.count).toBeLessThanOrEqual(9); // session + period + subjects + 2 grouped counts + 3 for the grades of ALL subjects (+ lastUsedAt touch)
     console.info(
       `progress: ${large.count} queries, ${large.ms.toFixed(0)} ms for 20 subjects / 505 activities`,
     );

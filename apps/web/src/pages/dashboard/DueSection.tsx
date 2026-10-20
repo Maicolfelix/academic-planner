@@ -19,6 +19,8 @@ interface Props {
   origin?: OriginOf;
   /** Wording of the time left; defaults to the calendar label ("Vence mañana"). */
   describe?: (a: DashboardActivity) => string;
+  /** A quiet extra line under an item (the Radar uses it for the grade context); nothing when it returns null. */
+  extra?: (a: DashboardActivity) => ReactNode;
 }
 
 /** A compact list of activities: title, subject, deadline and how far away it is. */
@@ -30,6 +32,7 @@ export function DueSection({
   overdue = false,
   footer,
   describe = (a) => dueRelativeLabel(a, now, timeZone),
+  extra,
   origin,
 }: Props) {
   const headingId = useId();
@@ -59,6 +62,7 @@ export function DueSection({
                 <span className="font-medium text-foreground">{describe(a)}</span>
                 {overdue && <OverdueBadge />}
               </p>
+              {extra?.(a)}
             </div>
           </Card>
         ))}

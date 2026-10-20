@@ -22,6 +22,7 @@ export * from './captureConfirm.js';
 export * from './profile.js';
 export * from './studyTrack.js';
 export * from './onboarding.js';
+export * from './gradeContext.js';
 export * from './gradingDistribution.js';
 export * from './gradingMath.js';
 export * from './grading.js';

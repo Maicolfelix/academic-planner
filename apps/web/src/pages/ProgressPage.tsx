@@ -5,6 +5,7 @@ import { originLabelOf, readsSeveralPeriods } from '../academic/origin';
 import { useProgress, useWorkload } from '../insights/useInsights';
 import { ProgressBar } from './progress/ProgressBar';
 import { ProgressByPeriod } from './progress/ProgressByPeriod';
+import { SubjectGradeList } from './progress/SubjectGradeList';
 import { SubjectProgressList } from './progress/SubjectProgressList';
 import { WorkloadDetail, busiestText, plural, totalsLine } from './progress/WorkloadDetail';
 
@@ -182,6 +183,10 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
       {several && <ProgressByPeriod byPeriod={byPeriod} />}
       <h3 className="sr-only">Por asignatura</h3>
       <SubjectProgressList
+        subjects={subjects}
+        origin={(periodId) => originLabelOf(byPeriod, periodId ?? '')}
+      />
+      <SubjectGradeList
         subjects={subjects}
         origin={(periodId) => originLabelOf(byPeriod, periodId ?? '')}
       />

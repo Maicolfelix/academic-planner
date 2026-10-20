@@ -103,6 +103,64 @@ export function createGradingRepository(db: Db) {
      * the cuts and the evaluations of every subject, with the title of the activity each one is linked to. Four queries,
      * all scoped by user.
      */
+    /**
+     * What the PROGRESS needs to show the grade of every subject of the given (current) periods: the scales, the cuts and the
+     * evaluations (only the figures), in three parallel queries whatever the number of subjects: never one query per subject.
+     */
+    async progressData(userId: string, periodIds: readonly string[]) {
+      const where = { userId, periodId: { in: [...periodIds] } };
+      const [profiles, cuts, evaluations] = await Promise.all([
+        db.gradingProfile.findMany({
+          where,
+          select: {
+            periodId: true,
+            minMilli: true,
+            maxMilli: true,
+            passMilli: true,
+            decimals: true,
+          },
+        }),
+        db.gradingPeriod.findMany({
+          where,
+          select: { id: true, subjectId: true, finalShareBp: true },
+          orderBy: { position: 'asc' },
+        }),
+        db.evaluation.findMany({
+          where,
+          select: {
+            subjectId: true,
+            gradingPeriodId: true,
+            periodShareBp: true,
+            scoreMilli: true,
+            isCutGrade: true,
+          },
+        }),
+      ]);
+      return { profiles, cuts, evaluations };
+    },
+
+    /** The evaluations linked to the given activities (the RADAR's context), with their cut, in ONE query. */
+    linkedToActivities: (userId: string, activityIds: readonly string[]) =>
+      activityIds.length === 0
+        ? Promise.resolve([])
+        : db.evaluation.findMany({
+            where: { userId, activityId: { in: [...activityIds] } },
+            select: {
+              id: true,
+              name: true,
+              activityId: true,
+              isCutGrade: true,
+              scoreMilli: true,
+              periodShareBp: true,
+              gradingPeriod: { select: { name: true, finalShareBp: true } },
+              period: {
+                select: { gradingProfile: { select: { maxMilli: true, decimals: true } } },
+              },
+            },
+            relationLoadStrategy: 'join',
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          }),
+
     async captureContext(userId: string, periodIds: readonly string[]) {
       const where = { userId, periodId: { in: [...periodIds] } };
       const [profiles, cuts, evaluations] = await Promise.all([

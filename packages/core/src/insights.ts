@@ -1,3 +1,4 @@
+import { subjectGradeProgressSchema } from './gradeContext.js';
 import { z } from 'zod';
 import { periodSchema, dateOnlySchema, type DateOnly } from './academic.js';
 import type { ActivityStatus } from './activity.js';
@@ -313,6 +314,8 @@ export const progressSchema = z.object({
       name: z.string(),
       color: z.string(),
       ...progressSummaryShape,
+      /** The academic grade of the subject, apart from the activities; null without a scale or cuts (never a made-up 0.0). */
+      grade: subjectGradeProgressSchema.nullable(),
     }),
   ),
 });

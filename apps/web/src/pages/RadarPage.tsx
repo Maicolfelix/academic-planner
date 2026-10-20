@@ -13,6 +13,7 @@ import { QueryError } from '../components/QueryError';
 import { useNow } from '../lib/useNow';
 import { useRadar } from '../radar/useRadar';
 import { DueSection } from './dashboard/DueSection';
+import { GradeContextLine } from './radar/GradeContextLine';
 import { RadarSummary } from './radar/RadarSummary';
 
 /**
@@ -82,6 +83,9 @@ export function RadarPage() {
             overdue={status === 'OVERDUE'}
             origin={originOf}
             describe={(a) => radarExplanation(a, now, timeZone)}
+            extra={(a) => (
+              <GradeContextLine context={items.find((i) => i.id === a.id)?.gradeContext} />
+            )}
             footer={
               hidden > 0 && (
                 <p className="text-sm">
