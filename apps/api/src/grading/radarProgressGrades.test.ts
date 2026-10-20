@@ -346,3 +346,76 @@ describe('Progress: the academic grade of each subject, apart from the activitie
     expect(res.status).toBe(401);
   });
 });
+
+describe('the Radar reads ONE scale per activity: every evaluation linked to an activity is of its own subject', () => {
+  async function twoSubjects() {
+    const { agent } = await signUp(app, 'a@example.com');
+    const med = await study(agent, 'Medicina');
+    const dip = await study(agent, 'Diplomado', 'OTHER_ACADEMIC');
+    const a = await subject(agent, med.period.id, 'Redes', [5000, 5000]);
+    const sameStudy = await subject(agent, med.period.id, 'Bases', [5000, 5000]);
+    const otherStudy = await subject(agent, dip.period.id, 'Inglés', [5000, 5000]);
+    const act = await activity(agent, a.id, 'Parcial A');
+    return { agent, a, sameStudy, otherStudy, act };
+  }
+  const body = (s: { id: string; cuts: { id: string }[] }, activityId: string) => ({
+    subjectId: s.id,
+    gradingPeriodId: s.cuts[0]!.id,
+    name: 'Parcial',
+    periodShareBp: 2000,
+    activityId,
+  });
+
+  it('creating an evaluation of ANOTHER subject (same period, or another study) linked to the activity is refused', async () => {
+    const w = await twoSubjects();
+    for (const other of [w.sameStudy, w.otherStudy]) {
+      const res = await w.agent.post('/api/evaluations').send(body(other, w.act.id));
+      expect(res.status, other.name).toBe(400);
+      expect(res.body.error.details.fields.activityId).toBeDefined();
+    }
+    expect(await prisma.evaluation.count()).toBe(0);
+  });
+
+  it('moving a linked evaluation to the activity of another subject is refused too', async () => {
+    const w = await twoSubjects();
+    const mine = (await post(w.agent, '/api/evaluations', body(w.a, w.act.id))).evaluation;
+    const foreignAct = await activity(w.agent, w.otherStudy.id, 'Parcial otro estudio');
+    const res = await w.agent
+      .patch(`/api/evaluations/${mine.id}`)
+      .send({ activityId: foreignAct.id });
+    expect(res.status).toBe(400);
+    expect((await prisma.evaluation.findUniqueOrThrow({ where: { id: mine.id } })).activityId).toBe(
+      w.act.id,
+    );
+  });
+
+  it('the database itself refuses it (composite foreign key), so no route can leave the pair inconsistent', async () => {
+    const w = await twoSubjects();
+    const mine = (await post(w.agent, '/api/evaluations', body(w.a, w.act.id))).evaluation;
+    const foreignAct = await activity(w.agent, w.sameStudy.id, 'Parcial Bases');
+    await expect(
+      prisma.evaluation.update({ where: { id: mine.id }, data: { activityId: foreignAct.id } }),
+    ).rejects.toThrow();
+  });
+
+  it('so the Radar’s context for an activity has one subject, one period and one scale', async () => {
+    const w = await twoSubjects();
+    await post(w.agent, '/api/evaluations', body(w.a, w.act.id));
+    await post(w.agent, '/api/evaluations', {
+      ...body(w.a, w.act.id),
+      name: 'Quiz',
+      gradingPeriodId: w.a.cuts[1]!.id,
+    });
+    const item = (await radar(w.agent)).groups;
+    const ctx = Object.values(item)
+      .flat()
+      .find((x) => (x as { id: string }).id === w.act.id) as {
+      gradeContext: { evaluations: { id: string }[]; decimals: number; maxMilli: number };
+    };
+    const rows = await prisma.evaluation.findMany({ where: { activityId: w.act.id } });
+    expect(new Set(rows.map((r) => r.subjectId)).size).toBe(1);
+    expect(new Set(rows.map((r) => r.periodId)).size).toBe(1);
+    expect(ctx.gradeContext.evaluations).toHaveLength(2);
+    expect([ctx.gradeContext.maxMilli, ctx.gradeContext.decimals]).toEqual([5000, 1]);
+  });
+});

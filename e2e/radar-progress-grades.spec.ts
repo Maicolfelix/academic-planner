@@ -122,7 +122,7 @@ test('Progress shows the grade apart from the activities; a subject without conf
   await expect(grades).toBeVisible();
   await expect(grades).toContainText('Ciberseguridad');
   await expect(grades).toContainText('Acumulada 0.5 / 5.0');
-  await expect(grades).toContainText('0 de 3 cortes con nota');
+  await expect(grades).toContainText('0 de 3 cortes calculados');
   await expect(grades).toContainText('Estimación: faltan pesos por definir.');
   await expect(grades).not.toContainText('Cálculo II');
   await expect(grades).not.toContainText('0.0');
@@ -146,7 +146,9 @@ test('Progress shows the grade apart from the activities; a subject without conf
   });
   await page.reload();
   await expect(page.getByRole('region', { name: 'Notas' })).toContainText('Acumulada 3.5 / 5.0');
-  await expect(page.getByRole('region', { name: 'Notas' })).toContainText('2 de 3 cortes con nota');
+  await expect(page.getByRole('region', { name: 'Notas' })).toContainText(
+    '2 de 3 cortes calculados',
+  );
   for (const width of [360, 768, 1366]) {
     await page.setViewportSize({ width, height: 900 });
     await expectNoHorizontalOverflow(page);

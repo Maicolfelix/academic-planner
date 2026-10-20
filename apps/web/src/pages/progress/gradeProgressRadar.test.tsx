@@ -84,16 +84,16 @@ describe('Progress: the Notas section, apart from the activities', () => {
       grade: g,
     }) as Progress['subjects'][number];
 
-  it('partial: "Acumulada 1.2 / 5.0", "1 de 3 cortes con nota" and the average of what is registered', () => {
+  it('partial: "Acumulada 1.2 / 5.0", "1 de 3 cortes calculados" and the average of what is registered', () => {
     const html = render([subject('1', 'Ciberseguridad', grade({}))]);
     expect(html).toContain('Notas');
     expect(html).toContain('Acumulada 1.2 / 5.0');
-    expect(html).toContain('1 de 3 cortes con nota');
+    expect(html).toContain('1 de 3 cortes calculados');
     expect(html).toContain('Promedio de lo registrado: 4.0');
     expect(html).toContain('Ver notas');
   });
 
-  it('complete: "3.9 / 5.0" and "3 de 3 cortes con nota", never called a partial', () => {
+  it('complete: "3.9 / 5.0" and "3 de 3 cortes calculados", never called a partial', () => {
     const html = render([
       subject(
         '1',
@@ -107,7 +107,7 @@ describe('Progress: the Notas section, apart from the activities', () => {
       ),
     ]);
     expect(html).toContain('3.9 / 5.0');
-    expect(html).toContain('3 de 3 cortes con nota');
+    expect(html).toContain('3 de 3 cortes calculados');
     expect(html).not.toContain('Acumulada');
   });
 

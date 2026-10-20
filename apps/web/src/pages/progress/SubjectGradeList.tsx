@@ -21,7 +21,8 @@ export function SubjectGradeList({ subjects, origin }: { subjects: Row[]; origin
         Notas
       </h3>
       <p className="text-sm text-slate-700">
-        Las notas son aparte del avance de actividades: no se mezclan en un mismo porcentaje.
+        Las notas son aparte del avance de actividades: no se mezclan en un mismo porcentaje. Un
+        corte se cuenta cuando ya puede calcularse completo.
       </p>
       <ul className="flex flex-col gap-2">
         {rows.map((s) => {
@@ -47,8 +48,8 @@ export function SubjectGradeList({ subjects, origin }: { subjects: Row[]; origin
                 )}
                 <span aria-hidden="true">·</span>
                 <span>
-                  {g.cutsWithGrade} de {g.cutsTotal} {g.cutsTotal === 1 ? 'corte' : 'cortes'} con
-                  nota
+                  {g.cutsWithGrade} de {g.cutsTotal}{' '}
+                  {g.cutsTotal === 1 ? 'corte calculado' : 'cortes calculados'}
                 </span>
               </p>
               {g.currentMilli !== null && g.cutsWithGrade < g.cutsTotal && (
