@@ -31,6 +31,12 @@ const region = (page: Page, name: string | RegExp) => page.getByRole('region', {
 const flat = (s: string) => s.replace(/\s+/g, ' ');
 const localDow = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Bogota', weekday: 'long' });
+/** The English weekday of the Bogotá day `plusDays` ahead (what `localDow` answers for an instant on that day). */
+const weekdayEn = (plusDays: number) =>
+  new Date(`${bogotaToday(plusDays)}T12:00:00Z`).toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    weekday: 'long',
+  });
 const localTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', {
     timeZone: 'America/Bogota',
@@ -322,9 +328,9 @@ test('MASTER: a student builds a semester, works with it, finishes things, close
     (a) => a.type === 'WORKSHOP' && a.subjectId === sid('Bioestadística'),
   )!;
   expect(quiz).toMatchObject({ subjectId: sid('Bases de Datos'), hasTime: true });
-  expect(localDow(quiz.dueAt)).toBe('Thursday');
+  expect(localDow(quiz.dueAt)).toBe(weekdayEn(4)); // the message names the day 4 days ahead
   expect(localTime(quiz.dueAt)).toBe('08:00');
-  expect(localDow(workshop.dueAt)).toBe('Friday');
+  expect(localDow(workshop.dueAt)).toBe(weekdayEn(5));
   const blocks = (
     await (
       await page.request.get(`/api/schedule?from=${bogotaToday(-6)}&to=${bogotaToday(7)}`)

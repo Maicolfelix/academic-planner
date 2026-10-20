@@ -104,7 +104,7 @@ for (const viewport of [
       const [anat] = await study(page, 'Medicina', ['Anatomía'], [5000, 5000]);
       await write(page, 'Parcial de Anatomía el viernes, vale 40% del Corte 1');
       await expect(cards(page)).toHaveCount(2);
-      await expect(quick(page).getByText('Corte 1 · 40 %')).toBeVisible();
+      await expect(quick(page).getByText(/Corte 1 · .*40 %/)).toBeVisible();
       await quick(page).getByRole('button', { name: 'Crear 1 actividad y 1 nota' }).click();
       await expect(quick(page).getByText(/1 actividad creada/)).toBeVisible();
       const ev = await gradesOf(page, anat!.id);

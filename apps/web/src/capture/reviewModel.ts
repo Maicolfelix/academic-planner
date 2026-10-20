@@ -375,7 +375,7 @@ export interface GradeView {
   cut: string | null;
   /** "Nota: 4.3" / "Nota: Pendiente" / null while unknown. */
   score: string | null;
-  /** "Corte 1 · 40 %" for a new evaluation. */
+  /** "40 %" for a new evaluation (the cut is already said once, before it). */
   weight: string | null;
   /** What the card is about: the name of the evaluation, or "Nota del corte". */
   title: string;
@@ -416,7 +416,7 @@ export function gradeView(g: ReviewGrade): GradeView {
   const pct = s.weight.percentBp === null ? null : `${s.weight.percentBp / 100} %`;
   const weight =
     choice?.action === 'CREATE_EVALUATION' && r.periodShareBp !== null
-      ? `${choice.cut.name} · ${r.periodShareBp / 100} %`
+      ? `${r.periodShareBp / 100} %`
       : s.intent === 'NEW_EVALUATION' && pct
         ? pct
         : null;

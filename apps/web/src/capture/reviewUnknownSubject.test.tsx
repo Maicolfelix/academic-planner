@@ -100,3 +100,13 @@ describe('no subject written at all, or a real one', () => {
     );
   });
 });
+
+describe('the summary line of a new evaluation', () => {
+  it('says the cut ONCE: "Corte 1 · Parcial · 40 % · Nota: Pendiente"', () => {
+    const html = render(review('Parcial de Ciberseguridad vale 40% del Corte 1'));
+    const line = />([^<]*Nota: Pendiente[^<]*)</.exec(html)?.[1];
+    expect(line).toBeDefined();
+    expect(line!.split('Corte 1')).toHaveLength(2); // exactly one occurrence
+    expect(line).toMatch(/^Corte 1 · Parcial · 40 % · Nota: Pendiente$/);
+  });
+});

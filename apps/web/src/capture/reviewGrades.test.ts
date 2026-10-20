@@ -141,7 +141,7 @@ describe('review of grades', () => {
     );
     const view = gradeView(state.grades[0]!);
     expect(view.score).toBe('Nota: 4.2');
-    expect(view.weight).toBe('Corte 1 · 40 %');
+    expect(view.weight).toBe('40 %');
     expect(buildConfirmRequest(state).evaluations![0]).toMatchObject({
       action: 'CREATE_EVALUATION',
       periodShareBp: 4000,

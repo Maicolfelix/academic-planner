@@ -194,6 +194,9 @@ test('every destination is a 44 px target with a visible focus ring, reachable b
 });
 
 test('the shell passes axe on the home and activities screens', async ({ page }) => {
+  // Four screens, each loaded and analysed by axe: ~8 s alone, but over the 30 s default when another heavy spec shares the machine
+  // (a time budget, not a defect: the failure was always "Test timeout of 30000ms exceeded", never a violation).
+  test.setTimeout(120_000);
   await signedIn(page);
   for (const url of ['/dashboard', '/activities', '/calendar', '/subjects']) {
     await page.goto(url);
