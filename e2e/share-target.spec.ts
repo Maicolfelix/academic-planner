@@ -216,6 +216,55 @@ test('a share is not lost if the draft cannot be written: it stays until it is s
   await expect(box(page)).toHaveValue('Parcial de redes'); // now a normal draft, once
 });
 
+test('"Usar lo compartido" with a failed first write leaves no hidden pending write and the share retries cleanly', async ({
+  page,
+}) => {
+  await newUser(page);
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (
+        this === window.localStorage &&
+        k.includes(':capture-quick') &&
+        sessionStorage.getItem('qa-fail-draft') === '1'
+      )
+        throw new Error('QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  const draftText = () =>
+    page.evaluate(() => {
+      const raw = Object.entries(localStorage).find(([k]) => k.includes(':capture-quick'))?.[1];
+      return raw ? (JSON.parse(raw).payload.text as string) : null;
+    });
+  const stored = () => page.evaluate((k) => sessionStorage.getItem(k), KEY);
+  const group = page.getByRole('group', { name: 'Tienes un borrador en Captura rápida.' });
+
+  await box(page).fill('Quiz de Anatomía');
+  await expect.poll(draftText).toBe('Quiz de Anatomía');
+
+  // The write of the shared text fails; storage is back to normal right after the click, before any debounce could fire.
+  await page.evaluate(() => sessionStorage.setItem('qa-fail-draft', '1'));
+  await page.goto('/share?text=' + encodeURIComponent('Parcial de Fisiología'));
+  await expect(group).toBeVisible();
+  await group.getByRole('button', { name: 'Usar lo compartido' }).click();
+  await page.evaluate(() => sessionStorage.removeItem('qa-fail-draft'));
+  await expect(box(page)).toHaveValue('Parcial de Fisiología'); // shown from memory
+  await page.waitForTimeout(900); // well past the 300 ms debounce: a hidden deferred write would have landed by now
+  expect(await draftText()).toBe('Quiz de Anatomía'); // nothing was written behind our back
+  expect(await stored()).not.toBeNull(); // and the share was not taken: it was never kept
+
+  // Retry (a reload asks again, inside the ten minutes): now it is written ONCE, then taken, and a reload does not ask again.
+  await page.reload();
+  await expect(group).toBeVisible();
+  await group.getByRole('button', { name: 'Usar lo compartido' }).click();
+  await expect.poll(draftText).toBe('Parcial de Fisiología');
+  expect(await stored()).toBeNull();
+  await page.reload();
+  await expect(group).toBeHidden();
+  await expect(box(page)).toHaveValue('Parcial de Fisiología');
+});
+
 test('an undecided conflict survives a reload and ends only with the decision', async ({
   page,
 }) => {

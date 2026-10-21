@@ -244,9 +244,14 @@ function CaptureFlowFor({
 
   function useShared() {
     if (offer === null) return;
-    commit(offer.text, null);
+    // ONE authoritative write, no deferred one: whatever was typed while deciding is settled first (so no older write can land
+    // after ours), then the shared text is written now and the share leaves only if that write worked. The state is updated
+    // directly: `commit` would schedule a second, hidden write of the same text that could succeed after this one failed.
+    writer.flush();
     const draft = toCaptureDraft(offer.text, null);
     deliverShared(() => draft !== null && writeDraft(userId, scope, draft));
+    setText(offer.text);
+    setReview(null);
     setShareNotice(sharedNoticeText(offer.notices)); // what was cut or dropped is told when the shared text is used
     setOffer(null);
     setRestored(false);
