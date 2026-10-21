@@ -75,6 +75,17 @@ export function consumeShared(): void {
   }
 }
 
+/**
+ * Takes the share ONLY once the caller says it is safely kept (the text is a durable draft). Until then it stays in the tab, so
+ * anything that interrupts the hand-off (a remount, a reload, storage that failed to write) cannot lose it: one delivery,
+ * not "removed before the box could keep it". Returns whether it was taken.
+ */
+export function deliverShared(persist: () => boolean): boolean {
+  if (!persist()) return false;
+  consumeShared();
+  return true;
+}
+
 export const sharedNoticeText = (notices: readonly ShareNotice[]) =>
   notices.map((n) => SHARE_NOTICE_MESSAGES[n]).join(' ');
 

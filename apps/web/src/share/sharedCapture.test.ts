@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SHARED_CAPTURE_KEY,
   consumeShared,
+  deliverShared,
   peekShared,
   planHandoff,
   sharedNoticeText,
@@ -120,6 +121,14 @@ describe('shared capture hand-off', () => {
     it('no share: nothing', () => {
       expect(planHandoff(null, true)).toEqual({ preload: null, offer: null, notice: '' });
     });
+  });
+
+  it('deliverShared takes the share only when it was safely kept', () => {
+    stashShared({ text: 'Quiz', notices: [] }, 1000);
+    expect(deliverShared(() => false)).toBe(false); // the draft could not be written
+    expect(peekShared(1000)?.text).toBe('Quiz'); // still there for another try
+    expect(deliverShared(() => true)).toBe(true);
+    expect(peekShared(1000)).toBeNull();
   });
 
   it('words the notices', () => {

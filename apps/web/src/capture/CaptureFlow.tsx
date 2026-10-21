@@ -11,8 +11,14 @@ import { ApiRequestError } from '../api/client';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../components/ui/Button';
 import { fieldControl } from '../components/ui/fieldStyles';
-import { readDraft, useDraftWriter } from '../lib/drafts';
-import { consumeShared, peekShared, planHandoff, sharedNoticeText } from '../share/sharedCapture';
+import { readDraft, useDraftWriter, writeDraft } from '../lib/drafts';
+import {
+  consumeShared,
+  deliverShared,
+  peekShared,
+  planHandoff,
+  sharedNoticeText,
+} from '../share/sharedCapture';
 import { CaptureReview } from './CaptureReview';
 import {
   captureDraftScope,
@@ -123,14 +129,17 @@ function CaptureFlowFor({
     writer.save(toCaptureDraft(nextText, nextReview));
   }
 
-  // The share is taken once: gone from storage as soon as this box has it (a reload does not bring it back). A preloaded text is
-  // kept as a normal draft from then on.
+  // The share is delivered ONCE and taken only when it is safe: a preloaded text is written as a normal draft right away and the
+  // share leaves the tab after that write, never before (a remount, a reload or a failed write cannot lose it). With an unfinished
+  // draft it waits for the student's decision. A share without text has nothing to keep.
   useEffect(() => {
     if (!shared) return;
-    consumeShared();
-    if (preload) {
-      writer.save(toCaptureDraft(sharedText, null));
+    if (sharedText !== null) {
+      const draft = toCaptureDraft(sharedText, null);
+      deliverShared(() => draft !== null && writeDraft(userId, scope, draft));
       inputRef.current?.focus();
+    } else if (offer === null) {
+      consumeShared();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
@@ -236,6 +245,8 @@ function CaptureFlowFor({
   function useShared() {
     if (offer === null) return;
     commit(offer.text, null);
+    const draft = toCaptureDraft(offer.text, null);
+    deliverShared(() => draft !== null && writeDraft(userId, scope, draft));
     setShareNotice(sharedNoticeText(offer.notices)); // what was cut or dropped is told when the shared text is used
     setOffer(null);
     setRestored(false);
@@ -301,7 +312,14 @@ function CaptureFlowFor({
             <Button variant="primary" onClick={useShared}>
               Usar lo compartido
             </Button>
-            <Button onClick={() => setOffer(null)}>Mantener mi borrador</Button>
+            <Button
+              onClick={() => {
+                consumeShared(); // the share was turned down: it is gone
+                setOffer(null);
+              }}
+            >
+              Mantener mi borrador
+            </Button>
           </div>
         </div>
       )}

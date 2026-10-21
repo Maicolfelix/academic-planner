@@ -133,8 +133,8 @@ test('with a draft, using a cut or link-dropping share tells what was cut; keepi
   // Too long + a draft + "use it": the cut text enters AND the notice is shown; the share was taken once.
   await page.goto('/share?text=' + encodeURIComponent('x'.repeat(8000)));
   await expect(page).toHaveURL(/\/dashboard$/);
-  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
   await group.getByRole('button', { name: 'Usar lo compartido' }).click();
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull(); // taken once the choice is made
   await expect(cutNotice).toBeVisible();
   expect((await box(page).inputValue()).length).toBeLessThanOrEqual(5000);
   await page.reload();
@@ -162,6 +162,76 @@ test('with a draft, using a cut or link-dropping share tells what was cut; keepi
   await group.getByRole('button', { name: 'Mantener mi borrador' }).click();
   await expect(box(page)).toHaveValue('Quiz de Anatomía');
   await expect(linkNotice).toBeHidden();
+});
+
+test('QA case: the exact share arrives, becomes a normal draft, and a reload neither loses nor duplicates it', async ({
+  page,
+}) => {
+  await newUser(page);
+  await page.goto('/share?title=Tarea&text=Entrega%20viernes&url=https%3A%2F%2Fexample.com');
+  const expected = ['Tarea', 'Entrega viernes', 'https://example.com'].join('\n');
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(box(page)).toHaveValue(expected);
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
+  const draft = await page.evaluate(() =>
+    Object.entries(localStorage)
+      .filter(([k]) => k.includes(':capture-quick'))
+      .map(([, v]) => v),
+  );
+  expect(draft).toHaveLength(1);
+  expect(draft[0]).toContain('Entrega viernes');
+  await page.reload();
+  await expect(box(page)).toHaveValue(expected); // the draft, once; not the share injected a second time
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
+});
+
+test('a share is not lost if the draft cannot be written: it stays until it is safely kept', async ({
+  page,
+}) => {
+  await newUser(page);
+  // Storage refuses the draft (full quota, a blocked profile…): the old hand-off had already removed the share by then.
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (
+        this === window.localStorage &&
+        k.includes(':capture-quick') &&
+        sessionStorage.getItem('qa-fail-draft') === '1'
+      )
+        throw new Error('QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  await page.evaluate(() => sessionStorage.setItem('qa-fail-draft', '1'));
+  await page.goto('/share?text=' + encodeURIComponent('Parcial de redes'));
+  await expect(box(page)).toHaveValue('Parcial de redes'); // shown from memory
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).not.toBeNull(); // not removed: nothing kept it yet
+
+  // Storage works again: the share (still within its ten minutes) is delivered and only then removed.
+  await page.evaluate(() => sessionStorage.removeItem('qa-fail-draft'));
+  await page.reload();
+  await expect(box(page)).toHaveValue('Parcial de redes');
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
+  await page.reload();
+  await expect(box(page)).toHaveValue('Parcial de redes'); // now a normal draft, once
+});
+
+test('an undecided conflict survives a reload and ends only with the decision', async ({
+  page,
+}) => {
+  await newUser(page);
+  await box(page).fill('Quiz de Anatomía');
+  await page.waitForTimeout(300);
+  await page.goto('/share?text=' + encodeURIComponent('Parcial de Fisiología'));
+  const group = page.getByRole('group', { name: 'Tienes un borrador en Captura rápida.' });
+  await expect(group).toBeVisible();
+  await page.reload();
+  await expect(group).toBeVisible(); // the share was not lost by looking away
+  await group.getByRole('button', { name: 'Mantener mi borrador' }).click();
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
+  await page.reload();
+  await expect(group).toBeHidden();
+  await expect(box(page)).toHaveValue('Quiz de Anatomía');
 });
 
 test('nothing shared: the capture opens with a discreet notice', async ({ page }) => {
