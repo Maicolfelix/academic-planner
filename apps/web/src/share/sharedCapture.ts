@@ -77,3 +77,20 @@ export function consumeShared(): void {
 
 export const sharedNoticeText = (notices: readonly ShareNotice[]) =>
   notices.map((n) => SHARE_NOTICE_MESSAGES[n]).join(' ');
+
+export interface ShareHandoff {
+  /** Text to put in an empty box right away. */
+  preload: string | null;
+  /** With an unfinished draft the share waits for the student's decision, notices included. */
+  offer: SharedCapture | null;
+  /** What to tell now (a share taken straight away, or one that carried no text). */
+  notice: string;
+}
+
+/** What the Quick Capture does with a share: take it, or ask first when there is a draft. Pure, so it can be tested. */
+export function planHandoff(shared: SharedCapture | null, hasDraft: boolean): ShareHandoff {
+  if (!shared) return { preload: null, offer: null, notice: '' };
+  const text = shared.text !== '' ? shared.text : null;
+  if (text !== null && hasDraft) return { preload: null, offer: shared, notice: '' };
+  return { preload: text, offer: null, notice: sharedNoticeText(shared.notices) };
+}

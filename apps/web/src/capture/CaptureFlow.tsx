@@ -12,7 +12,7 @@ import { useMe } from '../auth/useAuth';
 import { Button } from '../components/ui/Button';
 import { fieldControl } from '../components/ui/fieldStyles';
 import { readDraft, useDraftWriter } from '../lib/drafts';
-import { consumeShared, peekShared, sharedNoticeText } from '../share/sharedCapture';
+import { consumeShared, peekShared, planHandoff, sharedNoticeText } from '../share/sharedCapture';
 import { CaptureReview } from './CaptureReview';
 import {
   captureDraftScope,
@@ -97,11 +97,11 @@ function CaptureFlowFor({
   // unfinished draft without asking.
   const [shared] = useState(() => (mode === 'QUICK' ? peekShared() : null));
   const hasDraft = initial !== null && (initial.text.trim() !== '' || initial.review !== null);
-  const sharedText = shared && shared.text !== '' ? shared.text : null;
-  const [offer, setOffer] = useState(sharedText !== null && hasDraft ? sharedText : null);
-  const shareNotice =
-    shared && (sharedText === null || !hasDraft) ? sharedNoticeText(shared.notices) : '';
-  const preload = sharedText !== null && !hasDraft;
+  const [handoff] = useState(() => planHandoff(shared, hasDraft));
+  const [offer, setOffer] = useState(handoff.offer);
+  const [shareNotice, setShareNotice] = useState(handoff.notice);
+  const sharedText = handoff.preload;
+  const preload = sharedText !== null;
   const [text, setText] = useState(preload ? sharedText : (initial?.text ?? ''));
   const [rawReview, setReview] = useState<ReviewState | null>(initial?.review ?? null);
   const [restored, setRestored] = useState(initial !== null);
@@ -235,7 +235,8 @@ function CaptureFlowFor({
 
   function useShared() {
     if (offer === null) return;
-    commit(offer, null);
+    commit(offer.text, null);
+    setShareNotice(sharedNoticeText(offer.notices)); // what was cut or dropped is told when the shared text is used
     setOffer(null);
     setRestored(false);
     setInputError(undefined);

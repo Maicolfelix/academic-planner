@@ -109,6 +109,61 @@ test('an unfinished draft is never overwritten silently: keep it or use what was
   expect(await activityCount(page)).toBe(0);
 });
 
+test('with a draft, using a cut or link-dropping share tells what was cut; keeping the draft tells nothing', async ({
+  page,
+}) => {
+  await newUser(page);
+  const group = page.getByRole('group', { name: 'Tienes un borrador en Captura rápida.' });
+  const cutNotice = page.getByText('Lo compartido era muy largo y se recortó.');
+  const linkNotice = page.getByText('Se omitió un enlace que no era http ni https.');
+  const keep = async () => {
+    await box(page).fill('Quiz de Anatomía');
+    await page.waitForTimeout(300); // the draft is written as it is typed
+  };
+
+  // Too long + a draft: nothing is told while the student decides; keeping the draft leaves no stale warning.
+  await keep();
+  await page.goto('/share?text=' + encodeURIComponent('x'.repeat(8000)));
+  await expect(group).toBeVisible();
+  await expect(cutNotice).toBeHidden();
+  await group.getByRole('button', { name: 'Mantener mi borrador' }).click();
+  await expect(box(page)).toHaveValue('Quiz de Anatomía');
+  await expect(cutNotice).toBeHidden();
+
+  // Too long + a draft + "use it": the cut text enters AND the notice is shown; the share was taken once.
+  await page.goto('/share?text=' + encodeURIComponent('x'.repeat(8000)));
+  await expect(page).toHaveURL(/\/dashboard$/);
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), KEY)).toBeNull();
+  await group.getByRole('button', { name: 'Usar lo compartido' }).click();
+  await expect(cutNotice).toBeVisible();
+  expect((await box(page).inputValue()).length).toBeLessThanOrEqual(5000);
+  await page.reload();
+  await expect(cutNotice).toBeHidden(); // a reload does not bring the share (or its notice) back
+  expect((await box(page).inputValue()).length).toBeGreaterThan(0); // the used text is a normal draft now
+
+  // An unsafe link + a draft + "use it": no execution, the link is absent, the notice says it was dropped.
+  let dialogs = 0;
+  page.on('dialog', (d) => {
+    dialogs++;
+    void d.dismiss();
+  });
+  await keep();
+  await page.goto('/share?text=Tarea&url=' + encodeURIComponent('javascript:alert(1)'));
+  await expect(group).toBeVisible();
+  await expect(linkNotice).toBeHidden();
+  await group.getByRole('button', { name: 'Usar lo compartido' }).click();
+  await expect(box(page)).toHaveValue('Tarea');
+  await expect(linkNotice).toBeVisible();
+  expect(dialogs).toBe(0);
+
+  // And keeping the draft in that case leaves no link warning behind.
+  await keep();
+  await page.goto('/share?text=Tarea&url=' + encodeURIComponent('javascript:alert(1)'));
+  await group.getByRole('button', { name: 'Mantener mi borrador' }).click();
+  await expect(box(page)).toHaveValue('Quiz de Anatomía');
+  await expect(linkNotice).toBeHidden();
+});
+
 test('nothing shared: the capture opens with a discreet notice', async ({ page }) => {
   await newUser(page);
   await page.goto('/share');

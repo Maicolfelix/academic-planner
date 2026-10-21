@@ -4,6 +4,7 @@ import {
   SHARED_CAPTURE_KEY,
   consumeShared,
   peekShared,
+  planHandoff,
   sharedNoticeText,
   stashShared,
 } from './sharedCapture';
@@ -78,6 +79,47 @@ describe('shared capture hand-off', () => {
     stashShared({ text: 'viejo', notices: [] }, 1000);
     stashShared({ text: 'nuevo', notices: [] }, 2000);
     expect(peekShared(2000)?.text).toBe('nuevo');
+  });
+
+  describe('planHandoff (what the Quick Capture does with a share)', () => {
+    const share = (text: string, notices: ('TRUNCATED' | 'URL_DROPPED' | 'EMPTY')[] = []) => ({
+      text,
+      notices,
+      receivedAt: 1,
+      source: 'share-target' as const,
+    });
+
+    it('no draft: the text is preloaded and its notices are told now (current behaviour)', () => {
+      const h = planHandoff(share('Parcial', ['TRUNCATED']), false);
+      expect(h.preload).toBe('Parcial');
+      expect(h.offer).toBeNull();
+      expect(h.notice).toContain('recortó');
+    });
+
+    it('a draft + a normal share: asks first, nothing told, nothing replaced', () => {
+      const h = planHandoff(share('Parcial'), true);
+      expect(h).toEqual({ preload: null, offer: share('Parcial'), notice: '' });
+    });
+
+    it('a draft + a cut or link-dropping share: the offer keeps its notices for when it is used', () => {
+      const cut = planHandoff(share('x'.repeat(5000), ['TRUNCATED']), true);
+      expect(cut.offer?.notices).toEqual(['TRUNCATED']);
+      expect(cut.notice).toBe(''); // not told while the student still decides
+      const link = planHandoff(share('Tarea', ['URL_DROPPED']), true);
+      expect(link.offer?.notices).toEqual(['URL_DROPPED']);
+      expect(sharedNoticeText(link.offer!.notices)).toContain('http ni https');
+    });
+
+    it('nothing shared with a draft: just the discreet notice, the draft is not touched', () => {
+      const h = planHandoff(share('', ['EMPTY']), true);
+      expect(h.offer).toBeNull();
+      expect(h.preload).toBeNull();
+      expect(h.notice).toBe('No recibimos contenido para compartir.');
+    });
+
+    it('no share: nothing', () => {
+      expect(planHandoff(null, true)).toEqual({ preload: null, offer: null, notice: '' });
+    });
   });
 
   it('words the notices', () => {
