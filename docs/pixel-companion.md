@@ -1,6 +1,6 @@
 # Pixel Companion v1 (P8)
 
-**Estado: EN REVISIÓN (IN REVIEW).** Implementado y probado de forma automática; **sin QA real** en dispositivo. No se afirma validación con estudiantes ni que el personaje ayude a nadie: es una pieza visual de acompañamiento.
+**Estado: DONE (PR #58 fusionado).** QA visual manual aprobada por el mantenedor en escritorio y en un móvil real (entorno local de desarrollo por red local, HTTP). No es QA de release ni valida HTTPS, la PWA instalada ni producción, ni mide si el personaje ayuda a nadie. No hay personalización, mascota interactiva, recompensas ni sistema social. Es una pieza visual de acompañamiento.
 
 Un pequeño personaje de pixel-art **propio** de Academic Planner vive en el Inicio, junto al saludo, y dice **una frase corta y neutra** sobre el momento académico. Acompaña: **no juzga, no manipula, no castiga y no crea presión**. «Organizarse no debe convertirse en otra tarea»: no hay nada que cuidar, completar ni mantener.
 

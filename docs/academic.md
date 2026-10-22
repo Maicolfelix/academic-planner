@@ -145,7 +145,7 @@ Sale de la QA real: quien ajusta un corte espera que la nota final de la materia
 
 ## Pixel Companion (P8)
 
-Un personaje decorativo del Inicio dice una frase neutra sobre el momento académico (qué hay cerca). No usa las notas ni el porcentaje para juzgar, no guarda nada y no gamifica. Detalle: [pixel-companion.md](pixel-companion.md). **EN REVISIÓN: sin QA real.**
+Un personaje decorativo del Inicio dice una frase neutra sobre el momento académico (qué hay cerca). No usa las notas ni el porcentaje para juzgar, no guarda nada y no gamifica. Detalle: [pixel-companion.md](pixel-companion.md). **DONE (PR #58 fusionado); QA visual manual en escritorio y móvil real, entorno local.**
 
 ## Compartir hacia la Captura rápida (A5)
 
