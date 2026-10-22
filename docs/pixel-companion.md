@@ -38,7 +38,7 @@ Entrada (`CompanionContext`): `overdueCount` (vencidas), `immediateCount` (vence
 
 ## Dónde vive
 
-En la cabecera del Inicio, bajo el saludo y el periodo, solo si el estudiante ya tiene asignaturas. No es fijo, no flota y no tapa nada: el Radar y la Captura rápida no se desplazan de forma agresiva (en teléfono añade una fila compacta).
+En la cabecera del Inicio, bajo el saludo y el periodo, como una pequeña unidad (un contenedor tenue con el color `accent-soft`, borde suave y radio moderado, sin sombra, que mide lo que su contenido) alineada con el saludo: el personaje mide 64 px en teléfono, 72 px en tableta y 96 px en escritorio, y la frase principal va en tamaño de cuerpo con la segunda más discreta; solo si el estudiante ya tiene asignaturas. No es fijo, no flota y no tapa nada: el Radar y la Captura rápida no se desplazan de forma agresiva (en teléfono añade una fila compacta).
 
 ## Pruebas
 

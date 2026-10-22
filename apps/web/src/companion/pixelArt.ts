@@ -36,12 +36,19 @@ const BODY = [
   '........................', // 23
 ];
 
-/** A backpack on the left (a quiet academic detail), drawn over the body. */
+/**
+ * A backpack on the left (the academic detail): bigger than before, with a top handle, a pocket line and a strap that crosses
+ * the shoulder onto the body, so it reads as a school bag at a glance. Drawn over the body.
+ */
 const BACKPACK: Rect[] = [
-  [1, 9, 1, 6, 'O'],
-  [2, 8, 2, 1, 'O'],
-  [2, 9, 2, 5, 'K'],
-  [2, 14, 2, 1, 'O'],
+  [1, 7, 2, 1, 'O'], // handle
+  [1, 8, 3, 1, 'O'], // top
+  [0, 9, 1, 7, 'O'], // back edge
+  [1, 9, 3, 7, 'K'], // bag
+  [1, 13, 3, 1, 'O'], // pocket line
+  [1, 16, 3, 1, 'O'], // bottom
+  [5, 8, 2, 1, 'K'], // strap over the shoulder...
+  [6, 9, 1, 6, 'K'], // ...and down the front
 ];
 
 type Rect = [x: number, y: number, w: number, h: number, color: string];

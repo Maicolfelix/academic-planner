@@ -45,13 +45,16 @@ export function PixelCompanion({
   const known: CompanionState = state in FACES ? state : 'CALM';
   const face = FACES[known];
   return (
-    <div data-companion={known} className="flex items-center gap-3">
+    <div
+      data-companion={known}
+      className="flex w-fit max-w-full items-center gap-3 rounded-2xl border border-border bg-accent-soft/70 py-2 pr-4 pl-3 sm:gap-4 sm:pl-4 lg:gap-5"
+    >
       <svg
         viewBox={`0 0 ${GRID} ${GRID}`}
         aria-hidden="true"
         focusable="false"
         shapeRendering="crispEdges"
-        className="size-14 shrink-0 sm:size-16 lg:size-20"
+        className="size-16 shrink-0 sm:size-[4.5rem] lg:size-24"
       >
         <g className={IDLE[known]}>
           <Paths paths={BODY_PATHS} />
@@ -63,7 +66,7 @@ export function PixelCompanion({
         </g>
       </svg>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">{COMPANION_COPY[known]}</p>
+        <p className="text-base font-medium text-foreground">{COMPANION_COPY[known]}</p>
         {nextLine && <p className="text-sm break-words text-muted-foreground">{nextLine}</p>}
       </div>
     </div>
