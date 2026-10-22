@@ -187,6 +187,10 @@ body[data-ambient='done'] {
   --animate-halo: halo 6s ease-out infinite;
   --animate-scan: scan 9s ease-in-out infinite;
   --animate-orbit: orbit 48s linear infinite;
+  /* The Pixel Companion: tiny and slow, in whole logical pixels (it is pixel art). Always `motion-safe:`. */
+  --animate-companion-idle: companion-idle 4s steps(1, end) infinite;
+  --animate-companion-blink: companion-blink 6s steps(1, end) infinite;
+  --animate-companion-bustle: companion-bustle 2.4s steps(1, end) infinite;
 
   @keyframes rise {
     from {
@@ -292,6 +296,37 @@ body[data-ambient='done'] {
   @keyframes orbit {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes companion-idle {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-1px);
+    }
+  }
+
+  @keyframes companion-blink {
+    0%,
+    93%,
+    100% {
+      transform: scaleY(1);
+    }
+    95% {
+      transform: scaleY(0.15);
+    }
+  }
+
+  @keyframes companion-bustle {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(1px);
     }
   }
 

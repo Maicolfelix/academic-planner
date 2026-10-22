@@ -7,6 +7,12 @@ import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
 import { readsSeveralPeriods, type OriginOf } from '../academic/origin';
 import { useOrigins } from '../academic/useAcademic';
+import { PixelCompanion } from '../companion/PixelCompanion';
+import {
+  companionFromDashboard,
+  companionNextLine,
+  deriveCompanionState,
+} from '../companion/companionState';
 import { useDashboard } from '../dashboard/useDashboard';
 import { useNow } from '../lib/useNow';
 import { AmbientMood } from './dashboard/AmbientTone';
@@ -48,6 +54,9 @@ export function DashboardPage() {
   const timeZone = user?.timezone ?? DEFAULT_TIMEZONE;
   const hasData = d.subjectCount > 0 && d.summary.total > 0;
   const several = readsSeveralPeriods(d.periods);
+  // The companion is derived from what this page already has (no request, no stored state).
+  const companion = companionFromDashboard(d);
+  const companionState = deriveCompanionState(companion.context);
 
   // The highlighted next activity is not repeated in the lists below it.
   const nextId = d.nextDue?.id;
@@ -76,6 +85,14 @@ export function DashboardPage() {
           {d.greeting}, {user?.name}
         </h1>
         <PeriodScopeLine period={d.period} periods={d.periods} />
+        {d.subjectCount > 0 && (
+          <div className="mt-3">
+            <PixelCompanion
+              state={companionState}
+              nextLine={companionNextLine(companionState, companion.title)}
+            />
+          </div>
+        )}
       </header>
 
       <QueryError query={dashboard} title="No se pudo cargar tu panel" />
