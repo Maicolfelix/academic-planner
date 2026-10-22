@@ -33,6 +33,7 @@ const ProgressPage = named(() => import('./pages/ProgressPage'), 'ProgressPage')
 const RadarPage = named(() => import('./pages/RadarPage'), 'RadarPage');
 const ScheduleImportPage = named(() => import('./pages/ScheduleImportPage'), 'ScheduleImportPage');
 const IcsImportPage = named(() => import('./pages/IcsImportPage'), 'IcsImportPage');
+const SharePage = named(() => import('./pages/SharePage'), 'SharePage');
 const StatusPage = named(() => import('./pages/StatusPage'), 'StatusPage');
 const StudiesPage = named(() => import('./pages/StudiesPage'), 'StudiesPage');
 const SubjectsPage = named(() => import('./pages/SubjectsPage'), 'SubjectsPage');
@@ -52,6 +53,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/status" element={<StatusPage />} />
+          <Route path="/share" element={<SharePage />} />
           <Route element={<PublicOnly />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

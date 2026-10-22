@@ -44,6 +44,7 @@
 | [drafts.md](drafts.md)                               | Borradores persistentes (captura y formularios de actividad)                  |
 | [schedule-import.md](schedule-import.md)             | Importación de horario (OCR)                                                  |
 | [ics-import.md](ics-import.md)                       | Importador de calendarios `.ics` (A2)                                         |
+| [share-target.md](share-target.md)                   | Compartir texto hacia la Captura rápida (A5)                                  |
 | [pwa.md](pwa.md)                                     | PWA instalable                                                                |
 | [ux-accessibility.md](ux-accessibility.md)           | UX, accesibilidad y diseño adaptable                                          |
 

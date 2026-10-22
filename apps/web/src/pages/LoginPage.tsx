@@ -1,4 +1,4 @@
-import { fieldErrorsOf, loginSchema } from '@planner/core';
+import { fieldErrorsOf, loginSchema, safeReturnTo } from '@planner/core';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ApiRequestError } from '../api/client';
@@ -8,7 +8,7 @@ import { FormField } from '../components/FormField';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const state = useLocation().state as { notice?: string; warning?: string } | null;
+  const state = useLocation().state as { notice?: string; warning?: string; from?: unknown } | null;
   const notice = state?.notice;
   const warning = state?.warning;
   const login = useLogin();
@@ -26,7 +26,7 @@ export function LoginPage() {
     setFieldErrors({});
 
     login.mutate(parsed.data, {
-      onSuccess: () => navigate('/dashboard', { replace: true }),
+      onSuccess: () => navigate(safeReturnTo(state?.from) ?? '/dashboard', { replace: true }),
       onError: (err) => {
         if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {
           setFieldErrors(err.fieldErrors);
