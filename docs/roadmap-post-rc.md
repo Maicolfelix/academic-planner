@@ -44,13 +44,13 @@ Descubrir qué problemas importan de verdad antes de construir mucho. Ver [Pilot
 
 ### Etapa A — Automatización de entrada (apunta a la serie `1.1.x`)
 
-| Id  | Objetivo                                                                                                                                                                                                  |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**fusionado**, PR #18)                                                                                                                       |
-| A4  | Integración con calendario externo: **A4.1** «Añadir al calendario» (`.ics` por actividad; implementado en su PR); **A4.2** feed sincronizado (**diferido** hasta tener evidencia)                        |
-| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida) — **IN REVIEW** (texto/título/URL hacia la Captura rápida; sin QA real; [share-target.md](share-target.md)) |
-| A2  | Importación de un archivo `.ics` — **DONE** (PR #56 fusionado; QA real funcional en dispositivo, entorno local/LAN HTTP; [ics-import.md](ics-import.md))                                                  |
-| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))                                                                                                                 |
+| Id  | Objetivo                                                                                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Schedule Import crea las asignaturas faltantes al confirmar (**fusionado**, PR #18)                                                                                                                                                                                                                                     |
+| A4  | Integración con calendario externo: **A4.1** «Añadir al calendario» (`.ics` por actividad; implementado en su PR); **A4.2** feed sincronizado (**diferido** hasta tener evidencia)                                                                                                                                      |
+| A5  | Web Share Target (compartir texto desde otras aplicaciones hacia la Bandeja o Captura rápida) — **DONE** (PR #57 fusionado; texto/título/URL hacia la Captura rápida; QA funcional manual vía `/share` en desarrollo local; la validación real desde el menú del SO queda para P12; [share-target.md](share-target.md)) |
+| A2  | Importación de un archivo `.ics` — **DONE** (PR #56 fusionado; QA real funcional en dispositivo, entorno local/LAN HTTP; [ics-import.md](ics-import.md))                                                                                                                                                                |
+| A3  | Suscripción por URL a un calendario externo: **diferida** (ver [decisión](#decisión-ics))                                                                                                                                                                                                                               |
 
 ### Etapa UX — Base visual y ajustes (orden aprobado en la revisión del roadmap)
 

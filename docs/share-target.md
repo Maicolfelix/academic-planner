@@ -1,6 +1,6 @@
 # Compartir hacia la Captura rápida (A5, Web Share Target)
 
-**Estado: EN REVISIÓN (IN REVIEW).** Implementado y probado de forma automática; **sin QA real** desde el menú «Compartir» de un sistema operativo. No se afirma validación con estudiantes, HTTPS, PWA instalada ni producción.
+**Estado: DONE (PR #57 fusionado).** QA funcional manual a través de `/share` en el entorno local de desarrollo (HTTP). **La validación real del Share Target desde el menú «Compartir» del sistema operativo, con la PWA instalada, queda diferida a P12.** No se afirma HTTPS, producción, soporte universal de navegador/SO ni validación con estudiantes. Solo texto, título y enlace: no hay archivos ni imágenes.
 
 Desde otra aplicación (WhatsApp, el navegador, el correo, Classroom…) el estudiante comparte **texto, título y/o un enlace** con Academic Planner y se abre la **Captura rápida** con ese contenido ya escrito. Flujo: COMPARTIR → CAPTURAR → INTERPRETAR → PROPONER → CONFIRMAR. **Compartir nunca crea nada**: el estudiante ve la caja, puede editarla, interpretar o cancelar, y todo lo demás es la Captura rápida de siempre (sin segundo intérprete ni segunda pantalla).
 

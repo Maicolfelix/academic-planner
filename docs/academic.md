@@ -145,7 +145,7 @@ Sale de la QA real: quien ajusta un corte espera que la nota final de la materia
 
 ## Compartir hacia la Captura rápida (A5)
 
-Lo que otra aplicación comparte (texto, título, enlace `http(s)`) se precarga en la Captura rápida; no crea nada y no sobrescribe un borrador sin preguntar. Detalle y límites: [share-target.md](share-target.md). **EN REVISIÓN: sin QA real.**
+Lo que otra aplicación comparte (texto, título, enlace `http(s)`) se precarga en la Captura rápida; no crea nada y no sobrescribe un borrador sin preguntar. Detalle y límites: [share-target.md](share-target.md). **DONE (PR #57 fusionado); QA funcional manual vía `/share` en desarrollo local; el menú «Compartir» real del SO queda para P12.**
 
 ## Importador de calendarios `.ics` (A2)
 
