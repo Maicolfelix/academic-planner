@@ -439,6 +439,37 @@ function suggestSubjectName(tokens: readonly Token[], typeRecognised: boolean): 
   return capitalize(name.map((t) => t.raw).join(' '));
 }
 
+/**
+ * Which mentions share ONE day said once, as the index of the mention that is the root of their group (null = in no group).
+ * Pure and structural, in the order written, and never by text or by sentence alone:
+ *  - a mention that carries a day of its own opens a possible root (and a later one with another day opens another);
+ *  - a mention that INHERITS a day belongs to the latest root of its sentence that carries that very same day; if nobody
+ *    carries it (the day was said before the first activity) the first inheriting mention of that sentence and day is the root.
+ * So two chains of inheritance in the same sentence get two roots, and two sentences worded the same never meet.
+ */
+export function sharedDayRoots(
+  items: readonly { sentence: number; inherited: boolean; days: string }[],
+): (number | null)[] {
+  const result: (number | null)[] = items.map(() => null);
+  const carriers: { index: number; sentence: number; days: string }[] = [];
+  const orphans = new Map<string, number>();
+  items.forEach((item, i) => {
+    if (!item.inherited) {
+      carriers.push({ index: i, sentence: item.sentence, days: item.days });
+      return;
+    }
+    const carrier = [...carriers]
+      .reverse()
+      .find((c) => c.sentence === item.sentence && c.days === item.days);
+    const key = `${item.sentence}\u0000${item.days}`;
+    const root = carrier ? carrier.index : (orphans.get(key) ?? i);
+    if (!carrier && !orphans.has(key)) orphans.set(key, i);
+    result[i] = root;
+    result[root] = root;
+  });
+  return result;
+}
+
 interface ResolvedDay {
   date: DateOnly | null;
   certainty: FieldCertainty;
@@ -1150,25 +1181,19 @@ export function parseCaptureProposals(
   // A day said ONCE for several activities ("el martes: un taller a las 8, un examen a las 2, un proyecto a las 7:30") is ONE
   // date. Resolved with each own hour it would split on the day itself (on a Tuesday at 10 the 8 o'clock one moves to next week
   // while the others stay today), so the DATE of the group is resolved with its earliest certain hour. Only the date: each
-  // keeps its own hour.
-  //
-  // The group is structural, never textual: the mentions of ONE sentence that share the day said in that sentence (the ones that
-  // inherit it, and the first mention of the sentence when it carries the very same day). Its identity is its root MENTION, so
-  // two groups that happen to be worded the same ("para el martes" twice, in two sentences) never touch each other.
-  const sameDays = (x: Mention, y: Mention) =>
-    JSON.stringify(x.days.map((d) => d.expr)) === JSON.stringify(y.days.map((d) => d.expr));
+  // keeps its own hour. The group is structural (see `sharedDayRoots`), never textual.
+  const live = mentions.filter((m) => !m.suggested);
+  const roots = sharedDayRoots(
+    live.map((m) => ({
+      sentence: m.span.sentenceIndex,
+      inherited: m.daysInherited,
+      days: JSON.stringify(m.days.map((d) => d.expr)),
+    })),
+  );
   const dayGroupRoot = new Map<Mention, Mention>();
-  for (const m of mentions) {
-    if (m.suggested || !m.daysInherited) continue;
-    const inSentence = mentions.filter(
-      (x) => !x.suggested && x.span.sentenceIndex === m.span.sentenceIndex,
-    );
-    const first = inSentence[0]!;
-    const root =
-      !first.daysInherited && sameDays(first, m) ? first : inSentence.find((x) => x.daysInherited)!;
-    dayGroupRoot.set(m, root);
-    if (root !== m && !root.daysInherited) dayGroupRoot.set(root, root);
-  }
+  roots.forEach((root, i) => {
+    if (root !== null) dayGroupRoot.set(live[i]!, live[root]!);
+  });
   const earliestHourOf = new Map<Mention, PlannedTime>();
   for (const [m, root] of dayGroupRoot) {
     for (const d of m.days) {

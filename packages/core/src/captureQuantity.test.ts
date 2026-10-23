@@ -1,3 +1,4 @@
+import { segmentDiscourse } from './captureDiscourse.js';
 import { describe, expect, it } from 'vitest';
 import { maskMetaText } from './captureContext.js';
 import { parseCaptureProposals, type CaptureMode, type CaptureResult } from './captureProposals.js';
@@ -125,6 +126,35 @@ describe('the contractual case: three activities for one day', () => {
         '2026-10-13',
         '2026-10-13',
         '2026-10-15',
+        '2026-10-15',
+      ]);
+    });
+
+    // The strongest shape: ONE sentence (no full stop or semicolon) with two days. First prove the segmenter keeps every
+    // activity in the same sentence, so the test attacks the grouping and not something the segmenter already separates.
+    const ONE_SENTENCE = `Para el martes tengo un taller a las 8:00 am y un quiz a las 10:00 am, y para el jueves tengo un proyecto a las 3:00 pm y una tarea a las 5:00 pm.`;
+
+    it('both families are in the same sentence', () => {
+      const spans = segmentDiscourse(ONE_SENTENCE, ctx(), {
+        splitLeading: true,
+        implicitDetails: true,
+      });
+      expect(spans.filter((x) => x.role === 'INTRO')).toHaveLength(4);
+      expect(new Set(spans.map((x) => x.sentenceIndex)).size).toBe(1);
+    });
+
+    it('two days in one sentence: the martes group uses its own earliest hour and the jueves activity its own day', () => {
+      // Tuesday 12:00 (Bogotá): the 8:00 am one has passed, so the martes group is the 20th; the jueves one is the 15th.
+      const r = at(ONE_SENTENCE, '2026-10-13T17:00:00Z');
+      expect(r.map((x) => x[0])).toEqual(['08:00', '10:00', '15:00', '17:00']);
+      expect(r[0]![1]).toBe('2026-10-20');
+      expect(r[1]![1]).toBe('2026-10-20'); // shares the martes of the 8:00 am one
+      expect(r[2]![1]).toBe('2026-10-15'); // its own day wins
+      // Tuesday 06:00: nothing has passed, the martes group is today
+      const early = at(ONE_SENTENCE, '2026-10-13T11:00:00Z');
+      expect([early[0]![1], early[1]![1], early[2]![1]]).toEqual([
+        '2026-10-13',
+        '2026-10-13',
         '2026-10-15',
       ]);
     });
