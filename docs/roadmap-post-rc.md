@@ -119,7 +119,17 @@ Dos pruebas de `e2e/capture.spec.ts` daban falsas alarmas intermitentes; ambas s
 **Seguimientos separados (no pertenecen a TEST-REL-2, no se arreglan en su PR):**
 
 - **(RESUELTO en su propio PR) Capture: un día explícito posterior debería pasar a ser el contexto de herencia.** En una misma oración, «Para el martes tengo un taller a las 8 y un quiz a las 10, y para el jueves tengo un proyecto a las 3 y una tarea a las 5», la tarea (sin día propio) sigue heredando el martes inicial: hoy el texto compartido es solo lo que va antes de la **primera** actividad de la oración. Es una limitación anterior del motor; un cambio exigiría una regla nueva de herencia y no se mezcla con esta deuda de fiabilidad.
-- **`auth.spec`: un 401 raro de `/api/profile` al cerrar sesión** (1 de ~40 corridas; misma familia de carrera de cierre de sesión que el n.º 17). Seguimiento propio: investigar con la línea de tiempo de peticiones antes de decidir entre esperar la carga o permitirlo con motivo.
+- **`auth.spec`: un 401 raro de `/api/profile` al cerrar sesión** → formalizado y resuelto como **TEST-REL-3** (abajo).
+
+#### Deuda de fiabilidad de pruebas: TEST-REL-3 — auth logout/profile 401 race (resuelta)
+
+`auth.spec › full auth flow` fallaba de forma intermitente con `401 /api/profile` al cerrar sesión. Resuelto en el PR `test: eliminate auth logout profile race`: **solo prueba, sin cambio de producto**, sin reintentos, esperas arbitrarias, tiempos más largos ni 401 tolerados.
+
+- **Tasa antes:** 2 de 60 corridas en `main` limpio (con carga), ambas en el primer cierre de sesión.
+- **Causa raíz (con línea de tiempo):** la prueba afirmaba la URL del Home justo después de la redirección `/login → /dashboard` (cierta de inmediato) y cerraba la sesión mientras el Home aún cargaba. El `POST /api/auth/logout` salía, el servidor cerraba la sesión, y al llegar los datos del Home se montaba su aviso de perfil, que **iniciaba** `GET /api/profile` **después de que el cierre empezó** (no antes) y recibía 401. Una petición que nadie podía evitar desde la prueba: la ventana es de unos 20 ms.
+- **Reproducción determinista:** con `serviceWorkers: 'block'`, la respuesta del Home retenida 600 ms y la del cierre de sesión 1800 ms, cerrar sesión durante la carga falla **siempre** (8 de 8, con el mismo `401 /api/profile`); cerrar sesión con el Home cargado no falla nunca (8 de 8).
+- **Arreglo:** `signOutWhenLoaded` en `auth.spec` espera el efecto real antes de pulsar «Cerrar sesión» (el encabezado del Home y que no quede ninguna petición en vuelo, la convención del proyecto) y se usa en ambos cierres. Además, una **regresión determinista** (`signing out while the Home is slow to arrive`) reproduce la ventana con las respuestas retenidas: sin la espera falla siempre (mutación comprobada), con ella pasa.
+- **Producto:** no cambia. Cancelar las consultas al empezar el cierre habría evitado la petición tardía, pero añade un camino de error (qué pasa si el cierre falla) para un 401 inofensivo en una pantalla que ya se abandona.
 
 #### Dirección visual para UX1-2
 

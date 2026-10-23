@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   completeOnboarding,
   greetingFor,
@@ -8,6 +8,20 @@ import {
   uniqueEmail,
   watch,
 } from './helpers';
+
+/**
+ * Signs out once the Home has really finished loading (its heading is there and no request is left in flight).
+ *
+ * Why: the Home starts new queries as its data arrives (the profile one when its notice mounts). Clicking "Cerrar sesión" while the
+ * Home is still loading lets those queries start AFTER the logout began, against a session the server has already closed: a 401 on
+ * a request nobody could have avoided from the test side (TEST-REL-3, a ~20 ms window, about 1 run in 30). A URL assertion is not
+ * enough: right after a redirect it is already true while the screen has not loaded.
+ */
+async function signOutWhenLoaded(page: Page) {
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+}
 
 test('full auth flow: register, persist, logout, guard, login, wrong credentials', async ({
   page,
@@ -42,7 +56,7 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   await expect(page).toHaveURL(/\/dashboard$/);
 
   // 7. Logout -> login screen with confirmation.
-  await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+  await signOutWhenLoaded(page);
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('status')).toContainText('Sesión cerrada correctamente.');
 
@@ -56,7 +70,7 @@ test('full auth flow: register, persist, logout, guard, login, wrong credentials
   await expect(page.getByRole('heading', { level: 1, name: greetingFor(NAME) })).toBeVisible();
 
   // Back button after logout must not reveal the protected screen.
-  await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+  await signOutWhenLoaded(page);
   await expect(page).toHaveURL(/\/login$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/login$/);
@@ -120,4 +134,32 @@ test('login validates empty fields and anonymous root goes to /login', async ({ 
   await expect(page.getByText('Ingresa tu contraseña.')).toBeVisible();
 
   assertClean();
+});
+
+// TEST-REL-3, made deterministic. The browser hears about the Home's data late (the server answered at once) and about the logout
+// even later (the server closed the session at once). Signing out while the Home loads fails every time (a 401 on the profile
+// request the Home starts after the logout began); signing out once it has loaded never does. `page.route` needs the service worker
+// out of the way, as in the other specs that fake the network.
+test.describe('signing out while the Home is slow to arrive', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('no request of the screen starts after the logout began', async ({ page }) => {
+    const assertClean = watch(page);
+    await register(page, uniqueEmail());
+    await completeOnboarding(page);
+
+    const holdAnswer = async (pattern: string, ms: number) =>
+      page.route(pattern, async (route) => {
+        const answer = await route.fetch(); // the server has already answered...
+        await new Promise((resolve) => setTimeout(resolve, ms)); // ...and the browser hears late
+        await route.fulfill({ response: answer });
+      });
+    await holdAnswer('**/api/dashboard', 600);
+    await holdAnswer('**/api/auth/logout', 1800);
+
+    await page.goto('/dashboard');
+    await signOutWhenLoaded(page);
+    await expect(page).toHaveURL(/\/login$/);
+    assertClean();
+  });
 });
