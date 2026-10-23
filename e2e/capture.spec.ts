@@ -518,6 +518,11 @@ test("17. two accounts in one browser never see each other's drafts", async ({ p
   await expect(box(page)).toHaveValue('');
   await expect(quick(page).getByText('Retomé lo que tenías sin terminar.')).toHaveCount(0);
   await page.goto('/activities');
+  // The check below is only meaningful once the page has really loaded (a count of 0 is true on an empty page), and logging out
+  // while the lazily loaded page is still starting its queries makes those queries run against a session that is going away
+  // (401s). Wait for the screen to finish loading, as the other specs do before logging out.
+  await expect(page.getByRole('heading', { level: 1, name: 'Actividades' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
   await expect(page.getByText('Tienes una actividad sin terminar')).toHaveCount(0);
   await page.getByRole('banner').getByRole('button', { name: 'Cerrar sesión' }).click();
   await expect(page).toHaveURL(/\/login$/);

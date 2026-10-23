@@ -1,3 +1,4 @@
+import { segmentDiscourse } from './captureDiscourse.js';
 import { describe, expect, it } from 'vitest';
 import { maskMetaText } from './captureContext.js';
 import { parseCaptureProposals, type CaptureMode, type CaptureResult } from './captureProposals.js';
@@ -60,6 +61,116 @@ describe('the contractual case: three activities for one day', () => {
     expect(r.proposals.every((p) => p.date.value === '2026-10-13')).toBe(true);
     expect(r.proposals.slice(1).every((p) => p.date.origin === 'INHERITED')).toBe(true);
     expect(r.proposals.every((p) => p.blockingIssues.every((b) => b.field !== 'date'))).toBe(true);
+  });
+
+  // The shared day is ONE date whatever the clock says. (Bogotá is UTC-5; Tuesday is 13 October 2026, the next one the 20th.)
+  // Before: on a Tuesday at 10 the 8 o'clock activity moved to next week while the 2 pm and 7:30 pm ones stayed today.
+  it.each([
+    ['Sunday 20:00', '2026-10-11T20:00:00Z', '2026-10-13'],
+    ['Monday 23:00', '2026-10-13T04:00:00Z', '2026-10-13'],
+    ['Tuesday 06:00, before every hour', '2026-10-13T11:00:00Z', '2026-10-13'],
+    ['Tuesday 10:00, after the first hour', '2026-10-13T15:00:00Z', '2026-10-20'],
+    ['Tuesday 16:00, after the second hour', '2026-10-13T21:00:00Z', '2026-10-20'],
+    ['Tuesday 20:00, after every hour', '2026-10-14T01:00:00Z', '2026-10-20'],
+    ['Wednesday 10:00', '2026-10-14T15:00:00Z', '2026-10-20'],
+  ])('%s: the three share one Tuesday, %s -> %s', (_label, now, tuesday) => {
+    const r = parseCaptureProposals(CASE, { ...ctx(), now: new Date(now) }, 'QUICK');
+    expect(r.proposals.map((p) => [p.time.value, p.date.value])).toEqual([
+      ['08:00', tuesday],
+      ['14:00', tuesday],
+      ['19:30', tuesday],
+    ]);
+  });
+
+  // Two shared-day groups in ONE capture never touch each other, even when they are worded the same. Bogotá is UTC-5; the
+  // clocks are Tuesday 13 October 2026 at 06:00, 12:00 and 20:00 (the next Tuesday is the 20th, the Thursday the 15th).
+  describe('independent shared-day groups', () => {
+    const SAME_WORDS = `Para el martes: un taller a las 8:00 am y un examen a las 10:00 am. Para el martes: un proyecto a las 3:00 PM y una tarea a las 5:00 PM.`;
+    const SAME_WORDS_2 = `El martes tendremos un taller a las 8:00 am y un examen a las 10:00 am. El martes tendremos un proyecto a las 3:00 PM y una tarea a las 5:00 PM.`;
+    const OTHER_DAY = `Para el martes: un taller a las 8:00 am y un examen a las 10:00 am. Para el jueves: un proyecto a las 3:00 PM y una tarea a las 5:00 PM.`;
+    const at = (text: string, now: string) =>
+      parseCaptureProposals(text, { ...ctx(), now: new Date(now) }, 'QUICK').proposals.map((p) => [
+        p.time.value,
+        p.date.value,
+      ]);
+
+    it.each([
+      // each group uses ITS OWN earliest hour: at 12:00 the 8:00 group moved to next week, the 15:00 group did not
+      [
+        'Tuesday 12:00',
+        '2026-10-13T17:00:00Z',
+        ['2026-10-20', '2026-10-20', '2026-10-13', '2026-10-13'],
+      ],
+      [
+        'Tuesday 06:00',
+        '2026-10-13T11:00:00Z',
+        ['2026-10-13', '2026-10-13', '2026-10-13', '2026-10-13'],
+      ],
+      [
+        'Tuesday 20:00',
+        '2026-10-14T01:00:00Z',
+        ['2026-10-20', '2026-10-20', '2026-10-20', '2026-10-20'],
+      ],
+    ])('the same words twice, %s: no group contaminates the other', (_l, now, dates) => {
+      for (const text of [SAME_WORDS, SAME_WORDS_2]) {
+        const r = at(text, now);
+        expect(r.map((x) => x[0])).toEqual(['08:00', '10:00', '15:00', '17:00']);
+        expect(r.map((x) => x[1])).toEqual(dates);
+      }
+    });
+
+    it('two groups with different days: each its own day, and the hours of one never move the other', () => {
+      const r = at(OTHER_DAY, '2026-10-13T17:00:00Z');
+      expect(r.map((x) => x[1])).toEqual(['2026-10-20', '2026-10-20', '2026-10-15', '2026-10-15']);
+      expect(at(OTHER_DAY, '2026-10-13T11:00:00Z').map((x) => x[1])).toEqual([
+        '2026-10-13',
+        '2026-10-13',
+        '2026-10-15',
+        '2026-10-15',
+      ]);
+    });
+
+    // The strongest shape: ONE sentence (no full stop or semicolon) with two days. First prove the segmenter keeps every
+    // activity in the same sentence, so the test attacks the grouping and not something the segmenter already separates.
+    const ONE_SENTENCE = `Para el martes tengo un taller a las 8:00 am y un quiz a las 10:00 am, y para el jueves tengo un proyecto a las 3:00 pm y una tarea a las 5:00 pm.`;
+
+    it('both families are in the same sentence', () => {
+      const spans = segmentDiscourse(ONE_SENTENCE, ctx(), {
+        splitLeading: true,
+        implicitDetails: true,
+      });
+      expect(spans.filter((x) => x.role === 'INTRO')).toHaveLength(4);
+      expect(new Set(spans.map((x) => x.sentenceIndex)).size).toBe(1);
+    });
+
+    it('two days in one sentence: the martes group uses its own earliest hour and the jueves activity its own day', () => {
+      // Tuesday 12:00 (Bogotá): the 8:00 am one has passed, so the martes group is the 20th; the jueves one is the 15th.
+      const r = at(ONE_SENTENCE, '2026-10-13T17:00:00Z');
+      expect(r.map((x) => x[0])).toEqual(['08:00', '10:00', '15:00', '17:00']);
+      expect(r[0]![1]).toBe('2026-10-20');
+      expect(r[1]![1]).toBe('2026-10-20'); // shares the martes of the 8:00 am one
+      expect(r[2]![1]).toBe('2026-10-15'); // its own day wins
+      // Tuesday 06:00: nothing has passed, the martes group is today
+      const early = at(ONE_SENTENCE, '2026-10-13T11:00:00Z');
+      expect([early[0]![1], early[1]![1], early[2]![1]]).toEqual([
+        '2026-10-13',
+        '2026-10-13',
+        '2026-10-15',
+      ]);
+    });
+
+    it('an activity with a day of its own still wins over the shared one, and the shared group ignores it', () => {
+      const text = `Tengo 3 actividades para el martes: un taller a las 3:00 PM, un examen el jueves a las 8:00 am y un proyecto a las 5:00 PM`;
+      const r = parseCaptureProposals(
+        text,
+        { ...ctx(), now: new Date('2026-10-13T17:00:00Z') },
+        'QUICK',
+      );
+      const byTime = Object.fromEntries(r.proposals.map((p) => [p.time.value, p.date.value]));
+      expect(byTime['08:00']).toBe('2026-10-15'); // its own Thursday
+      expect(byTime['15:00']).toBe('2026-10-13'); // the shared Tuesday, resolved by 15:00 and 17:00 only
+      expect(byTime['17:00']).toBe('2026-10-13');
+    });
   });
 
   it('a day of their own beats the shared one', () => {

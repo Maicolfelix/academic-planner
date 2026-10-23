@@ -69,6 +69,8 @@ Corrección de un defecto de la importación de horario encontrado al probar con
 
 ### Fixed
 
+- **A day said once for several activities is one date, whatever the clock.** "Tengo 3 actividades para el martes: un taller a las 8, un examen a las 2…" resolved the shared Tuesday with each activity's own hour, so on a Tuesday at 10:00 the 8 o'clock one moved to next week while the others stayed today. The date of the group is now resolved once, with its earliest certain hour (each activity keeps its own hour). Regression tests in core with seven controlled clocks.
+- **Two flaky capture e2e tests (TEST-REL-2).** #17 logged out while its lazily loaded page was still starting its queries (401s) and checked privacy on a page that had not loaded; #28 depended on the real day and hour (the product defect above). No retries, waits or weakened assertions.
 - Schedule import now recognizes compact 24-hour time ranges such as `1900-2030` (19:00–20:30), `1400-1615` and `0800-0930`. A valid range takes priority over isolated times in the same block, which also no longer end up in the title.
 - Schedule import filters calendar-axis time labels (`1pm 2pm 3pm …`) that previously could replace the real hours of a class or create a false proposal.
 - Compact ranges are conservative: invalid times (`2560-2700`, `1965-2030`), years (`2019-2024`) and room numbers (`207-215`) are not read as hours.
