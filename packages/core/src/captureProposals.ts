@@ -1148,32 +1148,34 @@ export function parseCaptureProposals(
 
   // 3. Proposals.
   // A day said ONCE for several activities ("el martes: un taller a las 8, un examen a las 2, un proyecto a las 7:30") is ONE
-  // date: the activity that carries it (the one just before the first that inherits it) and the ones that inherit it. Resolved with
-  // each own hour it would split on the day itself (on a Tuesday at 10 the 8 o'clock one moves to next week while the others
-  // stay today), so the DATE of the group is resolved with its earliest certain hour. Only the date: each keeps its own hour.
-  const sharedDay = new Map<(typeof mentions)[number], string>();
-  mentions.forEach((m, i) => {
-    if (m.suggested || !m.daysInherited) return;
-    sharedDay.set(m, m.span.sharedText);
-    const origin = mentions[i - 1];
-    const same = (x: typeof m) => JSON.stringify(x.days.map((d) => d.expr));
-    if (
-      origin &&
-      !origin.suggested &&
-      !origin.daysInherited &&
-      !sharedDay.has(origin) &&
-      same(origin) === same(m)
-    ) {
-      sharedDay.set(origin, m.span.sharedText);
-    }
-  });
-  const earliestSharedHour = new Map<string, PlannedTime>();
-  for (const [m, key] of sharedDay) {
+  // date. Resolved with each own hour it would split on the day itself (on a Tuesday at 10 the 8 o'clock one moves to next week
+  // while the others stay today), so the DATE of the group is resolved with its earliest certain hour. Only the date: each
+  // keeps its own hour.
+  //
+  // The group is structural, never textual: the mentions of ONE sentence that share the day said in that sentence (the ones that
+  // inherit it, and the first mention of the sentence when it carries the very same day). Its identity is its root MENTION, so
+  // two groups that happen to be worded the same ("para el martes" twice, in two sentences) never touch each other.
+  const sameDays = (x: Mention, y: Mention) =>
+    JSON.stringify(x.days.map((d) => d.expr)) === JSON.stringify(y.days.map((d) => d.expr));
+  const dayGroupRoot = new Map<Mention, Mention>();
+  for (const m of mentions) {
+    if (m.suggested || !m.daysInherited) continue;
+    const inSentence = mentions.filter(
+      (x) => !x.suggested && x.span.sentenceIndex === m.span.sentenceIndex,
+    );
+    const first = inSentence[0]!;
+    const root =
+      !first.daysInherited && sameDays(first, m) ? first : inSentence.find((x) => x.daysInherited)!;
+    dayGroupRoot.set(m, root);
+    if (root !== m && !root.daysInherited) dayGroupRoot.set(root, root);
+  }
+  const earliestHourOf = new Map<Mention, PlannedTime>();
+  for (const [m, root] of dayGroupRoot) {
     for (const d of m.days) {
       const t = d.time ?? m.sharedTime;
       if (!t || t.value === null || t.certainty === 'AMBIGUOUS') continue;
-      const best = earliestSharedHour.get(key);
-      if (!best || t.value < best.value!) earliestSharedHour.set(key, t);
+      const best = earliestHourOf.get(root);
+      if (!best || t.value < best.value!) earliestHourOf.set(root, t);
     }
   }
   const drafts: { key: string; draft: Draft }[] = [];
@@ -1198,10 +1200,10 @@ export function parseCaptureProposals(
     }
 
     const timeOf = (d: PlannedDay): PlannedTime | null => d.time ?? mention.sharedTime;
-    // The date of a day shared by a group is resolved with the group's earliest hour (see `sharedDay`); each keeps its own hour.
+    // The date of a day shared by a group is resolved with the group's earliest hour (see `dayGroupRoot`); each keeps its own hour.
     const hourForDate = (d: PlannedDay): PlannedTime | null =>
-      sharedDay.has(mention)
-        ? (earliestSharedHour.get(sharedDay.get(mention)!) ?? timeOf(d))
+      dayGroupRoot.has(mention)
+        ? (earliestHourOf.get(dayGroupRoot.get(mention)!) ?? timeOf(d))
         : timeOf(d);
     if (mention.dateConflict) days = mention.dateConflict;
     const resolved = days.length > 0 ? resolveDays(days, today, context, hourForDate) : [];
