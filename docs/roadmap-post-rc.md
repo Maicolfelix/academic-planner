@@ -118,7 +118,7 @@ Dos pruebas de `e2e/capture.spec.ts` daban falsas alarmas intermitentes; ambas s
 
 **Seguimientos separados (no pertenecen a TEST-REL-2, no se arreglan en su PR):**
 
-- **Capture: un día explícito posterior debería pasar a ser el contexto de herencia.** En una misma oración, «Para el martes tengo un taller a las 8 y un quiz a las 10, y para el jueves tengo un proyecto a las 3 y una tarea a las 5», la tarea (sin día propio) sigue heredando el martes inicial: hoy el texto compartido es solo lo que va antes de la **primera** actividad de la oración. Es una limitación anterior del motor; un cambio exigiría una regla nueva de herencia y no se mezcla con esta deuda de fiabilidad.
+- **(RESUELTO en su propio PR) Capture: un día explícito posterior debería pasar a ser el contexto de herencia.** En una misma oración, «Para el martes tengo un taller a las 8 y un quiz a las 10, y para el jueves tengo un proyecto a las 3 y una tarea a las 5», la tarea (sin día propio) sigue heredando el martes inicial: hoy el texto compartido es solo lo que va antes de la **primera** actividad de la oración. Es una limitación anterior del motor; un cambio exigiría una regla nueva de herencia y no se mezcla con esta deuda de fiabilidad.
 - **`auth.spec`: un 401 raro de `/api/profile` al cerrar sesión** (1 de ~40 corridas; misma familia de carrera de cierre de sesión que el n.º 17). Seguimiento propio: investigar con la línea de tiempo de peticiones antes de decidir entre esperar la carga o permitirlo con motivo.
 
 #### Dirección visual para UX1-2

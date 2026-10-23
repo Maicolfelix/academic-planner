@@ -13,6 +13,7 @@ import {
   buildSubjectEntries,
   capitalize,
   cloneTokens,
+  findDateExpressions,
   interpretWords,
   matchSubject,
   resolveDate,
@@ -1048,6 +1049,7 @@ export function parseCaptureProposals(
   const bySpan = new Map<number, Mention>();
 
   // 1. Every introduced activity, with its own words.
+  let laterDayContext: { sentence: number; days: PlannedDay[] } | null = null;
   for (const span of spans) {
     if (span.role !== 'INTRO') continue;
     const groupId = `g${mentions.length + 1}`;
@@ -1060,14 +1062,38 @@ export function parseCaptureProposals(
     // The days: its own, else the ones the rest of the sentence gave ("El martes a las 10 tendremos parcial y quiz").
     let days = plan.days;
     let daysInherited = false;
+    // A day written BEFORE this activity's own word ("... y para el jueves tengo un proyecto a las 3") is the context of what
+    // follows in the sentence: "y una tarea a las 5" is jueves, not the martes the sentence started with.
+    const dayBeforeActivity =
+      span.headIndex > 0 &&
+      (findDateExpressions(tokenize(span.text))[0]?.match.start ?? Infinity) < span.headIndex;
     if (days.length === 0 && sharedPlan && sharedPlan.days.length > 0) {
-      days = sharedPlan.days.map((d) => ({ ...d }));
+      const later =
+        laterDayContext && laterDayContext.sentence === span.sentenceIndex
+          ? laterDayContext.days
+          : null;
+      days = (later ?? sharedPlan.days).map((d) => ({
+        ...d,
+        ...(later ? { time: null, timeIssue: null } : {}),
+      }));
       daysInherited = true;
       // "Tengo 3 actividades para el martes: un taller a las 8, un examen a las 2…": the day is shared, the hour is its own.
       const ownTimes = plan.times.filter((t): t is PlannedTime => t !== null);
       if (plan.timeItems === 1 && ownTimes.length === 1) {
         days = days.map((d) => ({ ...d, time: ownTimes[0]!, timeIssue: null }));
       }
+    }
+    // Only a day this activity wrote itself, before its own word, and only from the second activity of a sentence on (the first one
+    // carries the sentence's own day, which the later ones already inherit with its hour), opens a new context. It changes WHICH
+    // day is inherited and never makes an activity inherit one that nobody gave it (the inheritance above needs a shared day).
+    if (
+      !daysInherited &&
+      plan.days.length > 0 &&
+      dayBeforeActivity &&
+      sharedPlan &&
+      sharedPlan.days.length > 0
+    ) {
+      laterDayContext = { sentence: span.sentenceIndex, days: plan.days };
     }
     // A time nobody gave this stretch but the sentence did, once.
     let sharedTime: PlannedTime | null = null;

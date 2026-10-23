@@ -143,20 +143,65 @@ describe('the contractual case: three activities for one day', () => {
       expect(new Set(spans.map((x) => x.sentenceIndex)).size).toBe(1);
     });
 
-    it('two days in one sentence: the martes group uses its own earliest hour and the jueves activity its own day', () => {
-      // Tuesday 12:00 (Bogotá): the 8:00 am one has passed, so the martes group is the 20th; the jueves one is the 15th.
-      const r = at(ONE_SENTENCE, '2026-10-13T17:00:00Z');
-      expect(r.map((x) => x[0])).toEqual(['08:00', '10:00', '15:00', '17:00']);
-      expect(r[0]![1]).toBe('2026-10-20');
-      expect(r[1]![1]).toBe('2026-10-20'); // shares the martes of the 8:00 am one
-      expect(r[2]![1]).toBe('2026-10-15'); // its own day wins
-      // Tuesday 06:00: nothing has passed, the martes group is today
-      const early = at(ONE_SENTENCE, '2026-10-13T11:00:00Z');
-      expect([early[0]![1], early[1]![1], early[2]![1]]).toEqual([
-        '2026-10-13',
-        '2026-10-13',
-        '2026-10-15',
-      ]);
+    it('a later explicit day becomes the context of what follows: "y una tarea" is jueves, not the first martes', () => {
+      // [clock, martes group (taller 8:00, quiz 10:00), jueves group (proyecto 15:00, tarea 17:00)]
+      const cases: [string, string, string, string][] = [
+        ['Tuesday 06:00', '2026-10-13T11:00:00Z', '2026-10-13', '2026-10-15'],
+        [
+          'Tuesday 12:00 (the 8:00 am one has passed)',
+          '2026-10-13T17:00:00Z',
+          '2026-10-20',
+          '2026-10-15',
+        ],
+        ['Thursday 12:00', '2026-10-15T17:00:00Z', '2026-10-20', '2026-10-15'],
+        // Thursday 16:00: the 15:00 one has passed and the 17:00 one has not, yet the jueves group is ONE date (next Thursday)
+        ['Thursday 16:00', '2026-10-15T21:00:00Z', '2026-10-20', '2026-10-22'],
+        ['Friday 10:00', '2026-10-16T15:00:00Z', '2026-10-20', '2026-10-22'],
+      ];
+      for (const [, now, martes, jueves] of cases) {
+        const r = parseCaptureProposals(
+          ONE_SENTENCE,
+          { ...ctx(), now: new Date(now) },
+          'QUICK',
+        ).proposals;
+        expect(r.map((p) => p.time.value)).toEqual(['08:00', '10:00', '15:00', '17:00']);
+        expect(r.map((p) => p.date.value)).toEqual([martes, martes, jueves, jueves]);
+        // the first of each context carries its day; the others inherit it
+        expect(r.map((p) => p.date.origin)).toEqual(['PARSED', 'INHERITED', 'PARSED', 'INHERITED']);
+      }
+    });
+
+    it('the new context also applies to "y el miércoles un quiz y una tarea" (the day written before the activity word)', () => {
+      const text = `Para el lunes tengo un parcial a las 8:00 am, y el miércoles un quiz a las 2:00 pm y una tarea a las 4:00 pm.`;
+      const r = parseCaptureProposals(
+        text,
+        { ...ctx(), now: new Date('2026-10-13T17:00:00Z') },
+        'QUICK',
+      ).proposals;
+      expect(r.map((p) => p.date.value)).toEqual(['2026-10-19', '2026-10-14', '2026-10-14']);
+    });
+
+    it('it only changes WHICH day is inherited: nobody inherits a day that nobody gave them', () => {
+      // no day before the first activity: the "tarea" still asks for its day (it does not borrow the miércoles of the quiz)
+      const text = `Un taller el martes a las 8:00 am y el jueves un quiz y una tarea a las 5:00 pm.`;
+      const r = parseCaptureProposals(
+        text,
+        { ...ctx(), now: new Date('2026-10-13T17:00:00Z') },
+        'QUICK',
+      ).proposals;
+      const tarea = r.find((p) => p.title.value === 'Tarea')!;
+      expect(tarea.date.value).toBeNull();
+      expect(tarea.blockingIssues.map((b) => b.field)).toContain('date');
+    });
+
+    it('a day written AFTER the activity word is only its own activity day: it does not become the context', () => {
+      const text = `Para el martes: un taller a las 8:00 am y un examen el jueves a las 10:00 am y un proyecto a las 5:00 pm.`;
+      const r = parseCaptureProposals(
+        text,
+        { ...ctx(), now: new Date('2026-10-13T17:00:00Z') },
+        'QUICK',
+      ).proposals;
+      expect(r.map((p) => p.date.value)).toEqual(['2026-10-20', '2026-10-15', '2026-10-20']); // the proyecto keeps the martes
     });
 
     it('an activity with a day of its own still wins over the shared one, and the shared group ignores it', () => {
