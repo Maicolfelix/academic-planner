@@ -1147,6 +1147,35 @@ export function parseCaptureProposals(
   }
 
   // 3. Proposals.
+  // A day said ONCE for several activities ("el martes: un taller a las 8, un examen a las 2, un proyecto a las 7:30") is ONE
+  // date: the activity that carries it (the one just before the first that inherits it) and the ones that inherit it. Resolved with
+  // each own hour it would split on the day itself (on a Tuesday at 10 the 8 o'clock one moves to next week while the others
+  // stay today), so the DATE of the group is resolved with its earliest certain hour. Only the date: each keeps its own hour.
+  const sharedDay = new Map<(typeof mentions)[number], string>();
+  mentions.forEach((m, i) => {
+    if (m.suggested || !m.daysInherited) return;
+    sharedDay.set(m, m.span.sharedText);
+    const origin = mentions[i - 1];
+    const same = (x: typeof m) => JSON.stringify(x.days.map((d) => d.expr));
+    if (
+      origin &&
+      !origin.suggested &&
+      !origin.daysInherited &&
+      !sharedDay.has(origin) &&
+      same(origin) === same(m)
+    ) {
+      sharedDay.set(origin, m.span.sharedText);
+    }
+  });
+  const earliestSharedHour = new Map<string, PlannedTime>();
+  for (const [m, key] of sharedDay) {
+    for (const d of m.days) {
+      const t = d.time ?? m.sharedTime;
+      if (!t || t.value === null || t.certainty === 'AMBIGUOUS') continue;
+      const best = earliestSharedHour.get(key);
+      if (!best || t.value < best.value!) earliestSharedHour.set(key, t);
+    }
+  }
   const drafts: { key: string; draft: Draft }[] = [];
   for (const mention of mentions) {
     if (mention.suggested) {
@@ -1169,8 +1198,13 @@ export function parseCaptureProposals(
     }
 
     const timeOf = (d: PlannedDay): PlannedTime | null => d.time ?? mention.sharedTime;
+    // The date of a day shared by a group is resolved with the group's earliest hour (see `sharedDay`); each keeps its own hour.
+    const hourForDate = (d: PlannedDay): PlannedTime | null =>
+      sharedDay.has(mention)
+        ? (earliestSharedHour.get(sharedDay.get(mention)!) ?? timeOf(d))
+        : timeOf(d);
     if (mention.dateConflict) days = mention.dateConflict;
-    const resolved = days.length > 0 ? resolveDays(days, today, context, timeOf) : [];
+    const resolved = days.length > 0 ? resolveDays(days, today, context, hourForDate) : [];
     const weekdayDays = days.filter((d) => d.expr.kind === 'weekday');
     const possibleRecurrence =
       plan.recurrence.plural ||

@@ -62,6 +62,25 @@ describe('the contractual case: three activities for one day', () => {
     expect(r.proposals.every((p) => p.blockingIssues.every((b) => b.field !== 'date'))).toBe(true);
   });
 
+  // The shared day is ONE date whatever the clock says. (Bogotá is UTC-5; Tuesday is 13 October 2026, the next one the 20th.)
+  // Before: on a Tuesday at 10 the 8 o'clock activity moved to next week while the 2 pm and 7:30 pm ones stayed today.
+  it.each([
+    ['Sunday 20:00', '2026-10-11T20:00:00Z', '2026-10-13'],
+    ['Monday 23:00', '2026-10-13T04:00:00Z', '2026-10-13'],
+    ['Tuesday 06:00, before every hour', '2026-10-13T11:00:00Z', '2026-10-13'],
+    ['Tuesday 10:00, after the first hour', '2026-10-13T15:00:00Z', '2026-10-20'],
+    ['Tuesday 16:00, after the second hour', '2026-10-13T21:00:00Z', '2026-10-20'],
+    ['Tuesday 20:00, after every hour', '2026-10-14T01:00:00Z', '2026-10-20'],
+    ['Wednesday 10:00', '2026-10-14T15:00:00Z', '2026-10-20'],
+  ])('%s: the three share one Tuesday, %s -> %s', (_label, now, tuesday) => {
+    const r = parseCaptureProposals(CASE, { ...ctx(), now: new Date(now) }, 'QUICK');
+    expect(r.proposals.map((p) => [p.time.value, p.date.value])).toEqual([
+      ['08:00', tuesday],
+      ['14:00', tuesday],
+      ['19:30', tuesday],
+    ]);
+  });
+
   it('a day of their own beats the shared one', () => {
     const r = run(
       'Tengo 3 actividades para el martes un taller a las 8 am, un examen el miércoles a las 2 pm y un proyecto a las 7:30 pm',
