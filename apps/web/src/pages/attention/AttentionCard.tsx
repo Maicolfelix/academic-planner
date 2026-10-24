@@ -2,6 +2,8 @@ import { QueryError } from '../../components/QueryError';
 import { RADAR_LABELS, formatDue, radarExplanation, type RadarStatus } from '@planner/core';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
+import type { ActivityStatus } from '@planner/core';
+import { useUpdateActivity } from '../../activities/useActivities';
 import type { OriginOf } from '../../academic/origin';
 import { useOrigins } from '../../academic/useAcademic';
 import { useAttention } from '../../attention/useAttention';
@@ -47,6 +49,16 @@ const STAGE = [
 
 type Item = NonNullable<ReturnType<typeof useAttention>['data']>['recommendation'] & object;
 
+/** What the hero lets the student do without leaving the Home: the same status change as the Activities screen. */
+type HeroActions = {
+  /** Change the activity's status (the existing activity mutation, which refreshes every derived view). */
+  onStatus: (item: Item, status: ActivityStatus) => void;
+  /** The activity being changed and to what, while the request (and the refresh behind it) is in flight. */
+  pending: { id: string; status: ActivityStatus } | null;
+  /** The failed change, shown on that activity's own hero. */
+  error: { id: string; message: string } | null;
+};
+
 /**
  * "¿Qué hago ahora?": the next activities by deadline (at most five, the API's `upcoming`), one hero each, in a strip
  * that snaps: swipe on a phone, dots anywhere. The internal score is never shown. With a single activity it is just
@@ -56,6 +68,36 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
   const attention = useAttention();
   const originOf = useOrigins();
   const data = attention.data;
+  const update = useUpdateActivity();
+  const [error, setError] = useState<HeroActions['error']>(null);
+  const [notice, setNotice] = useState('');
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actions: HeroActions = {
+    pending: update.isPending
+      ? { id: update.variables.id, status: update.variables.input.status! }
+      : null,
+    error,
+    onStatus: (item, status) => {
+      if (update.isPending) return; // one change at a time: no double submit
+      setError(null);
+      setNotice('');
+      update.mutate(
+        { id: item.activity.id, input: { status } },
+        {
+          onSuccess: () => {
+            setNotice(
+              status === 'COMPLETED'
+                ? `«${item.activity.title}» completada.`
+                : `«${item.activity.title}» está en proceso.`,
+            );
+            // The finished hero is gone: keep the keyboard where the student was, at the top of this section.
+            if (status === 'COMPLETED') heading.current?.focus();
+          },
+          onError: (err) => setError({ id: item.activity.id, message: err.message }),
+        },
+      );
+    },
+  };
   const items: Item[] = data?.upcoming.length
     ? data.upcoming
     : data?.recommendation
@@ -64,9 +106,17 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
 
   return (
     <section aria-labelledby="attention-title" className="flex flex-col gap-2">
-      <h2 id="attention-title" className="text-section-title">
+      <h2
+        id="attention-title"
+        ref={heading}
+        tabIndex={-1}
+        className="text-section-title outline-none"
+      >
         ¿Qué hago ahora?
       </h2>
+      <p role="status" className="sr-only">
+        {notice}
+      </p>
 
       {attention.isPending && <p role="status">Buscando qué actividad requiere atención…</p>}
 
@@ -79,7 +129,13 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
       )}
 
       {items.length > 0 && (
-        <HeroCarousel items={items} timeZone={timeZone} now={now} origin={originOf} />
+        <HeroCarousel
+          items={items}
+          timeZone={timeZone}
+          now={now}
+          origin={originOf}
+          actions={actions}
+        />
       )}
     </section>
   );
@@ -111,11 +167,13 @@ function HeroCarousel({
   timeZone,
   now,
   origin,
+  actions,
 }: {
   items: Item[];
   timeZone: string;
   now: Date;
   origin: OriginOf;
+  actions: HeroActions;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
@@ -271,6 +329,13 @@ function HeroCarousel({
               timeZone={timeZone}
               now={now}
               origin={origin(item.activity.periodId)}
+              actions={{
+                onComplete: () => actions.onStatus(item, 'COMPLETED'),
+                onStart: () => actions.onStatus(item, 'IN_PROGRESS'),
+                pending: actions.pending?.id === item.activity.id ? actions.pending.status : null,
+                busy: actions.pending !== null,
+                error: actions.error?.id === item.activity.id ? actions.error.message : null,
+              }}
             />
           </div>
         ))}
@@ -318,12 +383,24 @@ export function Suggestion({
   timeZone,
   now,
   origin = null,
+  actions,
 }: {
   item: Item;
   timeZone: string;
   now: Date;
   /** The study the activity comes from, when it is worth saying (see `originLabelOf`). */
   origin?: string | null;
+  /** Without it the hero only offers the link (the static previews in the tests have no data layer). */
+  actions?: {
+    onComplete: () => void;
+    /** Only offered while the activity is still pending. */
+    onStart: () => void;
+    /** The status being saved for THIS activity, if any. */
+    pending: ActivityStatus | null;
+    /** Some change is in flight (any activity): every button waits. */
+    busy: boolean;
+    error: string | null;
+  };
 }) {
   const { activity, radarStatus, reasons } = item;
   return (
@@ -394,12 +471,41 @@ export function Suggestion({
         </div>
       </div>
 
-      {/* A white button on the deep surface; its focus ring is white too, the page's dark ring would vanish here. */}
-      <div>
+      {/* One primary (white on the deep surface; its focus ring is white too, the page's dark ring would vanish here), at
+          most one quiet secondary, and the way into the full activity as a plain link. */}
+      <div className={`flex animate-rise flex-wrap items-center gap-2 ${STAGE[4]}`}>
+        {actions && (
+          <button
+            type="button"
+            aria-label={`Completar: ${activity.title}`}
+            disabled={actions.busy}
+            aria-busy={actions.pending === 'COMPLETED'}
+            onClick={actions.onComplete}
+            className="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lift transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-accent-soft focus-visible:outline-white active:scale-[0.97] disabled:opacity-70 disabled:active:scale-100"
+          >
+            {actions.pending === 'COMPLETED' ? 'Completando…' : 'Completar'}
+          </button>
+        )}
+        {actions && activity.status === 'PENDING' && (
+          <button
+            type="button"
+            aria-label={`Empezar: ${activity.title}`}
+            disabled={actions.busy}
+            aria-busy={actions.pending === 'IN_PROGRESS'}
+            onClick={actions.onStart}
+            className="inline-flex min-h-11 items-center rounded-control px-3 py-2 text-sm font-semibold text-primary-foreground ring-1 ring-white/40 ring-inset transition-[background-color] duration-(--duration-fast) ease-standard hover:bg-white/10 focus-visible:outline-white disabled:opacity-70"
+          >
+            {actions.pending === 'IN_PROGRESS' ? 'Empezando…' : 'Empezar'}
+          </button>
+        )}
         <Link
           to={`/activities?edit=${activity.id}`}
           aria-label={`Ver actividad: ${activity.title}`}
-          className={`group inline-flex min-h-11 animate-rise items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lift transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-accent-soft focus-visible:outline-white active:scale-[0.97] ${STAGE[4]}`}
+          className={`group inline-flex min-h-11 items-center gap-1.5 rounded-control text-sm font-semibold focus-visible:outline-white ${
+            actions
+              ? 'px-2 text-primary-foreground/90 underline-offset-4 hover:underline'
+              : 'bg-white px-4 py-2 text-primary shadow-lift'
+          }`}
         >
           Ver actividad
           <span
@@ -410,6 +516,12 @@ export function Suggestion({
           </span>
         </Link>
       </div>
+
+      {actions?.error && (
+        <p role="alert" className="rounded-control bg-white/15 px-3 py-2 text-sm">
+          No se pudo guardar el cambio: {actions.error}
+        </p>
+      )}
     </article>
   );
 }

@@ -204,6 +204,18 @@ Una persona puede estudiar varias cosas a la vez (Medicina + un diplomado, coleg
 
 Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiales, evaluaciones, porcentajes, horario general. Privado: notas, recordatorios, estado, bloques de estudio y estimaciones. Requiere roles, propuestas, moderación e historial: por eso es una etapa posterior. No se construye ni se anticipa en el modelo de datos.
 
+### P9 — cierre de experiencia previo a v1.0
+
+Último bloque de producto antes del gate de release: coherencia y fricción, **sin funciones nuevas, sin tablas y sin cambiar motores** (solo web salvo que se pruebe lo contrario). Propuesta de la discovery de P9, aprobada por partes:
+
+| Id   | Objetivo                                                                                                                                              | Estado                  |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| P9-1 | «¿Qué hago ahora?» accionable: «Completar» (y «Empezar» si está pendiente) en el hero, con la misma mutación de actividad que la pantalla Actividades | en revisión (este PR)   |
+| P9-2 | Primer uso (estados vacíos con atajos a importar horario, Captura rápida e `.ics`) y Home compacto sin datos duplicados                               | pendiente de aprobación |
+| P9-3 | Ajustes mínimos: editar el periodo y cierre de semestre guiado (contraseña, nombre y zona horaria quedan fuera salvo decisión del mantenedor)         | pendiente de aprobación |
+
+**P9-1:** el motor de Atención no cambia (puntaje, niveles, desempates y razones intactos). El hero muestra una acción primaria «Completar» y, solo si la actividad está pendiente, una secundaria «Empezar» (pasa a «En proceso», una transición que ya existía en el selector de estado); «Ver actividad» queda como enlace. Sin endpoint ni migración nuevos. No muestra peso ni nota: `GET /api/attention` no trae `gradeContext` (solo el Radar) y añadirlo cambiaría un contrato, que P9-1 no toca.
+
 ### Prerrequisitos técnicos identificados
 
 Surgieron del análisis del código y se decidirán al iniciar la etapa correspondiente; no forman parte del orden aprobado:
