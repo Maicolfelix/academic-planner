@@ -51,15 +51,16 @@
 
 ## Calidad, seguridad y operación
 
-| Documento                                    | Contenido                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [security.md](security.md)                   | Modelo de amenazas, controles, hallazgos de dependencias y limitaciones              |
-| [testing.md](testing.md)                     | Capas de prueba, cifras, base de test, cómo ejecutar, humo de rendimiento            |
-| [system-validation.md](system-validation.md) | Validación integral (Fase 17): matriz de escenarios, evidencia, registro de defectos |
-| [deployment.md](deployment.md)               | Requisitos de producción, variables de entorno, `TRUST_PROXY`, base de datos         |
-| [development.md](development.md)             | Entorno, scripts, migraciones, Playwright y problemas comunes                        |
-| [limitations.md](limitations.md)             | Limitaciones conocidas, lo no validado y lo que no se afirma                         |
-| [final-checklist.md](final-checklist.md)     | Lista de verificación antes de publicar (lo pendiente queda sin marcar)              |
+| Documento                                    | Contenido                                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [security.md](security.md)                   | Modelo de amenazas, controles, hallazgos de dependencias y limitaciones                      |
+| [testing.md](testing.md)                     | Capas de prueba, cifras, base de test, cómo ejecutar, humo de rendimiento                    |
+| [system-validation.md](system-validation.md) | Validación integral (Fase 17): matriz de escenarios, evidencia, registro de defectos         |
+| [deployment.md](deployment.md)               | Requisitos de producción, variables de entorno, `TRUST_PROXY`, base de datos                 |
+| [development.md](development.md)             | Entorno, scripts, migraciones, Playwright y problemas comunes                                |
+| [limitations.md](limitations.md)             | Limitaciones conocidas, lo no validado y lo que no se afirma                                 |
+| [final-checklist.md](final-checklist.md)     | Lista de verificación antes de publicar (lo pendiente queda sin marcar)                      |
+| [next-phase-spikes.md](next-phase-spikes.md) | Spikes técnicos de las siguientes fases (sin implementar; requieren decisión del mantenedor) |
 
 ## Demostración y estado del proyecto
 
