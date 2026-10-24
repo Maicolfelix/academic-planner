@@ -51,6 +51,17 @@ const visibleSlide = (page: Page) =>
   });
 /** The strip shows slide `index`. */
 const scrolledTo = (page: Page, index: number) => expect.poll(() => visibleSlide(page)).toBe(index);
+/** The strip has stopped on slide `index`: that slide's centre is the strip's centre (a smooth scroll is not still on its way). */
+const settledOn = (page: Page, index: number) =>
+  expect
+    .poll(() =>
+      strip(page).evaluate((el, i) => {
+        const slide = el.querySelectorAll('[data-slide]')[i]!.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return Math.abs(slide.left + slide.width / 2 - (r.left + r.width / 2));
+      }, index),
+    )
+    .toBeLessThan(2);
 /** Intent (dot), projection (strip) and content (the slide that is not inert) all agree on `index`. */
 async function expectAllAt(page: Page, index: number, title?: string) {
   await expect(dots(page).nth(index)).toHaveAttribute('aria-current', 'true');
@@ -437,9 +448,20 @@ test('swipe, then a tap on a dot right away: the last intention wins; then a swi
   const assertClean = watch(page);
   await fiveActivities(page);
   const cdp = await page.context().newCDPSession(page);
-  const box = (await strip(page).boundingBox())!;
-  const y = Math.round(box.y + 120);
+  const viewportHeight = page.viewportSize()!.height;
   const drag = async (fromX: number, toX: number) => {
+    // Where the strip is NOW: tapping a dot scrolls the page to the dot, so a box measured earlier points at empty page.
+    // The touch goes through the middle of the part of the strip that is on screen, and must land on the strip.
+    const box = (await strip(page).boundingBox())!;
+    const top = Math.max(box.y, 0);
+    const y = Math.round((top + Math.min(box.y + box.height, viewportHeight)) / 2);
+    expect(
+      await strip(page).evaluate(
+        (el, [x, py]) => el.contains(document.elementFromPoint(x!, py!)),
+        [fromX, y],
+      ),
+      'the swipe starts on the strip',
+    ).toBe(true);
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
       touchPoints: [{ x: fromX, y }],
@@ -460,6 +482,7 @@ test('swipe, then a tap on a dot right away: the last intention wins; then a swi
     await expectAllAt(page, 3, 'D');
     await dots(page).nth(0).tap();
     await expectAllAt(page, 0, 'A');
+    await settledOn(page, 0); // the swipe starts from a strip at rest
     await drag(300, 60);
     await page.waitForTimeout(900); // how far a fling goes depends on its speed: it lands on 2nd or 3rd
     const lit = await dots(page).evaluateAll((ds) =>
