@@ -46,7 +46,8 @@ test('a calm student: planned ahead, nothing pressing', async ({ page }) => {
   await home(page);
   await expect(companion(page)).toHaveAttribute('data-companion', 'CALM');
   await expect(companion(page).getByText('Todo en orden por ahora.')).toBeVisible();
-  await expect(companion(page).getByText('Lo próximo es tu Informe de laboratorio.')).toBeVisible();
+  // the hero says which activity is next: the companion never repeats it
+  await expect(companion(page)).not.toContainText('Informe de laboratorio');
   await assertClean();
 });
 
@@ -63,13 +64,13 @@ test('a quiet day: everything is done and nothing is coming up', async ({ page }
   await expect(companion(page).getByText('Hoy se ve tranquilo.')).toBeVisible();
 });
 
-test('one clear next step: focused, naming it', async ({ page }) => {
+test('one clear next step: focused, without repeating the hero', async ({ page }) => {
   await newUser(page);
   await activity(page, 'Quiz de Ciberseguridad', 0);
   await home(page);
   await expect(companion(page)).toHaveAttribute('data-companion', 'FOCUSED');
   await expect(companion(page).getByText('Una cosa a la vez.')).toBeVisible();
-  await expect(companion(page).getByText('Lo próximo es tu Quiz de Ciberseguridad.')).toBeVisible();
+  await expect(companion(page)).not.toContainText('Quiz de Ciberseguridad'); // the hero below says it
 });
 
 test('several things close: busy, with no guilt and no extra pressure', async ({ page }) => {
@@ -81,7 +82,7 @@ test('several things close: busy, with no guilt and no extra pressure', async ({
   const text = (await companion(page).innerText()).toLowerCase();
   expect(text).toContain('hay varias cosas cerca. vamos por partes.');
   expect(text).not.toMatch(/atrasad|debes|rápido|urgente|culpa|preocup|!/);
-  expect(text).not.toContain('lo próximo'); // BUSY names nothing: the cards below do
+  expect(text).not.toContain('lo próximo'); // it names no activity: the hero below does
 });
 
 test('a student with no subjects yet has no companion (the Home explains what to do)', async ({

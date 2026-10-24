@@ -198,14 +198,18 @@ describe('surfaces', () => {
 describe('counters', () => {
   const summary = { total: 8, pending: 3, inProgress: 0, completed: 2, overdue: 0 };
 
-  it('are one editorial strip: numerals with their own hue once they have something to show, quiet at zero', () => {
+  it('are one editorial strip of the OPEN work: pending and in progress, each said once on the Home', () => {
     const out = html(<SummaryTiles summary={summary} />);
     expect(out.match(/<ul /g)).toHaveLength(1);
-    expect(out).toContain('text-success-ink'); // finalizadas: 2
+    expect(out.match(/<li /g)).toHaveLength(2);
+    expect(out).toContain('Pendientes');
+    expect(out).toContain('En proceso');
+    // finished lives in the Progress card, overdue in the Radar: not here
+    expect(out).not.toContain('Finalizadas');
+    expect(out).not.toContain('Vencidas');
     expect(out).toContain('text-primary'); // pendientes: 3
     expect(out).not.toContain('text-info-ink'); // en proceso: 0
-    expect(out).not.toContain('bg-danger-soft'); // vencidas: 0
-    expect(out).toContain('text-muted-foreground'); // the zero ones, still readable
+    expect(out).toContain('text-muted-foreground'); // the zero one, still readable
   });
 
   it('under each number a thin bar says its share of the total (decoration, and no bar for a zero)', () => {
@@ -213,14 +217,14 @@ describe('counters', () => {
     const widths = [...out.matchAll(/animate-fill rounded-full [^"]*" style="width:(\d+)%/g)].map(
       (m) => Number(m[1]),
     );
-    expect(widths).toEqual([38, 0, 25, 0]); // 3/8 and 2/8, rounded
-    expect(out.match(/<span aria-hidden="true" class="h-0.5/g)).toHaveLength(4);
+    expect(widths).toEqual([38, 0]); // 3/8, rounded
+    expect(out.match(/<span aria-hidden="true" class="h-0.5/g)).toHaveLength(2);
   });
 
   it('respond to a touch: a tint on hover and a press scale on every cell', () => {
     const out = html(<SummaryTiles summary={summary} />);
-    expect(out.match(/hover:bg-primary\/5/g)).toHaveLength(4);
-    expect(out.match(/active:scale-\[0.98\]/g)).toHaveLength(4);
+    expect(out.match(/hover:bg-primary\/5/g)).toHaveLength(2);
+    expect(out.match(/active:scale-\[0.98\]/g)).toHaveLength(2);
   });
 });
 

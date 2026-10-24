@@ -183,9 +183,6 @@ describe('the lists and the hero carry the origin only when it is given', () => 
     expect(html(<NextDueCard activity={a} timeZone={TZ} now={NOW} origin="Medicina" />)).toContain(
       'Farmacología · Medicina',
     );
-    expect(
-      html(<NextDueCard activity={a} timeZone={TZ} now={NOW} quiet origin="Medicina" />),
-    ).toContain('Medicina');
     expect(html(<NextDueCard activity={a} timeZone={TZ} now={NOW} />)).not.toContain('Medicina');
     const hero = html(
       <Suggestion

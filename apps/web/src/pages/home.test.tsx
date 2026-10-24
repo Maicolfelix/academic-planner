@@ -107,16 +107,12 @@ describe('a general activity (F1: no subject) says "Sin asignatura" where the su
     expect(out).not.toContain('undefined');
   });
 
-  it('the next delivery (card and quiet line) says it too', () => {
-    for (const quiet of [false, true]) {
-      const out = html(
-        <NextDueCard activity={general() as never} timeZone={TZ} now={NOW} quiet={quiet} />,
-      );
-      expect(out).toContain('Parcial de Redes');
-      expect(out).toContain('Sin asignatura');
-      expect(out).toMatch(/Vence/);
-      expect(out).not.toContain('null');
-    }
+  it('the next delivery says it too', () => {
+    const out = html(<NextDueCard activity={general() as never} timeZone={TZ} now={NOW} />);
+    expect(out).toContain('Parcial de Redes');
+    expect(out).toContain('Sin asignatura');
+    expect(out).toMatch(/Vence/);
+    expect(out).not.toContain('null');
   });
 
   it('a due list row has a neutral mark and the same words, and keeps the deadline', () => {
@@ -151,13 +147,11 @@ describe('the Radar mark', () => {
 describe('status counters', () => {
   const summary = { total: 8, pending: 3, inProgress: 1, completed: 2, overdue: 2 };
 
-  it('are four links to the matching filtered lists, each with its label as text', () => {
+  it('are two links to the matching filtered lists, each with its label as text', () => {
     const out = html(<SummaryTiles summary={summary} />);
     for (const [label, href] of [
       ['Pendientes', '/activities?status=PENDING'],
       ['En proceso', '/activities?status=IN_PROGRESS'],
-      ['Finalizadas', '/activities?status=COMPLETED'],
-      ['Vencidas', '/activities?overdue=true'],
     ]) {
       expect(out).toContain(label);
       expect(out).toContain(`href="${href}"`);
@@ -165,11 +159,11 @@ describe('status counters', () => {
     expect(out).toContain('aria-labelledby="summary-title"');
   });
 
-  it('only "Vencidas" is flagged, and only when there are some (and it is still text)', () => {
-    expect(html(<SummaryTiles summary={summary} />).match(/bg-danger-soft/g)).toHaveLength(1);
-    expect(html(<SummaryTiles summary={{ ...summary, overdue: 0 }} />)).not.toContain(
-      'bg-danger-soft',
-    );
+  it('does not repeat what other blocks of the Home already say (finished: Progress; overdue: Radar)', () => {
+    const out = html(<SummaryTiles summary={summary} />);
+    expect(out).not.toContain('Finalizadas');
+    expect(out).not.toContain('Vencidas');
+    expect(out).not.toContain('bg-danger-soft');
   });
 });
 
@@ -201,26 +195,18 @@ describe('progress', () => {
 describe('next delivery', () => {
   const next = activity({ title: 'Entrega final', dueAt: '2026-10-17T04:59:00.000Z' }) as never;
 
-  it('says title, subject and how far away it is, as a card or as one quiet line', () => {
-    for (const quiet of [false, true]) {
-      const out = html(<NextDueCard activity={next} timeZone={TZ} now={NOW} quiet={quiet} />);
-      expect(out).toContain('Próxima entrega');
-      expect(out).toContain('Entrega final');
-      expect(out).toContain('Redes de Computadores');
-      expect(out).toMatch(/Vence en \d+ días/);
-      expect(out).toContain('aria-labelledby="next-due-title"');
-    }
+  it('says title, subject and how far away it is', () => {
+    const out = html(<NextDueCard activity={next} timeZone={TZ} now={NOW} />);
+    expect(out).toContain('Próxima entrega');
+    expect(out).toContain('Entrega final');
+    expect(out).toContain('Redes de Computadores');
+    expect(out).toMatch(/Vence en \d+ días/);
+    expect(out).toContain('aria-labelledby="next-due-title"');
+    expect(out).toContain('shadow-card');
   });
 
-  it('the quiet line is not a second card (the hero already shows that activity)', () => {
-    const quiet = html(<NextDueCard activity={next} timeZone={TZ} now={NOW} quiet />);
-    const card = html(<NextDueCard activity={next} timeZone={TZ} now={NOW} />);
-    expect(quiet).not.toContain('shadow-card');
-    expect(card).toContain('shadow-card');
-  });
-
-  it('without an activity it says so, and "quiet" changes nothing', () => {
-    const out = html(<NextDueCard activity={null} timeZone={TZ} now={NOW} quiet />);
+  it('without an activity it says so', () => {
+    const out = html(<NextDueCard activity={null} timeZone={TZ} now={NOW} />);
     expect(out).toContain('No tienes entregas próximas.');
   });
 });

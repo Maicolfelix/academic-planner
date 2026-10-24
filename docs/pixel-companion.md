@@ -26,7 +26,7 @@ Entrada (`CompanionContext`): `overdueCount` (vencidas), `immediateCount` (vence
 
 **`CELEBRATE` no está en V1.** Necesita una señal de «recién completado» y el Inicio no la tiene sin inventar marcas de tiempo o añadir un campo al servidor; derivarlo del porcentaje total lo volvería permanente. Queda documentado como trabajo futuro: si algún día existe esa señal real, podría añadirse con un uso conservador. Hasta entonces, 4 estados.
 
-**Frase contextual:** en `FOCUSED` y `CALM` puede añadirse «Lo próximo es tu {título}.» solo cuando ese elemento está claro (la única cosa apremiante, o la próxima entrega). **Nunca una fecha** (para no contradecir una tarjeta) y nunca una urgencia inventada. En `BUSY` y `REST` no nombra nada: las tarjetas de abajo ya lo hacen.
+**Frase contextual (P9-2):** una línea con la **próxima clase de hoy** cuando el Inicio ya la tiene (`classesToday`; sin consulta nueva): «Tu próxima clase es {materia} a las {hora}.», «Tienes clase ahora: {materia}.» mientras dura, «Hoy no quedan clases.» al terminar las de hoy, y nada si hoy no hubo clases (el estudiante puede no usar el horario). **Nunca nombra una actividad:** «Lo próximo es tu {título}.» se retiró porque repetía el héroe que está justo debajo. Nunca una fecha de entrega ni una urgencia inventada.
 
 **Revisión de textos:** sin culpa, miedo, comparación social, urgencia falsa, antropomorfismo excesivo ni lenguaje infantil; sin exclamaciones. Hay una prueba que lo vigila.
 

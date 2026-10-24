@@ -1,4 +1,4 @@
-import type { Dashboard } from '@planner/core';
+import { formatClock, type Dashboard } from '@planner/core';
 
 /**
  * The Pixel Companion's state (V1): a small, deterministic description of the academic MOMENT, never of the person. It is
@@ -53,34 +53,41 @@ export const COMPANION_COPY: Record<CompanionState, string> = {
 
 const TITLE_MAX = 60;
 
-/** "Lo próximo es tu …" — only when exactly that one item is clearly known; never a date, so nothing can contradict a card. */
-export function companionNextLine(
-  state: CompanionState,
-  title: string | null | undefined,
+const clip = (text: string) => {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length > TITLE_MAX ? `${t.slice(0, TITLE_MAX - 1).trimEnd()}…` : t;
+};
+
+/**
+ * What the student has next TODAY in the timetable, in one neutral line (P9-2). It never names an activity: the "what do I do
+ * now" hero is right below and says that. Only classes the Home already carries (`classesToday`) are read; a class counts until
+ * it ends. With no class today at all it says nothing (the student may simply not use the timetable); once today's classes
+ * are over it says so.
+ */
+export function companionClassLine(
+  classes: readonly { title: string; startAt: string; endAt: string }[],
+  now: Date,
+  timeZone: string,
 ): string | null {
-  if (state !== 'FOCUSED' && state !== 'CALM') return null;
-  const t = (title ?? '').replace(/\s+/g, ' ').trim();
-  if (t === '') return null;
-  return `Lo próximo es tu ${t.length > TITLE_MAX ? `${t.slice(0, TITLE_MAX - 1).trimEnd()}…` : t}.`;
+  if (classes.length === 0) return null;
+  const t = now.getTime();
+  const next = classes
+    .filter((c) => Date.parse(c.endAt) > t)
+    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))[0];
+  if (!next) return 'Hoy no quedan clases.';
+  const title = clip(next.title);
+  if (title === '') return null;
+  return Date.parse(next.startAt) <= t
+    ? `Tienes clase ahora: ${title}.`
+    : `Tu próxima clase es ${title} a las ${formatClock(next.startAt, timeZone)}.`;
 }
 
-/** From the Home's own response (already normalized by the server) to the companion's input and the item it may mention. */
-export function companionFromDashboard(d: Dashboard): {
-  context: CompanionContext;
-  title: string | null;
-} {
-  const context: CompanionContext = {
+/** From the Home's own response (already normalized by the server) to the companion's input. */
+export function companionFromDashboard(d: Dashboard): CompanionContext {
+  return {
     overdueCount: d.summary.overdue,
     immediateCount: d.today.length,
     nextItemExists: d.nextDue !== null,
     hasActivities: d.summary.total > 0,
   };
-  // The one item to name: the single pressing activity, or else the next one due.
-  const single =
-    context.overdueCount === 1 && context.immediateCount === 0
-      ? d.overdue[0]
-      : context.overdueCount === 0 && context.immediateCount === 1
-        ? d.today[0]
-        : undefined;
-  return { context, title: (single ?? d.nextDue)?.title ?? null };
 }

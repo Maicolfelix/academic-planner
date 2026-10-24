@@ -128,17 +128,20 @@ test('an urgent activity is the hero: state in words, subject, deadline, reasons
   assertClean();
 });
 
-test('the counters and the five Radar tiles are links to the filtered lists', async ({ page }) => {
+test('the open-work counters and the five Radar tiles are links to the filtered lists', async ({
+  page,
+}) => {
   const assertClean = watch(page);
   const redes = await newUser(page);
   await apiCreateActivity(page, { subjectId: redes.id, title: 'Vieja', dueDate: daysFromNow(-3) });
   await apiCreateActivity(page, { subjectId: redes.id, title: 'Nueva', dueDate: daysFromNow(9) });
   await page.goto('/dashboard');
 
+  // Two counters (pending, in progress): finished is the Progress card's, overdue is the Radar's.
   const counters = region(page, 'Resumen del periodo');
-  await expect(counters.getByRole('link')).toHaveCount(4);
-  await counters.getByRole('link', { name: /Vencidas/ }).click();
-  await expect(page).toHaveURL(/\/activities\?overdue=true$/);
+  await expect(counters.getByRole('link')).toHaveCount(2);
+  await counters.getByRole('link', { name: /Pendientes/ }).click();
+  await expect(page).toHaveURL(/\/activities\?status=PENDING$/);
 
   await page.goto('/dashboard');
   const radar = region(page, 'Radar académico');
@@ -169,7 +172,7 @@ test('the counters and the five Radar tiles are links to the filtered lists', as
   assertClean();
 });
 
-test('when the hero is the next delivery, "Próxima entrega" is one quiet line and not a second card', async ({
+test('when the hero is the next delivery there is no second "Próxima entrega" and its title is said once', async ({
   page,
 }) => {
   const redes = await newUser(page);
@@ -180,12 +183,11 @@ test('when the hero is the next delivery, "Próxima entrega" is one quiet line a
   });
   await page.goto('/dashboard');
 
-  const next = region(page, 'Próxima entrega');
-  await expect(next).toContainText('Entrega final');
-  await expect(next).toContainText('Redes');
-  await expect(next).toContainText(/Vence en \d+ días/);
-  expect(await next.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
-  expect((await next.boundingBox())!.height, 'a line or two, not a card').toBeLessThan(90);
+  await expect(region(page, '¿Qué hago ahora?').getByRole('article')).toContainText(
+    'Entrega final',
+  );
+  await expect(region(page, 'Próxima entrega')).toHaveCount(0);
+  await expect(page.getByText('Entrega final')).toHaveCount(1);
 });
 
 test('progress: the bar says its value, fills once, and with reduced motion is simply at its value', async ({
@@ -264,7 +266,7 @@ test('a new user without activities sees the empty state, no hero, and can still
   await page.goto('/dashboard');
 
   await expect(
-    page.getByRole('heading', { name: 'Todavía no tienes actividades registradas.' }),
+    page.getByRole('heading', { name: 'Registra lo que tienes pendiente.' }),
   ).toBeVisible();
   await expect(region(page, '¿Qué hago ahora?')).toHaveCount(0);
   await expect(region(page, 'Radar académico')).toHaveCount(0);

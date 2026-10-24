@@ -38,7 +38,7 @@ export function PixelCompanion({
   nextLine,
 }: {
   state: CompanionState;
-  /** The next item, as a sentence, when it is clearly known (the Home decides). */
+  /** One more line under the state (the Home decides; today it is the next class of the day). Never an activity: the hero says that. */
   nextLine?: string | null;
 }) {
   // An unknown state never breaks the Home: it falls back to the neutral one.

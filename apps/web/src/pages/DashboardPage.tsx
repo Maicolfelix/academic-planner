@@ -1,16 +1,16 @@
-import { DEFAULT_TIMEZONE, type DashboardActivity } from '@planner/core';
+import { DEFAULT_TIMEZONE } from '@planner/core';
 import { Link } from 'react-router';
-import { useAttention } from '../attention/useAttention';
+import { heroItemsOf, useAttention } from '../attention/useAttention';
 import { useMe } from '../auth/useAuth';
 import { QueryError } from '../components/QueryError';
 import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
-import { readsSeveralPeriods, type OriginOf } from '../academic/origin';
+import { readsSeveralPeriods } from '../academic/origin';
 import { useOrigins } from '../academic/useAcademic';
 import { PixelCompanion } from '../companion/PixelCompanion';
 import {
+  companionClassLine,
   companionFromDashboard,
-  companionNextLine,
   deriveCompanionState,
 } from '../companion/companionState';
 import { useDashboard } from '../dashboard/useDashboard';
@@ -43,6 +43,7 @@ export function DashboardPage() {
   const user = useMe().data;
   const dashboard = useDashboard();
   const originOf = useOrigins();
+  const attention = useAttention();
   const now = useNow();
 
   if (dashboard.isPending) return <HomeSkeleton />;
@@ -55,13 +56,20 @@ export function DashboardPage() {
   const hasData = d.subjectCount > 0 && d.summary.total > 0;
   const several = readsSeveralPeriods(d.periods);
   // The companion is derived from what this page already has (no request, no stored state).
-  const companion = companionFromDashboard(d);
-  const companionState = deriveCompanionState(companion.context);
+  const companionState = deriveCompanionState(companionFromDashboard(d));
 
-  // The highlighted next activity is not repeated in the lists below it.
-  const nextId = d.nextDue?.id;
-  const today = d.today.filter((a) => a.id !== nextId);
-  const upcoming = d.upcoming.filter((a) => a.id !== nextId);
+  // Each block answers its own question, so nothing the hero already carries is said again under it. The hero carries the
+  // next activities by deadline (one on screen, the rest a swipe away): the lists that follow leave out the one on screen
+  // (overdue and today answer "what is overdue / due today") and "Próximas entregas" leaves out all of them (it is what
+  // comes AFTER the hero). Until the hero is known they wait, so nothing appears and then vanishes; if it cannot load, the
+  // old rule (leave out the next delivery) applies.
+  const heroItems = heroItemsOf(attention.data);
+  const heroIds = new Set(heroItems.map((i) => i.activity.id));
+  const onScreenId = heroItems[0]?.activity.id ?? d.nextDue?.id;
+  const heroKnown = !attention.isPending;
+  const overdue = d.overdue.filter((a) => a.id !== onScreenId);
+  const today = d.today.filter((a) => a.id !== onScreenId);
+  const upcoming = d.upcoming.filter((a) => a.id !== onScreenId && !heroIds.has(a.id));
 
   // Two columns from 1024 px: "what to do now" on the left and "how am I doing" on the right, with what comes next under
   // the left one. In the DOM the three groups follow the phone's reading order (now, how am I doing, what comes next), so
@@ -89,7 +97,7 @@ export function DashboardPage() {
           <div className="mt-3">
             <PixelCompanion
               state={companionState}
-              nextLine={companionNextLine(companionState, companion.title)}
+              nextLine={companionClassLine(d.classesToday, now, timeZone)}
             />
           </div>
         )}
@@ -113,30 +121,29 @@ export function DashboardPage() {
           {d.subjectCount === 0 && <NoSubjects />}
           {d.subjectCount > 0 && d.summary.total === 0 && <NoActivities />}
 
-          {hasData && d.overdue.length > 0 && (
+          {hasData && heroKnown && overdue.length > 0 && (
             <DueSection
               title="Vencidas"
-              items={d.overdue}
+              items={overdue}
               timeZone={timeZone}
               now={now}
               origin={originOf}
               overdue
               footer={
-                d.summary.overdue > d.overdue.length && (
+                d.summary.overdue > overdue.length && (
                   <p className="text-sm">
-                    Mostrando {d.overdue.length} de {d.summary.overdue}.{' '}
                     <Link
                       to="/activities?overdue=true"
                       className="font-medium text-accent-ink underline underline-offset-4"
                     >
-                      Ver todas las vencidas
+                      Ver todas las vencidas ({d.summary.overdue})
                     </Link>
                   </p>
                 )
               }
             />
           )}
-          {hasData && today.length > 0 && (
+          {hasData && heroKnown && today.length > 0 && (
             <DueSection
               title="Para hoy"
               items={today}
@@ -179,8 +186,15 @@ export function DashboardPage() {
         {/* WHAT COMES NEXT */}
         {hasData && (
           <div className="flex flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:self-start">
-            <NextDue activity={d.nextDue} timeZone={timeZone} now={now} origin={originOf} />
-            {upcoming.length > 0 && (
+            {heroKnown && (d.nextDue === null || !heroIds.has(d.nextDue.id)) && (
+              <NextDueCard
+                activity={d.nextDue}
+                timeZone={timeZone}
+                now={now}
+                origin={d.nextDue ? originOf(d.nextDue.periodId) : null}
+              />
+            )}
+            {heroKnown && upcoming.length > 0 && (
               <DueSection
                 title="Próximas entregas"
                 items={upcoming}
@@ -205,35 +219,5 @@ export function DashboardPage() {
 
       <InstallPrompt />
     </div>
-  );
-}
-
-/** "Próxima entrega": when the hero already shows that very activity it shrinks to one quiet line. */
-function NextDue({
-  activity,
-  timeZone,
-  now,
-  origin,
-}: {
-  activity: DashboardActivity | null;
-  timeZone: string;
-  now: Date;
-  origin: OriginOf;
-}) {
-  const attention = useAttention();
-  // Until the hero is known the card would appear and then collapse into a line (a flash, and a node swapped under the
-  // student's eyes): wait for the answer, and show the card as soon as it is known (or if it fails).
-  if (attention.isPending) return null;
-  // The hero opens on the first of its activities (the one due soonest): that is the one it already shows.
-  const heroId = (attention.data?.upcoming[0] ?? attention.data?.recommendation)?.activity.id;
-  const quiet = activity !== null && activity.id === heroId;
-  return (
-    <NextDueCard
-      activity={activity}
-      timeZone={timeZone}
-      now={now}
-      quiet={quiet}
-      origin={activity ? origin(activity.periodId) : null}
-    />
   );
 }
