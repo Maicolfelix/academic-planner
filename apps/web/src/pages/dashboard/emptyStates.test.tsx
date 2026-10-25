@@ -16,18 +16,25 @@ const actions = (out: string) => [...out.matchAll(/<(?:a|button)[ >]/g)].length;
 describe('first use: no subjects', () => {
   const out = html(<NoSubjects />);
 
-  it('starts from what the student already has: timetable and capture first, by hand last and quiet', () => {
+  it('starts from what the student already has: timetable and a message first, by hand last and quiet', () => {
     expect(out).toContain('Empieza con lo que ya tienes.');
-    const order = ['Importar mi horario', 'Captura rápida', 'Añadir asignatura manualmente'].map(
-      (label) => out.indexOf(label),
-    );
+    const order = [
+      'Importar mi horario',
+      'Interpretar un mensaje',
+      'Añadir asignatura manualmente',
+    ].map((label) => out.indexOf(label));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     // the first is the one primary button; the manual one is the quiet (ghost) one
     expect(out.match(/bg-primary text-primary-foreground/g)).toHaveLength(1);
     expect(out.indexOf('bg-primary text-primary-foreground')).toBeLessThan(
-      out.indexOf('Captura rápida'),
+      out.indexOf('Interpretar un mensaje'),
     );
+  });
+
+  it('names the Inbox for what it is: it does not promise the Home capture box it does not open', () => {
+    expect(out).toContain('href="/inbox"');
+    expect(out).not.toContain('Captura rápida');
   });
 
   it('offers at most three ways, all to routes that exist', () => {

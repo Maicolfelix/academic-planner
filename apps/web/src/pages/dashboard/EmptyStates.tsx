@@ -26,7 +26,7 @@ export function NoSubjects() {
             Importar mi horario
           </Link>
           <Link to="/inbox" className={secondary}>
-            Captura rápida
+            Interpretar un mensaje
           </Link>
           <Link to="/subjects?action=create" className={quiet}>
             Añadir asignatura manualmente

@@ -67,7 +67,7 @@ test('an account with nothing yet is offered its timetable and capture before ad
   });
   await expect(ways.getByRole('link')).toHaveText([
     'Importar mi horario',
-    'Captura rápida',
+    'Interpretar un mensaje',
     'Añadir asignatura manualmente',
   ]);
   await expectNoHorizontalOverflow(page);
@@ -78,9 +78,11 @@ test('an account with nothing yet is offered its timetable and capture before ad
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
   await page.goto('/dashboard');
-  await ways.getByRole('link', { name: 'Captura rápida' }).click();
+  // the copy promises what opens: the Inbox, made to interpret a message
+  await ways.getByRole('link', { name: 'Interpretar un mensaje' }).click();
   await expect(page).toHaveURL(/\/inbox$/);
-  await expect(page.getByRole('textbox')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Bandeja académica' })).toBeVisible();
+  await expect(page.getByLabel('Mensaje del profesor o instrucción académica')).toBeVisible();
 
   await page.goto('/dashboard');
   await ways.getByRole('link', { name: 'Añadir asignatura manualmente' }).click();
@@ -96,7 +98,7 @@ test('the first way in is reachable and visibly focused from the keyboard', asyn
   await first.focus();
   await expect(first).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Captura rápida' })).toBeFocused();
+  await expect(page.getByRole('link', { name: 'Interpretar un mensaje' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Añadir asignatura manualmente' })).toBeFocused();
 });
