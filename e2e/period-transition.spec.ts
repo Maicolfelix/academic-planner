@@ -68,10 +68,18 @@ test('Medicina changes semester: 2026-1 is kept and no longer current; 2026-2 is
   await chooseAction(page, 'Medicina', 'Periodos');
   const list = page.getByRole('dialog', { name: 'Periodos de Medicina' });
   await expect(list).toContainText(
+    'El periodo actual de este estudio forma parte de lo que muestra tu Inicio',
+  );
+  await expect(list).toContainText('también lee los periodos actuales de tus otros estudios');
+  await expect(list).toContainText(
     'Para cambiar de semestre, crea el siguiente o marca otro como actual',
   );
   await expect(list).toContainText('el anterior se conserva');
   await expect(list).not.toContainText(/cerrar semestre|eliminar|borrar/i);
+  // there is no account-wide current period: nothing may say or suggest it
+  await expect(list).not.toContainText(
+    /el periodo actual es el que lee|el [uú]nico periodo actual|periodo actual (global|de tu cuenta)|tu periodo actual/i,
+  );
   await list.getByRole('button', { name: 'Nuevo periodo' }).click();
 
   const form = page.getByRole('dialog', { name: 'Nuevo periodo' });

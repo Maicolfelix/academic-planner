@@ -66,8 +66,9 @@ export function PeriodsDialog({
       <div className="flex flex-col gap-4">
         {periods.length > 0 && (
           <p className="text-sm text-muted-foreground">
-            El periodo actual es el que lee tu Inicio. Para cambiar de semestre, crea el siguiente o
-            marca otro como actual: el anterior se conserva.
+            El periodo actual de este estudio forma parte de lo que muestra tu Inicio (que también
+            lee los periodos actuales de tus otros estudios). Para cambiar de semestre, crea el
+            siguiente o marca otro como actual: el anterior se conserva.
           </p>
         )}
         {update.isError && <FormError>{studyErrorText(update.error)}</FormError>}
