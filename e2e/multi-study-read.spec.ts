@@ -89,10 +89,11 @@ test('Home: the activities of BOTH studies are on it, it says what it reads, and
   ).toBeVisible();
   await expect(page.getByText('Parcial de Farmacología').first()).toBeVisible();
   await expect(page.getByText('Proyecto final Diplomado').first()).toBeVisible();
-  // the labels are text: each item names its study (the screen reader hears "Estudio: …")
-  const row = page.locator('li', { hasText: 'Proyecto final Diplomado' }).first();
-  await expect(row).toContainText(DIPLOMADO);
-  await expect(row.getByText('Estudio:')).toHaveCount(1);
+  // the labels are text: each item names its study. The hero carries the nearest activities (P9-2), so that is where this one is.
+  const slide = page.locator('[aria-roledescription="actividad"]', {
+    hasText: 'Proyecto final Diplomado',
+  });
+  await expect(slide).toContainText(DIPLOMADO);
   await expect(page.getByText('Resumen de tus estudios actuales')).toHaveCount(1);
   assertClean();
 });

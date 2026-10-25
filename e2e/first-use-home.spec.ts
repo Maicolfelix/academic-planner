@@ -251,6 +251,7 @@ test.describe('a Home with representative data', () => {
       /Tu próxima clase es Redes de Computadores a las 11:30\s?p\.\s?m\./,
     );
     for (const t of titles) await expect(companion(page)).not.toContainText(t);
+    await expect(companion(page)).not.toContainText('m..'); // one full stop, never "p. m.."
     assertClean();
   });
 

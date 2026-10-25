@@ -77,9 +77,10 @@ export function companionClassLine(
   if (!next) return 'Hoy no quedan clases.';
   const title = clip(next.title);
   if (title === '') return null;
-  return Date.parse(next.startAt) <= t
-    ? `Tienes clase ahora: ${title}.`
-    : `Tu próxima clase es ${title} a las ${formatClock(next.startAt, timeZone)}.`;
+  if (Date.parse(next.startAt) <= t) return `Tienes clase ahora: ${title}.`;
+  // The 12-hour clock already ends in a full stop ("11:30 p. m."): a second one would read "p. m..".
+  const clock = formatClock(next.startAt, timeZone);
+  return `Tu próxima clase es ${title} a las ${clock}${clock.endsWith('.') ? '' : '.'}`;
 }
 
 /** From the Home's own response (already normalized by the server) to the companion's input. */
