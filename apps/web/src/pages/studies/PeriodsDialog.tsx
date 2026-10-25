@@ -22,6 +22,9 @@ import { useCreateStudyPeriod, useUpdateStudyPeriod } from '../../studyTracks/us
 /**
  * The minimum to keep a study alive: see its periods, mark another one as the current one, edit one, add a new one. Marking one
  * current replaces only the current period OF THIS STUDY (other studies keep theirs). No history screen, no deleting here.
+ *
+ * Changing semester IS changing the current period: the earlier one is kept (a period has no "closed" state, nothing here ends
+ * or archives it), so the words say "current" and "next", never "close".
  */
 export function PeriodsDialog({
   track,
@@ -61,6 +64,12 @@ export function PeriodsDialog({
   return (
     <Modal title={`Periodos de ${track.name}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
+        {periods.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            El periodo actual es el que lee tu Inicio. Para cambiar de semestre, crea el siguiente o
+            marca otro como actual: el anterior se conserva.
+          </p>
+        )}
         {update.isError && <FormError>{studyErrorText(update.error)}</FormError>}
         {periods.length === 0 ? (
           <p className="text-foreground">Este estudio todavía no tiene periodos.</p>
@@ -88,7 +97,12 @@ export function PeriodsDialog({
                       onClick={() =>
                         update.mutate(
                           { id: p.id, input: { isCurrent: true } },
-                          { onSuccess: () => onDone(`«${p.name}» es ahora el periodo actual.`) },
+                          {
+                            onSuccess: () =>
+                              onDone(
+                                `«${p.name}» es ahora el periodo actual. El anterior se conserva.`,
+                              ),
+                          },
                         )
                       }
                     >
@@ -144,6 +158,8 @@ function PeriodForm({
     note: period?.studyLevelNote ?? '',
   });
   const [makeCurrent, setMakeCurrent] = useState(true);
+  // It becomes the study's current period when asked, or when the study has none yet (then there is nothing to replace).
+  const becomesCurrent = makeCurrent || !hasCurrent;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string>();
 
@@ -184,11 +200,19 @@ function PeriodForm({
         studyTrackId: track.id,
         ...(studyLevel !== null && { studyLevel }),
         ...(studyLevelNote !== null && { studyLevelNote }),
-        ...((makeCurrent || !hasCurrent) && { isCurrent: true }),
+        ...(becomesCurrent && { isCurrent: true }),
       });
       if (!parsed.success) return setFieldErrors(fieldErrorsOf(parsed.error));
       setFieldErrors({});
-      create.mutate(parsed.data, { onSuccess: () => onDone('Periodo creado.'), onError });
+      create.mutate(parsed.data, {
+        onSuccess: () =>
+          onDone(
+            becomesCurrent
+              ? `«${parsed.data.name}» es ahora el periodo actual.${hasCurrent ? ' El anterior se conserva.' : ''}`
+              : 'Periodo creado.',
+          ),
+        onError,
+      });
     }
   }
 
@@ -243,15 +267,26 @@ function PeriodForm({
         />
       </div>
       {!period && hasCurrent && (
-        <label className="flex min-h-11 items-center gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={makeCurrent}
-            onChange={(e) => setMakeCurrent(e.target.checked)}
-            className="size-5"
-          />
-          Hacerlo el periodo actual (reemplaza al actual de este estudio)
-        </label>
+        <div className="flex flex-col gap-1">
+          <label className="flex min-h-11 items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={makeCurrent}
+              onChange={(e) => setMakeCurrent(e.target.checked)}
+              aria-describedby="period-current-hint"
+              className="size-5"
+            />
+            Hacer este el periodo actual
+          </label>
+          <p id="period-current-hint" className="pl-8 text-sm text-muted-foreground">
+            {makeCurrent
+              ? 'El periodo actual de este estudio se conserva y deja de ser el activo; este pasa a serlo.'
+              : 'Quedará guardado sin cambiar el periodo actual; podrás marcarlo como actual cuando lo necesites.'}
+          </p>
+        </div>
+      )}
+      {!period && !hasCurrent && (
+        <p className="text-sm text-muted-foreground">Será el periodo actual de este estudio.</p>
       )}
       <FormActions>
         <Button onClick={onCancel} disabled={pending}>

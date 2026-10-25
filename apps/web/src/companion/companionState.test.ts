@@ -135,11 +135,25 @@ describe('companionClassLine (the classes of today the Home already has)', () =>
 
   it('names the next class by start time, with its hour in 12 h', () => {
     expect(companionClassLine(classes, at('11:00'), TZ)).toMatch(
-      /^Tu próxima clase es Redes de Computadores a las 8:00\s?a\. ?m\.\.$/,
+      /^Tu próxima clase es Redes de Computadores a las 8:00\s?a\. ?m\.$/,
     );
     expect(companionClassLine(classes, at('16:00'), TZ)).toMatch(
-      /^Tu próxima clase es Farmacología a las 2:00\s?p\. ?m\.\.$/,
+      /^Tu próxima clase es Farmacología a las 2:00\s?p\. ?m\.$/,
     );
+  });
+
+  it('ends in ONE full stop, a.m. and p.m. alike (the 12-hour clock already ends in one)', () => {
+    for (const hour of ['00', '04', '05', '10', '11', '12', '16', '17', '23']) {
+      const line = companionClassLine(
+        [cls('Redes', `${hour}:30`, `${hour}:55`)],
+        new Date('2026-10-07T12:00:00.000Z'),
+        TZ,
+      )!;
+      expect(line, hour).not.toContain('..');
+      expect(line, hour).not.toMatch(/[ap]\. ?m\.\./);
+      expect(line.endsWith('.'), hour).toBe(true);
+      expect(line, hour).toMatch(/a las \d{1,2}:30\s?[ap]\. ?m\.$/);
+    }
   });
 
   it('says so while a class is on, and when none is left', () => {
