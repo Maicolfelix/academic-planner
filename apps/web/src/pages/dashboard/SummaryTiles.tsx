@@ -3,16 +3,16 @@ import { Link } from 'react-router';
 
 type Summary = Dashboard['summary'];
 
-// Each metric has a hue of its own, used for the numeral and for the thin bar under it once it has something to show
-// (a zero stays quiet). `cell` tints the whole cell: only "Vencidas" does, and only when there are some.
+// Open work by state, nothing else: each concept is said ONCE on the Home. "Finalizadas" is the Progress card's own
+// figure, and "Vencidas" belongs to the Radar (same count, same filtered list). Each metric has a hue of its own, used for
+// the numeral and for the thin bar under it once it has something to show (a zero stays quiet).
 const METRICS: {
-  key: keyof Omit<Summary, 'total'>;
+  key: 'pending' | 'inProgress';
   label: string;
   symbol: string;
   to: string;
   ink: string;
   bar: string;
-  cell: string;
 }[] = [
   {
     key: 'pending',
@@ -21,7 +21,6 @@ const METRICS: {
     to: '/activities?status=PENDING',
     ink: 'text-primary',
     bar: 'bg-primary/70',
-    cell: 'bg-surface',
   },
   {
     key: 'inProgress',
@@ -30,31 +29,11 @@ const METRICS: {
     to: '/activities?status=IN_PROGRESS',
     ink: 'text-info-ink',
     bar: 'bg-info',
-    cell: 'bg-surface',
-  },
-  {
-    key: 'completed',
-    label: 'Finalizadas',
-    symbol: '✓',
-    to: '/activities?status=COMPLETED',
-    ink: 'text-success-ink',
-    bar: 'bg-success',
-    cell: 'bg-surface',
-  },
-  {
-    key: 'overdue',
-    label: 'Vencidas',
-    symbol: '⚠',
-    to: '/activities?overdue=true',
-    ink: 'text-danger-ink',
-    bar: 'bg-danger',
-    cell: 'bg-danger-soft',
   },
 ];
 
 /**
- * Four counters as ONE editorial strip, not four boxes: big numerals separated by hairlines (two by two on a phone
- * and in the desktop side column, four in a row between). Under each number, a thin bar says what share of the
+ * The open work as ONE editorial strip: two big numerals separated by a hairline. Under each number, a thin bar says what share of the
  * period's activities it is. Each cell is a link to the matching filtered list; the label is always text, and the bar
  * and the symbol are decoration.
  */
@@ -70,12 +49,12 @@ export function SummaryTiles({
       <h2 id="summary-title" className="sr-only">
         {several ? 'Resumen de tus estudios actuales' : 'Resumen del periodo'}
       </h2>
-      <ul className="grid animate-rise grid-cols-2 gap-px overflow-hidden rounded-surface border border-border bg-border shadow-card [animation-delay:80ms] sm:grid-cols-4 lg:grid-cols-2">
-        {METRICS.map(({ key, label, symbol, to, ink, bar, cell }, i) => {
+      <ul className="grid animate-rise grid-cols-2 gap-px overflow-hidden rounded-surface border border-border bg-border shadow-card [animation-delay:80ms]">
+        {METRICS.map(({ key, label, symbol, to, ink, bar }, i) => {
           const count = summary[key];
           const share = summary.total > 0 ? Math.round((count / summary.total) * 100) : 0;
           return (
-            <li key={key} className={count > 0 && key === 'overdue' ? cell : 'bg-surface'}>
+            <li key={key} className="bg-surface">
               <Link
                 to={to}
                 className="group flex h-full min-h-20 flex-col justify-between gap-2 px-4 py-3 transition-[background-color,transform] duration-(--duration-fast) ease-standard hover:bg-primary/5 active:scale-[0.98]"

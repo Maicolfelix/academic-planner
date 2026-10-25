@@ -6,7 +6,7 @@ import type { ActivityStatus } from '@planner/core';
 import { useUpdateActivity } from '../../activities/useActivities';
 import type { OriginOf } from '../../academic/origin';
 import { useOrigins } from '../../academic/useAcademic';
-import { useAttention } from '../../attention/useAttention';
+import { heroItemsOf, useAttention } from '../../attention/useAttention';
 import { Card } from '../../components/ui/Card';
 import { PriorityBadge, StatusBadge } from '../activities/badges';
 import { RadarDot } from '../radar/RadarDot';
@@ -98,11 +98,7 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
       );
     },
   };
-  const items: Item[] = data?.upcoming.length
-    ? data.upcoming
-    : data?.recommendation
-      ? [data.recommendation]
-      : [];
+  const items: Item[] = heroItemsOf(data);
 
   return (
     <section aria-labelledby="attention-title" className="flex flex-col gap-2">

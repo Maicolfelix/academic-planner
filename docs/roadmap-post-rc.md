@@ -210,11 +210,13 @@ Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiale
 
 | Id   | Objetivo                                                                                                                                              | Estado                  |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| P9-1 | «¿Qué hago ahora?» accionable: «Completar» (y «Empezar» si está pendiente) en el hero, con la misma mutación de actividad que la pantalla Actividades | en revisión (este PR)   |
-| P9-2 | Primer uso (estados vacíos con atajos a importar horario, Captura rápida e `.ics`) y Home compacto sin datos duplicados                               | pendiente de aprobación |
+| P9-1 | «¿Qué hago ahora?» accionable: «Completar» (y «Empezar» si está pendiente) en el hero, con la misma mutación de actividad que la pantalla Actividades | DONE (PR #65)           |
+| P9-2 | Primer uso (estados vacíos con atajos a importar horario, Captura rápida e `.ics`) y Home compacto sin datos duplicados                               | en revisión (este PR)   |
 | P9-3 | Ajustes mínimos: editar el periodo y cierre de semestre guiado (contraseña, nombre y zona horaria quedan fuera salvo decisión del mantenedor)         | pendiente de aprobación |
 
 **P9-1:** el motor de Atención no cambia (puntaje, niveles, desempates y razones intactos). El hero muestra una acción primaria «Completar» y, solo si la actividad está pendiente, una secundaria «Empezar» (pasa a «En proceso», una transición que ya existía en el selector de estado); «Ver actividad» queda como enlace. Sin endpoint ni migración nuevos. No muestra peso ni nota: `GET /api/attention` no trae `gradeContext` (solo el Radar) y añadirlo cambiaría un contrato, que P9-1 no toca.
+
+**P9-2:** solo presentación del Home, sin backend ni migración ni consultas nuevas. Estados vacíos con a lo sumo tres caminos que ya existían (sin asignaturas: «Importar mi horario», «Interpretar un mensaje» → Bandeja, añadir asignatura a mano; con asignaturas y sin actividades: «Captura rápida» —enfoca la caja del propio Inicio—, «Importar calendario .ics», añadir a mano). Cada bloque del Home responde una pregunta distinta: el héroe es la acción inmediata; «Próxima entrega» solo aparece si el héroe no la lleva; «Vencidas» y «Para hoy» omiten la actividad que el héroe ya muestra; «Próximas entregas» omite todo lo que el héroe lleva (y desaparece si no queda nada); los contadores son solo trabajo abierto (Pendientes, En proceso: «Finalizadas» es del Progreso y «Vencidas» del Radar); el Companion dice la próxima clase de hoy (de `classesToday`, ya cargada) y nunca el título de una actividad. Qué se conserva y dónde: [dashboard.md](dashboard.md#home-compacto-p9-2).
 
 ### Prerrequisitos técnicos identificados
 

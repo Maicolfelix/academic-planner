@@ -1,3 +1,4 @@
+import type { Attention } from '@planner/core';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAttention } from '../api/attention';
 
@@ -17,4 +18,14 @@ export function useAttention() {
     refetchInterval: 60_000,
     retry: false,
   });
+}
+
+/**
+ * The activities the Home hero carries, in its order: the next ones by deadline (the API's `upcoming`) or, when only
+ * forgotten overdue ones remain, the engine's recommendation. ONE definition for the hero and for the lists around it, so
+ * the Home never shows under the hero what the hero already says.
+ */
+export function heroItemsOf(data: Attention | undefined) {
+  if (!data) return [];
+  return data.upcoming.length ? data.upcoming : data.recommendation ? [data.recommendation] : [];
 }
