@@ -1,6 +1,6 @@
 # Compartir hacia la Captura rápida (A5, Web Share Target)
 
-**Estado: DONE (PR #57 fusionado).** QA funcional manual a través de `/share` en el entorno local de desarrollo (HTTP). **La validación real del Share Target desde el menú «Compartir» del sistema operativo, con la PWA instalada, queda diferida a P12.** No se afirma HTTPS, producción, soporte universal de navegador/SO ni validación con estudiantes. Solo texto, título y enlace: no hay archivos ni imágenes.
+**Estado: DONE (PR #57 fusionado).** QA funcional manual a través de `/share` en el entorno local de desarrollo (HTTP). **La validación real del Share Target desde el menú «Compartir» del sistema operativo, con la PWA instalada, es parte del release gate** (prueba en un Android real: [release-qa-plan.md](release-qa-plan.md#share-target-en-android-pwa-instalada)); hasta entonces **no está validado**. No se afirma HTTPS, producción, soporte universal de navegador/SO ni validación con estudiantes. Solo texto, título y enlace: no hay archivos ni imágenes.
 
 Desde otra aplicación (WhatsApp, el navegador, el correo, Classroom…) el estudiante comparte **texto, título y/o un enlace** con Academic Planner y se abre la **Captura rápida** con ese contenido ya escrito. Flujo: COMPARTIR → CAPTURAR → INTERPRETAR → PROPONER → CONFIRMAR. **Compartir nunca crea nada**: el estudiante ve la caja, puede editarla, interpretar o cancelar, y todo lo demás es la Captura rápida de siempre (sin segundo intérprete ni segunda pantalla).
 
@@ -8,7 +8,27 @@ Desde otra aplicación (WhatsApp, el navegador, el correo, Classroom…) el estu
 
 - Solo **texto, título y URL**. **Sin archivos ni imágenes.** Método `GET` (sin `multipart`, sin endpoint nuevo de API).
 - `manifest.share_target`: `action: /share`, `method: GET`, `params: { title, text, url }`.
-- **Depende del navegador, del sistema operativo y de tener la PWA instalada.** No se promete fuera de una PWA instalada ni en todos los navegadores. Probar `/share?text=…` a mano en un navegador **no** es la QA real del menú «Compartir» del sistema: esa validación queda para una instalación PWA con HTTPS (P12).
+- **Depende del navegador, del sistema operativo y de tener la PWA instalada.** No se promete fuera de una PWA instalada ni en todos los navegadores. Probar `/share?text=…` a mano en un navegador **no** es la QA real del menú «Compartir» del sistema: esa validación queda para una instalación PWA con HTTPS (release gate, ver [release-qa-plan.md](release-qa-plan.md)).
+
+## Soporte del Share Target y diferencia con el Web Share API
+
+**Son dos cosas distintas.** El **Web Share API** (`navigator.share`) sirve para **compartir desde** una página hacia otras apps; Academic Planner **no lo usa** (no hay botón de compartir), y Safari/iOS sí pueden compartir. El **Web Share Target** es lo contrario: que la PWA aparezca como **destino** en el menú «Compartir» del sistema. Es lo único que implementa A5.
+
+| Plataforma                                     | ¿Academic Planner puede ser destino de compartir? | Notas                                                                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Android con Chromium (WebAPK)**              | **Sí**, con la PWA **instalada**                  | Es el caso que se valida con un dispositivo real. En Android la URL suele llegar dentro del campo `text` (el código ya lo contempla).                                                                      |
+| **ChromeOS**                                   | **Sí**, con la PWA instalada                      | No es un objetivo de la QA de v1.                                                                                                                                                                          |
+| **Safari / iOS**                               | **No** como destino                               | Limitación de la plataforma, no un defecto. En un iPhone la app no aparece en la hoja de compartir; **la QA de iOS no lo espera ni lo exige**. Reconfirmar en la tabla de compatibilidad de MDN al probar. |
+| Chromium de escritorio (Windows, macOS, Linux) | Sin verificar                                     | Chrome 89 anunció soporte en escritorio para Windows y ChromeOS; no es un objetivo de v1 y no se afirma.                                                                                                   |
+
+**Siempre exige instalar la PWA:** el navegador registra el destino en el sistema operativo al instalar, y sin instalar la app no aparece. Requiere además HTTPS (service worker e instalación). MDN marca `share_target` como **experimental** y de «disponibilidad limitada»: no es una característica universal.
+
+Fuentes técnicas (consultadas el 2026-10-25; la documentación de web.dev es antigua, hay que revisar el estado actual al probar):
+
+- [Receiving shared data with the Web Share Target API (web.dev)](https://web.dev/web-share-target/)
+- [OS Integration, Web Share Target (web.dev, Learn PWA)](https://web.dev/learn/pwa/os-integration/)
+- [`share_target`, referencia del manifest (MDN)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target)
+- [New in Chrome 89 (Chrome for Developers)](https://developer.chrome.com/blog/new-in-chrome-89)
 
 ## Cómo funciona
 
