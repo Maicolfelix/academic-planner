@@ -16,8 +16,8 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 2. Migraciones
 
 - [x] **15 migraciones** lineales presentes; `prisma migrate status` en la base de desarrollo: «Database schema is up to date!» (revisión de 2026-10-25).
-- [x] **Validación desde una base vacía** con las 15 (RG-2, `npm run validate:fresh-db`, PostgreSQL 17 desechable en Docker): las 15 se aplican, `prisma migrate status` al día, 15 filas terminadas, arranque en producción, humo completo (registro, periodo, materia, actividad, completarla), datos persistentes tras reiniciar el proceso web y la base. **Pendiente repetirlo en el PostgreSQL de preproducción.**
-- [ ] **Sin deriva de esquema** (`prisma migrate diff`): **hay UNA diferencia conocida e intencional** (la FK compuesta `Evaluation → Activity` escrita a mano con `ON DELETE SET NULL ("activityId")`, que Prisma no puede expresar). No se generó ninguna migración. **Pendiente la aceptación del mantenedor** ([detalle](deployment.md#deriva-del-esquema-conocida-e-intencional)).
+- [x] **Validación desde una base vacía** con las 15 (RG-2, `npm run validate:fresh-db`, PostgreSQL 17 desechable en Docker): las 15 se aplican, `prisma migrate status` al día, sin deriva inesperada, 15 filas terminadas, arranque en producción, humo completo (registro, periodo, materia, actividad, completarla), datos persistentes tras reiniciar el proceso web y la base. **Pendiente repetirlo en el PostgreSQL de preproducción.**
+- [x] **Sin deriva inesperada de esquema** (`prisma migrate diff`, RG-2): la **única** diferencia es la FK manual `Evaluation → Activity` (`ON DELETE SET NULL ("activityId")`), **revisada y aceptada por el mantenedor**; cualquier otra bloquea `npm run validate:fresh-db` ([detalle](deployment.md#deriva-del-esquema-conocida-e-intencional)). `schema.prisma` y la base no son idénticos por diseño.
 
 ## 3. Calidad
 

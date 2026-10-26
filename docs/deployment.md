@@ -159,11 +159,11 @@ npm run validate:fresh-db      # base vacía y desechable: migraciones, deriva, 
 BASE_URL=https://host npm run smoke            # humo externo contra un despliegue (añade --full para el flujo completo)
 ```
 
-**`npm run validate:fresh-db`** (necesita Docker; unos minutos con las imágenes en caché; opciones `--skip-build` y `--accept-known-drift`):
+**`npm run validate:fresh-db`** (necesita Docker; unos minutos con las imágenes en caché; opciones `--skip-build` y `--require-zero-drift`, que es estricta: ni siquiera admite la diferencia conocida). **El comando normal pasa con la deriva conocida exacta y no necesita ninguna bandera de aceptación:**
 
 1. levanta PostgreSQL 17 en un contenedor propio (red privada, sin puerto publicado, nombre y contraseña aleatorios) y **se niega a ejecutarse** si la cadena de conexión no apunta a esa base `planner_fresh_*`;
 2. comprueba que la base está **vacía** y aplica **las 15 migraciones** con la imagen `migrate`; `prisma migrate status` y 15 filas terminadas en `_prisma_migrations`;
-3. `prisma migrate diff` contra `schema.prisma` (ver [deriva conocida](#deriva-del-esquema-conocida-e-intencional));
+3. `prisma migrate diff` contra `schema.prisma`: **sin deriva inesperada** (pasa con «No difference detected» o con **exactamente** la diferencia conocida, ver [deriva conocida](#deriva-del-esquema-conocida-e-intencional); falla con cualquier otra línea, tabla, índice, clave, `CHECK` o código de salida);
 4. arranca la imagen web en modo producción (un solo origen) y espera `/api/health`; comprueba que **no** ejecutó migraciones al arrancar;
 5. corre el humo `--full` como cliente externo y `scripts/container-check.mjs` dentro de la imagen: **argon2** y **`@napi-rs/canvas`** (módulos nativos), **`tesseract.js` con los datos `spa` locales** leyendo una imagen sintética, y la ruta `POST /api/schedule-import/parse` de punta a punta (sesión real, subida real, OCR real: 200 con una propuesta);
 6. reinicia el proceso web **y** la base y comprueba que los datos persistieron y que el humo pasa de nuevo;
@@ -176,7 +176,15 @@ BASE_URL=https://host npm run smoke            # humo externo contra un desplieg
 
 ### Deriva del esquema (conocida e intencional)
 
-Tras aplicar las 15 migraciones desde cero, `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` termina con código 2 y **una sola** diferencia: ``[*] Changed the `Evaluation` table`` / `[-] Removed foreign key on columns (activityId, subjectId)`. Es la clave foránea compuesta `Evaluation_activityId_subjectId_fkey` hacia `Activity("id", "subjectId")`, escrita **a mano** en la migración `20261015203000_grading_foundation` con `ON DELETE SET NULL ("activityId")` (PostgreSQL 15+; solo se anula la columna `activityId`, nunca `subjectId`), que Prisma no sabe expresar en `schema.prisma` (el comentario del modelo `Evaluation` y [data-model.md](data-model.md) lo documentan). **No se generó ninguna migración y no se cambió el esquema.** La validación **falla por defecto** ante esa diferencia y solo la acepta con `--accept-known-drift` cuando el texto es **exactamente** ese; cualquier otra diferencia sigue siendo un fallo. La decisión de aceptarla es del mantenedor. (La afirmación anterior de «sin deriva» era de `rc.1`, con 6 migraciones, antes de las notas.)
+Las migraciones son la **fuente real** de las invariantes SQL manuales (índices únicos parciales, `CHECK` y una clave foránea compuesta); `schema.prisma` no representa algunas de ellas, así que **la base migrada y `schema.prisma` no son idénticos**. Tras aplicar las 15 migraciones desde cero, `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` termina con código 2 y **una sola** diferencia: ``[*] Changed the `Evaluation` table`` / `[-] Removed foreign key on columns (activityId, subjectId)`. Es la clave foránea compuesta `Evaluation_activityId_subjectId_fkey` hacia `Activity("id", "subjectId")`, escrita **a mano** en la migración `20261015203000_grading_foundation` con `ON DELETE SET NULL ("activityId")` y `ON UPDATE NO ACTION` (PostgreSQL 15+; solo se anula la columna `activityId`, nunca `subjectId`), que Prisma no sabe expresar (el comentario del modelo `Evaluation` y [data-model.md](data-model.md) lo documentan).
+
+**Decisión del mantenedor: esa diferencia queda ACEPTADA.** No se crea ninguna migración, no se borra la clave y no se cambia `schema.prisma` para simularla: la base migrada es la autoridad de esta invariante. En consecuencia:
+
+- `npm run validate:fresh-db` **pasa** si la **única** diferencia es exactamente esa (las dos líneas, ni una más ni una menos) y **falla** ante cualquier otra: una línea adicional, solo una de las dos, otra tabla, otro índice, otra clave, otro `CHECK` o un código de salida inesperado. **No existe ninguna opción que acepte una deriva arbitraria.**
+- `--require-zero-drift` es el modo estricto opcional: exige que Prisma no reporte absolutamente nada (con la diferencia conocida, falla a propósito).
+- La decisión está en `scripts/drift-lib.mjs` (función pura `classifyDrift`, con sus pruebas en `scripts/drift-lib.test.mjs`).
+
+(La afirmación anterior de «sin deriva» era de `rc.1`, con 6 migraciones, antes de las notas.)
 
 ## Qué necesita el proveedor
 

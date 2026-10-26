@@ -3,12 +3,13 @@
 //
 //   node scripts/fresh-db-validation.mjs                      # builds the images, runs everything, destroys what it created
 //   node scripts/fresh-db-validation.mjs --skip-build         # reuse academic-planner:fresh-validation / -migrate:
-//   node scripts/fresh-db-validation.mjs --accept-known-drift # accept the ONE reviewed, intentional schema difference
+//   node scripts/fresh-db-validation.mjs --require-zero-drift # strict: not even the known, accepted difference may appear
 //
 // What it does (all inside Docker, nothing touches the development database or any *_test database):
 //   1. a throw-away PostgreSQL 17 container on a private network, no published port, a random name and password;
 //   2. proves the database is empty, applies ALL migrations with the `migrate` image (the explicit schema step);
-//   3. `prisma migrate status` and `prisma migrate diff` against schema.prisma (no drift);
+//   3. `prisma migrate status` and `prisma migrate diff` against schema.prisma: NO UNEXPECTED drift (the migrations are the real
+//      source of the manual SQL invariants and schema.prisma cannot express some, so exactly one reviewed difference is accepted);
 //   4. starts the web image (production mode, one origin) and waits for /api/health;
 //   5. the production smoke (scripts/smoke.mjs --full): register, onboarding data, subject, activity, complete, re-login;
 //   6. the container checks (argon2, @napi-rs/canvas, tesseract.js + Spanish data, schedule-import route);
@@ -25,15 +26,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classifyDrift } from './drift-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skipBuild = process.argv.includes('--skip-build');
-const acceptKnownDrift = process.argv.includes('--accept-known-drift');
-// The exact output of `prisma migrate diff` for the one INTENTIONAL difference (see the drift step below).
-const KNOWN_DRIFT = [
-  '[*] Changed the `Evaluation` table',
-  '[-] Removed foreign key on columns (activityId, subjectId)',
-];
+const requireZeroDrift = process.argv.includes('--require-zero-drift');
 const RUN_IMAGE = 'academic-planner:fresh-validation';
 const MIGRATE_IMAGE = 'academic-planner-migrate:fresh-validation';
 
@@ -45,10 +42,13 @@ const names = {
 };
 const dbName = `planner_fresh_${id}`;
 const dbPassword = randomBytes(12).toString('hex');
-const databaseUrl = `postgresql://postgres:${dbPassword}@${names.db}:5432/${dbName}`;
+// Built with the URL API (not as a literal with credentials): the password is random per run and never written anywhere.
+const target = new URL(`postgresql://${names.db}:5432/${dbName}`);
+target.username = 'postgres';
+target.password = dbPassword;
+const databaseUrl = target.href;
 
 // ── guards: this must be unmistakably a throw-away database ──────────────────────────────────────────────────────────
-const target = new URL(databaseUrl);
 if (
   !target.hostname.startsWith('planner-fresh-db-') ||
   !target.pathname.slice(1).startsWith('planner_fresh_') ||
@@ -204,27 +204,14 @@ async function main() {
   const drift = inApi(
     'npx --no-install prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code',
   );
-  const driftLines = (drift.stdout.match(/^\s*\[[*+-]\].*$/gm) ?? []).map((l) => l.trim());
-  const driftLabel =
-    'prisma migrate diff: no drift between the migrated database and schema.prisma';
-  if (drift.status === 0 && /No difference detected/i.test(drift.stdout)) {
-    record(driftLabel, true);
-  } else if (drift.status === 2 && JSON.stringify(driftLines) === JSON.stringify(KNOWN_DRIFT)) {
-    // The ONE difference that is intentional: the composite Evaluation -> Activity foreign key is written by hand in the
-    // migration (ON DELETE SET NULL ("activityId"), PostgreSQL 15+), which Prisma cannot express in schema.prisma, so a diff
-    // always reports it. It needs a maintainer's review, hence it only passes when explicitly accepted.
-    record(
-      driftLabel,
-      acceptKnownDrift,
-      `KNOWN, INTENTIONAL drift: ${KNOWN_DRIFT.join(' / ')} (hand-written FK, see data-model.md). ${acceptKnownDrift ? 'Accepted with --accept-known-drift.' : 'Review it, then re-run with --accept-known-drift.'}`,
-    );
-  } else {
-    record(
-      driftLabel,
-      false,
-      `exit ${drift.status}: ${driftLines.join(' / ') || drift.stdout.slice(0, 300)}`,
-    );
-  }
+  // Exactly the known, accepted difference (the hand-written Evaluation -> Activity foreign key) or nothing; every other line,
+  // table, index, key, CHECK or exit code blocks. No option accepts arbitrary drift.
+  const verdict = classifyDrift(drift, { requireZero: requireZeroDrift });
+  record(
+    'prisma migrate diff: no UNEXPECTED drift between the migrated database and schema.prisma',
+    verdict.ok,
+    verdict.detail,
+  );
   const migrationRows = Number(
     psql(
       'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null',
