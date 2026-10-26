@@ -1,6 +1,6 @@
 # Limitaciones conocidas
 
-Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Se revisó contra el código y las pruebas de `main` en `57090dd` (P9 completo, 2026-10-25). Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas); el estado de cada elemento del release está en [release-readiness-audit.md](release-readiness-audit.md).
+Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Se revisó contra el código y las pruebas de `main` en `1267657` (P9 completo y RG-1 fusionado) y contra la evidencia de RG-2 (PR #70; 2026-10-26). Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas); el estado de cada elemento del release está en [release-readiness-audit.md](release-readiness-audit.md).
 
 ## Lo que aún no está validado
 
