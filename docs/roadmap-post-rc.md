@@ -1,6 +1,6 @@
 # Roadmap del ciclo post-RC
 
-> **Estado: planificación. Nada de lo descrito aquí está implementado.** Este documento define un nuevo ciclo de producto posterior a `v1.0.0-rc.2`. El código y las pruebas siguen siendo la fuente de verdad de lo que el sistema hace hoy ([project-state.md](project-state.md), [limitations.md](limitations.md)). Cada elemento de este roadmap necesita **aprobación explícita del propietario** antes de implementarse; este documento no autoriza ninguno.
+> **Estado: ciclo post-RC parcialmente ejecutado.** Las etapas marcadas DONE (A1, A2, A5, P8, P9 y otras) están implementadas y fusionadas; los elementos pendientes siguen necesitando aprobación explícita. **P9 está completo y el trabajo activo es ahora exclusivamente el release gate de v1** ([release-readiness-audit.md](release-readiness-audit.md)). Este documento define el ciclo de producto posterior a `v1.0.0-rc.2`. El código y las pruebas siguen siendo la fuente de verdad de lo que el sistema hace hoy ([project-state.md](project-state.md), [limitations.md](limitations.md)). Cada elemento de este roadmap necesita **aprobación explícita del propietario** antes de implementarse; este documento no autoriza ninguno.
 
 ## Contexto
 
