@@ -1,6 +1,6 @@
 # Auditoría de preparación para el release (post-P9)
 
-> **Base:** la auditoría nació sobre `main` en `57090ddd28da6916ae1e985e12b69a45c19fd4fc` (P9 completo, RG-1; 2026-10-25). **Base de RG-2:** `main` en `1267657a3ca846adec66cc6e9d1e12352fbff233`, con la evidencia adicional de este PR #70 (2026-10-26). Es una auditoría **de lectura y de verificación local**: no se desplegó nada, no se publicó ninguna imagen, no se subió versión ni se creó ningún tag. Sustituye a la auditoría de octubre (PR #53, cerrado sin fusionar por estar desfasada); solo se reutiliza su formato.
+> **Base:** la auditoría nació sobre `main` en `57090ddd28da6916ae1e985e12b69a45c19fd4fc` (P9 completo, RG-1; 2026-10-25). **Base de RG-2:** `main` en `1267657a3ca846adec66cc6e9d1e12352fbff233`, con la evidencia adicional del PR #70 (RG-2a, fusionado el 2026-10-26); RG-2b (preproducción HTTPS en Railway) añade la suya en su propio PR. Es una auditoría **de lectura y de verificación local**: no se desplegó nada, no se publicó ninguna imagen, no se subió versión ni se creó ningún tag. Sustituye a la auditoría de octubre (PR #53, cerrado sin fusionar por estar desfasada); solo se reutiliza su formato.
 >
 > **Estados:** `READY` (comprobado después de P9 con evidencia), `PARTIAL` (hay evidencia parcial o de antes de P9), `NOT_READY` (falta trabajo), `NEEDS_OWNER` (decisión del mantenedor), `NEEDS_REAL_DEVICE` (solo se valida en un dispositivo o servidor real). Nada se marca `READY` por optimismo: la evidencia se cita.
 
@@ -50,7 +50,7 @@ Pendiente de decisión del propietario. **No existe `LICENSE`** y no se crea uno
 ## Qué falta, en orden
 
 1. **RG-1 (hecho, PR #69):** documentos al día, política de beta cerrada, plan de `rc.3`, procedimiento de respaldo y guion de QA.
-2. **RG-2 (este PR, primer hito local):** guardas de producción, `PORT`, imagen Docker, base vacía con las 15 migraciones, smoke y comprobaciones del contenedor, **todo validado en local sobre HTTP**. **Segundo hito:** elegir proveedor y validar una preproducción con HTTPS real (proxy, `__Host-`, HSTS, smoke).
+2. **RG-2a (DONE, PR #70):** guardas de producción, `PORT`, imagen Docker, base vacía con las 15 migraciones, smoke y comprobaciones del contenedor, **todo validado en local sobre HTTP**. **RG-2b (en revisión, este PR):** preproducción con HTTPS real en **Railway** (proveedor elegido por el mantenedor; ver [deployment.md](deployment.md#preproducción-en-railway-rg-2b)): proxy, `__Host-`, HSTS y humo por HTTPS.
 3. **RG-3:** Playwright completo, QA en dispositivos (incluido el Share Target en Android), PWA instalada y ensayo de restauración, todo con evidencia.
 4. **RG-4:** versión `1.0.0-rc.3`, notas y etiqueta; después, si pasa sin cambios, `v1.0.0`.
 

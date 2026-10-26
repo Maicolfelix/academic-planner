@@ -186,13 +186,64 @@ Las migraciones son la **fuente real** de las invariantes SQL manuales (índices
 
 (La afirmación anterior de «sin deriva» era de `rc.1`, con 6 migraciones, antes de las notas.)
 
+## Preproducción en Railway (RG-2b)
+
+Railway es el proveedor elegido por el mantenedor **para la preproducción** (no es producción pública). Todo lo de esta sección se contrastó con la documentación vigente de Railway el 2026-10-26; lo que Railway **no** documenta se marca como tal y se **mide**, no se asume.
+
+### Una sola imagen; las migraciones, un trabajo aparte
+
+La imagen `runtime` incluye la CLI de Prisma (`prisma` pasó a `dependencies` de la API), `apps/api/prisma/` (esquema y las 15 migraciones) y `apps/api/prisma.config.ts`. **El `CMD` no cambió** (`node apps/api/dist/server.js`): el proceso web nunca migra ni al arrancar ni al reiniciar. Las migraciones se ejecutan **únicamente** como _pre-deploy command_, con **el mismo comando que valida `npm run validate:fresh-db`** (ahora desde la imagen runtime): `npm run db:deploy`. El objetivo `migrate` del `Dockerfile` sigue existiendo para quien prefiera una imagen aparte.
+
+### Ajustes del servicio (Dashboard)
+
+No se versiona `railway.json`/`railway.toml`: la documentación de Railway marca la _config as code_ como **obsoleta** (los archivos antiguos funcionan hasta el 2026-12-01) y sustituirla por otro mecanismo sería complejidad de más para un solo servicio. Estos son los ajustes exactos:
+
+| Ajuste (servicio web) | Valor                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fuente                | El repositorio de GitHub, **rama `feat/rg2b-railway-preprod`** (después, un commit explícito); **sin** despliegue automático de `main`        |
+| Builder               | Dockerfile (Railway lo detecta en la raíz; sin `Dockerfile` alterno)                                                                          |
+| Pre-deploy command    | `npm run db:deploy` (contenedor aparte, red privada y variables del servicio; si falla (≠ 0) **el despliegue no continúa** y no se reintenta) |
+| Healthcheck path      | `/api/health` (Railway activa el despliegue solo con un 2xx; lo comprueba **solo al desplegar**, no después)                                  |
+| Réplicas              | **1** (los límites de frecuencia viven en memoria)                                                                                            |
+| Start command         | **vacío** (se usa el `CMD` de la imagen)                                                                                                      |
+| Dominio               | El generado por Railway (`*.up.railway.app`); HTTPS y el certificado los gestiona Railway                                                     |
+
+Variables del servicio web (**sin** valores reales en el repositorio, en los registros ni en capturas):
+
+| Variable       | Valor                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL` | **Referencia** a la variable privada del PostgreSQL del mismo proyecto (`${{Postgres.DATABASE_URL}}`; host `*.railway.internal`) |
+| `CORS_ORIGIN`  | Exactamente `https://<dominio>`, sin barra final                                                                                 |
+| `TRUST_PROXY`  | Ver abajo: se decide con evidencia                                                                                               |
+| `PORT`         | Lo inyecta Railway; **no** se define `API_PORT`                                                                                  |
+
+`NODE_ENV=production` y `WEB_DIST_DIR` ya los declara la imagen. La base: PostgreSQL **17** dentro del **mismo proyecto**, solo en la red privada (sin proxy TCP público), **sin** seed demo y nunca la base de desarrollo.
+
+### `TRUST_PROXY` en Railway: se mide, no se adivina
+
+Railway documenta `X-Real-IP` (IP del cliente), `X-Forwarded-Proto` (siempre `https`) y `X-Forwarded-Host`; **no documenta** cuántos proxies hay delante ni si sobrescribe un `X-Forwarded-For` enviado por el cliente. Por eso:
+
+1. Primer despliegue con `TRUST_PROXY` **sin definir** (el valor más restrictivo: ninguna cabecera de reenvío es de fiar; todos los clientes comparten la IP del proxy).
+2. Se envían más de 10 inicios de sesión fallidos (el límite) con un `X-Forwarded-For` distinto en cada uno: si el límite salta igual, la cabecera falsa **no** sirve para esquivarlo.
+3. Se cambia a `TRUST_PROXY=1` y se repite la prueba desde dos redes distintas: con la cabecera falsificada el límite debe seguir saltando para el cliente que abusa, y **otro cliente desde otra red no** debe verse limitado (si lo estuviera, la IP vista sería la del proxy, no la del cliente). Solo así `1` es el valor correcto; si no, se documenta el hallazgo y se queda el valor seguro.
+
+No se registran IP de usuarios reales: las pruebas usan cuentas inexistentes y direcciones de prueba. El resultado de esta medición está en [Evidencia de RG-2b](#evidencia-de-rg-2b).
+
+### Copias de seguridad
+
+Railway ofrece copias de volumen (diaria, semanal y mensual, y manuales) con el mismo precio que los volúmenes, y la restauración **monta un volumen nuevo** en el servicio; no está documentado que el servicio de PostgreSQL las traiga activadas. **No se afirma ninguna copia automática que no esté activada de verdad:** el estado real (disponible / activada) se registra abajo y el **ensayo de restauración queda para RG-3** ([backup-restore.md](backup-restore.md)).
+
+### Evidencia de RG-2b
+
+_Pendiente: se completa con la salida real del despliegue (sin secretos) antes de pedir la revisión final._
+
 ## Qué necesita el proveedor
 
 - Ejecutar **un contenedor** (o un servicio Node con la compilación hecha) **de larga duración** con **una sola instancia** (los límites de frecuencia viven en memoria).
 - **HTTPS/TLS terminado** por la plataforma o por un proxy delante, que **sobrescriba** `X-Forwarded-For`.
 - **Puerto configurable** (`PORT` o `API_PORT`) y variables de entorno propias, incluidos los secretos.
 - **PostgreSQL 17** persistente, con copias automáticas ([backup-restore.md](backup-restore.md)).
-- Un **trabajo o comando previo al despliegue** para el paso de migraciones (la imagen `migrate`), separado del proceso web.
+- Un **trabajo o comando previo al despliegue** para el paso de migraciones (`npm run db:deploy` desde la misma imagen), separado del proceso web.
 - **Health check** HTTP sobre `/api/health` (200 con la base, 503 sin ella).
 - Memoria suficiente para el OCR (la importación retiene hasta 10 MB por solicitud).
 

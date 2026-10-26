@@ -2,12 +2,12 @@
 // Fresh-database validation: proves the artifact works on a COMPLETELY EMPTY PostgreSQL, from nothing, and leaves nothing behind.
 //
 //   node scripts/fresh-db-validation.mjs                      # builds the images, runs everything, destroys what it created
-//   node scripts/fresh-db-validation.mjs --skip-build         # reuse academic-planner:fresh-validation / -migrate:
+//   node scripts/fresh-db-validation.mjs --skip-build         # reuse academic-planner:fresh-validation:
 //   node scripts/fresh-db-validation.mjs --require-zero-drift # strict: not even the known, accepted difference may appear
 //
 // What it does (all inside Docker, nothing touches the development database or any *_test database):
 //   1. a throw-away PostgreSQL 17 container on a private network, no published port, a random name and password;
-//   2. proves the database is empty, applies ALL migrations with the `migrate` image (the explicit schema step);
+//   2. proves the database is empty, applies ALL migrations with `npm run db:deploy` run from the RUNTIME image (the platform's pre-deploy step);
 //   3. `prisma migrate status` and `prisma migrate diff` against schema.prisma: NO UNEXPECTED drift (the migrations are the real
 //      source of the manual SQL invariants and schema.prisma cannot express some, so exactly one reviewed difference is accepted);
 //   4. starts the web image (production mode, one origin) and waits for /api/health;
@@ -32,7 +32,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skipBuild = process.argv.includes('--skip-build');
 const requireZeroDrift = process.argv.includes('--require-zero-drift');
 const RUN_IMAGE = 'academic-planner:fresh-validation';
-const MIGRATE_IMAGE = 'academic-planner-migrate:fresh-validation';
 
 const id = randomBytes(3).toString('hex');
 const names = {
@@ -122,9 +121,6 @@ async function main() {
   if (!skipBuild) {
     console.log('Building the images (cached layers make this quick when nothing changed)…');
     dockerOk(['build', '-t', RUN_IMAGE, '.'], { stdio: ['ignore', 'pipe', 'pipe'] });
-    dockerOk(['build', '--target', 'migrate', '-t', MIGRATE_IMAGE, '.'], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
   }
 
   // 1. an empty database in a private network
@@ -168,7 +164,11 @@ async function main() {
     names.network,
     '-e',
     `DATABASE_URL=${databaseUrl}`,
-    MIGRATE_IMAGE,
+    RUN_IMAGE,
+    // exactly what a platform's pre-deploy job runs, from the SAME image as the web process (its CMD is not touched)
+    'npm',
+    'run',
+    'db:deploy',
   ]);
   const applied = [...new Set(migrate.stdout.match(/\d{14}_[a-z0-9_]+/g) ?? [])];
   record(
@@ -191,7 +191,7 @@ async function main() {
       `DATABASE_URL=${databaseUrl}`,
       '--entrypoint',
       'sh',
-      MIGRATE_IMAGE,
+      RUN_IMAGE,
       '-c',
       `cd apps/api && ${cmd}`,
     ]);
