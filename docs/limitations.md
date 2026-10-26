@@ -1,21 +1,34 @@
 # Limitaciones conocidas
 
-Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Cada punto se verificó contra el código o las pruebas al preparar el candidato `1.0.0-rc.1` (Fase 20). Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas).
+Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. Se revisó contra el código y las pruebas de `main` en `57090dd` (P9 completo, 2026-10-25). Los riesgos de seguridad con más detalle están en [security.md](security.md#17-limitaciones-conocidas); el estado de cada elemento del release está en [release-readiness-audit.md](release-readiness-audit.md).
 
 ## Lo que aún no está validado
 
-| Tema                                    | Estado                                                                                                                                                                                                                  |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dispositivos reales (iOS / Android)** | **No probados.** Lo medido es emulación a 360, 768 y 1366 px en Edge/Chromium. La instalación de la PWA, el teclado virtual y la cámara/archivos en móviles físicos siguen pendientes.                                  |
-| **HTTPS y proxy inverso reales**        | **No validados.** Solo se probó la topología local de producción (la API sirviendo la app en el puerto 4300, sin HTTPS). Cookie `__Host-`, HSTS y `TRUST_PROXY` están implementados pero sin probar tras un proxy real. |
-| **Despliegue**                          | No se ha desplegado en ningún servidor. [deployment.md](deployment.md) describe los requisitos, no una experiencia.                                                                                                     |
-| **Carga y escala**                      | Solo hay pruebas de humo (500 actividades, una cuenta, máquina de desarrollo). No hay pruebas de carga, ni número de usuarios soportado, ni SLA.                                                                        |
-| **Navegadores**                         | Probado con Chromium/Edge. La PWA y el service worker varían entre navegadores; no se afirma soporte universal.                                                                                                         |
+| Tema                                    | Estado                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Despliegue real**                     | **No existe ningún despliegue.** [deployment.md](deployment.md) describe los requisitos, no una experiencia. No se ha probado tras un proxy inverso ni con HTTPS reales.                                                                                                                                            |
+| **HTTPS, proxy y cookie `__Host-`**     | **No validados.** Solo se probó la topología local de producción (la API sirviendo la app en el puerto 4300, con `NODE_ENV=test`, sin HTTPS). La cookie `__Host-` y la cabecera HSTS se prueban a nivel de API, pero **nunca en un navegador sobre HTTPS**; `TRUST_PROXY` y `CORS_ORIGIN` nunca tras un proxy real. |
+| **PWA instalada**                       | **No validada instalada sobre HTTPS** en ningún dispositivo. Manifest, service worker, precache y modo sin conexión se comprobaron en e2e local; la instalación real y la actualización del service worker, no.                                                                                                     |
+| **Web Share Target en Android**         | **No validado en un Android real.** Se probó la ruta `/share` en local; el menú «Compartir» del sistema con la PWA instalada sigue pendiente ([share-target.md](share-target.md)).                                                                                                                                  |
+| **Dispositivos reales (iOS / Android)** | La única QA real fue funcional, en un iPhone con Safari por **HTTP de red local** y sin cubrir P9. **Sin probar:** Android, PWA instalada, HTTPS, el teclado virtual en modo instalado. Plan: [release-qa-plan.md](release-qa-plan.md).                                                                             |
+| **Migraciones desde una base vacía**    | Hay **15 migraciones** lineales y la base de desarrollo está al día, pero la **validación desde una base vacía con las 15 está pendiente** (la última instalación limpia documentada fue con 6, en `rc.1`).                                                                                                         |
+| **Suite Playwright completa tras P9**   | No se ha corrido completa después de P9; solo corridas dirigidas verdes. Es parte del release gate.                                                                                                                                                                                                                 |
+| **Respaldo y restauración**             | Procedimiento documentado en [backup-restore.md](backup-restore.md); **no ensayado**.                                                                                                                                                                                                                               |
+| **Carga y escala**                      | Solo hay pruebas de humo (500 actividades, una cuenta, máquina de desarrollo). No hay pruebas de carga, ni número de usuarios soportado, ni SLA.                                                                                                                                                                    |
+| **Navegadores**                         | Probado con Chromium/Edge (y, en etapas anteriores, Safari en iPhone por HTTP). La PWA y el service worker varían entre navegadores; no se afirma soporte universal.                                                                                                                                                |
+
+### Web Share API y Web Share Target no son lo mismo
+
+- **Web Share API** (compartir **desde** una página hacia otras apps): Safari y iOS sí pueden compartir. Academic Planner **no** usa ese API; no hay botón de compartir.
+- **Web Share Target** (ser **destino** del menú «Compartir» del sistema): es lo que implementa A5. **Safari/iOS no lo soporta como destino**, así que en un iPhone Academic Planner no aparecerá en la hoja de compartir: es una limitación de la plataforma, no un defecto. Funciona (según la documentación técnica) en **Android con Chromium/WebAPK** y en **ChromeOS**, y **solo con la PWA instalada**. Detalle y fuentes: [share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api).
 
 ## Limitaciones funcionales
 
-- **Sin gestión del periodo en la interfaz.** El periodo se crea en el onboarding; la API permite editarlo y eliminarlo, pero no hay pantalla. Un usuario trabaja con un periodo actual.
-- **Sin pantalla de perfil:** no se puede cambiar la zona horaria (`User.timezone`, por defecto `America/Bogota`), el nombre ni la contraseña.
+- **Periodos:** se editan y se cambian desde **Mis estudios → Periodos** (nombre, fechas y nivel; crear el siguiente; marcar otro como actual). **No hay estado «cerrado»** para un periodo: cambiar de semestre es cambiar el periodo actual **de ese estudio** y el anterior se conserva. **No hay eliminación de periodos en la interfaz.** Un plan anterior sin estudio debe convertirse en estudio («Convertir en estudio») para administrar sus periodos desde ahí.
+- **Sin pantalla de perfil:**
+  - **Nombre:** no se puede cambiar.
+  - **Contraseña:** no se puede cambiar ni recuperar.
+  - **Zona horaria:** sin interfaz (`User.timezone`, por defecto `America/Bogota`).
 - **Sin sincronización con calendarios externos**, sin notificaciones push, correo ni SMS. Los recordatorios solo aparecen **dentro** de la aplicación, al abrirla.
 - **Sin aplicación nativa:** es una PWA.
 - **Sin modo sin conexión para datos.** Sin red abre el shell y avisa; consultar o escribir datos requiere conexión. No hay escrituras offline ni cola.
@@ -28,13 +41,18 @@ Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. 
 
 ## Limitaciones de seguridad y cuentas
 
-- Sin verificación de correo, recuperación de contraseña, MFA, OAuth, roles ni eliminación de cuenta.
+**Alcance de v1:** `v1.0.0` se valida como **beta cerrada** ([release-readiness-audit.md](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). Las tres primeras líneas de abajo **no bloquean la beta cerrada** pero **sí bloquean ofrecer el servicio con registro público abierto**.
+
+- **Sin verificación de correo.**
+- **Sin recuperación de contraseña** (ni cambio de contraseña dentro de la aplicación).
+- **Sin MFA**, OAuth, roles ni eliminación de cuenta.
 - El registro revela si un correo ya existe (409), a diferencia del inicio de sesión.
-- Sesión de duración fija de 7 días (sin renovación ni cierre por inactividad) y sin lista de sesiones activas.
-- Límites de frecuencia **en memoria y por proceso**: se reinician con el servidor y no se comparten entre instancias.
-- `npm audit`: **0 vulnerabilidades** (con y sin `--omit=dev`) tras la actualización de `package-lock.json` de patch/minor compatible (`prisma` y `@prisma/client` 7.10.1 con `deepmerge-ts` 8 y `mysql2` 3.24, `concurrently` 10.0.6 con `shell-quote` 1.12). Antes: 4 altas de la cadena del CLI de Prisma y 2 críticas de `shell-quote`, ninguna alcanzable. Ver [security.md](security.md#15-dependencias-npm-audit).
+- Sesión de duración fija de 7 días (sin renovación ni cierre por inactividad) y sin lista de sesiones activas. Las sesiones vencidas solo se borran al usarse; no hay tarea de purga.
+- Límites de frecuencia **en memoria y por proceso**: se reinician con el servidor y no se comparten entre instancias, así que v1 se despliega con **una sola instancia**.
+- `npm audit`: **0 vulnerabilidades** (con y sin `--omit=dev`) en `main` tras P9. Ver [security.md](security.md#15-dependencias-npm-audit) para el historial.
 - No se hizo prueba de penetración ni revisión de la infraestructura de despliegue.
 - La cuenta demo (contraseña pública) **no debe existir** en un despliegue público ([demo.md](demo.md)).
+- **Licencia:** no hay archivo `LICENSE` (decisión pendiente del propietario). Para una beta privada no bloquea; antes de cualquier distribución pública debe decidirse.
 
 ## Intérpretes de texto (Captura rápida y Bandeja académica)
 
