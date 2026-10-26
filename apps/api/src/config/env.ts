@@ -1,8 +1,17 @@
 import { z } from 'zod';
 
+/** A TCP port written as plain digits (no sign, no decimals, no exponent, no spaces) in 1–65535. */
+const portSchema = z
+  .string()
+  .regex(/^\d+$/, 'must be a whole number made of digits only')
+  .transform(Number)
+  .refine((n) => n >= 1 && n <= 65535, 'must be between 1 and 65535');
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  API_PORT: z.coerce.number().int().positive().default(3000),
+  // Which port the API listens on (see `resolvePort`): `API_PORT` first, then the `PORT` many platforms inject, then 3000.
+  API_PORT: z.string().optional(),
+  PORT: z.string().optional(),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   CORS_ORIGIN: z
     .string()
@@ -49,13 +58,61 @@ const envSchema = z.object({
   SCHEDULE_IMPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 });
 
-export type Env = z.infer<typeof envSchema>;
+type Parsed = z.infer<typeof envSchema>;
+export type Env = Omit<Parsed, 'API_PORT' | 'PORT'> & { API_PORT: number };
+
+const isSet = (v: string | undefined): v is string => v !== undefined;
+const isBlank = (v: string | undefined) => v === undefined || v.trim() === '';
+
+/**
+ * `API_PORT` wins; without it the `PORT` that many platforms inject; without either, 3000. Only the port that is USED is
+ * validated: a stray `PORT` is ignored while `API_PORT` is set. A value that is set but blank or malformed is an error,
+ * never silently replaced by the next one.
+ */
+function resolvePort(source: NodeJS.ProcessEnv): { port: number } | { problem: string } {
+  const [name, raw] = isSet(source.API_PORT)
+    ? (['API_PORT', source.API_PORT] as const)
+    : isSet(source.PORT)
+      ? (['PORT', source.PORT] as const)
+      : ([undefined, undefined] as const);
+  if (name === undefined) return { port: 3000 };
+  const parsed = portSchema.safeParse(raw);
+  return parsed.success
+    ? { port: parsed.data }
+    : { problem: `${name}: ${parsed.error.issues[0]?.message ?? 'invalid port'}` };
+}
+
+/**
+ * In production the operator must DECLARE the two things whose defaults are only right for development: the public origin
+ * (the default is `http://localhost:5173`, so every browser write would be refused) and where the built web app is (without it
+ * the API would answer `/` with a 404). `NODE_ENV` itself is never assumed: the operator sets it.
+ */
+function productionProblems(source: NodeJS.ProcessEnv): string[] {
+  if (source.NODE_ENV !== 'production') return [];
+  const problems: string[] = [];
+  if (isBlank(source.CORS_ORIGIN))
+    problems.push(
+      'CORS_ORIGIN: required in production (the exact public origin, e.g. https://app.example.com)',
+    );
+  if (isBlank(source.WEB_DIST_DIR))
+    problems.push('WEB_DIST_DIR: required in production (the folder with the built web app)');
+  return problems;
+}
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = envSchema.safeParse(source);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-    throw new Error(`Invalid environment configuration: ${problems}`);
+  const problems = parsed.success
+    ? []
+    : parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
+  const port = resolvePort(source);
+  if ('problem' in port) problems.push(port.problem);
+  problems.push(...productionProblems(source));
+  if (!parsed.success || 'problem' in port || problems.length > 0) {
+    throw new Error(`Invalid environment configuration: ${problems.join('; ')}`);
   }
-  return parsed.data;
+  // `API_PORT`/`PORT` are raw strings in the schema; the resolved number is the only one the rest of the app sees.
+  const { API_PORT: _raw, PORT: _fallback, ...rest } = parsed.data;
+  void _raw;
+  void _fallback;
+  return { ...rest, API_PORT: port.port };
 }

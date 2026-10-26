@@ -1,8 +1,21 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { createApp } from './app.js';
 import { loadEnv } from './config/env.js';
 import { createPrisma, pingDatabase } from './db/prisma.js';
 
 const env = loadEnv();
+
+// Production without the built web app would answer `/` with a 404 and look healthy: refuse to start instead.
+if (
+  env.NODE_ENV === 'production' &&
+  env.WEB_DIST_DIR &&
+  !existsSync(path.join(path.resolve(env.WEB_DIST_DIR), 'index.html'))
+) {
+  throw new Error(
+    'WEB_DIST_DIR does not contain index.html: the web app is not built or the path is wrong',
+  );
+}
 const prisma = createPrisma(env.DATABASE_URL);
 const app = createApp({
   prisma,

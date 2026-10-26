@@ -231,8 +231,8 @@ Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiale
 | PR   | Objetivo                                                                                                                                  | Estado                  |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | RG-0 | Cerrar #53 y #54 sin fusionar (desfasados)                                                                                                | Hecho                   |
-| RG-1 | Documentación y verificación del flujo de instalación (sin código de producto)                                                            | en revisión (este PR)   |
-| RG-2 | Artefacto de despliegue, guardas de arranque, mapeo de `PORT`, smoke de producción, validación desde base vacía y preproducción con HTTPS | pendiente de aprobación |
+| RG-1 | Documentación y verificación del flujo de instalación (sin código de producto)                                                            | DONE (PR #69)           |
+| RG-2 | Artefacto de despliegue, guardas de arranque, mapeo de `PORT`, smoke de producción, validación desde base vacía y preproducción con HTTPS | en revisión (este PR)   |
 | RG-3 | Playwright completo, suites de seguridad, QA en dispositivos (con el Share Target en Android) y ensayo de restauración, con evidencia     | pendiente de aprobación |
 | RG-4 | Versión `1.0.0-rc.3`, notas y tag (solo con autorización); después, si pasa sin cambios, `v1.0.0`                                         | pendiente de aprobación |
 
