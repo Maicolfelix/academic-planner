@@ -1,0 +1,36 @@
+# Nothing from the host goes into the image except the sources the build needs: no secrets, no host builds, no tests.
+.git
+.gitattributes
+.gitignore
+.env
+.env.*
+!.env.example
+
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+
+# generated at build time inside the image (Prisma client)
+apps/api/src/generated
+
+# tooling and review output
+graphify-out
+test-results
+playwright-report
+.claude
+.vscode
+.vite
+
+# not needed to build or run the app
+e2e
+docs
+scripts
+**/*.md
+!README.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+playwright.config.ts
+playwright.security.config.ts

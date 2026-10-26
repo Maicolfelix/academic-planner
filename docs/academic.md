@@ -149,7 +149,7 @@ Un personaje decorativo del Inicio dice una frase neutra sobre el momento acadé
 
 ## Compartir hacia la Captura rápida (A5)
 
-Lo que otra aplicación comparte (texto, título, enlace `http(s)`) se precarga en la Captura rápida; no crea nada y no sobrescribe un borrador sin preguntar. Detalle y límites: [share-target.md](share-target.md). **DONE (PR #57 fusionado); QA funcional manual vía `/share` en desarrollo local; el menú «Compartir» real del SO queda para P12.**
+Lo que otra aplicación comparte (texto, título, enlace `http(s)`) se precarga en la Captura rápida; no crea nada y no sobrescribe un borrador sin preguntar. Detalle y límites: [share-target.md](share-target.md). **DONE (PR #57 fusionado); QA funcional manual vía `/share` en desarrollo local; la validación real desde el menú «Compartir» del SO (Android con la PWA instalada) es del release gate (RG-3).**
 
 ## Importador de calendarios `.ics` (A2)
 
