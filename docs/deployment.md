@@ -172,7 +172,7 @@ BASE_URL=https://host npm run smoke            # humo externo contra un desplieg
 
 **`npm run smoke`** (`scripts/smoke.mjs`) es independiente de Playwright y de la base: solo conoce `BASE_URL`. Prueba, como un navegador: `/api/health`, `/` (HTML de la app), CSP estricta, un enlace profundo (`/dashboard` devuelve la app y un `/api/…` desconocido un 404 JSON, nunca la app), el manifest, que un `Origin` ajeno recibe 403, el registro de **una** cuenta sintética, los atributos de la cookie de sesión, `/api/auth/me`, una escritura autenticada pequeña (un periodo) y su lectura, el cierre de sesión (el **token viejo** deja de valer), un inicio de sesión real y, con `--full`, materia, actividad, completarla y su persistencia entre sesiones. **Los controles que solo tienen sentido con HTTPS** (prefijo `__Host-`, `Secure`, HSTS) están implementados y se marcan **`n/a` —nunca verdes— si `BASE_URL` no es HTTPS**; contra HTTPS un servidor mal configurado (p. ej. sin `NODE_ENV=production`) **falla**. No hay ningún atajo para el humo: no sube los límites de frecuencia (una cuenta por corrida). **La API no tiene eliminación de cuenta**, así que cada corrida deja una cuenta sintética (`smoke-…@smoke.planner.invalid`) y lo que creó: úsalo con criterio en un entorno real y no lo programes en bucle.
 
-**Estado de la validación** (2026-10-26, imagen construida de verdad, Docker en Windows con contenedores Linux): todo lo anterior **pasa en local sobre HTTP**. **Sigue sin validar:** HTTPS real, proxy inverso real (`TRUST_PROXY` y `X-Forwarded-For`), la cookie `__Host-`/`Secure`/HSTS **en un navegador y por HTTPS** (el humo la verificaría, pero no se ha ejecutado contra HTTPS), la PWA instalada, el Share Target en Android y los dispositivos reales. Eso es RG-2 (segundo hito, preproducción) y RG-3.
+**Estado de la validación** (2026-10-26, imagen construida de verdad, Docker en Windows con contenedores Linux): todo lo anterior **pasa en local sobre HTTP**. **HTTPS real y proxy:** validados el 2026-10-27 con un túnel temporal de Cloudflare ([abajo](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel)). **Sigue sin validar:** un alojamiento persistente, la PWA instalada, el Share Target en Android y los dispositivos reales (RG-3).
 
 ### Deriva del esquema (conocida e intencional)
 
@@ -187,6 +187,8 @@ Las migraciones son la **fuente real** de las invariantes SQL manuales (índices
 (La afirmación anterior de «sin deriva» era de `rc.1`, con 6 migraciones, antes de las notas.)
 
 ## Preproducción en Railway (RG-2b)
+
+> **Estado (2026-10-27): Railway quedó BLOQUEADO** (exige registrar una cuenta, y el mantenedor fijó un presupuesto de **$0**; no se creó ninguna cuenta ni recurso). Esta sección se conserva como la guía exacta si más adelante se decide usarlo; la validación HTTPS real se hizo sin coste con [Docker local y un túnel de Cloudflare](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel).
 
 Railway es el proveedor elegido por el mantenedor **para la preproducción** (no es producción pública). Todo lo de esta sección se contrastó con la documentación vigente de Railway el 2026-10-26; lo que Railway **no** documenta se marca como tal y se **mide**, no se asume.
 
@@ -227,15 +229,55 @@ Railway documenta `X-Real-IP` (IP del cliente), `X-Forwarded-Proto` (siempre `ht
 2. Se envían más de 10 inicios de sesión fallidos (el límite) con un `X-Forwarded-For` distinto en cada uno: si el límite salta igual, la cabecera falsa **no** sirve para esquivarlo.
 3. Se cambia a `TRUST_PROXY=1` y se repite la prueba desde dos redes distintas: con la cabecera falsificada el límite debe seguir saltando para el cliente que abusa, y **otro cliente desde otra red no** debe verse limitado (si lo estuviera, la IP vista sería la del proxy, no la del cliente). Solo así `1` es el valor correcto; si no, se documenta el hallazgo y se queda el valor seguro.
 
-No se registran IP de usuarios reales: las pruebas usan cuentas inexistentes y direcciones de prueba. El resultado de esta medición está en [Evidencia de RG-2b](#evidencia-de-rg-2b).
+No se registran IP de usuarios reales: las pruebas usan cuentas inexistentes y direcciones de prueba. El resultado de esta medición está en [Evidencia de RG-2b](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel).
 
 ### Copias de seguridad
 
 Railway ofrece copias de volumen (diaria, semanal y mensual, y manuales) con el mismo precio que los volúmenes, y la restauración **monta un volumen nuevo** en el servicio; no está documentado que el servicio de PostgreSQL las traiga activadas. **No se afirma ninguna copia automática que no esté activada de verdad:** el estado real (disponible / activada) se registra abajo y el **ensayo de restauración queda para RG-3** ([backup-restore.md](backup-restore.md)).
 
-### Evidencia de RG-2b
+## Validación HTTPS gratuita (RG-2b): Docker local + Cloudflare Quick Tunnel
 
-_Pendiente: se completa con la salida real del despliegue (sin secretos) antes de pedir la revisión final._
+**Restricción: presupuesto $0.** Ninguna opción verificada ofrece a la vez contenedor Docker, PostgreSQL 17 persistente, comando previo de migraciones y funcionamiento permanente sin pagar (documentación oficial consultada el 2026-10-27):
+
+| Opción                                     | ¿Gratis y sin tarjeta?                       | Por qué no (o sí) sirve para esto                                                                                                                                                                                    |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Railway                                    | Crédito de prueba, no gratuidad              | **Bloqueado:** exige registrar una cuenta; no hay uso gratuito permanente                                                                                                                                            |
+| Render Free                                | Sí, sin tarjeta (con registro de cuenta)     | La base gratuita **caduca a los 30 días** (y se borra 14 días después), sin copias; el servicio se suspende a los 15 min sin tráfico, sin disco persistente, y la documentación no menciona Docker ni comando previo |
+| Fly.io                                     | No                                           | Su Postgres gratuito ya no existe (hoy, prueba y Postgres gestionado de pago)                                                                                                                                        |
+| Neon / Supabase / Aiven                    | Sí (solo base de datos)                      | No alojan el contenedor; serían una pieza más de un montaje con otro proveedor para la app                                                                                                                           |
+| **Docker local + Cloudflare Quick Tunnel** | **Sí: sin cuenta, sin dominio, sin tarjeta** | **Elegida para validar.** No es un alojamiento: «sin garantía de disponibilidad», hostname aleatorio **distinto en cada ejecución**, 200 peticiones simultáneas, sin SSE; Cloudflare lo recomienda solo para pruebas |
+
+**No es un despliegue permanente ni abre la beta.** Se usa solo con datos sintéticos y una base desechable, y se cierra al terminar.
+
+### Cómo se hizo (reproducible)
+
+Todo en una red de Docker privada: PostgreSQL 17 **sin puerto publicado**, la imagen `runtime` y `cloudflare/cloudflared` (túnel rápido, `tunnel --url http://<web>:8080`, **sin abrir puertos del router**). El hostname solo se conoce al arrancar el túnel, así que el orden es: red → base → túnel → leer el hostname → `npm run db:deploy` desde la imagen → web con `CORS_ORIGIN=https://<hostname>` (sin barra), `TRUST_PROXY=1` y `PORT=8080` inyectado (sin `API_PORT`) → `BASE_URL=https://<hostname> npm run smoke -- --full`. Al terminar se destruyen los contenedores y la red, y el hostname deja de responder.
+
+### Evidencia (2026-10-27, commit `b2b18a8`, imagen construida de ese árbol)
+
+| Comprobación                     | Resultado | Evidencia                                                                                                                                                    |
+| -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migraciones (pre-deploy)         | PASS      | `npm run db:deploy` desde la imagen runtime: 15 encontradas y aplicadas, exit 0; la web **no** migra al arrancar                                             |
+| Contenedor                       | PASS      | Estado `healthy`; `NODE_ENV=production`, `WEB_DIST_DIR=/app/apps/web/dist`, `PORT=8080`, **`API_PORT` ausente**: escucha en 8080 (valida el respaldo de #70) |
+| HTTPS y certificado              | PASS      | `curl` verifica el certificado (`ssl_verify_result=0`); `/api/health` 200 con `database=up`                                                                  |
+| Humo `--full` por HTTPS          | PASS      | **36 pasan, 0 fallan, 0 `n/a`**                                                                                                                              |
+| Cookie de sesión                 | PASS      | `__Host-academic_planner_session`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, sin `Domain`                                                              |
+| HSTS, CSP, `no-store` en la API  | PASS      | Presentes (el humo los comprueba y no admite `n/a` en HTTPS)                                                                                                 |
+| CORS exacto                      | PASS      | Origen ajeno, mismo host por `http://` y host parecido: 403 `INVALID_ORIGIN`; el origen real escribe                                                         |
+| Deep links y 404 de `/api`       | PASS      | `/dashboard`, `/activities`, `/settings/studies` dan el shell; una ruta `/api` desconocida es un 404 JSON, nunca la app                                      |
+| Manifest, service worker, iconos | PASS      | `start_url`, `scope`, `share_target`, `sw.js` como JavaScript y los 3 iconos (solo **servidos**: no prueba la PWA instalada)                                 |
+
+### `TRUST_PROXY`: medido, no adivinado
+
+Con un origen de eco tras otro túnel y un `X-Forwarded-For` falsificado (`203.0.113.77, 198.51.100.9`): Cloudflare **añade la IP real del cliente como entrada más a la derecha** (comprobado contra `Cf-Connecting-Ip`), **conserva** las entradas falsificadas a su izquierda, envía `X-Forwarded-Proto: https`, y la conexión al origen llega desde el contenedor del túnel (un salto que **no** añade nada). Por tanto **hay un proxy de confianza: `TRUST_PROXY=1`**, que toma la entrada más a la derecha (la real) y descarta lo falsificado.
+
+Prueba de comportamiento con el límite real de inicios de sesión fallidos (10 por IP): **12 intentos con un `X-Forwarded-For` distinto cada uno** dieron 401 ×10 y **429 desde el 11.º** (la cabecera falsa no esquiva el límite), y un **cliente directo con otra IP** empezó desde cero (el contador es por IP, no global). No se cambió ningún límite ni se registró ninguna IP personal.
+
+**Alcance:** esto vale para la topología Cloudflare Tunnel. **Railway no documenta** su proxy (cuántos saltos, si sobrescribe `X-Forwarded-For`): con cualquier otro proveedor hay que repetir esta medición antes de fijar el valor.
+
+### No validado (honesto)
+
+Un **alojamiento persistente** (no existe ninguno), la PWA instalada, el Share Target en Android, un **navegador real** sobre HTTPS (el humo prueba cabeceras y el ciclo de sesión, no la interfaz), el comportamiento tras caídas largas y las **copias de seguridad**: hoy no hay una base persistente cuyas copias comprobar (**disponibles: no aplica; activadas: NO; restauración ensayada: NO**, RG-3).
 
 ## Qué necesita el proveedor
 

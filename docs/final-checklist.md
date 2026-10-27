@@ -31,16 +31,16 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 
 - [x] `npm audit` = 0 y `npm audit --omit=dev` = 0 en `main` tras #68.
 - [x] `npm run security:scan`, `npm run test:security` (273 pruebas) y `npm run test:security:browser` (9 de 9) tras RG-2.
-- [ ] Cookie `__Host-`, HSTS y `Secure` verificados **en un navegador sobre HTTPS** (hoy solo hay pruebas de API).
-- [ ] `TRUST_PROXY` y `CORS_ORIGIN` verificados tras un proxy real.
+- [x] Cookie `__Host-`, `Secure`, `HttpOnly`, `SameSite=Lax`, sin `Domain` y HSTS verificados por **HTTPS real** (humo `--full`, túnel temporal de Cloudflare, RG-2b). **Pendiente:** hacerlo en un navegador real (RG-3).
+- [x] `TRUST_PROXY=1` y `CORS_ORIGIN` exacto verificados tras un proxy real (Cloudflare Tunnel, con evidencia: IP añadida a la derecha, un `X-Forwarded-For` falso no esquiva el límite). **Solo vale para esa topología.**
 - [ ] **Decisión sobre cuentas** registrada: beta cerrada (recuperación de contraseña, verificación de correo y MFA no bloquean) o implementarlas antes de abrir el registro público.
 
 ## 5. Despliegue
 
 - [x] **Configuración de producción** (RG-2): con `NODE_ENV=production` el proceso no arranca sin `CORS_ORIGIN` ni `WEB_DIST_DIR`; `NODE_ENV` nunca se asume; `API_PORT` › `PORT` › 3000; tabla de variables en [deployment.md](deployment.md#variables-de-entorno).
 - [x] **Artefacto de despliegue** (RG-2): `Dockerfile` multi-etapa y `.dockerignore`; imagen construida y validada en local (usuario no root, sin secretos en las capas, `HEALTHCHECK` sano, `SIGTERM` limpio, argon2, `@napi-rs/canvas` y OCR en el contenedor); migraciones como paso aparte (objetivo `migrate`). **No se publicó ninguna imagen.**
-- [ ] **Preproducción con HTTPS** desplegada con la guía de [deployment.md](deployment.md) y **una sola instancia**.
-- [ ] Decisiones del mantenedor tomadas: proveedor, dominio y TLS, PostgreSQL gestionado.
+- [ ] **Preproducción persistente con HTTPS** y **una sola instancia** (Railway bloqueado por el registro de cuenta; presupuesto $0). La validación HTTPS se hizo en un túnel temporal, no es un despliegue permanente.
+- [ ] Decisiones del mantenedor tomadas: dónde alojar (sin coste), dominio y TLS, PostgreSQL persistente.
 
 ## 6. PWA
 
@@ -62,7 +62,7 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 9. Smoke de producción
 
 - [x] Script de humo **independiente de la base de pruebas** y parametrizado por `BASE_URL` (RG-2, `npm run smoke`): 27 comprobaciones pasan y 3 (HTTPS) son `n/a` contra el contenedor local por HTTP.
-- [ ] Humo verde sobre la preproducción con HTTPS: salud, cabeceras, registro, onboarding, una actividad, una captura, cierre de sesión.
+- [x] Humo `--full` verde por **HTTPS real** (túnel temporal): 36 pasan, 0 fallan, 0 `n/a`. **Pendiente:** repetirlo en un alojamiento persistente.
 
 ## 10. Metadatos del release
 
