@@ -172,7 +172,7 @@ BASE_URL=https://host npm run smoke            # humo externo contra un desplieg
 
 **`npm run smoke`** (`scripts/smoke.mjs`) es independiente de Playwright y de la base: solo conoce `BASE_URL`. Prueba, como un navegador: `/api/health`, `/` (HTML de la app), CSP estricta, un enlace profundo (`/dashboard` devuelve la app y un `/api/…` desconocido un 404 JSON, nunca la app), el manifest, que un `Origin` ajeno recibe 403, el registro de **una** cuenta sintética, los atributos de la cookie de sesión, `/api/auth/me`, una escritura autenticada pequeña (un periodo) y su lectura, el cierre de sesión (el **token viejo** deja de valer), un inicio de sesión real y, con `--full`, materia, actividad, completarla y su persistencia entre sesiones. **Los controles que solo tienen sentido con HTTPS** (prefijo `__Host-`, `Secure`, HSTS) están implementados y se marcan **`n/a` —nunca verdes— si `BASE_URL` no es HTTPS**; contra HTTPS un servidor mal configurado (p. ej. sin `NODE_ENV=production`) **falla**. No hay ningún atajo para el humo: no sube los límites de frecuencia (una cuenta por corrida). **La API no tiene eliminación de cuenta**, así que cada corrida deja una cuenta sintética (`smoke-…@smoke.planner.invalid`) y lo que creó: úsalo con criterio en un entorno real y no lo programes en bucle.
 
-**Estado de la validación** (2026-10-26, imagen construida de verdad, Docker en Windows con contenedores Linux): todo lo anterior **pasa en local sobre HTTP**. **HTTPS real y proxy:** validados el 2026-10-27 con un túnel temporal de Cloudflare ([abajo](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel)). **Sigue sin validar:** un alojamiento persistente, la PWA instalada, el Share Target en Android y los dispositivos reales (RG-3).
+**Estado de la validación** (2026-10-26, imagen construida de verdad, Docker en Windows con contenedores Linux): todo lo anterior **pasa en local sobre HTTP**. **HTTPS real y proxy:** validados el 2026-10-26 con un túnel temporal de Cloudflare ([abajo](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel)). **Sigue sin validar:** un alojamiento persistente, la PWA instalada, el Share Target en Android y los dispositivos reales (RG-3).
 
 ### Deriva del esquema (conocida e intencional)
 
@@ -188,7 +188,7 @@ Las migraciones son la **fuente real** de las invariantes SQL manuales (índices
 
 ## Preproducción en Railway (RG-2b)
 
-> **Estado (2026-10-27): Railway quedó BLOQUEADO** (exige registrar una cuenta, y el mantenedor fijó un presupuesto de **$0**; no se creó ninguna cuenta ni recurso). Esta sección se conserva como la guía exacta si más adelante se decide usarlo; la validación HTTPS real se hizo sin coste con [Docker local y un túnel de Cloudflare](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel).
+> **Estado (2026-10-26): Railway quedó BLOQUEADO** (exige registrar una cuenta, y el mantenedor fijó un presupuesto de **$0**; no se creó ninguna cuenta ni recurso). Esta sección se conserva como la guía exacta si más adelante se decide usarlo; la validación HTTPS real se hizo sin coste con [Docker local y un túnel de Cloudflare](#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel).
 
 Railway es el proveedor elegido por el mantenedor **para la preproducción** (no es producción pública). Todo lo de esta sección se contrastó con la documentación vigente de Railway el 2026-10-26; lo que Railway **no** documenta se marca como tal y se **mide**, no se asume.
 
@@ -237,7 +237,7 @@ Railway ofrece copias de volumen (diaria, semanal y mensual, y manuales) con el 
 
 ## Validación HTTPS gratuita (RG-2b): Docker local + Cloudflare Quick Tunnel
 
-**Restricción: presupuesto $0.** Ninguna opción verificada ofrece a la vez contenedor Docker, PostgreSQL 17 persistente, comando previo de migraciones y funcionamiento permanente sin pagar (documentación oficial consultada el 2026-10-27):
+**Restricción: presupuesto $0.** Ninguna opción verificada ofrece a la vez contenedor Docker, PostgreSQL 17 persistente, comando previo de migraciones y funcionamiento permanente sin pagar (documentación oficial consultada el 2026-10-26):
 
 | Opción                                     | ¿Gratis y sin tarjeta?                       | Por qué no (o sí) sirve para esto                                                                                                                                                                                    |
 | ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -249,11 +249,24 @@ Railway ofrece copias de volumen (diaria, semanal y mensual, y manuales) con el 
 
 **No es un despliegue permanente ni abre la beta.** Se usa solo con datos sintéticos y una base desechable, y se cierra al terminar.
 
+| Estado                        | Valor                                                          |
+| ----------------------------- | -------------------------------------------------------------- |
+| HTTPS temporal validado       | **SÍ** (túnel de Cloudflare, hostname aleatorio por ejecución) |
+| Alojamiento persistente       | **NO**                                                         |
+| Despliegue público permanente | **NO**                                                         |
+| Disponibilidad garantizada    | **NO** (el túnel rápido no ofrece ninguna)                     |
+
+Las fechas de este documento son locales de America/Bogotá (UTC−5); las pruebas con túnel se hicieron la noche del 2026-10-26, que en UTC ya era el 27.
+
+### Cómo repetir la sesión de pruebas sin pagar (insumo de RG-3)
+
+Mismo orden que arriba, siempre con **datos sintéticos** (cuentas `*.invalid`, nunca información personal real), una base **nueva y desechable** (nunca la de desarrollo), sin publicar el puerto de PostgreSQL ni el motor de Docker y sin abrir puertos del router. El hostname es nuevo en cada sesión: hay que releerlo y usarlo como `CORS_ORIGIN` exacto cada vez. Para probar con un teléfono, abrir el `https://…trycloudflare.com` de esa sesión; la PWA instalada, la sesión y el Share Target quedan atados a ese hostname y **no sobreviven** a la siguiente sesión. Al terminar: destruir contenedores, red y volúmenes, y comprobar que el hostname ya no responde. Las copias y la restauración se ensayan aparte, en un PostgreSQL local aislado.
+
 ### Cómo se hizo (reproducible)
 
 Todo en una red de Docker privada: PostgreSQL 17 **sin puerto publicado**, la imagen `runtime` y `cloudflare/cloudflared` (túnel rápido, `tunnel --url http://<web>:8080`, **sin abrir puertos del router**). El hostname solo se conoce al arrancar el túnel, así que el orden es: red → base → túnel → leer el hostname → `npm run db:deploy` desde la imagen → web con `CORS_ORIGIN=https://<hostname>` (sin barra), `TRUST_PROXY=1` y `PORT=8080` inyectado (sin `API_PORT`) → `BASE_URL=https://<hostname> npm run smoke -- --full`. Al terminar se destruyen los contenedores y la red, y el hostname deja de responder.
 
-### Evidencia (2026-10-27, commit `b2b18a8`, imagen construida de ese árbol)
+### Evidencia (2026-10-26, commit `b2b18a8`, imagen construida de ese árbol)
 
 | Comprobación                     | Resultado | Evidencia                                                                                                                                                    |
 | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
