@@ -1,6 +1,6 @@
 # RG-3: procedimiento de validación completa
 
-> **Estado (2026-10-27): ejecutado; resultados reales en [rg3-results.md](rg3-results.md).** Los bloques automatizados, HTTPS, seguridad y respaldo se ejecutaron y pasaron (con correcciones al procedimiento que quedaron aquí) y el mantenedor hizo la QA en un iPhone y dos Android reales (evidencia declarada, sin capturas). Este documento sigue siendo el guion y la plantilla; los resultados viven en `rg3-results.md`.
+> **Estado (2026-10-27): ejecutado; resultados reales en [rg3-results.md](rg3-results.md).** Los bloques automatizados, HTTPS, seguridad y respaldo se ejecutaron y pasaron (con correcciones al procedimiento que quedaron aquí) y el mantenedor declaró haber hecho la QA en un iPhone y dos Android reales, pero **sin la evidencia que este documento exige** (capturas, modelos y versiones): esos escenarios están `DECLARED_PASS`, no `PASS`, y RG-3 sigue PARCIAL hasta cerrar esa brecha. Este documento sigue siendo el guion y la plantilla; los resultados viven en `rg3-results.md`.
 
 **Presupuesto: $0 COP.** Sin cuentas de pago, sin tarjetas, sin contratar alojamiento, sin abrir el servicio como público permanente. **Solo datos sintéticos** (cuentas `@smoke.planner.invalid` o `@qa.planner.invalid`, nunca información personal real). Sin cambios de producto ni de diseño, sin subir versión y sin crear tags (RG-4).
 
