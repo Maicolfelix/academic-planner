@@ -51,18 +51,19 @@
 
 ## Calidad, seguridad y operación
 
-| Documento                                                | Contenido                                                                                       |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [security.md](security.md)                               | Modelo de amenazas, controles, hallazgos de dependencias y limitaciones                         |
-| [testing.md](testing.md)                                 | Capas de prueba, cifras, base de test, cómo ejecutar, humo de rendimiento                       |
-| [system-validation.md](system-validation.md)             | Validación integral (Fase 17): matriz de escenarios, evidencia, registro de defectos            |
-| [deployment.md](deployment.md)                           | Requisitos de producción, variables de entorno, `TRUST_PROXY`, base de datos                    |
-| [development.md](development.md)                         | Entorno, scripts, migraciones, Playwright y problemas comunes                                   |
-| [limitations.md](limitations.md)                         | Limitaciones conocidas, lo no validado y lo que no se afirma                                    |
-| [final-checklist.md](final-checklist.md)                 | Lista de verificación antes de publicar (lo pendiente queda sin marcar)                         |
-| [release-readiness-audit.md](release-readiness-audit.md) | Matriz vigente del release gate (READY / PARTIAL / NOT_READY / NEEDS_OWNER / NEEDS_REAL_DEVICE) |
-| [release-qa-plan.md](release-qa-plan.md)                 | Plan de QA en iPhone y Android (navegador y PWA instalada), incluido el Share Target            |
-| [backup-restore.md](backup-restore.md)                   | Procedimiento mínimo de respaldo y restauración de PostgreSQL (sin ensayar)                     |
+| Documento                                                | Contenido                                                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [security.md](security.md)                               | Modelo de amenazas, controles, hallazgos de dependencias y limitaciones                                                                           |
+| [testing.md](testing.md)                                 | Capas de prueba, cifras, base de test, cómo ejecutar, humo de rendimiento                                                                         |
+| [system-validation.md](system-validation.md)             | Validación integral (Fase 17): matriz de escenarios, evidencia, registro de defectos                                                              |
+| [deployment.md](deployment.md)                           | Requisitos de producción, variables de entorno, `TRUST_PROXY`, base de datos                                                                      |
+| [development.md](development.md)                         | Entorno, scripts, migraciones, Playwright y problemas comunes                                                                                     |
+| [limitations.md](limitations.md)                         | Limitaciones conocidas, lo no validado y lo que no se afirma                                                                                      |
+| [final-checklist.md](final-checklist.md)                 | Lista de verificación antes de publicar (lo pendiente queda sin marcar)                                                                           |
+| [release-readiness-audit.md](release-readiness-audit.md) | Matriz vigente del release gate (READY / PARTIAL / NOT_READY / NEEDS_OWNER / NEEDS_REAL_DEVICE)                                                   |
+| [rg3-procedure.md](rg3-procedure.md)                     | RG-3: gate, sesión HTTPS temporal con túnel, QA en dispositivos, respaldo/restauración, matriz de evidencia y criterios (preparado, sin ejecutar) |
+| [release-qa-plan.md](release-qa-plan.md)                 | Plan de QA en iPhone y Android (navegador y PWA instalada), incluido el Share Target                                                              |
+| [backup-restore.md](backup-restore.md)                   | Procedimiento mínimo de respaldo y restauración de PostgreSQL (sin ensayar)                                                                       |
 
 ## Demostración y estado del proyecto
 

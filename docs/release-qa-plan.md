@@ -1,6 +1,6 @@
 # Plan de QA en dispositivos reales (release gate)
 
-> **Estado: plan, sin ejecutar.** Nada de este documento es evidencia. Cada celda se llena con lo que de verdad se probó, en qué dispositivo, con qué commit y qué pasó. Se ejecuta sobre el candidato `v1.0.0-rc.3` desplegado en **preproducción con HTTPS** (RG-2/RG-3); hasta entonces la única QA real fue funcional, en un iPhone con Safari por HTTP de red local, y no cubre P9.
+> **Estado: plan, sin ejecutar.** Nada de este documento es evidencia. Cada celda se llena con lo que de verdad se probó, en qué dispositivo, con qué commit y qué pasó. Se ejecuta en RG-3 sobre el HTTPS **temporal** de una sesión con Docker local y Cloudflare Quick Tunnel ([procedimiento, matriz de evidencia y criterios](rg3-procedure.md)); no hay alojamiento permanente; hasta entonces la única QA real fue funcional, en un iPhone con Safari por HTTP de red local, y no cubre P9.
 >
 > **Por qué HTTPS:** la PWA instalada, el service worker, la cookie `__Host-` y el Share Target lo exigen. Sobre HTTP de red local no se puede instalar ni compartir; por eso esa QA anterior no los valida.
 

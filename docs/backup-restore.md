@@ -1,6 +1,6 @@
 # Respaldo y restauración de PostgreSQL (procedimiento mínimo)
 
-> **Estado: procedimiento documentado, NO ensayado.** No hay scripts, planificador ni software de respaldo propios: el proyecto no los implementa ni se crea un _scheduler_ nuevo. Esto es lo mínimo para una base PostgreSQL **persistente** (la de producción o preproducción). El **ensayo de restauración** con evidencia es un requisito del release gate (RG-3): hasta que se haga, la restauración no está validada.
+> **Estado: procedimiento documentado, NO ensayado.** No hay scripts, planificador ni software de respaldo propios: el proyecto no los implementa ni se crea un _scheduler_ nuevo. Esto es lo mínimo para una base PostgreSQL **persistente** (la de producción o preproducción). El **ensayo de restauración** con evidencia es un requisito del release gate (RG-3): hasta que se haga, la restauración no está validada. Como no hay base persistente, RG-3 lo ensaya con una base PostgreSQL 17 local, nueva y desechable ([paso a paso](rg3-procedure.md#6-respaldo-y-restauración-postgresql-17-local-aislado)); eso valida el procedimiento, no las copias de un proveedor.
 
 ## Qué se protege
 
