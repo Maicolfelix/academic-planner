@@ -61,6 +61,7 @@
 | [limitations.md](limitations.md)                         | Limitaciones conocidas, lo no validado y lo que no se afirma                                                                                      |
 | [final-checklist.md](final-checklist.md)                 | Lista de verificación antes de publicar (lo pendiente queda sin marcar)                                                                           |
 | [release-readiness-audit.md](release-readiness-audit.md) | Matriz vigente del release gate (READY / PARTIAL / NOT_READY / NEEDS_OWNER / NEEDS_REAL_DEVICE)                                                   |
+| [rg3-results.md](rg3-results.md)                         | RG-3: resultados reales de la ejecución (2026-10-27): automatizado DONE y QA en dispositivos declarada por el mantenedor con evidencia incompleta |
 | [rg3-procedure.md](rg3-procedure.md)                     | RG-3: gate, sesión HTTPS temporal con túnel, QA en dispositivos, respaldo/restauración, matriz de evidencia y criterios (preparado, sin ejecutar) |
 | [release-qa-plan.md](release-qa-plan.md)                 | Plan de QA en iPhone y Android (navegador y PWA instalada), incluido el Share Target                                                              |
 | [backup-restore.md](backup-restore.md)                   | Procedimiento mínimo de respaldo y restauración de PostgreSQL (sin ensayar)                                                                       |

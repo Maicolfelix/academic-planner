@@ -1,6 +1,6 @@
 # Lista de verificación final (antes de publicar `v1.0.0`)
 
-Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, RG-3 NOT STARTED (su [procedimiento](rg3-procedure.md) está preparado) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
+Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 DONE — owner accepted device-evidence waiver** (automatizado, HTTPS, seguridad y respaldo DONE; la QA en iPhone y Android reales la **ejecutó y declaró el mantenedor**, que aceptó la ausencia de capturas, modelos y versiones: [resultados](rg3-results.md)); RG-4 NOT STARTED (autorizado) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
 
 **Alcance de v1:** **beta cerrada** ([política](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). **Candidato:** `v1.0.0-rc.3` (preproducción, PWA real y dispositivos); `v1.0.0` solo si ese candidato pasa sin cambios. Las versiones siguen en `1.0.0-rc.2` y **no se ha creado ningún tag nuevo**: el cambio de versión es RG-4, con autorización.
 
@@ -24,7 +24,7 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 - [x] `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`, `npm run docs:check`, `npm run security:scan` y `git diff --check`: gate de #68.
 - [x] **Vitest** en verde tras RG-2: core 1405, API 1578, web 700.
 - [x] **Playwright dirigido** de P9 en verde: 206 pasan y 2 se omiten a propósito (`period-transition`, `my-studies`, `home-period`, `multi-study-read`, `dashboard`, `home`, `companion`, `first-use-home`, `attention-actions`, `home-carousel`, `onboarding-study`).
-- [ ] **Playwright COMPLETO** (892 pruebas en 44 archivos, 360 y 1366 px) con `--workers=2` sobre el commit candidato. **No se ha corrido completo después de P9**; es obligatorio para el release gate.
+- [x] **Playwright COMPLETO** sobre `4253a78` (RG-3, 2026-10-27): 892 pruebas, **877 pasan, 0 fallan, 0 intermitentes, 15 omitidas a propósito**, `--workers=2`, Edge ([resultados](rg3-results.md)).
 - [x] `npm run test:docs` (incluye las pruebas de las utilidades del humo).
 
 ## 4. Seguridad
@@ -45,19 +45,19 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 6. PWA
 
 - [x] Manifest, service worker, precache, `/api` como `NetworkOnly` y modo sin conexión comprobados en e2e local (`e2e/pwa.spec.ts`).
-- [ ] **PWA instalada sobre HTTPS** en un dispositivo real y su actualización.
-- [ ] **Share Target real en Android** (PWA instalada). iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
+- [x] **PWA instalada sobre HTTPS** — `OWNER_ACCEPTED` (RG-3: iPhone y dos Android, **declarado por el mantenedor, sin evidencia formal independiente**: sin capturas, modelos ni versiones; [decisión](rg3-results.md#decisión-del-mantenedor-sobre-evidencia-de-dispositivos)). Aviso de actualización: `NOT RUN`.
+- [x] **Share Target real en Android** (PWA instalada) — `OWNER_ACCEPTED` (RG-3, **declarado por el mantenedor, sin evidencia ni corroboración independiente**). iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
 
 ## 7. Dispositivos reales
 
-- [ ] iPhone: Safari por HTTPS y PWA instalada ([release-qa-plan.md](release-qa-plan.md)).
-- [ ] Android: Chrome por HTTPS y PWA instalada, con el Share Target.
+- [x] iPhone: Safari por HTTPS y PWA instalada — `OWNER_ACCEPTED` (RG-3, declarado, sin evidencia formal independiente; [plan](release-qa-plan.md), [resultados](rg3-results.md)).
+- [x] Android: Chrome por HTTPS y PWA instalada, con el Share Target — `OWNER_ACCEPTED` (RG-3, dos dispositivos, declarado, sin evidencia formal independiente).
 - [ ] Sin defectos BLOCKER ni HIGH abiertos de esa QA.
 
 ## 8. Respaldo y restauración
 
 - [ ] Copias automáticas del proveedor activas.
-- [ ] **Ensayo de restauración** con una copia real y evidencia ([backup-restore.md](backup-restore.md)).
+- [x] **Ensayo de restauración** (RG-3, 2026-10-27) en un PostgreSQL 17 local desechable con `pg_restore --exit-on-error`, recuentos e ids idénticos, relaciones y notas intactas, `db:deploy` sin cambios, salud y login contra la restaurada ([resultados](rg3-results.md)). **No valida copias automáticas de un proveedor, que no existen.**
 
 ## 9. Smoke de producción
 
