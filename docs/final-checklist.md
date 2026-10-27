@@ -1,6 +1,6 @@
 # Lista de verificación final (antes de publicar `v1.0.0`)
 
-Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 PARCIAL / BLOQUEADO** (la parte automatizada, HTTPS, seguridad y respaldo pasaron; la QA en iPhone y Android reales está `BLOCKED`: [resultados](rg3-results.md)) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
+Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 DONE, condicionado a la fusión del PR #73** (automatizado, HTTPS, seguridad y respaldo pasaron; la QA en iPhone y Android reales la **declaró el mantenedor**, sin capturas: [resultados](rg3-results.md)) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
 
 **Alcance de v1:** **beta cerrada** ([política](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). **Candidato:** `v1.0.0-rc.3` (preproducción, PWA real y dispositivos); `v1.0.0` solo si ese candidato pasa sin cambios. Las versiones siguen en `1.0.0-rc.2` y **no se ha creado ningún tag nuevo**: el cambio de versión es RG-4, con autorización.
 
@@ -45,13 +45,13 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 6. PWA
 
 - [x] Manifest, service worker, precache, `/api` como `NetworkOnly` y modo sin conexión comprobados en e2e local (`e2e/pwa.spec.ts`).
-- [ ] **PWA instalada sobre HTTPS** en un dispositivo real y su actualización.
-- [ ] **Share Target real en Android** (PWA instalada). iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
+- [x] **PWA instalada sobre HTTPS** en dispositivos reales (RG-3: iPhone con Safari y dos Android con Chrome, **declarado por el mantenedor**). **Pendiente:** su actualización (aviso de nueva versión), `NOT RUN`.
+- [x] **Share Target real en Android** (PWA instalada), **declarado por el mantenedor** en RG-3, sin corroboración independiente. iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
 
 ## 7. Dispositivos reales
 
-- [ ] iPhone: Safari por HTTPS y PWA instalada ([release-qa-plan.md](release-qa-plan.md)).
-- [ ] Android: Chrome por HTTPS y PWA instalada, con el Share Target.
+- [x] iPhone: Safari por HTTPS y PWA instalada (RG-3, **declarado por el mantenedor**; [plan](release-qa-plan.md), [resultados](rg3-results.md)).
+- [x] Android: Chrome por HTTPS y PWA instalada, con el Share Target (RG-3, dos dispositivos, **declarado por el mantenedor**).
 - [ ] Sin defectos BLOCKER ni HIGH abiertos de esa QA.
 
 ## 8. Respaldo y restauración

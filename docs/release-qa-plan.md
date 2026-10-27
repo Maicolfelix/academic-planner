@@ -54,8 +54,8 @@ Para cada uno: resultado (✅/❌/n.a.), notas y, si falla, un enlace al defecto
 
 ## Registro de evidencia (se llena durante la ejecución)
 
-| Fecha     | Commit/versión | Dispositivo y SO | Navegador/PWA | Flujos probados | Resultado | Defectos |
-| --------- | -------------- | ---------------- | ------------- | --------------- | --------- | -------- |
-| _(vacío)_ |                |                  |               |                 |           |          |
+| Fecha      | Commit/versión                             | Dispositivo y SO                                          | Navegador/PWA                                       | Flujos probados                                                                     | Resultado                                                                | Defectos          |
+| ---------- | ------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------- |
+| 2026-10-27 | `7e0ffae` (código de producto = `4253a78`) | iPhone y dos Android (modelos y versiones no registrados) | Safari y Chrome sobre HTTPS temporal; PWA instalada | Recorridos principales, instalación de la PWA, sin conexión, Share Target (Android) | PASS (declarado por el mantenedor; ver [rg3-results.md](rg3-results.md)) | Ninguno reportado |
 
 Un defecto BLOCKER o HIGH abierto impide etiquetar `v1.0.0`. Lo que se pruebe y falle se corrige en su propio PR y se repite la celda afectada sobre el nuevo candidato.

@@ -1,6 +1,6 @@
 # RG-3: resultados de la ejecución (2026-10-27)
 
-> **Estado: RG-3 PARCIAL / BLOQUEADO.** Todo lo automatizable pasó sobre HTTPS real y en local. La **QA en un iPhone y un Android reales (PWA instalada y Share Target) NO se ejecutó**: requiere un dispositivo físico y al mantenedor. Eso no significa que el producto esté defectuoso: significa que esa evidencia **todavía no existe**. RG-3 no se declara DONE y RG-4 no se inicia.
+> **Estado: RG-3 DONE, condicionado a la revisión y fusión de este PR.** Todo lo automatizable pasó sobre HTTPS real y en local, y el **mantenedor ejecutó la QA en un iPhone (Safari) y en dos Android (Chrome) con la PWA instalada** y reportó que todo funcionó, incluidos el Share Target y el comportamiento sin conexión. **Esa evidencia de dispositivos es una declaración del mantenedor, sin capturas ni modelos/versiones registrados**; el servidor corrobora parte de ella (ver más abajo) y lo que no se puede corroborar se señala. RG-4 no se inicia.
 
 Procedimiento ejecutado: [rg3-procedure.md](rg3-procedure.md). Fechas en America/Bogotá. Presupuesto: $0 COP (sin cuentas, sin tarjetas, sin alojamiento). Solo datos sintéticos (`@smoke.planner.invalid`, `@qa.planner.invalid`); no se tocó la base de desarrollo ni ninguna `*_test` fuera de sus suites; PostgreSQL no se publicó (los contenedores de la sesión no tenían puertos publicados).
 
@@ -86,24 +86,33 @@ Sesión creada con `rg3-up.sh` del procedimiento (hostname de `*.trycloudflare.c
 
 Dos expectativas **de la propia prueba** estaban mal (la CSP incluye la relajación documentada `style-src-attr`, y un cliente sin cabeceras de navegador está permitido por diseño); se corrigieron en la prueba tras leer `securityHeaders.ts`/`originCheck.ts` y `docs/security.md`, **no se relajó ningún control del producto**.
 
-## QA en dispositivos físicos (etapa E): BLOQUEADA
+## QA en dispositivos físicos (etapa E): ejecutada por el mantenedor
 
-No hay un iPhone ni un Android conectados a esta sesión ni herramienta autorizada para controlarlos; Playwright de escritorio **no** sustituye a un dispositivo. Ninguno de estos escenarios se ejecutó:
+Segunda sesión HTTPS temporal (otro hostname, ya cerrado) levantada con `rg3-up.sh` (humo 36/0/0 antes de entregar la dirección), sobre el commit `7e0ffae` (el código de producto es el mismo que `4253a78`). Pruebas hechas por el **mantenedor, a mano, en dispositivos físicos**: **un iPhone con Safari y dos Android con Chrome**, con cuentas y datos sintéticos, instalando la PWA desde el HTTPS temporal y abriéndola desde el icono.
 
-| ID        | Escenario                                                                                                                                                                      | Estado  | Motivo                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ---------------------------------------------------------- |
-| IOS-01…10 | Safari en iPhone: registro/login, onboarding, estudios y periodos, actividades, Radar, Progreso, notas, Captura rápida, importación de horario e `.ics`, navegación responsive | BLOCKED | requiere dispositivo físico y participación del mantenedor |
-| IOS-11    | Instalar la PWA y abrirla desde el icono                                                                                                                                       | BLOCKED | ídem                                                       |
-| IOS-12    | Offline/online en la PWA                                                                                                                                                       | BLOCKED | ídem                                                       |
-| IOS-13    | Aviso de actualización                                                                                                                                                         | NOT RUN | exige dos builds con distinto precaché                     |
-| AND-01…03 | Chrome en Android: recorridos principales, instalar la PWA, abrir en modo standalone                                                                                           | BLOCKED | requiere dispositivo físico y participación del mantenedor |
-| AND-04…07 | Share Target real desde otra app: precarga de Captura rápida, nada se crea sin confirmar, borrador no sobrescrito, login y retorno al compartir                                | BLOCKED | ídem                                                       |
+> **Cómo leer esta evidencia.** El estado `PASS (declarado)` significa que el mantenedor reportó en el chat que el escenario funcionó. **No hay capturas ni vídeos, y no se registraron modelos de dispositivo ni versiones de iOS, Android o Chrome** (se pidieron y no se facilitaron). El servidor no registra peticiones, así que solo algunos efectos se pueden corroborar en la base; el resto descansa en la palabra del mantenedor.
 
-El iOS no necesita Web Share Target (Safari/iOS no puede ser destino de compartir): no se exige.
+| ID        | Escenario                                                                                                                          | Estado           | Corroboración                                                                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IOS-01…02 | Safari: registro, inicio de sesión, onboarding                                                                                     | PASS (declarado) | el servidor tiene 2 cuentas nuevas (además de la del humo) y 2 sesiones                                                                              |
+| IOS-03…06 | Estudios y periodos, actividades, Radar, Progreso                                                                                  | PASS (declarado) | 2 estudios, 3 periodos, 6 asignaturas y 3 actividades (pendiente, en curso, completada)                                                              |
+| IOS-07    | Notas (escala, cortes y nota)                                                                                                      | PASS (declarado) | 3 cortes y 3 evaluaciones en la base                                                                                                                 |
+| IOS-08…09 | Captura rápida, importación de horario, importación `.ics`                                                                         | PASS (declarado) | **No corroborado:** la captura/importación no deja rastro propio, y **la base tiene 0 clases de horario**: si se importó un horario, no se confirmó. |
+| IOS-10    | Navegación responsive                                                                                                              | PASS (declarado) | —                                                                                                                                                    |
+| IOS-11    | Instalar la PWA y abrirla desde el icono                                                                                           | PASS (declarado) | —                                                                                                                                                    |
+| IOS-12    | Sin conexión: las acciones fallan con un mensaje (nunca éxito falso) y al volver la conexión todo funciona                         | PASS (declarado) | —                                                                                                                                                    |
+| IOS-13    | Aviso de actualización                                                                                                             | NOT RUN          | exige dos builds con distinto precaché                                                                                                               |
+| AND-01…03 | Chrome (dos Android): recorridos principales, instalar la PWA, abrir en modo standalone                                            | PASS (declarado) | las cuentas y los datos de arriba pudieron crearse en cualquiera de los tres dispositivos                                                            |
+| AND-04…07 | Share Target real desde otra app: precarga de Captura rápida, nada se crea sin confirmar, borrador no sobrescrito, login y retorno | PASS (declarado) | **No corroborado:** el Share Target no deja rastro hasta que se confirma; el mantenedor declaró haberlo probado («probé todo»)                       |
+| AND-08    | Sin conexión en la PWA instalada                                                                                                   | PASS (declarado) | —                                                                                                                                                    |
+
+Puntos sin respaldo independiente que deben leerse como tales: (1) la importación de horario (la base no muestra clases), (2) el Share Target y sus tres comprobaciones (precarga, confirmación obligatoria, protección del borrador), (3) los modelos y versiones. Si se quiere una evidencia más fuerte, se repite con capturas en otra sesión.
+
+iOS no necesita Web Share Target (Safari/iOS no puede ser destino de compartir): no se exigió.
 
 ## Limpieza (etapa G)
 
-Se ejecutó `rg3-down.sh`: el hostname **ya no sirve la aplicación**, no queda ningún contenedor ni red de la sesión, el archivo de estado se borró y se repitió el cierre sin error (idempotente). El túnel no se dejó abierto porque no había dispositivos disponibles. `academic-planner-db` (desarrollo) no se tocó.
+Las **dos** sesiones HTTPS se cerraron con `rg3-down.sh`: el hostname de cada una **ya no sirve la aplicación**, no queda ningún contenedor ni red de la sesión, el archivo de estado se borró y el cierre es idempotente (repetirlo no da error). El túnel de la segunda sesión se cerró justo después de que el mantenedor terminó las pruebas. `academic-planner-db` (desarrollo) no se tocó. Los datos de la sesión (cuentas sintéticas) se destruyeron con la base desechable.
 
 ## Defectos encontrados y corregidos
 
@@ -116,18 +125,18 @@ Ningún defecto de **producto**. Sí se encontraron y corrigieron cuatro errores
 
 ## Veredicto
 
-| Criterio de RG-3 DONE            | Estado                                                         |
-| -------------------------------- | -------------------------------------------------------------- |
-| Gate automatizado completo verde | **PASS**                                                       |
-| Playwright completo verde        | **PASS** (877/0, 15 omitidas por diseño)                       |
-| Fresh DB                         | **PASS** (15/15)                                               |
-| Respaldo y restauración          | **PASS**                                                       |
-| Humo HTTPS                       | **PASS** (36/0/0)                                              |
-| Seguridad y sesiones             | **PASS**                                                       |
-| QA real iPhone                   | **BLOCKED**                                                    |
-| QA real Android                  | **BLOCKED**                                                    |
-| PWA instalada verificada         | **BLOCKED** (solo se verificó el service worker en escritorio) |
-| Share Target real Android        | **BLOCKED**                                                    |
-| Recursos temporales eliminados   | **PASS**                                                       |
+| Criterio de RG-3 DONE                | Estado                                                |
+| ------------------------------------ | ----------------------------------------------------- |
+| Gate automatizado completo verde     | **PASS**                                              |
+| Playwright completo verde            | **PASS** (877/0, 15 omitidas por diseño)              |
+| Fresh DB                             | **PASS** (15/15)                                      |
+| Respaldo y restauración              | **PASS**                                              |
+| Humo HTTPS                           | **PASS** (36/0/0, en las dos sesiones)                |
+| Seguridad y sesiones                 | **PASS**                                              |
+| QA real iPhone                       | **PASS (declarado por el mantenedor)**                |
+| QA real Android                      | **PASS (declarado por el mantenedor)**                |
+| PWA instalada verificada             | **PASS (declarado)** en iPhone y Android              |
+| Share Target real Android verificado | **PASS (declarado)**; sin corroboración independiente |
+| Recursos temporales eliminados       | **PASS**                                              |
 
-**RG-3 = PARCIAL / BLOQUEADO.** Para cerrarlo hace falta una sesión con el mantenedor: abrir una sesión nueva con `rg3-up.sh` (el hostname será otro), probar en un iPhone y un Android reales, registrar los resultados en la matriz y cerrar con `rg3-down.sh`. RG-4 no se inicia.
+**RG-3 = DONE, condicionado a la revisión y fusión de este PR.** Salvedades que quedan registradas y no bloquean: el aviso de actualización de la PWA (`NOT RUN`), la falta de capturas y de modelos/versiones, y que la importación de horario y el Share Target no tienen corroboración en el servidor. Ningún defecto de producto apareció. RG-4 (versión `1.0.0-rc.3`, notas y tag) **no se inicia** sin autorización.
