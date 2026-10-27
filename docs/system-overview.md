@@ -91,7 +91,7 @@ Ver [testing.md](testing.md) y [system-validation.md](system-validation.md). En 
 
 ## Limitaciones principales
 
-No probado en dispositivos móviles reales; HTTPS y proxy reales sin validar y sin despliegue; sin sincronización con calendarios externos, sin notificaciones fuera de la app y sin modo sin conexión para datos; la importación de horario puede equivocarse y exige revisión; los intérpretes de texto solo entienden los fraseos previstos, en español. Lista completa: [limitations.md](limitations.md).
+Probado en dispositivos móviles reales solo por declaración del mantenedor (RG-3, sin capturas ni versiones); HTTPS y proxy reales validados solo de forma temporal (túnel de Cloudflare) y sin alojamiento persistente; sin sincronización con calendarios externos, sin notificaciones fuera de la app y sin modo sin conexión para datos; la importación de horario puede equivocarse y exige revisión; los intérpretes de texto solo entienden los fraseos previstos, en español. Lista completa: [limitations.md](limitations.md).
 
 ## Demostración
 

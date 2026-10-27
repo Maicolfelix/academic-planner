@@ -1,19 +1,19 @@
 # RG-3: procedimiento de validación completa
 
-> **Estado (2026-10-27): ejecutado; resultados reales en [rg3-results.md](rg3-results.md).** Los bloques automatizados, HTTPS, seguridad y respaldo se ejecutaron y pasaron (con correcciones al procedimiento que quedaron aquí) y el mantenedor declaró haber hecho la QA en un iPhone y dos Android reales, pero **sin la evidencia que este documento exige** (capturas, modelos y versiones): esos escenarios están `DECLARED_PASS`, no `PASS`, y RG-3 sigue PARCIAL hasta cerrar esa brecha. Este documento sigue siendo el guion y la plantilla; los resultados viven en `rg3-results.md`.
+> **Estado (2026-10-27): ejecutado; resultados reales en [rg3-results.md](rg3-results.md).** Los bloques automatizados, HTTPS, seguridad y respaldo se ejecutaron y pasaron (con correcciones al procedimiento que quedaron aquí) y el mantenedor declaró haber hecho la QA en un iPhone y dos Android reales, pero **sin la evidencia que este documento exige** (capturas, modelos y versiones): esos escenarios están `DECLARED_PASS`, no `PASS`; el mantenedor **aceptó formalmente esa carencia** y RG-3 se cerró como `DONE — OWNER ACCEPTED WITH DEVICE-EVIDENCE WAIVER` ([decisión](rg3-results.md#decisión-del-mantenedor-sobre-evidencia-de-dispositivos)). La regla de evidencia de este documento **no se relajó** y la excepción no es un precedente automático. Este documento sigue siendo el guion y la plantilla; los resultados viven en `rg3-results.md`.
 
 **Presupuesto: $0 COP.** Sin cuentas de pago, sin tarjetas, sin contratar alojamiento, sin abrir el servicio como público permanente. **Solo datos sintéticos** (cuentas `@smoke.planner.invalid` o `@qa.planner.invalid`, nunca información personal real). Sin cambios de producto ni de diseño, sin subir versión y sin crear tags (RG-4).
 
 ## Estado de partida
 
-| Paso                   | Estado                                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| RG-0, RG-1             | DONE (RG-1 = #69)                                                                     |
-| RG-2a                  | DONE (#70)                                                                            |
-| RG-2b                  | DONE (#71): HTTPS temporal validado con Cloudflare Quick Tunnel; humo `--full` 36/0/0 |
-| Alojamiento permanente | **NO** (no existe; el túnel no garantiza disponibilidad)                              |
-| RG-3                   | **NOT STARTED**: esta preparación no la ejecuta                                       |
-| RG-4                   | NOT STARTED (versión `1.0.0-rc.2` sin cambios, sin tag nuevo)                         |
+| Paso                   | Estado                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RG-0, RG-1             | DONE (RG-1 = #69)                                                                                                                                                  |
+| RG-2a                  | DONE (#70)                                                                                                                                                         |
+| RG-2b                  | DONE (#71): HTTPS temporal validado con Cloudflare Quick Tunnel; humo `--full` 36/0/0                                                                              |
+| Alojamiento permanente | **NO** (no existe; el túnel no garantiza disponibilidad)                                                                                                           |
+| RG-3                   | **DONE — aceptado por el mantenedor con renuncia a la evidencia formal de dispositivos** (ejecutado el 2026-10-27; resultados en [rg3-results.md](rg3-results.md)) |
+| RG-4                   | NOT STARTED (autorizado por el mantenedor tras el cierre de RG-3; versión `1.0.0-rc.2` sin cambios, sin tag nuevo)                                                 |
 
 ## Shell requerido
 

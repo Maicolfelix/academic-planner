@@ -1,15 +1,18 @@
 # RG-3: resultados de la ejecución (2026-10-27)
 
-> **Estado: RG-3 PARCIAL / PENDIENTE DE EVIDENCIA DE DISPOSITIVOS.** No se declara RG-3 DONE.
+> **Estado: RG-3 DONE — aceptado por el mantenedor con renuncia a la evidencia formal de dispositivos.**
 >
-> | Bloque                            | Estado                                                             |
-> | --------------------------------- | ------------------------------------------------------------------ |
-> | RG-3 automatizado                 | **DONE**                                                           |
-> | RG-3 HTTPS / seguridad / respaldo | **DONE**                                                           |
-> | RG-3 QA en dispositivos físicos   | **EJECUTADA / DECLARADA POR EL MANTENEDOR · EVIDENCIA INCOMPLETA** |
-> | RG-3 en conjunto                  | **PARCIAL / PENDIENTE DE EVIDENCIA DE DISPOSITIVOS**               |
+> | Bloque                                    | Estado                                                                              |
+> | ----------------------------------------- | ----------------------------------------------------------------------------------- |
+> | RG-3 automatizado                         | **DONE**                                                                            |
+> | RG-3 HTTPS / seguridad / respaldo         | **DONE**                                                                            |
+> | RG-3 QA en dispositivos físicos           | **OWNER_ACCEPTED / DECLARED_PASS**                                                  |
+> | Ejecución declarada por el mantenedor     | **SÍ**                                                                              |
+> | Evidencia formal completa de dispositivos | **NO** (sin capturas, modelos ni versiones)                                         |
+> | Renuncia del mantenedor a esa evidencia   | **ACEPTADA** ([decisión](#decisión-del-mantenedor-sobre-evidencia-de-dispositivos)) |
+> | **RG-3 en conjunto**                      | **DONE — OWNER ACCEPTED WITH DEVICE-EVIDENCE WAIVER**                               |
 >
-> El mantenedor **reportó que probó todo en un iPhone (Safari) y en dos Android (Chrome) con la PWA instalada y que funcionó**, incluidos el Share Target y el comportamiento sin conexión. Eso se conserva aquí como `DECLARED_PASS`, claramente distinto de un `PASS` con evidencia: **no hay capturas ni vídeos, ni modelos, ni versiones de sistema operativo ni de navegador**, así que **no satisface todavía el estándar formal de evidencia** de [rg3-procedure.md](rg3-procedure.md) (captura, salida de comando, traza o identificador de CI; nunca «lo vi bien»). Ese estándar **no se relajó**. RG-4 no está iniciado ni autorizado.
+> Esto **no** significa que hayan aparecido capturas que no existen: la QA en un iPhone (Safari) y dos Android (Chrome), con PWA instalada, modo standalone, sin conexión, Share Target y recorridos académicos, sigue siendo una **declaración del mantenedor**, y los escenarios siguen identificados como `DECLARED_PASS`/`OWNER_ACCEPTED`, **no** como evidencia independiente. `Device QA accepted by maintainer; formal device evidence incomplete.`
 
 Procedimiento ejecutado: [rg3-procedure.md](rg3-procedure.md). Fechas en America/Bogotá. Presupuesto: $0 COP (sin cuentas, sin tarjetas, sin alojamiento). Solo datos sintéticos (`@smoke.planner.invalid`, `@qa.planner.invalid`); no se tocó la base de desarrollo ni ninguna `*_test` fuera de sus suites; PostgreSQL no se publicó (los contenedores de la sesión no tenían puertos publicados).
 
@@ -106,56 +109,51 @@ Sesión creada con `rg3-up.sh` del procedimiento (hostname de `*.trycloudflare.c
 
 Dos expectativas **de la propia prueba** estaban mal (la CSP incluye la relajación documentada `style-src-attr`, y un cliente sin cabeceras de navegador está permitido por diseño); se corrigieron en la prueba tras leer `securityHeaders.ts`/`originCheck.ts` y `docs/security.md`, **no se relajó ningún control del producto**.
 
-## QA en dispositivos físicos (etapa E): ejecutada por el mantenedor, evidencia incompleta
+## QA en dispositivos físicos (etapa E): ejecutada por el mantenedor, evidencia incompleta, aceptada por el mantenedor
 
 Segunda sesión HTTPS temporal (otro hostname, ya cerrado), levantada con `rg3-up.sh` (humo 36/0/0 antes de entregar la dirección) sobre `7e0ffae`. El **mantenedor** probó **a mano, en dispositivos físicos: un iPhone con Safari y dos Android con Chrome**, con cuentas y datos sintéticos, instalando la PWA desde el HTTPS temporal y abriéndola desde el icono.
 
 **Estados usados aquí** (ninguno equivale a un `PASS` con evidencia completa):
 
-- `DECLARED_PASS` — el mantenedor reportó que el escenario funcionó. **No verificado por una captura, un vídeo ni un comando.**
+- `DECLARED_PASS` — el mantenedor reportó que el escenario funcionó. **No verificado por una captura, un vídeo ni un comando.** `OWNER_ACCEPTED` indica que el mantenedor aceptó formalmente esa carencia de evidencia (ver la decisión más abajo); **no** la convierte en un `PASS` con evidencia.
 - `SERVER-CORROBORATED` — además, el servidor tiene datos que son consistentes con el escenario (se indican). Corrobora que algo se creó; **no** que la interfaz se vio bien ni en qué dispositivo.
 - `NOT RUN` — no se ejecutó.
 
-**Por qué no es todavía un `PASS` formal.** El procedimiento exige una captura, una salida de comando, una traza o un identificador de CI por escenario. Para estos escenarios **no hay capturas ni vídeos; no se registró el modelo de ningún dispositivo; no se registraron las versiones de iOS, Android, Safari ni Chrome** (se pidieron y no se facilitaron). El servidor no registra peticiones, así que solo algunos efectos se pueden corroborar en la base. Por tanto, **esta sección no satisface todavía el estándar formal de evidencia** y no puede cerrar RG-3.
+**Por qué no es todavía un `PASS` formal.** El procedimiento exige una captura, una salida de comando, una traza o un identificador de CI por escenario. Para estos escenarios **no hay capturas ni vídeos; no se registró el modelo de ningún dispositivo; no se registraron las versiones de iOS, Android, Safari ni Chrome** (se pidieron y no se facilitaron). El servidor no registra peticiones, así que solo algunos efectos se pueden corroborar en la base. Por tanto, **esta sección no satisface el estándar formal de evidencia**; RG-3 se cierra por la decisión del mantenedor, no porque la evidencia sea completa.
 
-| ID        | Escenario                                                                                                                          | Estado                                                               | Corroboración del servidor                                                                                    |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| IOS-01…02 | Safari: registro, inicio de sesión, onboarding                                                                                     | DECLARED_PASS · SERVER-CORROBORATED                                  | 2 cuentas nuevas (además de la del humo) y 2 sesiones                                                         |
-| IOS-03    | Estudios y periodos                                                                                                                | DECLARED_PASS · SERVER-CORROBORATED                                  | 2 estudios y 3 periodos en la base                                                                            |
-| IOS-04…06 | Asignaturas, actividades, Radar, Progreso                                                                                          | DECLARED_PASS · SERVER-CORROBORATED (solo asignaturas y actividades) | 6 asignaturas y 3 actividades (pendiente, en curso, completada); **Radar y Progreso: sin corroboración**      |
-| IOS-07    | Notas (escala, cortes y nota)                                                                                                      | DECLARED_PASS · SERVER-CORROBORATED                                  | 3 cortes y 3 evaluaciones                                                                                     |
-| IOS-08    | Captura rápida                                                                                                                     | DECLARED_PASS                                                        | ninguna (no deja rastro propio)                                                                               |
-| IOS-09    | Importación de horario e `.ics`                                                                                                    | DECLARED_PASS                                                        | **ninguna: la base tiene 0 clases de horario**; si se importó un horario, no se confirmó                      |
-| IOS-10    | Navegación responsive                                                                                                              | DECLARED_PASS                                                        | ninguna                                                                                                       |
-| IOS-11    | Instalar la PWA y abrirla desde el icono                                                                                           | DECLARED_PASS                                                        | ninguna                                                                                                       |
-| IOS-12    | Sin conexión: las acciones fallan con un mensaje (nunca éxito falso) y al volver la conexión todo funciona                         | DECLARED_PASS                                                        | ninguna                                                                                                       |
-| IOS-13    | Aviso de actualización de la PWA                                                                                                   | NOT RUN                                                              | exige dos builds con distinto precaché                                                                        |
-| AND-01…03 | Chrome (dos Android): recorridos principales, instalar la PWA, abrir en modo standalone                                            | DECLARED_PASS                                                        | los datos de arriba pudieron crearse desde cualquiera de los tres dispositivos; **no se atribuyen a ninguno** |
-| AND-04…07 | Share Target real desde otra app: precarga de Captura rápida, nada se crea sin confirmar, borrador no sobrescrito, login y retorno | DECLARED_PASS                                                        | **ninguna, ni independiente ni del servidor** (el Share Target no deja rastro hasta que se confirma)          |
-| AND-08    | Sin conexión en la PWA instalada                                                                                                   | DECLARED_PASS                                                        | ninguna                                                                                                       |
+| ID        | Escenario                                                                                                                          | Estado                                                                                | Corroboración del servidor                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| IOS-01…02 | Safari: registro, inicio de sesión, onboarding                                                                                     | DECLARED_PASS · OWNER_ACCEPTED · SERVER-CORROBORATED                                  | 2 cuentas nuevas (además de la del humo) y 2 sesiones                                                         |
+| IOS-03    | Estudios y periodos                                                                                                                | DECLARED_PASS · OWNER_ACCEPTED · SERVER-CORROBORATED                                  | 2 estudios y 3 periodos en la base                                                                            |
+| IOS-04…06 | Asignaturas, actividades, Radar, Progreso                                                                                          | DECLARED_PASS · OWNER_ACCEPTED · SERVER-CORROBORATED (solo asignaturas y actividades) | 6 asignaturas y 3 actividades (pendiente, en curso, completada); **Radar y Progreso: sin corroboración**      |
+| IOS-07    | Notas (escala, cortes y nota)                                                                                                      | DECLARED_PASS · OWNER_ACCEPTED · SERVER-CORROBORATED                                  | 3 cortes y 3 evaluaciones                                                                                     |
+| IOS-08    | Captura rápida                                                                                                                     | DECLARED_PASS · OWNER_ACCEPTED                                                        | ninguna (no deja rastro propio)                                                                               |
+| IOS-09    | Importación de horario e `.ics`                                                                                                    | DECLARED_PASS · OWNER_ACCEPTED                                                        | **ninguna: la base tiene 0 clases de horario**; si se importó un horario, no se confirmó                      |
+| IOS-10    | Navegación responsive                                                                                                              | DECLARED_PASS · OWNER_ACCEPTED                                                        | ninguna                                                                                                       |
+| IOS-11    | Instalar la PWA y abrirla desde el icono                                                                                           | DECLARED_PASS · OWNER_ACCEPTED                                                        | ninguna                                                                                                       |
+| IOS-12    | Sin conexión: las acciones fallan con un mensaje (nunca éxito falso) y al volver la conexión todo funciona                         | DECLARED_PASS · OWNER_ACCEPTED                                                        | ninguna                                                                                                       |
+| IOS-13    | Aviso de actualización de la PWA                                                                                                   | NOT RUN                                                                               | exige dos builds con distinto precaché                                                                        |
+| AND-01…03 | Chrome (dos Android): recorridos principales, instalar la PWA, abrir en modo standalone                                            | DECLARED_PASS · OWNER_ACCEPTED                                                        | los datos de arriba pudieron crearse desde cualquiera de los tres dispositivos; **no se atribuyen a ninguno** |
+| AND-04…07 | Share Target real desde otra app: precarga de Captura rápida, nada se crea sin confirmar, borrador no sobrescrito, login y retorno | DECLARED_PASS · OWNER_ACCEPTED                                                        | **ninguna, ni independiente ni del servidor** (el Share Target no deja rastro hasta que se confirma)          |
+| AND-08    | Sin conexión en la PWA instalada                                                                                                   | DECLARED_PASS · OWNER_ACCEPTED                                                        | ninguna                                                                                                       |
 
 iOS no necesita Web Share Target (Safari/iOS no puede ser destino de compartir): no se exigió.
 
 Puntos que merecen mención aparte: (1) la importación de horario no tiene respaldo (0 clases en la base); (2) el Share Target y sus tres comprobaciones descansan solo en la declaración; (3) no hay modelos ni versiones.
 
-### Evidencia mínima que falta para cerrar RG-3
+### Evidencia formal que sigue faltando (renunciada por el mantenedor)
 
-No hace falta repetir todo el recorrido: basta una QA física mínima **con evidencia**, que cierre la brecha.
+Para convertir estos escenarios en `PASS` con evidencia formal bastaría una QA física mínima: en **iPhone**, una captura de Safari sobre HTTPS, una de la PWA abierta desde el icono, y modelo, iOS y Safari; en **Android**, una captura de Chrome sobre HTTPS, una de la PWA standalone, una del Share Target (menú del sistema o Captura rápida precargada), y modelo, Android y Chrome. **No se exige para cerrar RG-3** por la decisión de abajo, pero sigue siendo el camino si se quiere elevar la evidencia más adelante (requiere una sesión nueva con `rg3-up.sh` y cuentas sintéticas, y cerrarla con `rg3-down.sh`).
 
-**iPhone**
+## Decisión del mantenedor sobre evidencia de dispositivos
 
-- Una captura de **Safari funcionando sobre HTTPS**.
-- Una captura de la **PWA abierta desde el icono**.
-- Registrar **modelo, versión de iOS y versión de Safari**.
-
-**Android**
-
-- Una captura de **Chrome sobre HTTPS**.
-- Una captura de la **PWA en modo standalone**.
-- Una captura del **Share Target desde el menú del sistema** o de la **Captura rápida con el texto precargado**.
-- Registrar **modelo, versión de Android y versión de Chrome**.
-
-Con eso, los escenarios correspondientes pueden subir de `DECLARED_PASS` a `PASS` y RG-3 puede declararse DONE. Requiere una sesión nueva (`rg3-up.sh` da un hostname distinto) y cerrarla después con `rg3-down.sh`; usar cuentas sintéticas.
+- El estándar original del procedimiento pedía, para cada escenario, una captura, una salida de comando, una traza o un identificador de CI, y el registro de modelo y versiones.
+- **Esa evidencia no se registró** en la QA en un iPhone (Safari) y dos Android (Chrome).
+- El mantenedor **confirmó que realizó las pruebas** (PWA instalada, modo standalone, sin conexión, Share Target real en Android y recorridos académicos principales) y que funcionaron.
+- El mantenedor **aceptó formalmente esa carencia para este proyecto universitario** y autorizó cerrar RG-3.
+- Por esa decisión, **RG-3 puede cerrarse**: `DONE — OWNER ACCEPTED WITH DEVICE-EVIDENCE WAIVER`.
+- Los escenarios **siguen identificados como `DECLARED_PASS` / `OWNER_ACCEPTED`**, no como evidencia independiente. Nada se reclasificó retroactivamente como `PASS` con evidencia.
+- **Esta excepción no es un precedente automático** para otros release gates: cada gate que pida evidencia de dispositivos debe pedirla de nuevo, o el mantenedor debe renunciar a ella de forma explícita.
 
 ## Limpieza (etapa G)
 
@@ -172,28 +170,30 @@ Ningún defecto de **producto**. Sí se encontraron y corrigieron cuatro errores
 
 ## Veredicto
 
-| Criterio                                                      | Estado                                                                       |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Gate automatizado completo verde                              | **READY** (PASS)                                                             |
-| Playwright completo                                           | **READY** (877 pasan, 0 fallan, 15 omitidas por diseño)                      |
-| Seguridad API y navegador                                     | **READY** (273/273 · 9/9)                                                    |
-| Fresh DB                                                      | **READY** (15/15)                                                            |
-| Respaldo y restauración                                       | **READY** (PASS, con notas y cortes)                                         |
-| Humo HTTPS                                                    | **READY** (36 pasan, 0 fallan, 0 n/a, en las dos sesiones)                   |
-| Cookies, HSTS, CSP y CORS                                     | **READY** (PASS)                                                             |
-| Aislamiento de usuarios, logout, reinicio, límite de intentos | **READY** (PASS)                                                             |
-| Recursos temporales eliminados                                | **READY** (PASS)                                                             |
-| QA real iPhone                                                | **DECLARED_PASS** · evidencia incompleta (sin capturas, modelo ni versiones) |
-| QA real Android                                               | **DECLARED_PASS** · evidencia incompleta                                     |
-| PWA instalada verificada                                      | **DECLARED_PASS** · evidencia incompleta                                     |
-| Share Target real Android                                     | **DECLARED_PASS** · sin corroboración independiente ni del servidor          |
+| Criterio                                                      | Estado                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Gate automatizado completo verde                              | **READY** (PASS)                                                     |
+| Playwright completo                                           | **READY** (877 pasan, 0 fallan, 15 omitidas por diseño)              |
+| Seguridad API y navegador                                     | **READY** (273/273 · 9/9)                                            |
+| Fresh DB                                                      | **READY** (15/15)                                                    |
+| Respaldo y restauración                                       | **READY** (PASS, con notas y cortes)                                 |
+| Humo HTTPS                                                    | **READY** (36 pasan, 0 fallan, 0 n/a, en las dos sesiones)           |
+| Cookies, HSTS, CSP y CORS                                     | **READY** (PASS)                                                     |
+| Aislamiento de usuarios, logout, reinicio, límite de intentos | **READY** (PASS)                                                     |
+| Recursos temporales eliminados                                | **READY** (PASS)                                                     |
+| QA real iPhone                                                | **OWNER_ACCEPTED / DECLARED_PASS** · evidencia formal incompleta     |
+| QA real Android                                               | **OWNER_ACCEPTED / DECLARED_PASS** · evidencia formal incompleta     |
+| PWA instalada                                                 | **OWNER_ACCEPTED / DECLARED_PASS** · evidencia formal incompleta     |
+| Share Target real Android                                     | **OWNER_ACCEPTED / DECLARED_PASS** · sin corroboración independiente |
 
-| Bloque                            | Estado                                                         |
-| --------------------------------- | -------------------------------------------------------------- |
-| RG-3 automatizado                 | **DONE**                                                       |
-| RG-3 HTTPS / seguridad / respaldo | **DONE**                                                       |
-| RG-3 QA en dispositivos físicos   | **EJECUTADA / DECLARADA · EVIDENCIA INCOMPLETA**               |
-| **RG-3 en conjunto**              | **PARCIAL / PENDIENTE DE EVIDENCIA DE DISPOSITIVOS**           |
-| RG-4                              | **NOT STARTED** (no autorizado; versión `1.0.0-rc.2`, sin tag) |
+| Bloque                            | Estado                                                          |
+| --------------------------------- | --------------------------------------------------------------- |
+| RG-3 automatizado                 | **DONE**                                                        |
+| RG-3 HTTPS / seguridad / respaldo | **DONE**                                                        |
+| RG-3 QA en dispositivos físicos   | **OWNER_ACCEPTED / DECLARED_PASS**                              |
+| Evidencia formal de dispositivos  | **INCOMPLETA**                                                  |
+| Renuncia del mantenedor           | **ACEPTADA**                                                    |
+| **RG-3 en conjunto**              | **DONE — OWNER ACCEPTED WITH DEVICE-EVIDENCE WAIVER**           |
+| RG-4                              | **NOT STARTED** (autorizado por el mantenedor tras este cierre) |
 
-Ningún defecto de producto apareció. Pendiente solo cerrar la brecha de evidencia de dispositivos (ver arriba). RG-4 no se inicia.
+Ningún defecto de producto apareció. Sin cambio de versión (`1.0.0-rc.2`) y sin tags en este PR.

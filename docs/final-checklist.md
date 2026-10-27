@@ -1,6 +1,6 @@
 # Lista de verificación final (antes de publicar `v1.0.0`)
 
-Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 PARCIAL / PENDIENTE DE EVIDENCIA DE DISPOSITIVOS** (automatizado, HTTPS, seguridad y respaldo DONE; la QA en iPhone y Android reales la **declaró el mantenedor** pero sin capturas, modelos ni versiones: [resultados](rg3-results.md)) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
+Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 DONE — owner accepted device-evidence waiver** (automatizado, HTTPS, seguridad y respaldo DONE; la QA en iPhone y Android reales la **ejecutó y declaró el mantenedor**, que aceptó la ausencia de capturas, modelos y versiones: [resultados](rg3-results.md)); RG-4 NOT STARTED (autorizado) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
 
 **Alcance de v1:** **beta cerrada** ([política](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). **Candidato:** `v1.0.0-rc.3` (preproducción, PWA real y dispositivos); `v1.0.0` solo si ese candidato pasa sin cambios. Las versiones siguen en `1.0.0-rc.2` y **no se ha creado ningún tag nuevo**: el cambio de versión es RG-4, con autorización.
 
@@ -45,13 +45,13 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 6. PWA
 
 - [x] Manifest, service worker, precache, `/api` como `NetworkOnly` y modo sin conexión comprobados en e2e local (`e2e/pwa.spec.ts`).
-- [ ] **PWA instalada sobre HTTPS** en un dispositivo real y su actualización. **Declarado** por el mantenedor en RG-3 (iPhone y dos Android) pero **sin evidencia** (capturas, modelos y versiones): falta para marcarlo. Aviso de actualización: `NOT RUN`.
-- [ ] **Share Target real en Android** (PWA instalada). **Declarado** por el mantenedor en RG-3, sin evidencia ni corroboración independiente: falta una captura del menú del sistema o de la Captura rápida precargada. iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
+- [x] **PWA instalada sobre HTTPS** — `OWNER_ACCEPTED` (RG-3: iPhone y dos Android, **declarado por el mantenedor, sin evidencia formal independiente**: sin capturas, modelos ni versiones; [decisión](rg3-results.md#decisión-del-mantenedor-sobre-evidencia-de-dispositivos)). Aviso de actualización: `NOT RUN`.
+- [x] **Share Target real en Android** (PWA instalada) — `OWNER_ACCEPTED` (RG-3, **declarado por el mantenedor, sin evidencia ni corroboración independiente**). iOS **no** es destino de compartir: no se espera ([share-target.md](share-target.md#soporte-del-share-target-y-diferencia-con-el-web-share-api)).
 
 ## 7. Dispositivos reales
 
-- [ ] iPhone: Safari por HTTPS y PWA instalada. **Declarado** (RG-3); falta evidencia: captura de Safari sobre HTTPS, captura de la PWA desde el icono, y modelo, iOS y Safari ([plan](release-qa-plan.md), [resultados](rg3-results.md)).
-- [ ] Android: Chrome por HTTPS y PWA instalada, con el Share Target. **Declarado** (RG-3, dos dispositivos); falta evidencia: capturas de Chrome sobre HTTPS, de la PWA standalone y del Share Target, y modelo, Android y Chrome.
+- [x] iPhone: Safari por HTTPS y PWA instalada — `OWNER_ACCEPTED` (RG-3, declarado, sin evidencia formal independiente; [plan](release-qa-plan.md), [resultados](rg3-results.md)).
+- [x] Android: Chrome por HTTPS y PWA instalada, con el Share Target — `OWNER_ACCEPTED` (RG-3, dos dispositivos, declarado, sin evidencia formal independiente).
 - [ ] Sin defectos BLOCKER ni HIGH abiertos de esa QA.
 
 ## 8. Respaldo y restauración
