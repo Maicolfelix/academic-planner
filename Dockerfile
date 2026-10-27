@@ -28,13 +28,14 @@ FROM build AS migrate
 USER node
 CMD ["npm", "run", "db:deploy"]
 
-# ── prod-deps: only what the web process needs ─────────────────────────────────────────────────────────────────────
+# ── prod-deps: what the web process needs, plus the Prisma CLI, schema and migrations. A platform runs `npm run db:deploy`
+#    from this same image as a separate pre-deploy job; the web process never calls them ──────────────────────────────
 FROM build AS prod-deps
 RUN npm prune --omit=dev \
  && mkdir -p /out/packages/core /out/apps/api /out/apps/web \
  && cp -a node_modules package.json /out/ \
  && cp -a packages/core/package.json packages/core/dist /out/packages/core/ \
- && cp -a apps/api/package.json apps/api/dist /out/apps/api/ \
+ && cp -a apps/api/package.json apps/api/dist apps/api/prisma apps/api/prisma.config.ts /out/apps/api/ \
  && if [ -d apps/api/node_modules ]; then cp -a apps/api/node_modules /out/apps/api/; fi \
  && cp -a apps/web/dist /out/apps/web/
 

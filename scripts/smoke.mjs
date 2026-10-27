@@ -109,13 +109,15 @@ async function run() {
     csp.ok,
     csp.detail,
   );
-  const deep = await call('GET', '/dashboard');
-  check(
-    'deep-link',
-    'GET /dashboard (no session) gets the app shell, not a 404 or JSON',
-    deep.status === 200 && /<div id="root"/.test(deep.text),
-    `status ${deep.status}`,
-  );
+  for (const path of ['/dashboard', '/activities', '/settings/studies']) {
+    const deep = await call('GET', path);
+    check(
+      `deep-link${path}`,
+      `GET ${path} (no session) gets the app shell, not a 404 or JSON`,
+      deep.status === 200 && /<div id="root"/.test(deep.text),
+      `status ${deep.status}`,
+    );
+  }
   const missingApi = await call('GET', '/api/this-route-does-not-exist');
   check(
     'api-not-shell',
@@ -125,12 +127,30 @@ async function run() {
       !/<div id="root"/.test(missingApi.text),
     `status ${missingApi.status}`,
   );
-  const sw = await call('GET', '/manifest.webmanifest');
+  const manifest = await call('GET', '/manifest.webmanifest');
   check(
     'manifest',
-    'the PWA manifest is served',
-    sw.status === 200 && sw.json?.share_target?.action === '/share',
-    `status ${sw.status}`,
+    'the PWA manifest is served with start_url, scope and share_target',
+    manifest.status === 200 &&
+      manifest.json?.share_target?.action === '/share' &&
+      typeof manifest.json?.start_url === 'string' &&
+      typeof manifest.json?.scope === 'string',
+    `status ${manifest.status}`,
+  );
+  const sw = await call('GET', '/sw.js');
+  check(
+    'service-worker',
+    'the service worker script is served as JavaScript',
+    sw.status === 200 && /javascript/.test(sw.headers.get('content-type') ?? ''),
+    `status ${sw.status} ${sw.headers.get('content-type')}`,
+  );
+  const iconSrcs = (manifest.json?.icons ?? []).map((i) => i.src);
+  const iconStatuses = await Promise.all(iconSrcs.map((src) => call('GET', src)));
+  check(
+    'icons',
+    `the ${iconSrcs.length} manifest icons are served`,
+    iconSrcs.length > 0 && iconStatuses.every((r) => r.status === 200),
+    iconStatuses.map((r) => r.status).join(','),
   );
 
   // HSTS: only meaningful (and only sent) over HTTPS
@@ -154,6 +174,24 @@ async function run() {
     forged.status === 403 && forged.json?.error?.code === 'INVALID_ORIGIN',
     `status ${forged.status}`,
   );
+  // look-alikes of the real origin: the wrong scheme and a host that merely contains it
+  const real = new URL(originOf(baseUrl));
+  const lookalikes = {
+    'the same host over the other scheme': `${real.protocol === 'https:' ? 'http:' : 'https:'}//${real.host}`,
+    'a look-alike host': `${real.protocol}//${real.host}.forged.invalid`,
+  };
+  for (const [label, origin] of Object.entries(lookalikes)) {
+    const res = await call('POST', '/api/auth/login', {
+      body: { email: 'nobody@smoke.planner.invalid', password: 'x' },
+      headers: { origin },
+    });
+    check(
+      `origin-check-${label.replaceAll(' ', '-')}`,
+      `a write from ${label} is refused (403 INVALID_ORIGIN)`,
+      res.status === 403 && res.json?.error?.code === 'INVALID_ORIGIN',
+      `status ${res.status}`,
+    );
+  }
 
   // 5. register: one account per run
   const account = smokeAccount();
