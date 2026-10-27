@@ -66,8 +66,8 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 
 ## 10. Metadatos del release
 
-- [ ] **Notas de versión** de `rc.3` y de `v1.0.0` (qué cambió desde `rc.2`: 209 commits y 9 migraciones).
-- [ ] **Subir las versiones a `1.0.0-rc.3`** y etiquetar `v1.0.0-rc.3` (pre-release): solo en RG-4, con autorización, después de fusionar y desde `main`.
+- [x] **Notas de versión** de `rc.3` ([release-notes-1.0.0-rc.3.md](release-notes-1.0.0-rc.3.md); 230 commits y 9 migraciones desde `rc.2`). Las de `v1.0.0` siguen pendientes.
+- [x] **Versiones subidas a `1.0.0-rc.3`** (raíz, tres workspaces y `package-lock.json`; PR de RG-4). **Pendiente:** etiquetar `v1.0.0-rc.3` (pre-release) **solo después de fusionar el PR**, desde `main` y con autorización.
 - [ ] **Licencia decidida** (no existe `LICENSE`; no bloquea una beta privada, sí una distribución pública).
 - [ ] **`v1.0.0`:** solo si `rc.3` pasa el gate sin cambios y con autorización expresa.
 - [x] `v1.0.0-rc.1` y `v1.0.0-rc.2` publicados como pre-release (inmutables).

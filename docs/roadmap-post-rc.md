@@ -235,7 +235,7 @@ Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiale
 | RG-2a | Artefacto de despliegue, guardas de arranque, mapeo de `PORT`, smoke de producción y validación desde base vacía, todo en local                                                    | DONE (PR #70)                                         |
 | RG-2b | Validación HTTPS real sin coste: Docker local + Cloudflare Quick Tunnel (Railway bloqueado por el registro de cuenta y el presupuesto de $0): proxy, cookie `__Host-`, HSTS y humo | DONE (PR #71)                                         |
 | RG-3  | Playwright completo, suites de seguridad, QA en dispositivos (con el Share Target en Android) y ensayo de restauración ([resultados](rg3-results.md))                              | DONE — owner accepted device-evidence waiver (PR #73) |
-| RG-4  | Versión `1.0.0-rc.3`, notas y tag (solo con autorización); después, si pasa sin cambios, `v1.0.0`                                                                                  | NOT STARTED (autorizado por el mantenedor tras RG-3)  |
+| RG-4  | Versión `1.0.0-rc.3`, notas y tag (el tag solo tras fusionar y con autorización); después, si pasa sin cambios, `v1.0.0`                                                           | en revisión (versión y notas; tag pendiente)          |
 
 ### Prerrequisitos técnicos identificados
 
