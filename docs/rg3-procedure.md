@@ -91,6 +91,24 @@ healthy() { alive "$1" || fail "el contenedor $1 se detuvo"; [ "$(docker inspect
 
 ```bash
 source "$TEMP/rg3-lib.sh"
+STATE="$TEMP/rg3-session.env"                           # estado de la sesión (solo el hostname), FUERA del repositorio; lo lee rg3-down.sh
+
+# no pisar una sesión que sigue viva: el trap de abajo la destruiría
+if [ -e "$STATE" ] || docker ps -a --format '{{.Names}}' | grep -qE '^planner-rg3-(db|web|tunnel)$'; then
+  echo "Ya hay una sesión (o restos de una): ejecuta primero rg3-down.sh" >&2; exit 1
+fi
+
+# limpieza automática si el arranque falla en CUALQUIER punto (migraciones, healthcheck, humo, Ctrl+C…); idempotente
+SESSION_OK=0
+cleanup_failed_start() {
+  [ "$SESSION_OK" = 1 ] && return 0                     # arranque correcto: el túnel DEBE seguir vivo para los dispositivos
+  echo "El arranque falló: se destruyen los recursos de la sesión." >&2
+  docker rm -f planner-rg3-tunnel planner-rg3-web planner-rg3-db >/dev/null 2>&1 || true
+  docker network rm planner-rg3 >/dev/null 2>&1 || true
+  rm -f "$STATE"
+}
+trap cleanup_failed_start EXIT
+trap 'exit 1' INT TERM
 
 # 0. imagen del commit a probar (anotar el commit en la matriz)
 git rev-parse HEAD
@@ -116,6 +134,8 @@ DIAG=planner-rg3-tunnel wait_for 90 "un hostname HTTPS de Cloudflare" have_host
 HOST="$(get_host)"
 [[ "$HOST" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]] || fail "hostname vacío o inválido: '$HOST'"
 echo "Hostname de esta sesión: $HOST"                   # no se copia a ningún documento versionado
+# se guarda para rg3-down.sh (cada script es un proceso Bash distinto y las variables no sobreviven); solo el hostname, nunca una contraseña
+( umask 077; printf 'HOST=%s\n' "$HOST" > "$STATE" )
 
 # 3. migraciones: un paso aparte, desde la misma imagen (la web nunca migra al arrancar); con set -e un fallo detiene todo
 docker run --rm --network planner-rg3 -e DATABASE_URL="$DBURL" academic-planner:rg3 npm run db:deploy
@@ -132,21 +152,45 @@ DIAG=planner-rg3-tunnel wait_for 120 "$HOST/api/health con database up" public_o
 
 # 6. humo completo por HTTPS: debe dar 36 pasan, 0 fallan, 0 n/a (con set -e, un fallo detiene el script)
 BASE_URL="$HOST" npm run smoke -- --full
+
+# arranque correcto: desarmar la limpieza. El script termina, pero los contenedores y el túnel QUEDAN corriendo.
+SESSION_OK=1
+echo "Sesión lista en $HOST. Cuando acabes: bash \"\$TEMP/rg3-down.sh\""
 ```
+
+El script **no cierra el túnel** al terminar bien: la sesión queda en marcha para las pruebas en el iPhone y el Android hasta que se ejecute `rg3-down.sh`. Solo un fallo (o Ctrl+C) durante el arranque dispara la limpieza.
 
 `TRUST_PROXY=1` está medido **solo** para esta topología (Cloudflare delante de un único contenedor): no se extiende a otro proveedor sin repetir la medición. Con la sesión lista, el mantenedor abre `$HOST` en el teléfono para los bloques 3, 4 y 5. Para el reinicio del bloque 5, `docker restart planner-rg3-web` (el hostname no cambia mientras el contenedor del túnel siga vivo).
 
 ### Cierre obligatorio de cada sesión (`$TEMP/rg3-down.sh`)
 
-Se ejecuta siempre, aunque algo haya fallado. No usa `set -e` para que un recurso ya inexistente no corte la limpieza.
+Se ejecuta siempre al terminar, y es **idempotente**: se puede repetir sin error aunque ya no quede nada. Lee el hostname del archivo de estado (no depende de variables de otro proceso), destruye los recursos, **comprueba que el hostname ya no sirve la aplicación** y borra el archivo solo si esa comprobación pasó (si no, lo conserva para poder repetir). No usa `set -e` para que un recurso ya inexistente no corte la limpieza. Sale con código distinto de 0 si el hostname sigue sirviendo.
 
 ```bash
 export MSYS_NO_PATHCONV=1
-HOST="${HOST:-}"                                        # el hostname de la sesión, si se conserva en el entorno
-docker rm -f planner-rg3-tunnel planner-rg3-web planner-rg3-db
-docker network rm planner-rg3
-[ -z "$HOST" ] || curl -s -o /dev/null -w "%{http_code}\n" --max-time 10 "$HOST/api/health"   # no debe ser 200 (se espera 502 o 404)
-docker ps -a --format '{{.Names}}' | grep planner-rg3 || echo "sin contenedores de la sesión"
+STATE="$TEMP/rg3-session.env"
+HOST=""
+[ ! -f "$STATE" ] || HOST="$(sed -n 's/^HOST=//p' "$STATE" | head -1)"
+[[ -z "$HOST" || "$HOST" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]] || { echo "Archivo de estado inválido; se ignora el hostname." >&2; HOST=""; }
+
+docker rm -f planner-rg3-tunnel planner-rg3-web planner-rg3-db >/dev/null 2>&1 || true
+docker network rm planner-rg3 >/dev/null 2>&1 || true
+
+STATUS=0
+if [ -n "$HOST" ]; then
+  # el hostname no debe servir la aplicación; el corte del túnel puede tardar unos segundos
+  still_serving() { curl -fsS --max-time 10 "$HOST/api/health" 2>/dev/null | grep -q '"database"'; }
+  for _ in $(seq 1 15); do still_serving || break; sleep 2; done
+  if still_serving; then echo "FALLO: $HOST sigue sirviendo la aplicación" >&2; STATUS=1
+  else echo "OK: $HOST ya no sirve la aplicación"; fi
+else
+  echo "Sin archivo de estado: no hay hostname que verificar (cierre ya hecho o sesión sin hostname)."
+fi
+
+if docker ps -a --format '{{.Names}}' | grep -E '^planner-rg3-(db|web|tunnel)$'; then echo "FALLO: quedan contenedores de la sesión" >&2; STATUS=1
+else echo "sin contenedores de la sesión"; fi
+[ "$STATUS" = 0 ] && rm -f "$STATE"                     # solo si todo quedó cerrado
+exit "$STATUS"
 ```
 
 Reglas de la sesión: solo datos sintéticos, nunca la base de desarrollo, no publicar el puerto de PostgreSQL ni el motor de Docker, no abrir puertos del router, no pegar el hostname en ningún documento versionado ni dejar contraseñas en el historial o en el repositorio, y no tratar el túnel como servicio: no garantiza disponibilidad (200 peticiones simultáneas, sin SSE).
