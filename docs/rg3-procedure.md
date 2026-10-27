@@ -1,6 +1,6 @@
-# RG-3: procedimiento de validación completa (preparado, NO ejecutado)
+# RG-3: procedimiento de validación completa
 
-> **Estado (2026-10-27): preparación documental. RG-3 no se ha ejecutado** y requiere autorización explícita del mantenedor. Nada de este documento es evidencia: es el guion, los criterios y la plantilla donde se registrará lo que de verdad se pruebe. Los comandos de las secciones 1 a 4 son los del repositorio; los de las secciones 5 y 6 componen lo ya validado en [RG-2b](deployment.md#validación-https-gratuita-rg-2b-docker-local--cloudflare-quick-tunnel) y **no se han ejecutado tal como están escritos aquí**: si alguno falla al ejecutarlos, se corrige este documento, no se improvisa.
+> **Estado (2026-10-27): ejecutado en parte; resultados reales en [rg3-results.md](rg3-results.md).** Los bloques automatizados, HTTPS, seguridad y respaldo se ejecutaron y pasaron (con correcciones al procedimiento que quedaron aquí); la QA en iPhone y Android reales **no se ejecutó** (`BLOCKED`, requiere dispositivo físico y al mantenedor). Este documento sigue siendo el guion y la plantilla; los resultados viven en `rg3-results.md`.
 
 **Presupuesto: $0 COP.** Sin cuentas de pago, sin tarjetas, sin contratar alojamiento, sin abrir el servicio como público permanente. **Solo datos sintéticos** (cuentas `@smoke.planner.invalid` o `@qa.planner.invalid`, nunca información personal real). Sin cambios de producto ni de diseño, sin subir versión y sin crear tags (RG-4).
 
@@ -19,7 +19,7 @@
 
 El equipo de desarrollo usa **Windows con Docker Desktop** (contenedores Linux). Las secciones 1, 2 y 6 están escritas para **Git Bash** (el que trae Git for Windows) o **WSL con la integración de Docker Desktop**; **no se incluyen equivalentes de PowerShell ni de `cmd`** y no deben ejecutarse allí. Requisitos: `bash` 4 o superior (con `set -euo pipefail` y sustitución de procesos), `docker` (CLI hablando con Docker Desktop: `docker info` responde), `curl`, `openssl`, `git`, `awk`, `sed`, y Node/npm (el mismo del repositorio: `node` también procesa JSON en la sección 6). En Git Bash, las funciones de ayuda exportan `MSYS_NO_PATHCONV=1` para que una ruta como `/tmp/planner.dump` dentro de un contenedor no se convierta en una ruta de Windows; por el mismo motivo, los scripts se guardan en `$TEMP` y no se pegan línea por línea en PowerShell.
 
-**Estado de los comandos: PREPARADOS, NO EJECUTADOS.** Los comandos de las secciones 2 y 6 componen lo ya validado en RG-2b y RG-2a, pero **no se han ejecutado tal como están escritos aquí**, ni en Git Bash ni en WSL. Si alguno falla en la primera ejecución, se corrige este documento y el hallazgo queda en la matriz; no se improvisa. Solo se comprobó su **sintaxis** con `bash -n` (Git Bash); eso no prueba que funcionen. Hasta que se ejecuten, ningún resultado de estos scripts existe.
+**Estado de los comandos:** las secciones 2 y 6 se **ejecutaron en Git Bash sobre Windows con Docker Desktop** el 2026-10-27 (`rg3-up.sh`, `rg3-down.sh`, `rg3-br.sh`); al ejecutarlos aparecieron cuatro errores que ya están corregidos aquí ([rg3-results.md](rg3-results.md#defectos-encontrados-y-corregidos)). **WSL no se probó.**
 
 ## Qué es automatizado y qué requiere a una persona
 
@@ -83,6 +83,9 @@ wait_for() {
 }
 # pg_url <contenedor> <base>: arma la cadena de conexión con $PGPASS (sin escribirla literal)
 pg_url() { printf 'postgresql://%s:%s@%s:5432/%s' postgres "$PGPASS" "$1" "$2"; }
+# http_code <argumentos de curl…>: imprime solo el código HTTP. Se evita «-o /dev/null»: el curl de Git Bash puede salir con 23 (error de escritura) aunque haya respuesta
+http_code() { curl -s -w '
+%{http_code}' "$@" | tail -n 1; }
 alive()   { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; }
 healthy() { alive "$1" || fail "el contenedor $1 se detuvo"; [ "$(docker inspect -f '{{.State.Health.Status}}' "$1" 2>/dev/null)" = healthy ]; }
 ```
@@ -147,7 +150,8 @@ web_healthy() { healthy planner-rg3-web; }
 DIAG=planner-rg3-web wait_for 120 "el contenedor web en estado healthy" web_healthy
 
 # 5. el hostname público ya llega a la aplicación (el DNS del túnel puede tardar unos segundos)
-public_ok() { curl -fsS --max-time 10 "$HOST/api/health" | grep -q '"database":"up"'; }
+# la respuesta se captura antes de comprobarla: con «curl | grep -q» y pipefail, curl puede salir con 23 (error de escritura) aunque haya respuesta
+public_ok() { local body; body="$(curl -fsS --max-time 10 "$HOST/api/health")" && [[ "$body" == *'"database":"up"'* ]]; }
 DIAG=planner-rg3-tunnel wait_for 120 "$HOST/api/health con database up" public_ok
 
 # 6. humo completo por HTTPS: debe dar 36 pasan, 0 fallan, 0 n/a (con set -e, un fallo detiene el script)
@@ -267,15 +271,14 @@ origin_healthy() { healthy planner-rg3-br-web; }
 DIAG=planner-rg3-br-web wait_for 120 "la web de origen healthy" origin_healthy
 BASE_URL=http://127.0.0.1:4310 npm run smoke -- --full        # HTTP local: los controles solo-HTTPS salen n/a, y aquí está bien
 
-# Opcional, para cubrir notas y cortes (el humo no los crea): RG3_PAUSE_FOR_NOTES=1 bash …/rg3-br.sh
-# y crear a mano, en http://127.0.0.1:4310 y con una cuenta sintética, un estudio, un corte y una nota.
-if [ "${RG3_PAUSE_FOR_NOTES:-0}" = 1 ]; then read -r -p "Crea ahora el corte y la nota y pulsa Enter para continuar… "; fi
+# datos sintéticos de notas (el humo no los crea): un estudio, periodo, materia, escala, 3 cortes y una nota, por la API pública
+node scripts/rg3-seed-grades.mjs http://127.0.0.1:4310
 
 # --- huellas: recuentos reales y suma de ids por tabla, y las relaciones --------------------------------------------
 psql_in() { docker exec -i planner-rg3-br-db psql -U postgres -d "$1" -v ON_ERROR_STOP=1 -At; }
 fingerprint() { psql_in "$1" <<'SQL'
 SELECT 'User', count(*), coalesce(md5(string_agg(id::text, ',' ORDER BY id::text)), '') FROM "User"
-UNION ALL SELECT 'UserProfile', count(*), coalesce(md5(string_agg(id::text, ',' ORDER BY id::text)), '') FROM "UserProfile"
+UNION ALL SELECT 'UserProfile', count(*), coalesce(md5(string_agg("userId"::text, ',' ORDER BY "userId"::text)), '') FROM "UserProfile"
 UNION ALL SELECT 'StudyTrack', count(*), coalesce(md5(string_agg(id::text, ',' ORDER BY id::text)), '') FROM "StudyTrack"
 UNION ALL SELECT 'AcademicPeriod', count(*), coalesce(md5(string_agg(id::text, ',' ORDER BY id::text)), '') FROM "AcademicPeriod"
 UNION ALL SELECT 'Subject', count(*), coalesce(md5(string_agg(id::text, ',' ORDER BY id::text)), '') FROM "Subject"
@@ -329,7 +332,8 @@ diff "$TEMP/br-origin-rel.txt" "$TEMP/br-restored-rel.txt" || fail "las relacion
 relations_ok planner_restored                              || fail "la restaurada tiene relaciones rotas"
 grep -q '^migrations_applied|15|15$' "$TEMP/br-restored.txt" || fail "la restaurada no tiene las 15 migraciones terminadas"
 NOTES="$(awk -F'|' '$1=="evaluation_total"{print $2}' "$TEMP/br-restored-rel.txt")"
-[ "$NOTES" -gt 0 ] && echo "notas y cortes verificados: $NOTES evaluaciones" || echo "SIN NOTAS EN EL ORIGEN: BR-01 no cubre notas ni cortes → registrarlo como NOT RUN en esa parte"
+[ "$NOTES" -gt 0 ] || fail "el origen no tiene notas: BR-01 no cubriría notas ni cortes"
+echo "notas y cortes verificados: $NOTES evaluaciones"
 
 # --- db:deploy sobre la restaurada no debe aplicar nada --------------------------------------------------------------
 DEPLOY_OUT="$(docker run --rm --network planner-rg3-br -e DATABASE_URL="$URL_RESTORED" academic-planner:rg3 npm run db:deploy 2>&1)"
@@ -343,8 +347,9 @@ docker run -d --name planner-rg3-br-web2 --network planner-rg3-br -p 127.0.0.1:4
   -e DATABASE_URL="$URL_RESTORED" -e CORS_ORIGIN=http://127.0.0.1:4311 -e PORT=8080 academic-planner:rg3 >/dev/null
 restored_healthy() { healthy planner-rg3-br-web2; }
 DIAG=planner-rg3-br-web2 wait_for 120 "la web restaurada healthy" restored_healthy
-[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4311/api/health)" = 200 ] || fail "/api/health de la restaurada no dio 200"
-curl -fsS http://127.0.0.1:4311/api/health | grep -q '"database":"up"' || fail "la restaurada no reporta database up"
+[ "$(http_code http://127.0.0.1:4311/api/health)" = 200 ] || fail "/api/health de la restaurada no dio 200"
+HEALTH_BODY="$(curl -fsS http://127.0.0.1:4311/api/health)"
+[[ "$HEALTH_BODY" == *'"database":"up"'* ]] || fail "la restaurada no reporta database up"
 
 # la cuenta sintética del humo viene de la copia; su contraseña se deriva de su correo (smoke-<etiqueta>@… → smoke-<etiqueta>-correct-horse)
 EMAIL="$(psql_in planner_restored <<<"SELECT email FROM \"User\" WHERE email LIKE 'smoke-%@smoke.planner.invalid'" | head -1)"
@@ -355,16 +360,17 @@ LOGIN_HEADERS="$(curl -si -X POST http://127.0.0.1:4311/api/auth/login -H 'conte
 echo "$LOGIN_HEADERS" | head -1 | grep -q ' 200' || fail "el inicio de sesión contra la restaurada no dio 200"
 COOKIE="$(echo "$LOGIN_HEADERS" | grep -i '^set-cookie:.*academic_planner_session=' | head -1 | sed -E 's/^[^:]*: *//; s/;.*//')"
 [ -n "$COOKIE" ] || fail "el inicio de sesión no entregó cookie de sesión"
-ME_STATUS="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4311/api/auth/me -H "cookie: $COOKIE")"
+ME_STATUS="$(http_code http://127.0.0.1:4311/api/auth/me -H "cookie: $COOKIE")"
 [ "$ME_STATUS" = 200 ] || fail "/api/auth/me con la sesión de la restaurada dio $ME_STATUS"
-N_API="$(curl -fsS http://127.0.0.1:4311/api/activities -H "cookie: $COOKIE" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).activities.length))")"
+ACTIVITIES_BODY="$(curl -fsS http://127.0.0.1:4311/api/activities -H "cookie: $COOKIE")"
+N_API="$(printf '%s' "$ACTIVITIES_BODY" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).activities.length))")"
 N_DB="$(awk -F'|' '$1=="Activity"{print $2}' "$TEMP/br-origin.txt")"
 [ "$N_API" = "$N_DB" ] || fail "la API de la restaurada lista $N_API actividades y el origen tenía $N_DB"
 echo "BR-01: TODAS LAS COMPROBACIONES DEL SCRIPT CUMPLIDAS (falta registrarlas en la matriz)"
 rm -f "$TEMP"/br-origin*.txt "$TEMP"/br-restored*.txt          # los recuentos no son datos personales, pero no se dejan archivos sueltos
 ```
 
-Criterio de `BR-01`, todos a la vez y cada uno registrado: (1) `pg_dump` terminó con éxito y el archivo es legible; (2) `pg_restore --exit-on-error` terminó con éxito; (3) recuentos e ids idénticos entre origen y restaurada, tabla por tabla; (4) las relaciones periodo → asignatura → actividad (y corte → nota, **si existen notas**) son coherentes y no cambian; (5) las 15 migraciones constan como terminadas y `db:deploy` no aplica ninguna; (6) `/api/health` da 200 con `database: up` contra la restaurada; (7) una cuenta de la copia inicia sesión y su lista de actividades coincide con el origen; (8) todo quedó destruido (el `trap` lo hace; comprobarlo con `docker ps -a | grep planner-rg3-br`). Si el origen no tenía notas, esa parte se registra `NOT RUN` y `BR-01` no se declara completo para notas. El respaldo solo cuenta como **ensayado** con esa evidencia; **no equivale a las copias de un proveedor**, que no existen.
+Criterio de `BR-01`, todos a la vez y cada uno registrado: (1) `pg_dump` terminó con éxito y el archivo es legible; (2) `pg_restore --exit-on-error` terminó con éxito; (3) recuentos e ids idénticos entre origen y restaurada, tabla por tabla; (4) las relaciones periodo → asignatura → actividad (y corte → nota, **si existen notas**) son coherentes y no cambian; (5) las 15 migraciones constan como terminadas y `db:deploy` no aplica ninguna; (6) `/api/health` da 200 con `database: up` contra la restaurada; (7) una cuenta de la copia inicia sesión y su lista de actividades coincide con el origen; (8) todo quedó destruido (el `trap` lo hace; comprobarlo con `docker ps -a | grep planner-rg3-br`). El origen siempre lleva notas y cortes sintéticos (`scripts/rg3-seed-grades.mjs`); si faltaran, el script falla. El respaldo solo cuenta como **ensayado** con esa evidencia; **no equivale a las copias de un proveedor**, que no existen.
 
 ## Matriz de evidencia
 
