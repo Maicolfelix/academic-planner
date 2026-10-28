@@ -6,6 +6,7 @@ import {
   type Weekday,
   type Workload,
 } from '@planner/core';
+import { Card } from '../../components/ui/Card';
 
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -45,10 +46,14 @@ export function WorkloadDetail({ workload }: { workload: Workload }) {
             <span aria-hidden="true" className="text-sm font-semibold">
               {d.totalCommitments}
             </span>
-            <span aria-hidden="true" className="flex h-16 w-full items-end rounded bg-slate-100">
+            <span aria-hidden="true" className="flex h-16 w-full items-end rounded-md bg-secondary">
               <span
                 style={{ height: `${(d.totalCommitments / max) * 100}%` }}
-                className={`w-full rounded ${d.date === busiest ? 'bg-slate-900' : 'bg-slate-500'}`}
+                className={`w-full origin-bottom animate-grow rounded-md ${
+                  d.date === busiest
+                    ? 'bg-[linear-gradient(180deg,var(--accent),#4f46e5)]'
+                    : 'bg-accent/45'
+                }`}
               />
             </span>
             <span aria-hidden="true" className="text-xs">
@@ -60,24 +65,21 @@ export function WorkloadDetail({ workload }: { workload: Workload }) {
 
       <ul aria-label="Detalle por día" className="flex flex-col gap-1.5">
         {workload.days.map((d) => (
-          <li
-            key={d.date}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
+          <Card as="li" key={d.date} className="px-3 py-2 text-sm">
             <p className="flex flex-wrap items-center gap-x-2">
               <span className="font-medium">
                 {WEEKDAY_LABELS[d.weekday as Weekday]} {formatDateOnly(d.date)}
               </span>
               {d.date === busiest && (
-                <span className="rounded-full border border-slate-900 px-2 text-xs font-medium">
+                <span className="rounded-full border border-accent/40 bg-accent-soft px-2 text-xs font-medium text-accent-ink">
                   Día con más compromisos
                 </span>
               )}
             </p>
             {d.totalCommitments === 0 ? (
-              <p className="text-slate-700">Sin compromisos registrados</p>
+              <p className="text-muted-foreground">Sin compromisos registrados</p>
             ) : (
-              <p className="text-slate-700">
+              <p className="text-muted-foreground">
                 {plural(d.activityCount, 'actividad', 'actividades')} ·{' '}
                 {plural(d.scheduleCount, 'bloque de agenda', 'bloques de agenda')}
                 {d.scheduledMinutes > 0 && (
@@ -89,7 +91,7 @@ export function WorkloadDetail({ workload }: { workload: Workload }) {
                 </span>
               </p>
             )}
-          </li>
+          </Card>
         ))}
       </ul>
     </div>

@@ -6,7 +6,7 @@ import { Card } from '../../components/ui/Card';
  * A ring that draws itself once: the same value as the bar below, as a shape. Decoration (the percentage is text beside
  * it and the progressbar carries the value). Paint-only animation on one small SVG.
  */
-function Ring({ percent }: { percent: number }) {
+export function Ring({ percent }: { percent: number }) {
   const done = percent === 100;
   return (
     <svg

@@ -1,4 +1,5 @@
 import type { Progress } from '@planner/core';
+import { Card } from '../../components/ui/Card';
 import { ProgressBar } from './ProgressBar';
 
 /**
@@ -16,13 +17,10 @@ export function ProgressByPeriod({ byPeriod }: { byPeriod: Progress['byPeriod'] 
         {byPeriod.map(({ period, studyTrack, general }) => {
           const name = studyTrack?.name ?? period.name;
           return (
-            <li
-              key={period.id}
-              className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-slate-300 bg-white p-3"
-            >
+            <Card as="li" key={period.id} className="flex min-w-0 flex-col gap-1.5 p-3">
               <p className="font-medium break-words">{name}</p>
               {general.total === 0 ? (
-                <p className="text-sm text-slate-700">Sin actividades registradas</p>
+                <p className="text-sm text-muted-foreground">Sin actividades registradas</p>
               ) : (
                 <>
                   <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
@@ -47,7 +45,7 @@ export function ProgressByPeriod({ byPeriod }: { byPeriod: Progress['byPeriod'] 
                   />
                 </>
               )}
-            </li>
+            </Card>
           );
         })}
       </ul>

@@ -172,6 +172,7 @@ body[data-ambient='done'] {
   --animate-rise: rise var(--duration-normal) var(--ease-enter) backwards;
   --animate-pop: pop var(--duration-normal) var(--ease-spring) backwards;
   --animate-fill: fill var(--duration-slow) var(--ease-enter) backwards;
+  --animate-grow: grow var(--duration-slow) var(--ease-enter) backwards;
   --animate-glint: glint 900ms var(--ease-standard) 500ms both;
   --animate-beacon: beacon 1100ms var(--ease-standard) 400ms 1 backwards;
   --animate-complete: complete 1100ms var(--ease-standard) 1 backwards;
@@ -513,6 +514,16 @@ body[data-ambient='done'] {
     from {
       opacity: 0;
       transform: translateY(12px) scale(0.98);
+    }
+  }
+
+  /* A day's bar rises from the bottom, once (the vertical twin of `fill`). */
+  @keyframes grow {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
     }
   }
 
