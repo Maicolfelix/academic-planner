@@ -691,6 +691,9 @@ dialog::backdrop {
   background: var(--accent);
   box-shadow: 5px 5px 0 0 var(--primary);
 }
+.date-own::-webkit-calendar-picker-indicator {
+  display: none;
+}
 .pixel-grid {
   background-image: radial-gradient(rgb(31 38 112 / 0.1) 1px, transparent 1.4px);
   background-size: 22px 22px;
