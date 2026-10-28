@@ -287,7 +287,14 @@ function exactSubjectRanges(tokens: Token[], entries: SubjectEntry[]): [number, 
  */
 const MEETING_NOUNS = new Set(['reunion', 'reuniones', 'cita', 'citas', 'tramite', 'tramites']);
 /** "ensayo": a written (or rehearsed) piece of work that is not one of the school types. It is a TASK by default. */
-const ESSAY_NOUNS = new Set(['ensayo', 'ensayos']);
+const ESSAY_NOUNS = new Set([
+  'ensayo',
+  'ensayos',
+  'actividad',
+  'actividades',
+  'practica',
+  'practicas',
+]);
 const ERRAND_VERBS = new Set([
   'llevar',
   'pagar',
