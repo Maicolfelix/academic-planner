@@ -112,6 +112,58 @@ export const PIXELS = {
     '#...#.......',
     '#####.......',
   ],
+  lock: [
+    '...####.....',
+    '..#....#....',
+    '..#....#....',
+    '..#....#....',
+    '############',
+    '############',
+    '#####..#####',
+    '#####..#####',
+    '############',
+    '############',
+  ],
+  user: [
+    '....####....',
+    '...######...',
+    '...######...',
+    '....####....',
+    '............',
+    '..########..',
+    '.##########.',
+    '############',
+    '############',
+  ],
+  enter: [
+    '.......#....',
+    '........#...',
+    '.........#..',
+    '###########.',
+    '.........#..',
+    '........#...',
+    '.......#....',
+  ],
+  tick: [
+    '..........##',
+    '.........##.',
+    '##......##..',
+    '.##....##...',
+    '..##..##....',
+    '...####.....',
+    '....##......',
+  ],
+  warn: [
+    '.....##.....',
+    '.....##.....',
+    '....####....',
+    '....#..#....',
+    '...######...',
+    '...##..##...',
+    '..###..###..',
+    '.####..####.',
+    '############',
+  ],
   cap: [
     '.....##.....',
     '...######...',
@@ -182,6 +234,19 @@ export const InboxIcon = () => <PixelIcon rows={PIXELS.inbox} />;
 /** Mis estudios: a graduation cap. */
 export const CapIcon = ({ className }: { className?: string }) => (
   <PixelIcon rows={PIXELS.cap} className={className} />
+);
+
+/** The sign-in and sign-up pictures and the small marks of a message. */
+export const LockIcon = () => <PixelIcon rows={PIXELS.lock} />;
+export const UserPixelIcon = () => <PixelIcon rows={PIXELS.user} />;
+export const EnterIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.enter} className={className} />
+);
+export const TickIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.tick} className={className} />
+);
+export const WarnIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.warn} className={className} />
 );
 
 /** Cerrar sesión: an arrow leaving through a door. */

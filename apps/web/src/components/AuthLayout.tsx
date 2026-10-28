@@ -1,8 +1,10 @@
 import { useState, type FocusEvent, type ReactNode } from 'react';
 import { CompanionSprite } from '../companion/PixelCompanion';
 import type { CompanionPose } from '../companion/pixelArt';
+import { Brand } from './Brand';
 import { PixelSky } from './auth/PixelSky';
 import { Card } from './ui/Card';
+import { PageHeader } from './ui/PageHeader';
 
 /** What the form is doing, so the companion can act it out. */
 export type AuthMood = 'idle' | 'pending' | 'error' | 'success';
@@ -16,11 +18,14 @@ export type AuthMood = 'idle' | 'pending' | 'error' | 'success';
  */
 export function AuthLayout({
   title,
+  icon,
   intro,
   mood = 'idle',
   children,
 }: {
   title: string;
+  /** The pixel picture beside the title. */
+  icon?: ReactNode;
   /** What the companion says when nothing is happening. */
   intro: string;
   mood?: AuthMood;
@@ -55,20 +60,7 @@ export function AuthLayout({
       <section className="relative flex min-h-[17rem] flex-col overflow-hidden bg-(image:--gradient-hero) px-6 pt-6 text-white lg:min-h-screen lg:px-12 lg:pt-10">
         <PixelSky />
         <div className="relative z-10 flex flex-col gap-1 lg:gap-3">
-          <p className="flex items-center gap-2 text-sm font-semibold tracking-wide">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7">
-              <rect width="24" height="24" rx="6" className="fill-white" />
-              <path
-                d="m7.5 12.5 3 3 6-7"
-                fill="none"
-                className="stroke-primary"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Academic Planner
-          </p>
+          <Brand onDark />
           <p className="max-w-md text-xl font-semibold text-balance sm:text-2xl lg:mt-6 lg:text-4xl lg:leading-tight">
             Aquí vive tu semestre.
           </p>
@@ -106,12 +98,18 @@ export function AuthLayout({
         onBlurCapture={() => setOnPassword(false)}
         className="relative flex items-center justify-center px-6 py-8 lg:px-12"
       >
-        <div className="flex w-full max-w-sm flex-col gap-5">
-          <h1 className="text-display animate-settle break-words">{title}</h1>
+        {/* Graph paper behind the form, the same as behind every screen of the app. */}
+        <span aria-hidden="true" className="pixel-grid pointer-events-none absolute inset-0" />
+        <div className="relative flex w-full max-w-sm flex-col gap-5">
+          <PageHeader icon={icon} title={title} />
           <Card
             variant="solid"
-            className="flex animate-settle flex-col gap-4 p-5 shadow-floating [animation-delay:60ms]"
+            className="relative flex animate-settle flex-col gap-4 overflow-hidden p-5 shadow-floating [animation-delay:60ms]"
           >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,var(--accent),var(--primary))]"
+            />
             {children}
           </Card>
         </div>

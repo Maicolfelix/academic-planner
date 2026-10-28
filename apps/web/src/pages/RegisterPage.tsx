@@ -4,7 +4,9 @@ import { Link, useNavigate } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useRegister } from '../auth/useAuth';
 import { AuthLayout, type AuthMood } from '../components/AuthLayout';
+import { AuthNotice } from '../components/auth/AuthNotice';
 import { buttonStyles } from '../components/ui/buttonStyles';
+import { EnterIcon, UserPixelIcon } from '../components/ui/icons';
 import { FormField } from '../components/FormField';
 
 export function RegisterPage() {
@@ -48,15 +50,17 @@ export function RegisterPage() {
         : 'idle';
 
   return (
-    <AuthLayout title="Crear cuenta" intro="Mucho gusto. Vamos a armar tu espacio." mood={mood}>
+    <AuthLayout
+      title="Crear cuenta"
+      icon={<UserPixelIcon />}
+      intro="Mucho gusto. Vamos a armar tu espacio."
+      mood={mood}
+    >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {formError && (
-          <p
-            role="alert"
-            className="rounded-control border border-danger-line bg-danger-soft p-3 text-sm text-danger-ink"
-          >
+          <AuthNotice tone="danger" role="alert">
             {formError}
-          </p>
+          </AuthNotice>
         )}
         <FormField
           id="name"
@@ -88,15 +92,20 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={register.isPending}
-          className={buttonStyles({ variant: 'primary', className: 'w-full' })}
+          className={buttonStyles({ variant: 'primary', className: 'w-full gap-2' })}
         >
           {register.isPending ? 'Creando cuenta…' : 'Crear cuenta'}
+          {!register.isPending && <EnterIcon className="size-5" />}
         </button>
       </form>
-      <p className="text-sm">
-        ¿Ya tienes cuenta?{' '}
-        <Link to="/login" className="font-medium text-accent-ink underline underline-offset-4">
+      <p className="flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-border-strong/50 pt-4 text-sm">
+        <span>¿Ya tienes cuenta?</span>
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink transition-transform duration-(--duration-fast) ease-standard hover:-translate-y-px"
+        >
           Iniciar sesión
+          <EnterIcon className="size-4" />
         </Link>
       </p>
     </AuthLayout>

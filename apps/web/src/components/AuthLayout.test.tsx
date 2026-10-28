@@ -15,7 +15,8 @@ describe('AuthLayout', () => {
   it('has one h1, the brand as text, the form content and a decorative sky and companion', () => {
     const out = html();
     expect(out.match(/<h1\b/g)).toHaveLength(1);
-    expect(out).toContain('Academic Planner');
+    // the name is set in two weights: read it without the tags
+    expect(out.replace(/<[^>]+>/g, '')).toContain('Academic Planner');
     expect(out).toContain('<form aria-label="demo"');
     // every picture is hidden from assistive technology and nothing here is focusable but the form
     for (const svg of out.match(/<svg\b[^>]*>/g) ?? []) expect(svg).toContain('aria-hidden="true"');
