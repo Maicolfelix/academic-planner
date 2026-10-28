@@ -89,7 +89,7 @@ export function ActivityCard({
       style={{
         backgroundImage: `radial-gradient(130% 70% at 0% 0%, ${withAlpha(color, 0.1)}, transparent 60%)`,
       }}
-      className={`relative flex min-w-0 flex-col gap-1 px-3 py-2.5 pl-4 transition-[transform,box-shadow] duration-(--duration-fast) ease-standard hover:-translate-y-px hover:shadow-lift ${
+      className={`relative flex min-w-0 flex-col gap-1 px-3 py-2.5 pl-4 transition-shadow duration-(--duration-fast) ease-standard hover:shadow-lift ${
         radar && URGENT.includes(radar) ? 'border-danger-line' : ''
       } ${justCompleted ? 'animate-complete' : ''}`}
     >

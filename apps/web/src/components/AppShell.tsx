@@ -183,7 +183,7 @@ export function AppShell() {
             })}
           >
             <CapIcon className="size-5" />
-            <span className="sr-only sm:not-sr-only">Mis estudios</span>
+            <span className="sr-only sm:not-sr-only lg:sr-only xl:not-sr-only">Mis estudios</span>
           </Link>
           <LogoutButton />
         </div>

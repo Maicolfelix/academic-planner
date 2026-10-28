@@ -26,7 +26,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
         className={`gap-2 border border-border-strong/50 bg-surface font-semibold hover:text-danger-ink ${className}`}
       >
         <LogoutIcon className="size-5" />
-        <span className="sr-only sm:not-sr-only">
+        <span className="sr-only sm:not-sr-only lg:sr-only xl:not-sr-only">
           {logout.isPending ? 'Cerrando…' : 'Cerrar sesión'}
         </span>
       </Button>
