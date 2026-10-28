@@ -265,13 +265,20 @@ describe('motion (index.css)', () => {
 
   it('loops are either the loading placeholder or AMBIENT (slow, discreet), and reduced motion stops loops', () => {
     const loops = [...css.matchAll(/--animate-([a-z-]+):[^;]*infinite[^;]*;/g)].map((m) => m[1]);
-    // `breathe` is the loading placeholder; the rest are the ambient category (documented in ux-accessibility.md). The three
-    // `companion-*` are the Pixel Companion's (P8): one logical pixel, always `motion-safe:` (see companion/PixelCompanion.test.tsx).
+    // `breathe` is the loading placeholder; the rest are the ambient category (documented in ux-accessibility.md). The
+    // `companion-*` loops are the Pixel Companion's (P8, C1): one logical pixel, always `motion-safe:` (see companion/PixelCompanion.test.tsx).
     expect(loops.sort()).toEqual([
       'breathe',
       'companion-blink',
       'companion-bustle',
+      'companion-drip',
+      'companion-float',
       'companion-idle',
+      'companion-look',
+      'companion-nod',
+      'companion-sleep',
+      'companion-sway',
+      'companion-twinkle',
       'drift',
       'drift-slow',
       'halo',
