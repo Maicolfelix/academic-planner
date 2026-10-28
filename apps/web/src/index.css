@@ -23,6 +23,8 @@
   --border-strong: #8791b2;
   --primary: #1f2670;
   --primary-hover: #181e5a;
+  /* The lit top of a primary button (a little lighter than the ink). */
+  --primary-lift: #2c3494;
   --primary-foreground: #ffffff;
   /* A quiet fill: the hover of outlined and ghost controls, the track of a progress bar. */
   --secondary: #eceef8;
@@ -665,6 +667,17 @@ dialog::backdrop {
 }
 .stagger > *:nth-child(n + 8) {
   animation-delay: 315ms;
+}
+/* Every section title carries two little pixels, one teal and one indigo, stepping down: the same hand as the companion. */
+.text-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 11px;
+  vertical-align: 0.12em;
+  background: var(--accent);
+  box-shadow: 5px 5px 0 0 var(--primary);
 }
 .pixel-grid {
   background-image: radial-gradient(rgb(31 38 112 / 0.1) 1px, transparent 1.4px);

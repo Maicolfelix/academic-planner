@@ -12,7 +12,9 @@ const SIZE: Record<ButtonSize, string> = {
 
 // `secondary` sets no text color, so a caller can add one (e.g. `text-danger`) without a class fight.
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
+  // A deep indigo with a lit top edge and a tinted shadow: it sits ON the page instead of being painted flat on it.
+  primary:
+    'bg-primary text-primary-foreground bg-[linear-gradient(180deg,var(--primary-lift),var(--primary))] shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_6px_12px_-6px_rgb(31_38_112/0.65)] hover:brightness-110',
   secondary: 'border border-border-strong hover:bg-secondary',
   ghost: 'hover:bg-secondary',
   danger: 'bg-danger text-primary-foreground hover:bg-danger/90',

@@ -24,33 +24,168 @@ function Icon({ children, className = 'size-6' }: { children: ReactNode; classNa
   );
 }
 
+/**
+ * The big icons (navigation and screen headers) are PIXEL art, drawn on a 12-wide grid like the companion: the same hand
+ * everywhere. Each `#` is one square; runs on a row merge into one rectangle. Crisp edges, `currentColor`, decoration.
+ */
+function PixelIcon({ rows, className = 'size-6' }: { rows: string[]; className?: string }) {
+  const d = rows
+    .flatMap((row, y) =>
+      [...row.matchAll(/#+/g)].map((m) => `M${m.index} ${y}h${m[0].length}v1h-${m[0].length}z`),
+    )
+    .join('');
+  return (
+    <svg
+      viewBox={`0 0 12 ${rows.length}`}
+      fill="currentColor"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
 export const HomeIcon = () => (
-  <Icon>
-    <path d="m3 11 9-8 9 8" />
-    <path d="M5 10v10h14V10" />
-    <path d="M10 20v-5h4v5" />
-  </Icon>
+  <PixelIcon
+    rows={[
+      '.....##.....',
+      '....####....',
+      '...######...',
+      '..########..',
+      '.##########.',
+      '############',
+      '..########..',
+      '..########..',
+      '..###..###..',
+      '..###..###..',
+      '..###..###..',
+    ]}
+  />
 );
 
 export const CheckSquareIcon = () => (
-  <Icon>
-    <rect x="3" y="3" width="18" height="18" rx="4" />
-    <path d="m8 12 3 3 5-6" />
-  </Icon>
+  <PixelIcon
+    rows={[
+      '.##########.',
+      '#..........#',
+      '#........#.#',
+      '#.......#..#',
+      '#......#...#',
+      '#.#...#....#',
+      '#..#.#.....#',
+      '#...#......#',
+      '#..........#',
+      '#..........#',
+      '.##########.',
+    ]}
+  />
 );
 
 export const CalendarIcon = () => (
-  <Icon>
-    <rect x="3" y="5" width="18" height="16" rx="3" />
-    <path d="M3 10h18M8 3v4M16 3v4" />
-  </Icon>
+  <PixelIcon
+    rows={[
+      '..#......#..',
+      '..#......#..',
+      '############',
+      '#..........#',
+      '############',
+      '#..........#',
+      '#.##.##.##.#',
+      '#..........#',
+      '#.##.##.##.#',
+      '#..........#',
+      '############',
+    ]}
+  />
 );
 
 export const BookIcon = () => (
-  <Icon>
-    <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />
-    <path d="M5 17a3 3 0 0 1 3-3h11" />
-  </Icon>
+  <PixelIcon
+    rows={[
+      '.#########..',
+      '#.........#.',
+      '#.#####...#.',
+      '#.........#.',
+      '#.####....#.',
+      '#.........#.',
+      '#.........#.',
+      '#.........#.',
+      '#.........#.',
+      '.##########.',
+    ]}
+  />
+);
+
+/** The Radar: a ring and a sweep. */
+export const RadarIcon = () => (
+  <PixelIcon
+    rows={[
+      '...######...',
+      '..#......#..',
+      '.#.....#..#.',
+      '#.....#....#',
+      '#....#.....#',
+      '#...##.....#',
+      '#...##.....#',
+      '#..........#',
+      '.#........#.',
+      '..#......#..',
+      '...######...',
+    ]}
+  />
+);
+
+/** The Bandeja: a tray that receives. */
+export const InboxIcon = () => (
+  <PixelIcon
+    rows={[
+      '.##########.',
+      '#..........#',
+      '#..........#',
+      '#..........#',
+      '#..........#',
+      '###......###',
+      '#..######..#',
+      '#..........#',
+      '############',
+    ]}
+  />
+);
+
+/** Mis estudios: a graduation cap. */
+export const CapIcon = () => (
+  <PixelIcon
+    rows={[
+      '.....##.....',
+      '...######...',
+      '.##########.',
+      '############',
+      '.##########.',
+      '...######...',
+      '...#.##.#...',
+      '...######...',
+    ]}
+  />
+);
+
+/** Progreso: three rising bars on a baseline. */
+export const ChartIcon = () => (
+  <PixelIcon
+    rows={[
+      '.........##.',
+      '.........##.',
+      '.....##..##.',
+      '.....##..##.',
+      '.....##..##.',
+      '.##..##..##.',
+      '.##..##..##.',
+      '.##..##..##.',
+      '############',
+    ]}
+  />
 );
 
 /** Two sparks: "write it in a sentence and I will organize it" (Quick Capture). */
@@ -134,38 +269,6 @@ export const BellIcon = ({ className = 'size-4' }: IconProps) => (
   <Icon className={className}>
     <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
     <path d="M10 21a2 2 0 0 0 4 0" />
-  </Icon>
-);
-
-/** The Radar: rings and a sweep. */
-export const RadarIcon = () => (
-  <Icon>
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="4.5" />
-    <path d="M12 12 18 6" />
-  </Icon>
-);
-
-/** The Bandeja: a tray that receives. */
-export const InboxIcon = () => (
-  <Icon>
-    <path d="M3 13h5l1.5 3h5L16 13h5" />
-    <path d="M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z" />
-  </Icon>
-);
-
-/** Mis estudios: a graduation cap. */
-export const CapIcon = () => (
-  <Icon>
-    <path d="m2 9 10-5 10 5-10 5z" />
-    <path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" />
-  </Icon>
-);
-
-/** Progreso: three rising bars. */
-export const ChartIcon = () => (
-  <Icon>
-    <path d="M4 20V13M12 20V5M20 20v-9" />
   </Icon>
 );
 
