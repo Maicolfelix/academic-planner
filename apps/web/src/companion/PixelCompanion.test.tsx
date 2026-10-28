@@ -44,18 +44,29 @@ describe('PixelCompanion', () => {
     }
   });
 
-  it('states differ in the face only; REST is still, BUSY and CALM move a little', () => {
-    expect(html('REST')).not.toContain('animate-');
-    expect(html('FOCUSED')).toContain('motion-safe:animate-companion-blink');
-    expect(html('BUSY')).toContain('motion-safe:animate-companion-bustle');
-    expect(html('CALM')).toContain('motion-safe:animate-companion-idle');
-    const bodies = COMPANION_STATES.map(
-      (s) => html(s).match(/<g class="[^"]*"><path[^>]*d="([^"]*)"/)?.[1],
-    );
-    expect(new Set(bodies).size).toBe(1); // the same body in every state
+  it('states differ in the face and one small extra; the body is the same in all of them', () => {
+    const bodyPath = Object.values(BODY_PATHS)[0]!;
+    for (const s of COMPANION_STATES) expect(html(s)).toContain(`d="${bodyPath}"`);
     expect(new Set(COMPANION_STATES.map((s) => JSON.stringify(FACES[s]))).size).toBe(
       COMPANION_STATES.length,
     );
+  });
+
+  it('each mood has its own motion; every awake one hops in, waves and blinks, and REST is asleep', () => {
+    const has = (s: CompanionState, n: string) =>
+      html(s).includes(`motion-safe:animate-companion-${n}`);
+    expect([has('CALM', 'idle'), has('CALM', 'twinkle'), has('CALM', 'look')]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([has('FOCUSED', 'nod'), has('FOCUSED', 'twinkle')]).toEqual([true, false]);
+    expect([has('BUSY', 'bustle'), has('BUSY', 'drip')]).toEqual([true, true]);
+    expect([has('REST', 'sleep'), has('REST', 'float')]).toEqual([true, true]);
+    for (const s of ['CALM', 'FOCUSED', 'BUSY'] as const)
+      for (const n of ['hop', 'wave', 'blink', 'sway']) expect(has(s, n), `${s} ${n}`).toBe(true);
+    // asleep: no blinking, waving or swaying (it still hops in when it appears)
+    for (const n of ['wave', 'blink', 'sway']) expect(has('REST', n), `REST ${n}`).toBe(false);
   });
 
   it('shows the next item only when given, as text that wraps', () => {
@@ -98,11 +109,36 @@ describe('pixel art data', () => {
 describe('the stylesheet contract for reduced motion', () => {
   const css = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
 
-  it('declares the three companion animations and the global reduced-motion rule that ends every animation at once', () => {
-    for (const n of ['companion-idle', 'companion-blink', 'companion-bustle'])
+  it('declares the companion animations and the global reduced-motion rule that ends every animation at once', () => {
+    for (const n of [
+      'companion-idle',
+      'companion-blink',
+      'companion-bustle',
+      'companion-hop',
+      'companion-wave',
+      'companion-sway',
+      'companion-look',
+      'companion-nod',
+      'companion-sleep',
+      'companion-float',
+      'companion-drip',
+      'companion-twinkle',
+    ])
       expect(css).toContain(`--animate-${n}:`);
     const reduce = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduce).toContain('animation-duration: 0.01ms !important');
     expect(reduce).toContain('animation-iteration-count: 1 !important');
+  });
+});
+
+describe('Tailwind can see every animation class', () => {
+  it('writes each class as a full literal in the source (assembled class names are never generated)', () => {
+    const src = readFileSync(new URL('./PixelCompanion.tsx', import.meta.url), 'utf8');
+    expect(src).not.toMatch(/\$\{[^}]*\}[a-z]+['`]/); // no template-built class
+    for (const state of COMPANION_STATES)
+      for (const c of [...html(state).matchAll(/motion-safe:animate-companion-[a-z]+/g)].map(
+        (m) => m[0],
+      ))
+        expect(src, c).toContain(c);
   });
 });

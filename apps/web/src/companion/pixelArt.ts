@@ -53,13 +53,18 @@ const BACKPACK: Rect[] = [
 
 type Rect = [x: number, y: number, w: number, h: number, color: string];
 
+// A one-pixel shine in each open eye is what makes it look alive rather than painted on.
 const EYES_OPEN: Rect[] = [
   [8, 8, 2, 3, 'O'],
   [14, 8, 2, 3, 'O'],
+  [8, 8, 1, 1, 'P'],
+  [14, 8, 1, 1, 'P'],
 ];
 const EYES_SMALL: Rect[] = [
   [8, 9, 2, 2, 'O'],
   [14, 9, 2, 2, 'O'],
+  [8, 9, 1, 1, 'P'],
+  [14, 9, 1, 1, 'P'],
 ];
 const EYES_CLOSED: Rect[] = [
   [8, 10, 2, 1, 'O'],
@@ -98,6 +103,51 @@ export const FACES: Record<CompanionState, Face> = {
   REST: { eyes: EYES_CLOSED, rest: SMILE },
 };
 
+/** Rosy cheeks (the belly's light tone), shared by every state. */
+export const CHEEKS: Rect[] = [
+  [7, 11, 1, 1, 'L'],
+  [16, 11, 1, 1, 'L'],
+];
+/** A curl on the tuft: it is its own layer so it can sway while the head stays still. */
+export const TUFT: Rect[] = [
+  [12, 1, 1, 1, 'O'],
+  [13, 0, 2, 1, 'O'],
+];
+/** The right arm at rest; the greeting lifts the same shape up beside the head and waves it. */
+export const ARM: Rect[] = [
+  [20, 11, 3, 1, 'O'],
+  [20, 12, 2, 3, 'B'],
+  [22, 12, 1, 3, 'O'],
+  [20, 15, 3, 1, 'O'],
+];
+/** A small shadow on the floor, so the character stands somewhere. */
+export const SHADOW: Rect[] = [[7, 22, 10, 1, 'O']];
+/** Extras that belong to one state each (see PixelCompanion). */
+export const SPARKLE: Rect[] = [
+  [20, 2, 1, 3, 'K'],
+  [19, 3, 3, 1, 'K'],
+];
+export const SPARKLE_SMALL: Rect[] = [
+  [3, 3, 1, 1, 'K'],
+  [2, 4, 3, 1, 'K'],
+  [3, 5, 1, 1, 'K'],
+];
+export const Z_BIG: Rect[] = [
+  [18, 2, 4, 1, 'O'],
+  [20, 3, 1, 1, 'O'],
+  [19, 4, 1, 1, 'O'],
+  [18, 5, 4, 1, 'O'],
+];
+export const Z_SMALL: Rect[] = [
+  [15, 0, 3, 1, 'O'],
+  [16, 1, 1, 1, 'O'],
+  [15, 2, 3, 1, 'O'],
+];
+export const DROP: Rect[] = [
+  [18, 4, 1, 2, 'K'],
+  [17, 5, 3, 1, 'K'],
+];
+
 /** Run-length merges the letters of the grid into one path per color: "M x y h w v 1 h -w z" per horizontal run. */
 export function pathsOfGrid(rows: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -122,6 +172,17 @@ export function pathsOfRects(rects: readonly Rect[]): Record<string, string> {
 
 export const BODY_PATHS = pathsOfGrid(BODY);
 export const BACKPACK_PATHS = pathsOfRects(BACKPACK);
+export const CHEEK_PATHS = pathsOfRects(CHEEKS);
+export const TUFT_PATHS = pathsOfRects(TUFT);
+export const ARM_PATHS = pathsOfRects(ARM);
+export const SHADOW_PATHS = pathsOfRects(SHADOW);
+export const EXTRA_PATHS = {
+  sparkle: pathsOfRects(SPARKLE),
+  sparkleSmall: pathsOfRects(SPARKLE_SMALL),
+  zBig: pathsOfRects(Z_BIG),
+  zSmall: pathsOfRects(Z_SMALL),
+  drop: pathsOfRects(DROP),
+};
 
 /** Letter -> the token class that fills it. Only the app's own colors. */
 export const FILL: Record<string, string> = {
