@@ -2,7 +2,7 @@
 
 **`v1.0.0` es la beta cerrada final del proyecto universitario.** Es el **mismo producto validado en [`v1.0.0-rc.3`](release-notes-1.0.0-rc.3.md)**: este PR solo cambia la versión y la documentación. **No es una certificación para producción pública**: **no existe un alojamiento persistente** (HTTPS y proxy reales se validaron de forma **temporal**, con un túnel de Cloudflare), la QA en dispositivos físicos fue **declarada por el mantenedor con evidencia formal incompleta y un waiver explícito**, y **no hay licencia decidida** (no existe `LICENSE`).
 
-> **El tag `v1.0.0` se creará solo después de fusionar este PR y con autorización expresa del mantenedor.** Mientras tanto el tag `v1.0.0` y el GitHub Release final **no existen**; el último release publicado es `v1.0.0-rc.3` (pre-release, tag anotado e inmutable sobre `2e6d2b4`).
+> **El tag `v1.0.0` (anotado, inmutable) se creó sobre `main` `817913d`, el merge del PR #76, con autorización expresa del mantenedor.** El release anterior es `v1.0.0-rc.3` (pre-release, tag anotado e inmutable sobre `2e6d2b4`).
 
 ## Qué cambia respecto a rc.3
 
@@ -38,7 +38,7 @@ Todo lo de [rc.2](release-notes-1.0.0-rc.2.md) y [rc.1](release-notes-1.0.0-rc.1
 Node.js ≥ 22.18 (probado con 24.19), npm ≥ 10, Docker Desktop (PostgreSQL 17, puerto del host 5433) y un navegador moderno.
 
 ```bash
-git clone https://github.com/Maicolfelix/academic-planner.git && cd academic-planner && git checkout v1.0.0-rc.3   # el tag v1.0.0 existirá solo después de fusionar este PR y con autorización
+git clone https://github.com/Maicolfelix/academic-planner.git && cd academic-planner && git checkout v1.0.0
 npm ci
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 npm run db:up
