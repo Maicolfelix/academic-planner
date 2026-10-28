@@ -268,6 +268,7 @@ describe('motion (index.css)', () => {
     // `breathe` is the loading placeholder; the rest are the ambient category (documented in ux-accessibility.md). The
     // `companion-*` loops are the Pixel Companion's (P8, C1): one logical pixel, always `motion-safe:` (see companion/PixelCompanion.test.tsx).
     expect(loops.sort()).toEqual([
+      'bob',
       'breathe',
       'companion-blink',
       'companion-bustle',
@@ -301,7 +302,7 @@ describe('motion (index.css)', () => {
     for (const file of sources) {
       const code = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
       const used = [
-        ...code.matchAll(/(motion-safe:)?animate-(drift-slow|drift|halo|scan|node|orbit)\b/g),
+        ...code.matchAll(/(motion-safe:)?animate-(drift-slow|drift|halo|scan|node|orbit|bob)\b/g),
       ];
       expect(used.length, file).toBeGreaterThan(0);
       for (const [match, safe] of used) expect(safe, `${file}: ${match}`).toBe('motion-safe:');

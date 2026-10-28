@@ -24,11 +24,117 @@ function Icon({ children, className = 'size-6' }: { children: ReactNode; classNa
   );
 }
 
+/** The pictures, one row of text per row of squares. Also drawn big, in the empty states. */
+export const PIXELS = {
+  home: [
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '..########..',
+    '.##########.',
+    '############',
+    '..########..',
+    '..########..',
+    '..###..###..',
+    '..###..###..',
+    '..###..###..',
+  ],
+  check: [
+    '.##########.',
+    '#..........#',
+    '#........#.#',
+    '#.......#..#',
+    '#......#...#',
+    '#.#...#....#',
+    '#..#.#.....#',
+    '#...#......#',
+    '#..........#',
+    '#..........#',
+    '.##########.',
+  ],
+  calendar: [
+    '..#......#..',
+    '..#......#..',
+    '############',
+    '#..........#',
+    '############',
+    '#..........#',
+    '#.##.##.##.#',
+    '#..........#',
+    '#.##.##.##.#',
+    '#..........#',
+    '############',
+  ],
+  book: [
+    '.#########..',
+    '#.........#.',
+    '#.#####...#.',
+    '#.........#.',
+    '#.####....#.',
+    '#.........#.',
+    '#.........#.',
+    '#.........#.',
+    '#.........#.',
+    '.##########.',
+  ],
+  radar: [
+    '...######...',
+    '..#......#..',
+    '.#.....#..#.',
+    '#.....#....#',
+    '#....#.....#',
+    '#...##.....#',
+    '#...##.....#',
+    '#..........#',
+    '.#........#.',
+    '..#......#..',
+    '...######...',
+  ],
+  inbox: [
+    '.##########.',
+    '#..........#',
+    '#..........#',
+    '#..........#',
+    '#..........#',
+    '###......###',
+    '#..######..#',
+    '#..........#',
+    '############',
+  ],
+  cap: [
+    '.....##.....',
+    '...######...',
+    '.##########.',
+    '############',
+    '.##########.',
+    '...######...',
+    '...#.##.#...',
+    '...######...',
+  ],
+  chart: [
+    '.........##.',
+    '.........##.',
+    '.....##..##.',
+    '.....##..##.',
+    '.....##..##.',
+    '.##..##..##.',
+    '.##..##..##.',
+    '.##..##..##.',
+    '############',
+  ],
+} as const;
+
 /**
  * The big icons (navigation and screen headers) are PIXEL art, drawn on a 12-wide grid like the companion: the same hand
  * everywhere. Each `#` is one square; runs on a row merge into one rectangle. Crisp edges, `currentColor`, decoration.
  */
-function PixelIcon({ rows, className = 'size-6' }: { rows: string[]; className?: string }) {
+export function PixelIcon({
+  rows,
+  className = 'size-6',
+}: {
+  rows: readonly string[];
+  className?: string;
+}) {
   const d = rows
     .flatMap((row, y) =>
       [...row.matchAll(/#+/g)].map((m) => `M${m.index} ${y}h${m[0].length}v1h-${m[0].length}z`),
@@ -48,145 +154,25 @@ function PixelIcon({ rows, className = 'size-6' }: { rows: string[]; className?:
   );
 }
 
-export const HomeIcon = () => (
-  <PixelIcon
-    rows={[
-      '.....##.....',
-      '....####....',
-      '...######...',
-      '..########..',
-      '.##########.',
-      '############',
-      '..########..',
-      '..########..',
-      '..###..###..',
-      '..###..###..',
-      '..###..###..',
-    ]}
-  />
-);
+export const HomeIcon = () => <PixelIcon rows={PIXELS.home} />;
 
-export const CheckSquareIcon = () => (
-  <PixelIcon
-    rows={[
-      '.##########.',
-      '#..........#',
-      '#........#.#',
-      '#.......#..#',
-      '#......#...#',
-      '#.#...#....#',
-      '#..#.#.....#',
-      '#...#......#',
-      '#..........#',
-      '#..........#',
-      '.##########.',
-    ]}
-  />
-);
+export const CheckSquareIcon = () => <PixelIcon rows={PIXELS.check} />;
 
-export const CalendarIcon = () => (
-  <PixelIcon
-    rows={[
-      '..#......#..',
-      '..#......#..',
-      '############',
-      '#..........#',
-      '############',
-      '#..........#',
-      '#.##.##.##.#',
-      '#..........#',
-      '#.##.##.##.#',
-      '#..........#',
-      '############',
-    ]}
-  />
-);
+export const CalendarIcon = () => <PixelIcon rows={PIXELS.calendar} />;
 
-export const BookIcon = () => (
-  <PixelIcon
-    rows={[
-      '.#########..',
-      '#.........#.',
-      '#.#####...#.',
-      '#.........#.',
-      '#.####....#.',
-      '#.........#.',
-      '#.........#.',
-      '#.........#.',
-      '#.........#.',
-      '.##########.',
-    ]}
-  />
-);
+export const BookIcon = () => <PixelIcon rows={PIXELS.book} />;
 
 /** The Radar: a ring and a sweep. */
-export const RadarIcon = () => (
-  <PixelIcon
-    rows={[
-      '...######...',
-      '..#......#..',
-      '.#.....#..#.',
-      '#.....#....#',
-      '#....#.....#',
-      '#...##.....#',
-      '#...##.....#',
-      '#..........#',
-      '.#........#.',
-      '..#......#..',
-      '...######...',
-    ]}
-  />
-);
+export const RadarIcon = () => <PixelIcon rows={PIXELS.radar} />;
 
 /** The Bandeja: a tray that receives. */
-export const InboxIcon = () => (
-  <PixelIcon
-    rows={[
-      '.##########.',
-      '#..........#',
-      '#..........#',
-      '#..........#',
-      '#..........#',
-      '###......###',
-      '#..######..#',
-      '#..........#',
-      '############',
-    ]}
-  />
-);
+export const InboxIcon = () => <PixelIcon rows={PIXELS.inbox} />;
 
 /** Mis estudios: a graduation cap. */
-export const CapIcon = () => (
-  <PixelIcon
-    rows={[
-      '.....##.....',
-      '...######...',
-      '.##########.',
-      '############',
-      '.##########.',
-      '...######...',
-      '...#.##.#...',
-      '...######...',
-    ]}
-  />
-);
+export const CapIcon = () => <PixelIcon rows={PIXELS.cap} />;
 
 /** Progreso: three rising bars on a baseline. */
-export const ChartIcon = () => (
-  <PixelIcon
-    rows={[
-      '.........##.',
-      '.........##.',
-      '.....##..##.',
-      '.....##..##.',
-      '.....##..##.',
-      '.##..##..##.',
-      '.##..##..##.',
-      '.##..##..##.',
-      '############',
-    ]}
-  />
-);
+export const ChartIcon = () => <PixelIcon rows={PIXELS.chart} />;
 
 /** Two sparks: "write it in a sentence and I will organize it" (Quick Capture). */
 export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (

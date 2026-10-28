@@ -167,8 +167,8 @@ export function DayList({
                 <button
                   type="button"
                   onClick={() => onOpen(row.o)}
-                  className={`flex w-full min-w-0 overflow-hidden rounded-lg border bg-white text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
-                    row.o.hasConflict ? 'border-red-700' : 'border-slate-300'
+                  className={`flex w-full min-w-0 overflow-hidden rounded-surface border bg-surface text-left shadow-card transition-[transform,box-shadow] duration-(--duration-fast) ease-standard hover:-translate-y-px hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                    row.o.hasConflict ? 'border-red-700' : 'border-border'
                   }`}
                 >
                   <span
@@ -223,7 +223,7 @@ function ActivityRow({
       type="button"
       onClick={() => onOpen(activity)}
       aria-label={agendaActivityLabel(item, WEEKDAY_LABELS[weekdayOf(item.date)], timeZone)}
-      className={`flex w-full min-w-0 overflow-hidden rounded-lg border border-dashed text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+      className={`flex w-full min-w-0 overflow-hidden rounded-surface border border-dashed text-left transition-[transform,box-shadow] duration-(--duration-fast) ease-standard hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
         item.overdue
           ? 'border-danger-line bg-danger-soft/60 hover:bg-danger-soft'
           : 'border-accent/50 bg-accent-soft/40 hover:bg-accent-soft/70'

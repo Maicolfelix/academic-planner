@@ -243,6 +243,7 @@ function TrackedGradesView({
 
       {!profile && (
         <EmptyState
+          art="chart"
           title="Configura las notas de esta materia"
           titleAs="h2"
           action={
@@ -258,6 +259,7 @@ function TrackedGradesView({
 
       {profile && grades.gradingPeriods.length === 0 && (
         <EmptyState
+          art="chart"
           title="¿Cómo se divide esta materia?"
           titleAs="h2"
           action={

@@ -210,6 +210,8 @@ body[data-ambient='done'] {
   --animate-companion-walk: companion-walk 0.45s steps(1, end) infinite;
   /* C3: the stars of the sign-in sky dim for a moment (they are mostly lit, unlike a sparkle). */
   --animate-companion-star: companion-star 4s steps(1, end) infinite;
+  /* The object of an empty state bobs one square up and down (steps, transform only). */
+  --animate-bob: bob 3s steps(1, end) infinite;
   --animate-companion-bubble: companion-bubble 0.18s steps(3, end) 1;
 
   @keyframes rise {
@@ -325,6 +327,16 @@ body[data-ambient='done'] {
   @keyframes orbit {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
     }
   }
 

@@ -150,6 +150,7 @@ export function StudiesPage() {
 
       {loaded && cards.length === 0 && !legacy && (
         <EmptyState
+          art="cap"
           title={archived.length > 0 ? 'No tienes estudios activos.' : 'Aún no tienes estudios.'}
           action={add}
         >

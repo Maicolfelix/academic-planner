@@ -126,7 +126,7 @@ function SubjectsView({ period, explicit }: { period: AcademicPeriod; explicit: 
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && list.length === 0 && (
-        <EmptyState title="Aún no tienes asignaturas." action={add}>
+        <EmptyState art="book" title="Aún no tienes asignaturas." action={add}>
           Agrega las materias de este semestre para comenzar a organizar tus actividades.
         </EmptyState>
       )}

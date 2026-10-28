@@ -1,4 +1,5 @@
 import { CompanionLayer } from '../companion/CompanionLayer';
+import { CompanionSprite } from '../companion/PixelCompanion';
 import { Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useDueReminders } from '../reminders/useReminders';
@@ -184,7 +185,16 @@ export function AppShell() {
         tabIndex={-1}
         className={`mx-auto ${width} px-4 pt-6 pb-24 outline-none lg:pt-10 lg:pb-12`}
       >
-        <Suspense fallback={<p role="status">Cargando…</p>}>
+        <Suspense
+          fallback={
+            <div className="flex items-center gap-3 py-6">
+              <CompanionSprite state="CALM" walking className="size-14" />
+              <p role="status" className="text-muted-foreground">
+                Cargando…
+              </p>
+            </div>
+          }
+        >
           <Outlet />
         </Suspense>
       </main>
