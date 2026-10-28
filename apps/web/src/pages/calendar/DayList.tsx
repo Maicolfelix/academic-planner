@@ -117,18 +117,18 @@ export function DayList({
 
       <h2 className="text-lg font-semibold">
         {WEEKDAY_LABELS[weekdayOf(selected)]} {dayNumber(selected)}
-        {selected === today && <span className="font-normal text-slate-600"> · hoy</span>}
+        {selected === today && <span className="font-normal text-muted-foreground"> · hoy</span>}
       </h2>
 
       {untimed.length === 0 && rows.length === 0 && (
-        <p className="rounded-md border border-dashed border-slate-300 p-4 text-slate-600">
+        <p className="rounded-control border border-dashed border-border p-4 text-muted-foreground">
           Nada programado este día.
         </p>
       )}
 
       {untimed.length > 0 && (
         <section aria-labelledby="agenda-untimed" className="flex flex-col gap-2">
-          <h3 id="agenda-untimed" className="text-sm font-semibold text-slate-700">
+          <h3 id="agenda-untimed" className="text-sm font-semibold text-muted-foreground">
             Sin hora
           </h3>
           <ul className="flex flex-col gap-2">
@@ -148,7 +148,7 @@ export function DayList({
       )}
 
       {rows.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className="stagger flex flex-col gap-2">
           {rows.map((row) =>
             row.kind === 'activity' ? (
               <li key={`a-${row.a.activity.id}`}>
@@ -167,8 +167,8 @@ export function DayList({
                 <button
                   type="button"
                   onClick={() => onOpen(row.o)}
-                  className={`flex w-full min-w-0 overflow-hidden rounded-lg border bg-white text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
-                    row.o.hasConflict ? 'border-red-700' : 'border-slate-300'
+                  className={`flex w-full min-w-0 overflow-hidden rounded-surface border bg-surface text-left shadow-card transition-[transform,box-shadow] duration-(--duration-fast) ease-standard hover:-translate-y-px hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    row.o.hasConflict ? 'border-danger' : 'border-border'
                   }`}
                 >
                   <span
@@ -181,14 +181,14 @@ export function DayList({
                       {timeRange(row.o, timeZone)}
                     </span>
                     <span className="font-medium break-words">{row.o.title}</span>
-                    <span className="text-sm text-slate-700 break-words">
+                    <span className="text-sm text-muted-foreground break-words">
                       {SCHEDULE_BLOCK_TYPE_LABELS[row.o.type]}
                       {row.o.subject && ` · ${row.o.subject.name}`}
                       <OriginLabel label={origin?.(row.o.periodId)} />
                       {row.o.isRecurring && ' · se repite cada semana'}
                     </span>
                     {row.o.hasConflict && (
-                      <span className="text-sm font-semibold text-red-800">
+                      <span className="text-sm font-semibold text-danger-ink">
                         ⚠ Choque de horario con otro bloque
                       </span>
                     )}
@@ -223,7 +223,7 @@ function ActivityRow({
       type="button"
       onClick={() => onOpen(activity)}
       aria-label={agendaActivityLabel(item, WEEKDAY_LABELS[weekdayOf(item.date)], timeZone)}
-      className={`flex w-full min-w-0 overflow-hidden rounded-lg border border-dashed text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+      className={`flex w-full min-w-0 overflow-hidden rounded-surface border border-dashed text-left transition-[transform,box-shadow] duration-(--duration-fast) ease-standard hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
         item.overdue
           ? 'border-danger-line bg-danger-soft/60 hover:bg-danger-soft'
           : 'border-accent/50 bg-accent-soft/40 hover:bg-accent-soft/70'
@@ -250,7 +250,7 @@ function ActivityRow({
         >
           {activity.title}
         </span>
-        <span className="text-sm text-slate-700 break-words">
+        <span className="text-sm text-muted-foreground break-words">
           Actividad · {ACTIVITY_TYPE_LABELS[activity.type]}
           {subject && ` · ${subject.name}`}
           <OriginLabel label={origin?.(activity.periodId)} /> ·{' '}

@@ -8,8 +8,10 @@ import {
   FILL,
   GRID,
   SHADOW_PATHS,
+  POSE_FACES,
   TUFT_PATHS,
   pathsOfRects,
+  type CompanionPose,
 } from './pixelArt';
 import { COMPANION_COPY, type CompanionState } from './companionState';
 
@@ -84,14 +86,21 @@ export function CompanionSprite({
   state,
   className = 'size-16 shrink-0 sm:size-[4.5rem] lg:size-24',
   walking = false,
+  pose,
 }: {
   state: CompanionState;
   className?: string;
   walking?: boolean;
+  /** Acts a moment out (covering its eyes, joy, worry) instead of showing the state's face. */
+  pose?: CompanionPose;
 }) {
   // An unknown state never breaks the Home: it falls back to the neutral one.
   const known: CompanionState = state in FACES ? state : 'CALM';
-  const face = FACES[known];
+  const posed = pose && pose in POSE_FACES ? pose : undefined;
+  const face = posed ? POSE_FACES[posed] : FACES[known];
+  // Only the poses that carry a mood bring its small extra (a pose that hides the face brings none).
+  const extras: CompanionState | null =
+    posed === 'joy' ? 'CALM' : posed === 'worried' ? 'BUSY' : posed === 'cover' ? null : known;
   return (
     <svg
       viewBox={`0 0 ${GRID} ${GRID}`}
@@ -111,8 +120,11 @@ export function CompanionSprite({
           <g className={awake(known, 'motion-safe:animate-companion-sway')}>
             <Paths paths={TUFT_PATHS} />
           </g>
-          <g className={awake(known, 'motion-safe:animate-companion-wave')}>
-            <Paths paths={ARM_PATHS} />
+          {/* The greeting wave belongs to a plain arrival; a pose holds its arm still (raised in joy). */}
+          <g transform={posed === 'joy' ? 'translate(0 -5)' : undefined}>
+            <g className={posed ? '' : awake(known, 'motion-safe:animate-companion-wave')}>
+              <Paths paths={ARM_PATHS} />
+            </g>
           </g>
           <g className={known === 'CALM' ? 'motion-safe:animate-companion-look' : ''}>
             <g
@@ -123,7 +135,7 @@ export function CompanionSprite({
           </g>
           <Paths paths={pathsOfRects(face.rest)} />
         </g>
-        <Extras state={known} />
+        {extras && <Extras state={extras} />}
       </g>
     </svg>
   );

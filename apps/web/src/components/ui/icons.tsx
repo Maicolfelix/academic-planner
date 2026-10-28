@@ -24,34 +24,337 @@ function Icon({ children, className = 'size-6' }: { children: ReactNode; classNa
   );
 }
 
-export const HomeIcon = () => (
-  <Icon>
-    <path d="m3 11 9-8 9 8" />
-    <path d="M5 10v10h14V10" />
-    <path d="M10 20v-5h4v5" />
-  </Icon>
+/** The pictures, one row of text per row of squares. Also drawn big, in the empty states. */
+export const PIXELS = {
+  home: [
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '..########..',
+    '.##########.',
+    '############',
+    '..########..',
+    '..########..',
+    '..###..###..',
+    '..###..###..',
+    '..###..###..',
+  ],
+  check: [
+    '.##########.',
+    '#..........#',
+    '#........#.#',
+    '#.......#..#',
+    '#......#...#',
+    '#.#...#....#',
+    '#..#.#.....#',
+    '#...#......#',
+    '#..........#',
+    '#..........#',
+    '.##########.',
+  ],
+  calendar: [
+    '..#......#..',
+    '..#......#..',
+    '############',
+    '#..........#',
+    '############',
+    '#..........#',
+    '#.##.##.##.#',
+    '#..........#',
+    '#.##.##.##.#',
+    '#..........#',
+    '############',
+  ],
+  book: [
+    '.#########..',
+    '#.........#.',
+    '#.#####...#.',
+    '#.........#.',
+    '#.####....#.',
+    '#.........#.',
+    '#.........#.',
+    '#.........#.',
+    '#.........#.',
+    '.##########.',
+  ],
+  radar: [
+    '...######...',
+    '..#......#..',
+    '.#.....#..#.',
+    '#.....#....#',
+    '#....#.....#',
+    '#...##.....#',
+    '#...##.....#',
+    '#..........#',
+    '.#........#.',
+    '..#......#..',
+    '...######...',
+  ],
+  inbox: [
+    '.##########.',
+    '#..........#',
+    '#..........#',
+    '#..........#',
+    '#..........#',
+    '###......###',
+    '#..######..#',
+    '#..........#',
+    '############',
+  ],
+  logout: [
+    '#####.......',
+    '#...#.......',
+    '#...#..#....',
+    '#...#...#...',
+    '#...#######.',
+    '#...#...#...',
+    '#...#..#....',
+    '#...#.......',
+    '#####.......',
+  ],
+  lock: [
+    '...####.....',
+    '..#....#....',
+    '..#....#....',
+    '..#....#....',
+    '############',
+    '############',
+    '#####..#####',
+    '#####..#####',
+    '############',
+    '############',
+  ],
+  user: [
+    '....####....',
+    '...######...',
+    '...######...',
+    '....####....',
+    '............',
+    '..########..',
+    '.##########.',
+    '############',
+    '############',
+  ],
+  enter: [
+    '.......#....',
+    '........#...',
+    '.........#..',
+    '###########.',
+    '.........#..',
+    '........#...',
+    '.......#....',
+  ],
+  tick: [
+    '..........##',
+    '.........##.',
+    '##......##..',
+    '.##....##...',
+    '..##..##....',
+    '...####.....',
+    '....##......',
+  ],
+  warn: [
+    '.....##.....',
+    '.....##.....',
+    '....####....',
+    '....#..#....',
+    '...######...',
+    '...##..##...',
+    '..###..###..',
+    '.####..####.',
+    '############',
+  ],
+  left: [
+    '.......##...',
+    '......##....',
+    '.....##.....',
+    '....##......',
+    '.....##.....',
+    '......##....',
+    '.......##...',
+  ],
+  right: [
+    '...##.......',
+    '....##......',
+    '.....##.....',
+    '......##....',
+    '.....##.....',
+    '....##......',
+    '...##.......',
+  ],
+  plus: [
+    '.....##.....',
+    '.....##.....',
+    '.....##.....',
+    '############',
+    '############',
+    '.....##.....',
+    '.....##.....',
+    '.....##.....',
+  ],
+  bell: [
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '...######...',
+    '..########..',
+    '..########..',
+    '.##########.',
+    '############',
+    '............',
+    '.....##.....',
+  ],
+  upload: [
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '.....##.....',
+    '.....##.....',
+    '.....##.....',
+    '............',
+    '#..........#',
+    '#..........#',
+    '############',
+  ],
+  spark: [
+    '.....##.....',
+    '.....##.....',
+    '....####....',
+    '############',
+    '############',
+    '....####....',
+    '.....##.....',
+    '.....##.....',
+  ],
+  play: [
+    '..##........',
+    '..####......',
+    '..######....',
+    '..########..',
+    '..######....',
+    '..####......',
+    '..##........',
+  ],
+  trophy: [
+    '############',
+    '#.########.#',
+    '#.########.#',
+    '.##########.',
+    '..########..',
+    '....####....',
+    '.....##.....',
+    '.....##.....',
+    '....####....',
+    '..########..',
+  ],
+  cap: [
+    '.....##.....',
+    '...######...',
+    '.##########.',
+    '############',
+    '.##########.',
+    '...######...',
+    '...#.##.#...',
+    '...######...',
+  ],
+  chart: [
+    '.........##.',
+    '.........##.',
+    '.....##..##.',
+    '.....##..##.',
+    '.....##..##.',
+    '.##..##..##.',
+    '.##..##..##.',
+    '.##..##..##.',
+    '############',
+  ],
+} as const;
+
+/**
+ * The big icons (navigation and screen headers) are PIXEL art, drawn on a 12-wide grid like the companion: the same hand
+ * everywhere. Each `#` is one square; runs on a row merge into one rectangle. Crisp edges, `currentColor`, decoration.
+ */
+export function PixelIcon({
+  rows,
+  className = 'size-6',
+}: {
+  rows: readonly string[];
+  className?: string;
+}) {
+  const d = rows
+    .flatMap((row, y) =>
+      [...row.matchAll(/#+/g)].map((m) => `M${m.index} ${y}h${m[0].length}v1h-${m[0].length}z`),
+    )
+    .join('');
+  return (
+    <svg
+      viewBox={`0 0 12 ${rows.length}`}
+      fill="currentColor"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
+export const HomeIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.home} className={className} />
 );
 
-export const CheckSquareIcon = () => (
-  <Icon>
-    <rect x="3" y="3" width="18" height="18" rx="4" />
-    <path d="m8 12 3 3 5-6" />
-  </Icon>
+export const CheckSquareIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.check} className={className} />
 );
 
-export const CalendarIcon = () => (
-  <Icon>
-    <rect x="3" y="5" width="18" height="16" rx="3" />
-    <path d="M3 10h18M8 3v4M16 3v4" />
-  </Icon>
+export const CalendarIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.calendar} className={className} />
 );
 
-export const BookIcon = () => (
-  <Icon>
-    <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />
-    <path d="M5 17a3 3 0 0 1 3-3h11" />
-  </Icon>
+export const BookIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.book} className={className} />
 );
+
+/** The Radar: a ring and a sweep. */
+export const RadarIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.radar} className={className} />
+);
+
+/** The Bandeja: a tray that receives. */
+export const InboxIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.inbox} className={className} />
+);
+
+/** Mis estudios: a graduation cap. */
+export const CapIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.cap} className={className} />
+);
+
+/** The sign-in and sign-up pictures and the small marks of a message. */
+export const LockIcon = () => <PixelIcon rows={PIXELS.lock} />;
+export const UserPixelIcon = () => <PixelIcon rows={PIXELS.user} />;
+export const EnterIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.enter} className={className} />
+);
+export const TickIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.tick} className={className} />
+);
+export const WarnIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.warn} className={className} />
+);
+
+export const PlusIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.plus} className={className} />
+);
+
+/** Cerrar sesión: an arrow leaving through a door. */
+export const LogoutIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.logout} className={className} />
+);
+
+/** Progreso: three rising bars on a baseline. */
+export const ChartIcon = () => <PixelIcon rows={PIXELS.chart} />;
 
 /** Two sparks: "write it in a sentence and I will organize it" (Quick Capture). */
 export const SparkIcon = ({ className = 'size-5' }: { className?: string }) => (
@@ -135,19 +438,4 @@ export const BellIcon = ({ className = 'size-4' }: IconProps) => (
     <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
     <path d="M10 21a2 2 0 0 0 4 0" />
   </Icon>
-);
-
-/** The product mark: a rounded square with a check, the same idea as the favicon. */
-export const BrandMark = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7 text-primary">
-    <rect width="24" height="24" rx="6" fill="currentColor" />
-    <path
-      d="m7.5 12.5 3 3 6-7"
-      fill="none"
-      className="stroke-primary-foreground"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
 );

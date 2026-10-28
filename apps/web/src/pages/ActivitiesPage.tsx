@@ -16,6 +16,7 @@ import { clearDraft, useStoredDraft } from '../lib/drafts';
 import { useNow } from '../lib/useNow';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { CheckSquareIcon } from '../components/ui/icons';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ActivityFilters } from './activities/ActivityFilters';
 import { activityDraftSchema, activityDraftScope, isBlank } from './activities/activityDraft';
@@ -116,6 +117,7 @@ export function ActivitiesPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        icon={<CheckSquareIcon />}
         title="Actividades"
         description={several ? 'Todos tus estudios actuales' : period.name}
         actions={list.length > 0 && add}

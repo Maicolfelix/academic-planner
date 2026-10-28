@@ -49,18 +49,19 @@ export function SummaryTiles({
       <h2 id="summary-title" className="sr-only">
         {several ? 'Resumen de tus estudios actuales' : 'Resumen del periodo'}
       </h2>
-      <ul className="grid animate-rise grid-cols-2 gap-px overflow-hidden rounded-surface border border-border bg-border shadow-card [animation-delay:80ms]">
+      <ul className="stagger grid grid-cols-2 gap-2.5">
         {METRICS.map(({ key, label, symbol, to, ink, bar }, i) => {
           const count = summary[key];
           const share = summary.total > 0 ? Math.round((count / summary.total) * 100) : 0;
           return (
-            <li key={key} className="bg-surface">
+            <li key={key}>
               <Link
                 to={to}
-                className="group flex h-full min-h-20 flex-col justify-between gap-2 px-4 py-3 transition-[background-color,transform] duration-(--duration-fast) ease-standard hover:bg-primary/5 active:scale-[0.98]"
+                className="group relative flex h-full min-h-24 flex-col justify-between gap-2 overflow-hidden rounded-surface border border-border bg-surface px-4 pt-4 pb-3 shadow-card transition-[transform,box-shadow] duration-(--duration-normal) ease-spring hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]"
               >
+                <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
                 <span
-                  className={`text-3xl leading-none font-semibold tabular-nums ${
+                  className={`text-4xl leading-none font-semibold tabular-nums ${
                     count > 0 ? ink : 'text-muted-foreground'
                   }`}
                 >

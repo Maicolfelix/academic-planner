@@ -148,6 +148,48 @@ export const DROP: Rect[] = [
   [17, 5, 3, 1, 'K'],
 ];
 
+/**
+ * Poses for the moments a screen wants to ACT out (the sign-in: it covers its eyes while a password is typed, worries about
+ * an error, rejoices when you get in). A pose replaces the state's face; the body, backpack and feet stay.
+ */
+export type CompanionPose = 'cover' | 'joy' | 'worried';
+
+const HANDS_OVER_EYES: Rect[] = [
+  [7, 7, 4, 4, 'O'],
+  [8, 8, 2, 2, 'L'],
+  [13, 7, 4, 4, 'O'],
+  [14, 8, 2, 2, 'L'],
+];
+const EYES_HAPPY: Rect[] = [
+  [8, 10, 1, 1, 'O'],
+  [9, 9, 1, 1, 'O'],
+  [10, 10, 1, 1, 'O'],
+  [13, 10, 1, 1, 'O'],
+  [14, 9, 1, 1, 'O'],
+  [15, 10, 1, 1, 'O'],
+];
+const GRIN: Rect[] = [
+  [10, 11, 4, 1, 'O'],
+  [11, 12, 2, 1, 'O'],
+];
+const BROWS_WORRIED: Rect[] = [
+  [8, 7, 1, 1, 'O'],
+  [9, 6, 1, 1, 'O'],
+  [15, 7, 1, 1, 'O'],
+  [14, 6, 1, 1, 'O'],
+];
+const FROWN: Rect[] = [
+  [10, 12, 1, 1, 'O'],
+  [11, 11, 2, 1, 'O'],
+  [13, 12, 1, 1, 'O'],
+];
+
+export const POSE_FACES: Record<CompanionPose, Face> = {
+  cover: { eyes: [], rest: [...HANDS_OVER_EYES, ...MOUTH_FLAT] },
+  joy: { eyes: EYES_HAPPY, rest: GRIN },
+  worried: { eyes: EYES_SMALL, rest: [...BROWS_WORRIED, ...FROWN] },
+};
+
 /** Run-length merges the letters of the grid into one path per color: "M x y h w v 1 h -w z" per horizontal run. */
 export function pathsOfGrid(rows: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};

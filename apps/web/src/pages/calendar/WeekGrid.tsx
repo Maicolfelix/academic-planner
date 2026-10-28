@@ -83,8 +83,8 @@ export function WeekGrid({
         <div
           key={day}
           aria-current={day === today ? 'date' : undefined}
-          className={`border-b border-l border-slate-300 px-1 py-2 text-center font-medium ${
-            day === today ? 'bg-slate-100' : ''
+          className={`border-b border-l border-border px-1 py-2 text-center font-medium ${
+            day === today ? 'bg-secondary' : ''
           }`}
         >
           <span>{WEEKDAY_SHORT_LABELS[weekdayOf(day)]}</span>{' '}
@@ -95,14 +95,14 @@ export function WeekGrid({
 
       {untimed.length > 0 && (
         <>
-          <div className="flex items-start justify-end px-1 pt-1.5 text-right text-xs text-slate-600">
+          <div className="flex items-start justify-end px-1 pt-1.5 text-right text-xs text-muted-foreground">
             Sin hora
           </div>
           {days.map((day) => (
             <ul
               key={day}
               aria-label={`Sin hora, ${WEEKDAY_LABELS[weekdayOf(day)]} ${dayNumber(day)}`}
-              className="flex min-w-0 flex-col gap-1 border-b border-l border-slate-300 p-1"
+              className="flex min-w-0 flex-col gap-1 border-b border-l border-border p-1"
             >
               {untimed
                 .filter((a) => a.date === day)
@@ -129,7 +129,7 @@ export function WeekGrid({
           <span
             key={h}
             style={{ top: (h - firstHour) * HOUR_PX }}
-            className="absolute right-1 -translate-y-2 text-xs text-slate-600"
+            className="absolute right-1 -translate-y-2 text-xs text-muted-foreground"
           >
             {h > firstHour && formatHourLabel(h)}
           </span>
@@ -143,7 +143,7 @@ export function WeekGrid({
         return (
           <div
             key={day}
-            className="relative border-l border-slate-300"
+            className="relative border-l border-border"
             style={{
               height,
               backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, #e2e8f0 ${HOUR_PX - 1}px, #e2e8f0 ${HOUR_PX}px)`,
@@ -182,8 +182,8 @@ export function WeekGrid({
                     o.hasConflict ? ', con choque de horario' : ''
                   }`}
                   style={{ ...box, borderLeftColor: o.subject?.color ?? '#64748B' }}
-                  className={`absolute flex flex-col overflow-hidden rounded border border-l-4 bg-white p-1 text-left text-xs shadow-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-slate-900 ${
-                    o.hasConflict ? 'border-red-700' : 'border-slate-300'
+                  className={`absolute flex flex-col overflow-hidden rounded border border-l-4 bg-surface p-1 text-left text-xs shadow-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                    o.hasConflict ? 'border-danger' : 'border-border'
                   }`}
                 >
                   {/* Side by side (lanes > 1) a block is ~70 px wide: keep only what fits; the full text is in its accessible name. */}
@@ -193,13 +193,13 @@ export function WeekGrid({
                   </span>
                   <span className={`truncate `}>{timeRange(o, timeZone)}</span>
                   {p.lanes === 1 && (
-                    <span className="truncate text-slate-700">
+                    <span className="truncate text-muted-foreground">
                       {SCHEDULE_BLOCK_TYPE_LABELS[o.type]}
                       {o.isRecurring && ' · semanal'}
                     </span>
                   )}
                   {o.hasConflict && p.lanes === 1 && (
-                    <span className="truncate font-semibold text-red-800">⚠ Choque</span>
+                    <span className="truncate font-semibold text-danger-ink">⚠ Choque</span>
                   )}
                 </button>
               );
@@ -236,7 +236,7 @@ export function ActivityMarker({
       title={`${activity.title} (${ACTIVITY_TYPE_LABELS[activity.type]})`}
       aria-label={agendaActivityLabel(item, WEEKDAY_LABELS[weekdayOf(item.date)], timeZone)}
       style={{ borderLeftColor: subject?.color ?? '#64748B' }}
-      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded border border-l-4 border-dashed px-1 py-0.5 text-left text-xs hover:bg-accent-soft/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-slate-900 ${
+      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded border border-l-4 border-dashed px-1 py-0.5 text-left text-xs hover:bg-accent-soft/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
         item.overdue
           ? 'border-danger-line bg-danger-soft text-danger-ink'
           : 'border-accent/50 bg-accent-soft/50 text-accent-ink'

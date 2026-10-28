@@ -1,3 +1,4 @@
+import { PIXELS, PixelIcon } from '../../components/ui/icons';
 import {
   ACTIVITY_STATUSES,
   ACTIVITY_STATUS_LABELS,
@@ -92,6 +93,19 @@ export function ActivityCard({
         radar && URGENT.includes(radar) ? 'border-danger-line' : ''
       } ${justCompleted ? 'animate-complete' : ''}`}
     >
+      {/* A finished activity wears a big, pale pixel check in its corner: the app's way of saying "done". Clipped on its own
+          layer so the card's menu can still open past the edge. */}
+      {done && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-surface"
+        >
+          <PixelIcon
+            rows={PIXELS.check}
+            className="absolute -right-2 -bottom-3 size-20 -rotate-6 text-success/10"
+          />
+        </span>
+      )}
       {/* The subject's color as a thin, inset rail (not a slab down the edge): a mark that says "this subject". */}
       <span
         aria-hidden="true"

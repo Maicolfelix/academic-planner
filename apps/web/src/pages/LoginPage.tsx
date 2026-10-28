@@ -3,7 +3,10 @@ import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useLogin } from '../auth/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
+import { AuthLayout, type AuthMood } from '../components/AuthLayout';
+import { AuthNotice } from '../components/auth/AuthNotice';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { EnterIcon, LockIcon } from '../components/ui/icons';
 import { FormField } from '../components/FormField';
 
 export function LoginPage() {
@@ -36,23 +39,36 @@ export function LoginPage() {
     });
   }
 
+  const mood: AuthMood = login.isPending
+    ? 'pending'
+    : login.isSuccess
+      ? 'success'
+      : formError || Object.keys(fieldErrors).length > 0
+        ? 'error'
+        : 'idle';
+
   return (
-    <AuthLayout title="Iniciar sesión">
+    <AuthLayout
+      title="Iniciar sesión"
+      icon={<LockIcon />}
+      intro="Hola otra vez. Qué bueno verte."
+      mood={mood}
+    >
       {warning && (
-        <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+        <AuthNotice tone="warning" role="status">
           {warning}
-        </p>
+        </AuthNotice>
       )}
       {notice && (
-        <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+        <AuthNotice tone="success" role="status">
           {notice}
-        </p>
+        </AuthNotice>
       )}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+          <AuthNotice tone="danger" role="alert">
             {formError}
-          </p>
+          </AuthNotice>
         )}
         <FormField
           id="email"
@@ -75,15 +91,20 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={login.isPending}
-          className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+          className={buttonStyles({ variant: 'primary', className: 'w-full gap-2' })}
         >
           {login.isPending ? 'Entrando…' : 'Entrar'}
+          {!login.isPending && <EnterIcon className="size-5" />}
         </button>
       </form>
-      <p className="text-sm">
-        ¿No tienes cuenta?{' '}
-        <Link to="/register" className="font-medium underline">
+      <p className="flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-border-strong/50 pt-4 text-sm">
+        <span>¿No tienes cuenta?</span>
+        <Link
+          to="/register"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink transition-transform duration-(--duration-fast) ease-standard hover:-translate-y-px"
+        >
           Crear cuenta
+          <EnterIcon className="size-4" />
         </Link>
       </p>
     </AuthLayout>

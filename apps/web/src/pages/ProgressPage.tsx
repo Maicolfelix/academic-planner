@@ -1,4 +1,9 @@
 import { QueryError } from '../components/QueryError';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { Card } from '../components/ui/Card';
+import { ChartIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Ring } from './dashboard/ProgressCard';
 import { addDays, formatDateOnly, formatDuration, isRealDateOnly } from '@planner/core';
 import { Link, useSearchParams } from 'react-router';
 import { originLabelOf, readsSeveralPeriods } from '../academic/origin';
@@ -9,8 +14,7 @@ import { SubjectGradeList } from './progress/SubjectGradeList';
 import { SubjectProgressList } from './progress/SubjectProgressList';
 import { WorkloadDetail, busiestText, plural, totalsLine } from './progress/WorkloadDetail';
 
-const secondary =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+const secondary = buttonStyles({ variant: 'secondary', size: 'sm' });
 
 /**
  * Descriptive views of what the student registered: progress of the activities (general and per subject) and
@@ -28,12 +32,11 @@ export function ProgressPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Progreso y carga semanal</h1>
-        <p className="text-sm text-slate-700">
-          Todo se calcula con lo que has registrado en la aplicación.
-        </p>
-      </header>
+      <PageHeader
+        icon={<ChartIcon />}
+        title="Progreso y carga semanal"
+        description="Todo se calcula con lo que has registrado en la aplicación."
+      />
 
       <section aria-labelledby="progress-title" className="flex flex-col gap-3">
         <h2 id="progress-title" className="text-lg font-semibold">
@@ -78,9 +81,9 @@ export function ProgressPage() {
               {formatDateOnly(workload.data.week.to)}
             </p>
             {workload.data.totals.totalCommitments === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-300 p-4">
-                No hay compromisos registrados en esta semana.
-              </p>
+              <Card variant="dashed" className="p-4">
+                <p>No hay compromisos registrados en esta semana.</p>
+              </Card>
             ) : (
               <div className="flex flex-col gap-1">
                 <p>
@@ -100,7 +103,7 @@ export function ProgressPage() {
                   )}
                   .
                 </p>
-                <p className="text-sm text-slate-700">{totalsLine(workload.data.totals)}</p>
+                <p className="text-sm text-muted-foreground">{totalsLine(workload.data.totals)}</p>
                 {workload.data.busiestDay && (
                   <p className="text-sm">
                     Día con más compromisos:{' '}
@@ -110,13 +113,13 @@ export function ProgressPage() {
               </div>
             )}
             <WorkloadDetail workload={workload.data} />
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-muted-foreground">
               Se basa solo en lo que has registrado: una actividad cuenta como un compromiso y no
               suma horas; las horas programadas son las de tu agenda.
             </p>
             <Link
               to={`/calendar?week=${workload.data.week.from}`}
-              className="inline-flex min-h-11 items-center self-start text-sm font-medium underline"
+              className="inline-flex min-h-11 items-center self-start text-sm font-medium text-accent-ink underline underline-offset-4"
             >
               Ver esta semana en la Agenda
             </Link>
@@ -127,7 +130,7 @@ export function ProgressPage() {
       <p>
         <Link
           to="/dashboard"
-          className="inline-flex min-h-11 items-center text-sm font-medium underline"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-accent-ink underline underline-offset-4"
         >
           Volver al inicio
         </Link>
@@ -142,11 +145,13 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
   const several = readsSeveralPeriods(byPeriod);
   if (general.total === 0 && subjects.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-slate-300 p-4">
-        {several
-          ? 'Aún no hay asignaturas ni actividades registradas en tus estudios actuales.'
-          : 'Aún no hay asignaturas ni actividades registradas en este periodo.'}
-      </p>
+      <Card variant="dashed" className="p-4">
+        <p>
+          {several
+            ? 'Aún no hay asignaturas ni actividades registradas en tus estudios actuales.'
+            : 'Aún no hay asignaturas ni actividades registradas en este periodo.'}
+        </p>
+      </Card>
     );
   }
   const text = `${general.completed} de ${general.total} actividades completadas`;
@@ -154,32 +159,42 @@ function ProgressContent({ data }: { data: NonNullable<ReturnType<typeof useProg
   const withoutSubject = general.total - subjects.reduce((n, s) => n + s.total, 0);
   return (
     <>
-      <div className="flex flex-col gap-2 rounded-lg border border-slate-300 p-4">
+      <Card
+        variant={general.total > 0 && general.percentage === 100 ? 'success' : 'tinted'}
+        className="flex flex-col gap-3 p-4"
+      >
         {general.total === 0 ? (
           <p>Sin actividades registradas</p>
         ) : (
           <>
-            <p className="text-3xl font-semibold">{general.percentage}%</p>
+            <div className="flex items-center gap-4">
+              <Ring percent={general.percentage} />
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="animate-pop text-4xl leading-none font-semibold text-primary [animation-delay:120ms]">
+                  {general.percentage}%
+                </p>
+                <p>{text}</p>
+              </div>
+            </div>
             <ProgressBar
               percent={general.percentage}
               label="Progreso general de actividades"
               valueText={`${general.percentage}%, ${text}`}
             />
-            <p>{text}</p>
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-muted-foreground">
               {plural(general.pending, 'pendiente', 'pendientes')} · {general.inProgress} en proceso
               · {plural(general.overdue, 'vencida', 'vencidas')}
             </p>
           </>
         )}
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted-foreground">
           {several
             ? 'Mide solo las actividades que has registrado en tus estudios actuales. Todas pesan lo mismo.'
             : 'Mide solo las actividades que has registrado en este periodo. Todas pesan lo mismo.'}
           {withoutSubject > 0 &&
             ` Incluye ${withoutSubject === 1 ? '1 actividad sin asignatura' : `${withoutSubject} actividades sin asignatura`}, que no aparece en ninguna asignatura.`}
         </p>
-      </div>
+      </Card>
       {several && <ProgressByPeriod byPeriod={byPeriod} />}
       <h3 className="sr-only">Por asignatura</h3>
       <SubjectProgressList

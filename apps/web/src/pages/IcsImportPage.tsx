@@ -1,3 +1,6 @@
+import { CalendarIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
+import { buttonStyles } from '../components/ui/buttonStyles';
 import {
   ICS_IMPORT_MAX_BYTES,
   ICS_IMPORT_MESSAGES,
@@ -27,10 +30,8 @@ import { IcsRowCard } from './icsImport/IcsRowCard';
 
 const READ_ERROR =
   'No pudimos leer el calendario. Revisa que sea un archivo .ics e inténtalo de nuevo.';
-const button =
-  'min-h-11 rounded-md border border-slate-400 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const primary =
-  'min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+const button = buttonStyles({ className: 'text-sm disabled:opacity-60' });
+const primary = buttonStyles({ variant: 'primary', className: 'text-sm disabled:opacity-60' });
 
 /**
  * .ics import: FILE -> READ -> PROPOSALS -> REVIEW/CORRECT -> CONFIRM. Reading never saves and the file is not stored. Confirming
@@ -170,17 +171,20 @@ export function IcsImportPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Importar calendario</h1>
-        <Link to="/calendar" className={`${button} inline-flex items-center`}>
-          Volver a la Agenda
-        </Link>
-      </header>
+      <PageHeader
+        icon={<CalendarIcon />}
+        title="Importar calendario"
+        actions={
+          <Link to="/calendar" className={`${button} inline-flex items-center`}>
+            Volver a la Agenda
+          </Link>
+        }
+      />
 
       {!result && (
         <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 rounded-lg border-2 border-dashed border-slate-400 p-4">
-            <label htmlFor="ics-file" className="text-sm font-medium text-slate-800">
+          <div className="flex flex-col gap-2 rounded-surface border-2 border-dashed border-border-strong p-4">
+            <label htmlFor="ics-file" className="text-sm font-medium text-foreground">
               Archivo de calendario (.ics)
             </label>
             <input
@@ -190,15 +194,15 @@ export function IcsImportPage() {
               onChange={(e) => choose(e.target.files?.[0])}
               aria-invalid={inputError ? true : undefined}
               aria-describedby={`ics-file-help${inputError ? ' ics-file-error' : ''}`}
-              className="min-h-11 w-full min-w-0 text-base"
+              className="min-h-11 w-full min-w-0 text-base file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-control file:border file:border-border-strong file:bg-secondary file:px-4 file:font-medium file:text-foreground hover:file:bg-accent-soft"
             />
             {file && (
-              <p className="text-sm break-words text-slate-800">
+              <p className="text-sm break-words text-foreground">
                 Archivo elegido: <span className="font-medium">{file.name}</span>
               </p>
             )}
           </div>
-          <p id="ics-file-help" className="text-sm text-slate-600">
+          <p id="ics-file-help" className="text-sm text-muted-foreground">
             Máximo 1 MB y 500 eventos. Se entienden eventos únicos y clases que se repiten cada
             semana. El archivo se lee en el servidor de Academic Planner, no se guarda: solo se crea
             lo que confirmes.
@@ -209,7 +213,7 @@ export function IcsImportPage() {
               ref={errorRef}
               tabIndex={-1}
               role="alert"
-              className="text-sm text-red-700 outline-none"
+              className="text-sm text-danger-ink outline-none"
             >
               {inputError}
             </p>
@@ -225,7 +229,7 @@ export function IcsImportPage() {
             )}
           </div>
           {parse.isPending && (
-            <p role="status" className="text-sm text-slate-700">
+            <p role="status" className="text-sm text-muted-foreground">
               Leyendo calendario…
             </p>
           )}
@@ -245,7 +249,7 @@ export function IcsImportPage() {
               ? 'Sin eventos en el archivo'
               : `${result.proposals.length} ${result.proposals.length === 1 ? 'evento' : 'eventos'} en ${result.fileName}`}
           </h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Revisa y corrige: nada se crea hasta que pulses el botón de importar.
           </p>
 
@@ -254,13 +258,16 @@ export function IcsImportPage() {
               ref={submitErrorRef}
               tabIndex={-1}
               role="alert"
-              className="rounded-md bg-red-50 p-3 text-sm text-red-800 outline-none"
+              className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink outline-none"
             >
               {submitError}
             </p>
           )}
           {summary && (
-            <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+            <p
+              role="status"
+              className="rounded-control bg-success-soft p-3 text-sm text-success-ink"
+            >
               {summary}{' '}
               <Link to="/calendar" className="font-medium underline">
                 Ver Agenda

@@ -49,13 +49,22 @@ export function SubjectCard({
         }}
         className="pointer-events-none absolute -top-12 -right-12 size-36 rounded-full"
       />
+      {/* The same corner in dots of its color, like graph paper that fades away: the pixel hand of the app. */}
+      <span
+        aria-hidden="true"
+        style={{
+          backgroundImage: `radial-gradient(${withAlpha(color, 0.45)} 1px, transparent 1.4px)`,
+          maskImage: 'radial-gradient(70% 70% at 100% 0%, #000, transparent)',
+        }}
+        className="pointer-events-none absolute inset-0 bg-[length:10px_10px]"
+      />
 
       <div className="relative flex items-start gap-3">
         <span
           aria-hidden="true"
           data-subject-swatch
           style={{ backgroundColor: color, color: readableInk(color) }}
-          className="grid size-12 shrink-0 place-items-center rounded-2xl text-xl font-bold shadow-card transition-transform duration-(--duration-normal) ease-spring group-hover:scale-105 group-hover:-rotate-3"
+          className="grid size-12 shrink-0 place-items-center rounded-2xl text-xl font-bold shadow-[3px_3px_0_0_rgb(31_38_112/0.2),inset_0_2px_0_rgb(255_255_255/0.28)] transition-transform duration-(--duration-normal) ease-spring group-hover:scale-105 group-hover:-rotate-3"
         >
           {initialsOf(subject.name)}
         </span>

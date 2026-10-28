@@ -1,5 +1,6 @@
 import { CaptureFlow } from '../../capture/CaptureFlow';
-import { SparkIcon } from '../../components/ui/icons';
+import { IconTile } from '../../components/ui/IconTile';
+import { PIXELS, PixelIcon } from '../../components/ui/icons';
 
 /**
  * Quick capture: write what you have to do, in your own words — one activity or several, in any order — and the app reads
@@ -9,10 +10,13 @@ import { SparkIcon } from '../../components/ui/icons';
 export function QuickCapture() {
   return (
     <section aria-labelledby="quick-capture-title" className="flex flex-col gap-2">
-      <h2 id="quick-capture-title" className="flex items-center gap-2 text-lg font-semibold">
-        <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-accent-ink">
-          <SparkIcon className="size-4" />
-        </span>
+      <h2
+        id="quick-capture-title"
+        className="flex items-center gap-2.5 text-section-title before:hidden"
+      >
+        <IconTile>
+          <PixelIcon rows={PIXELS.spark} />
+        </IconTile>
         Captura rápida
       </h2>
       <CaptureFlow

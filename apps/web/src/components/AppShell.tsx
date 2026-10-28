@@ -1,4 +1,6 @@
+import { AchievementToast } from '../achievements/AchievementToast';
 import { CompanionLayer } from '../companion/CompanionLayer';
+import { CompanionSprite } from '../companion/PixelCompanion';
 import { Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useDueReminders } from '../reminders/useReminders';
@@ -7,7 +9,8 @@ import { useSlidingIndicator } from '../lib/useSlidingIndicator';
 import { LogoutButton } from './LogoutButton';
 import { ReminderBadge } from './ReminderBadge';
 import { buttonStyles } from './ui/buttonStyles';
-import { BookIcon, BrandMark, CalendarIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
+import { Brand } from './Brand';
+import { BookIcon, CalendarIcon, CapIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
 
 /**
  * The four places a student comes back to every day. Everything else is reached from the screen where it makes
@@ -89,6 +92,8 @@ export function AppShell() {
         <span className="ambient-orb ambient-orb-a" />
         <span className="ambient-orb ambient-orb-b" />
         <span className="ambient-orb ambient-orb-c" />
+        {/* Graph paper: a faint dotted grid that fades out down the page (the pixels of the companion, spread thin). */}
+        <span className="pixel-grid absolute inset-0" />
       </div>
       {/* First stop of the keyboard: jump over the navigation, straight to the page. */}
       <a
@@ -97,12 +102,16 @@ export function AppShell() {
       >
         Saltar al contenido
       </a>
-      <header className="relative border-b border-border/70 bg-surface/90 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-[linear-gradient(90deg,transparent,rgb(13_148_136/0.5),rgb(99_102_241/0.45),transparent)]">
+      <header className="sticky top-0 z-20 border-b border-border/70 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-[linear-gradient(90deg,transparent,rgb(13_148_136/0.5),rgb(99_102_241/0.45),transparent)]">
         {/* The bar is as wide as the widest screen (Agenda, Home), so brand, four destinations and sign-out fit on ONE row from 1024 px; the reading column below it stays narrow. */}
+        {/* The glass lives on its own layer: a backdrop filter on the header itself would trap the fixed bottom navigation inside it. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-surface/80 backdrop-blur-md"
+        />
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 px-4 py-2 lg:py-3">
-          <span className="mr-auto flex items-center gap-2 py-2 font-semibold tracking-tight lg:mr-0">
-            <BrandMark />
-            Academic Planner
+          <span className="mr-auto lg:mr-0">
+            <Brand />
           </span>
 
           <nav
@@ -164,10 +173,17 @@ export function AppShell() {
           {/* The end of the bar is where the avatar and the bell will go: they arrive with their own features. */}
           <Link
             to="/settings/studies"
+            title="Mis estudios"
             aria-current={pathname.startsWith('/settings/studies') ? 'page' : undefined}
-            className={buttonStyles({ variant: 'ghost', size: 'sm' })}
+            className={buttonStyles({
+              variant: 'ghost',
+              size: 'sm',
+              className:
+                'gap-2 border border-accent/30 bg-accent-soft font-semibold text-accent-ink shadow-card',
+            })}
           >
-            Mis estudios
+            <CapIcon className="size-5" />
+            <span className="sr-only sm:not-sr-only lg:sr-only xl:not-sr-only">Mis estudios</span>
           </Link>
           <LogoutButton />
         </div>
@@ -177,10 +193,20 @@ export function AppShell() {
         tabIndex={-1}
         className={`mx-auto ${width} px-4 pt-6 pb-24 outline-none lg:pt-10 lg:pb-12`}
       >
-        <Suspense fallback={<p role="status">Cargando…</p>}>
+        <Suspense
+          fallback={
+            <div className="flex items-center gap-3 py-6">
+              <CompanionSprite state="CALM" walking className="size-14" />
+              <p role="status" className="text-muted-foreground">
+                Cargando…
+              </p>
+            </div>
+          }
+        >
           <Outlet />
         </Suspense>
       </main>
+      <AchievementToast />
       <CompanionLayer />
     </div>
   );

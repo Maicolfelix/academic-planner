@@ -5,7 +5,7 @@ import { useOnlineStatus } from './useOnlineStatus';
 
 const HOUR = 60 * 60 * 1000;
 const button =
-  'min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+  'min-h-11 rounded-control border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 /**
  * Two discreet notices above the app, in the normal flow (they never cover the navigation or a form):
@@ -28,7 +28,7 @@ export function PwaNotices() {
   return (
     <>
       {!online && (
-        <div role="status" className="bg-amber-100 px-4 py-2 text-sm text-amber-950">
+        <div role="status" className="bg-warning-soft px-4 py-2 text-sm text-warning-ink">
           <p className="mx-auto max-w-3xl">
             <strong>Sin conexión.</strong> {OFFLINE_MESSAGE} {OFFLINE_DETAIL}
           </p>

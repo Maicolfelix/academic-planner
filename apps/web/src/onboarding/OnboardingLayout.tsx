@@ -1,6 +1,7 @@
 import type { PrimaryUse } from '@planner/core';
 import { forwardRef, type ReactNode } from 'react';
-import { BrandMark } from '../components/ui/icons';
+import { CompanionSprite } from '../companion/PixelCompanion';
+import { Brand } from '../components/Brand';
 import { progressSteps, STEP_LABEL } from './onboardingModel';
 
 export type ProgressStep = keyof typeof STEP_LABEL;
@@ -39,10 +40,7 @@ export const OnboardingLayout = forwardRef<
       </div>
       <main className="mx-auto flex min-h-screen w-full max-w-lg flex-col gap-5 px-4 py-6 sm:py-12">
         <header className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2 font-semibold tracking-tight">
-            <BrandMark />
-            Academic Planner
-          </span>
+          <Brand />
           <ol aria-label="Pasos" className="flex items-center gap-1.5 text-xs font-medium">
             {steps.map((s) =>
               s === step ? (
@@ -63,15 +61,25 @@ export const OnboardingLayout = forwardRef<
           </ol>
         </header>
 
-        <div className="flex flex-col gap-2">
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            className="text-2xl font-semibold tracking-tight outline-none sm:text-3xl"
-          >
-            {title}
-          </h1>
-          {intro && <p className="text-muted-foreground">{intro}</p>}
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-tight outline-none sm:text-3xl"
+            >
+              {title}
+            </h1>
+            {intro && <p className="text-muted-foreground">{intro}</p>}
+          </div>
+          {/* The companion goes along on every question (decoration: it says nothing the heading does not). At the end it rejoices. */}
+          <div key={step === 'FINAL' ? 'done' : 'going'} className="shrink-0">
+            <CompanionSprite
+              state="CALM"
+              pose={step === 'FINAL' ? 'joy' : undefined}
+              className="size-16 sm:size-20"
+            />
+          </div>
         </div>
 
         {children}

@@ -1,6 +1,7 @@
 import type { Progress } from '@planner/core';
 import type { OriginOf } from '../../academic/origin';
 import { OriginLabel } from '../../components/OriginLabel';
+import { Card } from '../../components/ui/Card';
 import { ProgressBar } from './ProgressBar';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -19,10 +20,13 @@ export function SubjectProgressList({
 }) {
   return (
     <ul className="flex flex-col gap-2">
-      {subjects.map((s) => (
-        <li
+      {subjects.map((s, i) => (
+        <Card
+          as="li"
           key={s.id}
-          className="flex min-w-0 overflow-hidden rounded-lg border border-slate-300 bg-white"
+          // the first ones come in one after another (a quarter of a second in all), the rest are simply there
+          style={i < 6 ? { animationDelay: `${i * 40}ms` } : undefined}
+          className={`flex min-w-0 overflow-hidden ${i < 6 ? 'animate-rise' : ''}`}
         >
           <span
             aria-hidden="true"
@@ -35,7 +39,7 @@ export function SubjectProgressList({
               <OriginLabel label={origin?.(s.periodId)} />
             </p>
             {s.total === 0 ? (
-              <p className="text-sm text-slate-700">Sin actividades registradas</p>
+              <p className="text-sm text-muted-foreground">Sin actividades registradas</p>
             ) : (
               <>
                 <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
@@ -49,8 +53,9 @@ export function SubjectProgressList({
                   percent={s.percentage}
                   label={`Progreso de ${s.name}`}
                   valueText={`${s.percentage}%, ${s.completed} de ${s.total} actividades completadas`}
+                  color={s.color}
                 />
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-muted-foreground">
                   {plural(s.pending, 'pendiente', 'pendientes')} ·{' '}
                   {plural(s.inProgress, 'en proceso', 'en proceso')}
                   {s.overdue > 0 && (
@@ -66,7 +71,7 @@ export function SubjectProgressList({
               </>
             )}
           </div>
-        </li>
+        </Card>
       ))}
     </ul>
   );

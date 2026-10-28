@@ -9,6 +9,8 @@ import {
 import { Link } from 'react-router';
 import { useRadar } from '../../radar/useRadar';
 import { Card } from '../../components/ui/Card';
+import { IconTile } from '../../components/ui/IconTile';
+import { RadarIcon } from '../../components/ui/icons';
 import { INTERACTIVE_TILE } from '../../components/ui/interactive';
 import { RadarDot } from './RadarDot';
 
@@ -44,7 +46,10 @@ export function RadarCard() {
   return (
     <section aria-labelledby="radar-title" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 id="radar-title" className="text-section-title">
+        <h2 id="radar-title" className="flex items-center gap-2.5 text-section-title before:hidden">
+          <IconTile>
+            <RadarIcon />
+          </IconTile>
           Radar académico
         </h2>
         <Link
@@ -94,15 +99,15 @@ export function RadarGlance({ summary }: { summary: Radar['summary'] }) {
             >
               <Link
                 to={`/activities?radar=${status}`}
-                className={`group flex min-h-16 flex-col justify-between gap-1 rounded-surface border px-3 py-2 lg:min-h-11 lg:flex-row lg:items-center ${
+                className={`group flex h-full min-h-16 flex-col justify-between gap-1 rounded-surface border px-3 py-2 lg:min-h-11 lg:flex-row lg:items-center ${
                   count > 0 ? `${TONE[status]} shadow-card` : QUIET
                 } ${INTERACTIVE_TILE}`}
               >
-                <span className="flex items-center gap-2 text-xs font-medium lg:text-sm">
+                <span className="flex items-start gap-2 text-xs leading-tight font-medium lg:items-center lg:text-sm">
                   <RadarDot status={status} ambient={count > 0 ? i : undefined} />
                   <span>{RADAR_GROUP_LABELS[status]}</span>
                 </span>
-                <span className="text-xl leading-none font-semibold">{count}</span>
+                <span className="text-2xl leading-none font-semibold tabular-nums">{count}</span>
               </Link>
             </li>
           );

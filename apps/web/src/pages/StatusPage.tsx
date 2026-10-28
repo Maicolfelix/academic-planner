@@ -11,11 +11,11 @@ export function StatusPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
       <h1 className="text-2xl font-semibold">Academic Planner</h1>
-      <section aria-live="polite" className="rounded-lg border border-slate-300 p-4">
-        <h2 className="text-sm font-medium text-slate-600">Estado del sistema</h2>
+      <section aria-live="polite" className="rounded-surface border border-border p-4">
+        <h2 className="text-sm font-medium text-muted-foreground">Estado del sistema</h2>
         {isPending && <p>Conectando con el servidor…</p>}
         {error && (
-          <p role="alert" className="text-red-700">
+          <p role="alert" className="text-danger-ink">
             No se pudo conectar con el servidor: {error.message}
           </p>
         )}
@@ -31,7 +31,7 @@ export function StatusPage() {
       <button
         type="button"
         onClick={() => refetch()}
-        className="self-start rounded-md bg-slate-900 px-4 py-2 text-white"
+        className="self-start rounded-control bg-slate-900 px-4 py-2 text-white"
       >
         Reintentar
       </button>

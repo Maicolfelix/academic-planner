@@ -17,6 +17,9 @@ import { useActivities } from '../activities/useActivities';
 import { usePeriods, useCurrentPeriod, useOrigins, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { CalendarIcon, PIXELS, PixelIcon, PlusIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useIsDesktop } from '../lib/useIsDesktop';
 import { useNow } from '../lib/useNow';
 import { useSchedule, useScheduleBlock } from '../schedule/useSchedule';
@@ -27,10 +30,8 @@ import { DayList } from './calendar/DayList';
 import { DeleteBlockDialog } from './calendar/DeleteBlockDialog';
 import { WeekGrid } from './calendar/WeekGrid';
 
-const primary =
-  'min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const secondary =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100';
+const primary = buttonStyles({ variant: 'primary', className: 'gap-2' });
+const secondary = buttonStyles({ size: 'sm', className: 'gap-2' });
 
 /**
  * The weekly agenda (Monday–Sunday): a grid on desktop, a day-by-day list on phones. It draws TWO things on the same
@@ -87,28 +88,33 @@ export function CalendarPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Agenda</h1>
-          <p className="text-sm text-slate-600" aria-live="polite">
+      <PageHeader
+        icon={<CalendarIcon />}
+        title="Agenda"
+        description={
+          <span aria-live="polite">
             Semana del {formatDateOnly(week.from)} al {formatDateOnly(week.to)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/calendar/import" className={`${secondary} inline-flex items-center`}>
-            Importar horario
-          </Link>
-          <Link to="/calendar/import-ics" className={`${secondary} inline-flex items-center`}>
-            Importar calendario (.ics)
-          </Link>
-          <button type="button" onClick={() => setEditing('new')} className={primary}>
-            Agregar bloque
-          </button>
-        </div>
-      </header>
+          </span>
+        }
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link to="/calendar/import" className={secondary}>
+              Importar horario
+            </Link>
+            <Link to="/calendar/import-ics" className={secondary}>
+              Importar calendario (.ics)
+            </Link>
+            <button type="button" onClick={() => setEditing('new')} className={primary}>
+              <PlusIcon className="size-4" />
+              Agregar bloque
+            </button>
+          </div>
+        }
+      />
 
       <nav aria-label="Semana" className="flex flex-wrap gap-2">
         <button type="button" onClick={() => goTo(addDays(week.from, -7))} className={secondary}>
+          <PixelIcon rows={PIXELS.left} className="size-4" />
           Anterior
         </button>
         <button
@@ -124,6 +130,7 @@ export function CalendarPage() {
         </button>
         <button type="button" onClick={() => goTo(addDays(week.from, 7))} className={secondary}>
           Siguiente
+          <PixelIcon rows={PIXELS.right} className="size-4" />
         </button>
       </nav>
 

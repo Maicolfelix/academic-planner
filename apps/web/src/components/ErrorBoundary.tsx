@@ -1,3 +1,5 @@
+import { CompanionSprite } from '../companion/PixelCompanion';
+import { buttonStyles } from './ui/buttonStyles';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 /**
@@ -19,7 +21,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     if (!this.state.failed) return this.props.children;
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-        <h1 className="text-2xl font-semibold">Algo salió mal</h1>
+        {/* A worried companion keeps you company (decoration: the heading says it all). */}
+        <CompanionSprite state="CALM" pose="worried" className="size-24" />
+        <h1 className="text-display">Algo salió mal</h1>
         <p>
           Ocurrió un error inesperado. Tus datos guardados están a salvo. Recarga la página para
           continuar.
@@ -28,7 +32,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
           <button
             type="button"
             onClick={() => window.location.assign('/dashboard')}
-            className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            className={buttonStyles({ variant: 'primary' })}
           >
             Volver al inicio
           </button>

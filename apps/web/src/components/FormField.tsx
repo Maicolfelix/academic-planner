@@ -1,3 +1,5 @@
+import { useRef, useSyncExternalStore } from 'react';
+import { DatePickerButton } from './ui/DatePicker';
 import { fieldControl, FIELD_LABEL } from './ui/fieldStyles';
 import { FieldError } from './ui/form';
 
@@ -22,6 +24,19 @@ interface FormFieldProps {
   disabled?: boolean;
 }
 
+/** A mouse or a trackpad (not a finger): where the app's own calendar replaces the browser's grey one. Off while rendering on a server. */
+function usePointerFine(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia('(pointer: fine)');
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia('(pointer: fine)').matches,
+    () => false,
+  );
+}
+
 /**
  * A labelled NATIVE input (or textarea, date or time picker): label above, the control, then a hint or an error. The
  * error is linked with `aria-describedby`, marks the field `aria-invalid` and says it in words with an icon. A hint is
@@ -43,6 +58,9 @@ export function FormField({
   required,
   disabled,
 }: FormFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pointerFine = usePointerFine();
+  const ownCalendar = type === 'date' && pointerFine && !disabled;
   const showHint = Boolean(hint) && !error;
   const describedBy = [error && `${id}-error`, showHint && `${id}-hint`].filter(Boolean).join(' ');
   const shared = {
@@ -55,23 +73,34 @@ export function FormField({
     'aria-invalid': error ? true : undefined,
     'aria-required': required ? true : undefined,
     'aria-describedby': describedBy || undefined,
-    className: fieldControl(Boolean(error)),
+    className: `${fieldControl(Boolean(error))}${ownCalendar ? ' date-own pr-11' : ''}`,
   };
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className={FIELD_LABEL}>
+      <label htmlFor={id} id={`${id}-label`} className={FIELD_LABEL}>
         {label}
       </label>
       {multiline ? (
         <textarea {...shared} rows={3} onChange={(e) => onChange(e.target.value)} />
       ) : (
-        <input
-          {...shared}
-          type={type}
-          autoComplete={autoComplete}
-          inputMode={inputMode}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <div className="relative">
+          <input
+            {...shared}
+            ref={inputRef}
+            type={type}
+            autoComplete={autoComplete}
+            inputMode={inputMode}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {ownCalendar && (
+            <DatePickerButton
+              inputRef={inputRef}
+              value={value}
+              labelId={`${id}-label`}
+              disabled={disabled}
+            />
+          )}
+        </div>
       )}
       {showHint && (
         <p id={`${id}-hint`} className="text-sm text-muted-foreground">

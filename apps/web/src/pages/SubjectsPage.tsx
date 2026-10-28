@@ -11,6 +11,7 @@ import { SubjectCard } from './subjects/SubjectCard';
 import { SubjectFormDialog } from './subjects/SubjectFormDialog';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { BookIcon } from '../components/ui/icons';
 import { PageHeader } from '../components/ui/PageHeader';
 
 /**
@@ -100,6 +101,7 @@ function SubjectsView({ period, explicit }: { period: AcademicPeriod; explicit: 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        icon={<BookIcon />}
         title="Mis asignaturas"
         description={`${studyPrefix}${period.name} · ${formatDateOnly(period.startDate)} – ${formatDateOnly(period.endDate)}`}
         actions={list.length > 0 && add}
@@ -124,13 +126,13 @@ function SubjectsView({ period, explicit }: { period: AcademicPeriod; explicit: 
       <QueryError query={subjects} title="No se pudieron cargar tus asignaturas" />
 
       {subjects.isSuccess && list.length === 0 && (
-        <EmptyState title="Aún no tienes asignaturas." action={add}>
+        <EmptyState art="book" title="Aún no tienes asignaturas." action={add}>
           Agrega las materias de este semestre para comenzar a organizar tus actividades.
         </EmptyState>
       )}
 
       {list.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((subject) => (
             <SubjectCard
               key={subject.id}

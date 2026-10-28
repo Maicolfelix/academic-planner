@@ -41,13 +41,13 @@ export function WeekCard() {
                 Día con más compromisos: <strong>{busiestText(workload.data.busiestDay)}</strong>
               </p>
             )}
-            <p className="text-sm text-slate-700">{totalsLine(workload.data.totals)}</p>
+            <p className="text-sm text-muted-foreground">{totalsLine(workload.data.totals)}</p>
           </>
         ))}
 
       {workload.data && (
         <>
-          <p className="text-sm text-slate-600">Se basa solo en lo que has registrado.</p>
+          <p className="text-sm text-muted-foreground">Se basa solo en lo que has registrado.</p>
           <div className="flex flex-wrap gap-x-4">
             <Link to={`/calendar?week=${workload.data.week.from}`} className={link}>
               Ver semana

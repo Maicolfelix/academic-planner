@@ -1,3 +1,4 @@
+import { LoadingScreen } from './components/LoadingScreen';
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { PublicOnly, RequireAuth, RequirePeriod } from './auth/guards';
@@ -43,13 +44,7 @@ export function App() {
   return (
     <>
       <PwaNotices />
-      <Suspense
-        fallback={
-          <p role="status" className="p-6">
-            Cargando…
-          </p>
-        }
-      >
+      <Suspense fallback={<LoadingScreen>Cargando…</LoadingScreen>}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/status" element={<StatusPage />} />

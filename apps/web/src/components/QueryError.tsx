@@ -15,7 +15,7 @@ interface Props {
 }
 
 const button =
-  'min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+  'min-h-11 rounded-control border border-border-strong px-3 py-2 text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 /**
  * A failed request, said once and in the right size:
@@ -30,7 +30,7 @@ export function QueryError({ query, title }: Props) {
 
   if (query.data !== undefined) {
     return (
-      <p role="status" className="text-sm text-slate-700">
+      <p role="status" className="text-sm text-muted-foreground">
         No pudimos actualizar esta información; ves lo último que se cargó.{' '}
         <button type="button" onClick={() => query.refetch()} className={`${button} ml-1`}>
           Reintentar
@@ -39,7 +39,7 @@ export function QueryError({ query, title }: Props) {
     );
   }
   return (
-    <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
+    <div role="alert" className="rounded-control bg-danger-soft p-3 text-danger-ink">
       <p className="mb-2">
         {title}: {reason}
       </p>

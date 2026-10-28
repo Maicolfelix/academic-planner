@@ -28,7 +28,7 @@ export function ClassesToday({ classes, timeZone }: Props) {
               <span className="font-semibold">{timeRange(c, timeZone)}</span>
               <span className="min-w-0 break-words">{c.title}</span>
               {c.hasConflict && (
-                <span className="text-sm font-semibold text-red-800">⚠ Choque de horario</span>
+                <span className="text-sm font-semibold text-danger-ink">⚠ Choque de horario</span>
               )}
             </div>
           </Card>

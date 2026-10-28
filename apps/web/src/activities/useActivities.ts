@@ -1,5 +1,6 @@
 import type { UpdateActivityRequest } from '@planner/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { emitAchievement } from '../achievements/achievementBus';
 import { ATTENTION_KEY } from '../attention/useAttention';
 import { PROGRESS_KEY, WORKLOAD_KEY } from '../insights/useInsights';
 import { DASHBOARD_KEY } from '../dashboard/useDashboard';
@@ -49,7 +50,11 @@ export function useUpdateActivity() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateActivityRequest }) =>
       updateActivityRequest(id, input),
-    onSuccess: invalidate,
+    onSuccess: (activity, { input }) => {
+      invalidate();
+      // The student just finished it: the achievement card celebrates (it keeps nothing).
+      if (input.status === 'COMPLETED') emitAchievement({ title: activity.title });
+    },
   });
 }
 

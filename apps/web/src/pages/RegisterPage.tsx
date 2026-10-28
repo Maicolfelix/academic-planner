@@ -3,7 +3,10 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useRegister } from '../auth/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
+import { AuthLayout, type AuthMood } from '../components/AuthLayout';
+import { AuthNotice } from '../components/auth/AuthNotice';
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { EnterIcon, UserPixelIcon } from '../components/ui/icons';
 import { FormField } from '../components/FormField';
 
 export function RegisterPage() {
@@ -38,13 +41,26 @@ export function RegisterPage() {
     });
   }
 
+  const mood: AuthMood = register.isPending
+    ? 'pending'
+    : register.isSuccess
+      ? 'success'
+      : formError || Object.keys(fieldErrors).length > 0
+        ? 'error'
+        : 'idle';
+
   return (
-    <AuthLayout title="Crear cuenta">
+    <AuthLayout
+      title="Crear cuenta"
+      icon={<UserPixelIcon />}
+      intro="Mucho gusto. Vamos a armar tu espacio."
+      mood={mood}
+    >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+          <AuthNotice tone="danger" role="alert">
             {formError}
-          </p>
+          </AuthNotice>
         )}
         <FormField
           id="name"
@@ -76,15 +92,20 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={register.isPending}
-          className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+          className={buttonStyles({ variant: 'primary', className: 'w-full gap-2' })}
         >
           {register.isPending ? 'Creando cuenta…' : 'Crear cuenta'}
+          {!register.isPending && <EnterIcon className="size-5" />}
         </button>
       </form>
-      <p className="text-sm">
-        ¿Ya tienes cuenta?{' '}
-        <Link to="/login" className="font-medium underline">
+      <p className="flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-border-strong/50 pt-4 text-sm">
+        <span>¿Ya tienes cuenta?</span>
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink transition-transform duration-(--duration-fast) ease-standard hover:-translate-y-px"
+        >
           Iniciar sesión
+          <EnterIcon className="size-4" />
         </Link>
       </p>
     </AuthLayout>

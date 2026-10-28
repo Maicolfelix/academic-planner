@@ -1,3 +1,6 @@
+import { PIXELS, PixelIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
+import { buttonStyles } from '../components/ui/buttonStyles';
 import {
   DEFAULT_TIMEZONE,
   SCHEDULE_IMPORT_MAX_BYTES,
@@ -44,10 +47,8 @@ const READ_ERROR =
   'No pudimos leer suficiente información del horario. Prueba con otra imagen o ingresa tu horario manualmente.';
 const TYPE_OK = /\.(png|jpe?g|pdf)$/i;
 
-const button =
-  'min-h-11 rounded-md border border-slate-400 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const primary =
-  'min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+const button = buttonStyles({ className: 'text-sm disabled:opacity-60' });
+const primary = buttonStyles({ variant: 'primary', className: 'text-sm disabled:opacity-60' });
 
 const toRows = (result: ScheduleImportResult): ImportRow[] =>
   result.proposals.map((proposal) => {
@@ -352,12 +353,15 @@ export function ScheduleImportPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Importar horario</h1>
-        <Link to="/calendar" className={`${button} inline-flex items-center`}>
-          Volver a la Agenda
-        </Link>
-      </header>
+      <PageHeader
+        icon={<PixelIcon rows={PIXELS.upload} />}
+        title="Importar horario"
+        actions={
+          <Link to="/calendar" className={`${button} inline-flex items-center`}>
+            Volver a la Agenda
+          </Link>
+        }
+      />
 
       {!result && (
         <form onSubmit={submit} noValidate className="flex flex-col gap-3">
@@ -368,14 +372,14 @@ export function ScheduleImportPage() {
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={`flex flex-col gap-2 rounded-lg border-2 border-dashed p-4 ${
-              dragging ? 'border-slate-900 bg-slate-100' : 'border-slate-400'
+            className={`flex flex-col gap-2 rounded-surface border-2 border-dashed p-4 ${
+              dragging ? 'border-primary bg-accent-soft' : 'border-border-strong'
             }`}
           >
-            <label htmlFor="schedule-file" className="text-sm font-medium text-slate-800">
+            <label htmlFor="schedule-file" className="text-sm font-medium text-foreground">
               Archivo del horario (imagen PNG o JPG, o PDF)
             </label>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Arrastra tu horario aquí o selecciona un archivo.
             </p>
             <input
@@ -385,15 +389,15 @@ export function ScheduleImportPage() {
               onChange={(e) => choose(e.target.files?.[0])}
               aria-invalid={inputError ? true : undefined}
               aria-describedby={`schedule-file-help${inputError ? ' schedule-file-error' : ''}`}
-              className="min-h-11 w-full min-w-0 text-base"
+              className="min-h-11 w-full min-w-0 text-base file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-control file:border file:border-border-strong file:bg-secondary file:px-4 file:font-medium file:text-foreground hover:file:bg-accent-soft"
             />
             {file && (
-              <p className="text-sm text-slate-800 break-words">
+              <p className="text-sm text-foreground break-words">
                 Archivo elegido: <span className="font-medium">{file.name}</span>
               </p>
             )}
           </div>
-          <p id="schedule-file-help" className="text-sm text-slate-600">
+          <p id="schedule-file-help" className="text-sm text-muted-foreground">
             Máximo 10 MB; los PDF, hasta 5 páginas. El archivo se lee en el servidor de Academic
             Planner, no se envía a terceros y no se guarda: solo se crean las clases (y las
             asignaturas nuevas que necesiten) que confirmes.
@@ -404,7 +408,7 @@ export function ScheduleImportPage() {
               ref={errorRef}
               tabIndex={-1}
               role="alert"
-              className="text-sm text-red-700 outline-none"
+              className="text-sm text-danger-ink outline-none"
             >
               {inputError}{' '}
               <Link to="/calendar" className="font-medium underline">
@@ -423,7 +427,7 @@ export function ScheduleImportPage() {
             )}
           </div>
           {parse.isPending && (
-            <p role="status" className="text-sm text-slate-700">
+            <p role="status" className="text-sm text-muted-foreground">
               Procesando horario… Puede tardar unos segundos.
             </p>
           )}
@@ -443,7 +447,7 @@ export function ScheduleImportPage() {
               ? 'Sin clases detectadas'
               : `${rows.length} ${rows.length === 1 ? 'clase detectada' : 'clases detectadas'}`}
           </h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             {result.source.type === 'PDF'
               ? result.source.method === 'PDF_TEXT'
                 ? 'Leído del texto del PDF.'
@@ -455,7 +459,7 @@ export function ScheduleImportPage() {
           </p>
 
           {result.warnings.length > 0 && (
-            <ul className="flex list-disc flex-col gap-1 rounded-md bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-950">
+            <ul className="flex list-disc flex-col gap-1 rounded-control bg-warning-soft py-2 pr-3 pl-7 text-sm text-warning-ink">
               {result.warnings.map((w) => (
                 <li key={w.code}>{w.message}</li>
               ))}
@@ -475,14 +479,17 @@ export function ScheduleImportPage() {
               ref={submitErrorRef}
               tabIndex={-1}
               role="alert"
-              className="rounded-md bg-red-50 p-3 text-sm text-red-800 outline-none"
+              className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink outline-none"
             >
               {submitError}
             </p>
           )}
 
           {summary && (
-            <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+            <p
+              role="status"
+              className="rounded-control bg-success-soft p-3 text-sm text-success-ink"
+            >
               {summary}{' '}
               {importedCount > 0 && (
                 <Link to="/calendar" className="font-medium underline">
@@ -534,7 +541,7 @@ export function ScheduleImportPage() {
           </ul>
 
           {newSubjects.length > 0 && (
-            <p className="text-sm text-slate-800">
+            <p className="text-sm text-foreground">
               {newSubjects.length === 1
                 ? 'Al importar se creará una asignatura nueva: '
                 : `Al importar se crearán ${newSubjects.length} asignaturas nuevas: `}

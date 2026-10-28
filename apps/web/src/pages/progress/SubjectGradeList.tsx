@@ -2,6 +2,7 @@ import { formatScore, type Progress } from '@planner/core';
 import { Link } from 'react-router';
 import type { OriginOf } from '../../academic/origin';
 import { OriginLabel } from '../../components/OriginLabel';
+import { Card } from '../../components/ui/Card';
 
 type Row = Progress['subjects'][number];
 
@@ -20,7 +21,7 @@ export function SubjectGradeList({ subjects, origin }: { subjects: Row[]; origin
       <h3 id="progress-grades-title" className="text-lg font-semibold">
         Notas
       </h3>
-      <p className="text-sm text-slate-700">
+      <p className="text-sm text-muted-foreground">
         Las notas son aparte del avance de actividades: no se mezclan en un mismo porcentaje. Un
         corte se cuenta cuando ya puede calcularse completo.
       </p>
@@ -29,10 +30,7 @@ export function SubjectGradeList({ subjects, origin }: { subjects: Row[]; origin
           const g = s.grade;
           const max = formatScore(g.maxMilli, g.decimals);
           return (
-            <li
-              key={s.id}
-              className="flex min-w-0 flex-col gap-1 rounded-lg border border-slate-300 bg-white p-3"
-            >
+            <Card as="li" key={s.id} className="flex min-w-0 flex-col gap-1 p-3">
               <p className="font-medium break-words">
                 {s.name}
                 <OriginLabel label={origin?.(s.periodId)} />
@@ -53,20 +51,22 @@ export function SubjectGradeList({ subjects, origin }: { subjects: Row[]; origin
                 </span>
               </p>
               {g.currentMilli !== null && g.cutsWithGrade < g.cutsTotal && (
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-muted-foreground">
                   Promedio de lo registrado: {formatScore(g.currentMilli, g.decimals)}
                 </p>
               )}
               {!g.complete && (
-                <p className="text-sm text-slate-700">Estimación: faltan pesos por definir.</p>
+                <p className="text-sm text-muted-foreground">
+                  Estimación: faltan pesos por definir.
+                </p>
               )}
               <Link
                 to={`/subjects/${s.id}/grades`}
-                className="inline-flex min-h-11 items-center self-start text-sm font-medium underline"
+                className="inline-flex min-h-11 items-center self-start text-sm font-medium text-accent-ink underline underline-offset-4"
               >
                 Ver notas
               </Link>
-            </li>
+            </Card>
           );
         })}
       </ul>

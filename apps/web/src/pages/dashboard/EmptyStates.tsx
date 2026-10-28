@@ -18,6 +18,7 @@ function Ways({ children }: { children: React.ReactNode }) {
 export function NoSubjects() {
   return (
     <EmptyState
+      art="calendar"
       titleAs="h2"
       title="Empieza con lo que ya tienes."
       action={
@@ -43,6 +44,7 @@ export function NoSubjects() {
 export function NoActivities() {
   return (
     <EmptyState
+      art="inbox"
       titleAs="h2"
       title="Registra lo que tienes pendiente."
       action={

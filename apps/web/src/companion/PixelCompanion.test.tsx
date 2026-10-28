@@ -124,6 +124,7 @@ describe('the stylesheet contract for reduced motion', () => {
       'companion-drip',
       'companion-twinkle',
       'companion-walk',
+      'companion-star',
       'companion-bubble',
     ])
       expect(css).toContain(`--animate-${n}:`);

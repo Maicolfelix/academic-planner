@@ -70,7 +70,7 @@ export function Modal({
       }}
       onInput={() => setDirty(true)}
       onChange={() => setDirty(true)}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(31rem,calc(100vw-2rem))] animate-dialog overflow-y-auto rounded-surface border border-border/70 bg-surface-elevated p-5 text-foreground shadow-floating backdrop:bg-[rgb(20_26_60/0.5)] sm:p-6"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(31rem,calc(100vw-2rem))] animate-dialog overflow-y-auto rounded-surface border border-border/70 bg-surface-elevated p-5 text-foreground shadow-floating backdrop:bg-[rgb(20_26_60/0.5)] backdrop:bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1.4px)] backdrop:bg-[length:22px_22px] sm:p-6"
     >
       {/* A thin accent edge: decoration, hidden from assistive technology. (No `relative` on the dialog: a modal dialog is
           already `position: fixed` and that is what centers it; overriding it pushed tall ones off the top of the screen.) */}
@@ -78,9 +78,11 @@ export function Modal({
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,var(--accent),var(--primary))]"
       />
-      <h2 id={titleId} className="mb-4 text-section-title break-words">
+      <h2 id={titleId} className="mb-2 text-section-title break-words">
         {title}
       </h2>
+      {/* The row of pixels under the title, the same as under a screen's: it ties the dialog to the page it came from. */}
+      <span aria-hidden="true" className="pixel-rule mb-4 block h-1" />
       {asking && (
         <div
           role="alert"
