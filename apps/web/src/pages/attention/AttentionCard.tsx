@@ -8,6 +8,8 @@ import type { OriginOf } from '../../academic/origin';
 import { useOrigins } from '../../academic/useAcademic';
 import { heroItemsOf, useAttention } from '../../attention/useAttention';
 import { Card } from '../../components/ui/Card';
+import { IconTile } from '../../components/ui/IconTile';
+import { PIXELS, PixelIcon, TickIcon } from '../../components/ui/icons';
 import { PriorityBadge, StatusBadge } from '../activities/badges';
 import { RadarDot } from '../radar/RadarDot';
 
@@ -106,8 +108,11 @@ export function AttentionCard({ timeZone, now }: { timeZone: string; now: Date }
         id="attention-title"
         ref={heading}
         tabIndex={-1}
-        className="text-section-title outline-none"
+        className="flex items-center gap-2.5 text-section-title outline-none before:hidden"
       >
+        <IconTile>
+          <PixelIcon rows={PIXELS.play} />
+        </IconTile>
         ¿Qué hago ahora?
       </h2>
       <p role="status" className="sr-only">
@@ -479,6 +484,7 @@ export function Suggestion({
             onClick={actions.onComplete}
             className="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lift transition-[transform,background-color] duration-(--duration-fast) ease-standard hover:bg-accent-soft focus-visible:outline-white active:scale-[0.97] disabled:opacity-70 disabled:active:scale-100"
           >
+            <TickIcon className="size-4" />
             {actions.pending === 'COMPLETED' ? 'Completando…' : 'Completar'}
           </button>
         )}
@@ -489,8 +495,9 @@ export function Suggestion({
             disabled={actions.busy}
             aria-busy={actions.pending === 'IN_PROGRESS'}
             onClick={actions.onStart}
-            className="inline-flex min-h-11 items-center rounded-control px-3 py-2 text-sm font-semibold text-primary-foreground ring-1 ring-white/40 ring-inset transition-[background-color] duration-(--duration-fast) ease-standard hover:bg-white/10 focus-visible:outline-white disabled:opacity-70"
+            className="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-primary-foreground ring-1 ring-white/40 ring-inset transition-[background-color] duration-(--duration-fast) ease-standard hover:bg-white/10 focus-visible:outline-white disabled:opacity-70"
           >
+            <PixelIcon rows={PIXELS.play} className="size-4" />
             {actions.pending === 'IN_PROGRESS' ? 'Empezando…' : 'Empezar'}
           </button>
         )}

@@ -9,6 +9,8 @@ import {
 import { Link } from 'react-router';
 import { useRadar } from '../../radar/useRadar';
 import { Card } from '../../components/ui/Card';
+import { IconTile } from '../../components/ui/IconTile';
+import { RadarIcon } from '../../components/ui/icons';
 import { INTERACTIVE_TILE } from '../../components/ui/interactive';
 import { RadarDot } from './RadarDot';
 
@@ -44,7 +46,10 @@ export function RadarCard() {
   return (
     <section aria-labelledby="radar-title" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 id="radar-title" className="text-section-title">
+        <h2 id="radar-title" className="flex items-center gap-2.5 text-section-title before:hidden">
+          <IconTile>
+            <RadarIcon />
+          </IconTile>
           Radar académico
         </h2>
         <Link

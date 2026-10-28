@@ -201,7 +201,7 @@ describe('counters', () => {
   it('are one editorial strip of the OPEN work: pending and in progress, each said once on the Home', () => {
     const out = html(<SummaryTiles summary={summary} />);
     expect(out.match(/<ul /g)).toHaveLength(1);
-    expect(out.match(/<li /g)).toHaveLength(2);
+    expect(out.match(/<li[ >]/g)).toHaveLength(2);
     expect(out).toContain('Pendientes');
     expect(out).toContain('En proceso');
     // finished lives in the Progress card, overdue in the Radar: not here
@@ -221,9 +221,9 @@ describe('counters', () => {
     expect(out.match(/<span aria-hidden="true" class="h-0.5/g)).toHaveLength(2);
   });
 
-  it('respond to a touch: a tint on hover and a press scale on every cell', () => {
+  it('respond to a touch: a lift on hover and a press scale on every tile', () => {
     const out = html(<SummaryTiles summary={summary} />);
-    expect(out.match(/hover:bg-primary\/5/g)).toHaveLength(2);
+    expect(out.match(/hover:-translate-y-0\.5/g)).toHaveLength(2);
     expect(out.match(/active:scale-\[0.98\]/g)).toHaveLength(2);
   });
 });

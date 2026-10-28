@@ -1,3 +1,5 @@
+import { fieldControl } from '../../components/ui/fieldStyles';
+import { buttonStyles } from '../../components/ui/buttonStyles';
 import {
   ACTIVITY_TYPE_LABELS,
   WEEKDAY_LABELS,
@@ -15,10 +17,8 @@ import {
   type RowKind,
 } from '../../icsImport/icsReviewModel';
 
-const button =
-  'min-h-11 rounded-md border border-slate-400 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
-const field =
-  'min-h-11 w-full min-w-0 rounded-md border border-slate-400 bg-white px-3 py-2 text-base';
+const button = buttonStyles({ className: 'text-sm disabled:opacity-60' });
+const field = fieldControl(false);
 
 /** "07:00" -> "7:00 a. m." (hours on screen are always 12 h). */
 function clock(hhmm: string): string {
@@ -60,7 +60,7 @@ export function IcsRowCard({
     : 'Sin fecha válida';
 
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-slate-300 bg-white p-3">
+    <li className="flex flex-col gap-3 rounded-surface border border-border bg-surface p-3">
       <div className="flex items-start gap-3">
         <input
           id={`${id}-selected`}
@@ -73,9 +73,11 @@ export function IcsRowCard({
         />
         <div className="min-w-0 flex-1">
           <p className="font-medium break-words">{p.sourceTitle || 'Sin título'}</p>
-          <p className="text-sm text-slate-700">{when}</p>
+          <p className="text-sm text-muted-foreground">{when}</p>
           {p.exceptions > 0 && (
-            <p className="text-sm text-slate-700">Con {p.exceptions} fecha(s) excluida(s).</p>
+            <p className="text-sm text-muted-foreground">
+              Con {p.exceptions} fecha(s) excluida(s).
+            </p>
           )}
         </div>
         <button
@@ -90,13 +92,13 @@ export function IcsRowCard({
       </div>
 
       {unsupported && (
-        <p className="rounded-md bg-slate-100 p-2 text-sm text-slate-800">
+        <p className="rounded-control bg-secondary p-2 text-sm text-foreground">
           No se puede importar: {p.reason}
         </p>
       )}
 
       {p.warnings.length > 0 && (
-        <ul className="flex list-disc flex-col gap-1 rounded-md bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-950">
+        <ul className="flex list-disc flex-col gap-1 rounded-control bg-warning-soft py-2 pr-3 pl-7 text-sm text-warning-ink">
           {p.warnings.map((w) => (
             <li key={w.code}>{w.message}</li>
           ))}
@@ -162,7 +164,7 @@ export function IcsRowCard({
                 </select>
               </div>
               {row.kind === 'ACTIVITY' && (
-                <p className="text-sm text-slate-700">{ACTIVITY_TYPE_LABELS[p.type]}</p>
+                <p className="text-sm text-muted-foreground">{ACTIVITY_TYPE_LABELS[p.type]}</p>
               )}
               {row.kind === 'BLOCK' && (
                 <div className="flex flex-col gap-1">
@@ -206,7 +208,7 @@ export function IcsRowCard({
                 </fieldset>
               )}
               {row.kind === 'BLOCK' && !isWeekly(row) && p.repeats === 'WEEKLY' && (
-                <p className="text-sm text-slate-700">Se creará una sola clase.</p>
+                <p className="text-sm text-muted-foreground">Se creará una sola clase.</p>
               )}
             </>
           )}
@@ -217,7 +219,7 @@ export function IcsRowCard({
         <p className="text-sm text-amber-900">{pending.map((k) => REVIEW_LABEL[k]).join(' ')}</p>
       )}
       {row.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger-ink">
           {row.error}
         </p>
       )}

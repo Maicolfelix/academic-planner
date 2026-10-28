@@ -1,5 +1,7 @@
 import { dueRelativeLabel, formatDue, type DashboardActivity } from '@planner/core';
 import { Card } from '../../components/ui/Card';
+import { IconTile } from '../../components/ui/IconTile';
+import { CalendarIcon } from '../../components/ui/icons';
 
 interface Props {
   activity: DashboardActivity | null;
@@ -15,8 +17,11 @@ export function NextDueCard({ activity, timeZone, now, origin = null }: Props) {
     <Card as="section" aria-labelledby="next-due-title" className="p-4">
       <h2
         id="next-due-title"
-        className="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+        className="flex items-center gap-2.5 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
       >
+        <IconTile>
+          <CalendarIcon />
+        </IconTile>
         Próxima entrega
       </h2>
       {activity ? (

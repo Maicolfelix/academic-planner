@@ -125,7 +125,7 @@ export function ImportProposalCard({
     <li>
       <article
         aria-labelledby={`${id}-title`}
-        className={`flex flex-col gap-3 rounded-lg border-2 bg-white p-4 ${
+        className={`flex flex-col gap-3 rounded-surface border-2 bg-surface p-4 ${
           row.status === 'created' ? 'border-green-700' : 'border-slate-900'
         }`}
       >
@@ -133,10 +133,10 @@ export function ImportProposalCard({
           <h3 id={`${id}-title`} className="text-base font-semibold break-words">
             Clase {index + 1}: {d.title || p.title || 'Sin título'}
           </h3>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium">{badge}</span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">{badge}</span>
         </header>
 
-        <p className="text-sm text-slate-700 break-words">
+        <p className="text-sm text-muted-foreground break-words">
           Texto leído: <span className="font-medium">“{p.source.rawText}”</span>
           {p.source.page > 1 && <> (página {p.source.page})</>}
         </p>
@@ -144,7 +144,7 @@ export function ImportProposalCard({
         {(notes.length > 0 || duplicate || conflicts.length > 0) && (
           <ul
             id={`${id}-warnings`}
-            className="flex list-disc flex-col gap-1 rounded-md bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-950"
+            className="flex list-disc flex-col gap-1 rounded-control bg-warning-soft py-2 pr-3 pl-7 text-sm text-warning-ink"
           >
             {duplicate && <li>Esta clase parece estar ya en tu agenda.</li>}
             {conflicts.map((c) => (
@@ -159,33 +159,33 @@ export function ImportProposalCard({
         )}
 
         {row.status === 'error' && row.error && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+          <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger-ink">
             {row.error}
           </p>
         )}
 
         {row.status === 'created' ? (
-          <p role="status" className="text-sm text-green-900">
+          <p role="status" className="text-sm text-success-ink">
             Clase importada: {d.title}, {WEEKDAY_LABELS[Number(d.weekday) as 1].toLowerCase()}{' '}
             {d.startTime}–{d.endTime}, cada semana.
           </p>
         ) : (
           <>
             {suggested && d.subjectId === '' && (
-              <div className="flex flex-col gap-2 rounded-md border border-slate-300 p-3 text-sm">
+              <div className="flex flex-col gap-2 rounded-control border border-border p-3 text-sm">
                 <p>¿Quisiste decir {suggested.name}?</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onChange({ subjectId: suggested.id })}
-                    className="min-h-11 rounded-md border border-slate-400 px-4 py-2 font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                    className="min-h-11 rounded-control border border-border-strong px-4 py-2 font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     Sí, es {suggested.name}
                   </button>
                   <button
                     type="button"
                     onClick={() => onChange({ subjectId: NEW_SUBJECT })}
-                    className="min-h-11 rounded-md border border-slate-400 px-4 py-2 font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                    className="min-h-11 rounded-control border border-border-strong px-4 py-2 font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     No, crear una asignatura nueva
                   </button>
@@ -194,7 +194,7 @@ export function ImportProposalCard({
             )}
 
             {candidates.length > 1 && !suggested && (
-              <fieldset className="flex flex-col gap-2 rounded-md border border-slate-300 p-3">
+              <fieldset className="flex flex-col gap-2 rounded-control border border-border p-3">
                 <legend className="px-1 text-sm font-medium">¿A cuál te refieres?</legend>
                 {candidates.map((c) => (
                   <label key={c.id} className="flex min-h-11 items-center gap-2 text-base">
@@ -229,7 +229,7 @@ export function ImportProposalCard({
                 <span className="rounded-full border border-slate-500 px-2 py-0.5 text-xs font-semibold">
                   {subjectState.chip}
                 </span>
-                <span className="text-slate-700">{subjectState.help}</span>
+                <span className="text-muted-foreground">{subjectState.help}</span>
               </p>
               <SelectField
                 id={`${id}-subject`}
@@ -306,7 +306,7 @@ export function ImportProposalCard({
             />
 
             {nameConflict && (
-              <div className="flex flex-col gap-2 rounded-md border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">
+              <div className="flex flex-col gap-2 rounded-control border border-amber-500 bg-warning-soft p-3 text-sm text-warning-ink">
                 <p>
                   Dos clases parecen tener el mismo nombre de asignatura («{d.newName.trim()}»),
                   pero vienen de códigos diferentes ({nameConflict.prefixes.join(' y ')}). Revisa si
@@ -316,7 +316,7 @@ export function ImportProposalCard({
                   <button
                     type="button"
                     onClick={onSameSubject}
-                    className="min-h-11 rounded-md border border-slate-500 bg-white px-4 py-2 font-medium hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                    className="min-h-11 rounded-control border border-slate-500 bg-surface px-4 py-2 font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     Sí, es la misma asignatura
                   </button>
@@ -326,7 +326,7 @@ export function ImportProposalCard({
             )}
 
             {(problems.length > 0 || badRange || nameConflict) && (
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-muted-foreground">
                 {problems.length > 0
                   ? `Para importarla falta ${problems.join(', ')}.`
                   : badRange

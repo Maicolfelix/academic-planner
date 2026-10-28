@@ -42,7 +42,7 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
           >
             <PixelIcon rows={PIXELS.bell} className="size-6 origin-top motion-safe:animate-bell" />
           </span>
-          <h2 id="reminders-panel-heading" className="text-section-title">
+          <h2 id="reminders-panel-heading" className="text-section-title before:hidden">
             Recordatorios
           </h2>
         </div>

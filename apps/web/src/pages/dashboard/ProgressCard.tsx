@@ -1,6 +1,8 @@
 import type { Dashboard } from '@planner/core';
 import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
+import { IconTile } from '../../components/ui/IconTile';
+import { ChartIcon } from '../../components/ui/icons';
 
 /**
  * A ring that draws itself once: the same value as the bar below, as a shape. Decoration (the percentage is text beside
@@ -72,8 +74,11 @@ export function ProgressCard({
     >
       <h2
         id="progress-title"
-        className="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+        className="flex items-center gap-2.5 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
       >
+        <IconTile>
+          <ChartIcon />
+        </IconTile>
         Progreso de actividades
       </h2>
       <div className="flex items-center gap-4">

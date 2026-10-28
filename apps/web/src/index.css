@@ -725,7 +725,7 @@ dialog::backdrop {
   animation-delay: 315ms;
 }
 /* Every section title carries two little pixels, one teal and one indigo, stepping down: the same hand as the companion. */
-.text-section-title::before {
+.text-section-title:not([class*='before:hidden'])::before {
   content: '';
   display: inline-block;
   width: 5px;
