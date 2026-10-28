@@ -123,6 +123,8 @@ describe('the stylesheet contract for reduced motion', () => {
       'companion-float',
       'companion-drip',
       'companion-twinkle',
+      'companion-walk',
+      'companion-bubble',
     ])
       expect(css).toContain(`--animate-${n}:`);
     const reduce = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));

@@ -201,6 +201,9 @@ body[data-ambient='done'] {
   --animate-companion-float: companion-float 4s steps(1, end) infinite;
   --animate-companion-drip: companion-drip 2.4s steps(1, end) infinite;
   --animate-companion-twinkle: companion-twinkle 3.2s steps(1, end) infinite;
+  /* C2: the roaming companion's step and the bubble it speaks in. */
+  --animate-companion-walk: companion-walk 0.45s steps(1, end) infinite;
+  --animate-companion-bubble: companion-bubble 0.18s steps(3, end) 1;
 
   @keyframes rise {
     from {
@@ -458,6 +461,23 @@ body[data-ambient='done'] {
     80% {
       opacity: 0;
       transform: translateY(4px);
+    }
+  }
+
+  @keyframes companion-walk {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-1px);
+    }
+  }
+
+  /* Only a small rise, never opacity: a half-faded bubble would read as low contrast to anyone (and to axe) who looks mid-way. */
+  @keyframes companion-bubble {
+    from {
+      transform: translateY(3px);
     }
   }
 

@@ -1,3 +1,4 @@
+import { CompanionLayer } from '../companion/CompanionLayer';
 import { Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useDueReminders } from '../reminders/useReminders';
@@ -180,6 +181,7 @@ export function AppShell() {
           <Outlet />
         </Suspense>
       </main>
+      <CompanionLayer />
     </div>
   );
 }
