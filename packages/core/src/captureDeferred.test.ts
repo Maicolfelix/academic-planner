@@ -116,3 +116,29 @@ describe('hard messages', () => {
     expect(rows('el informe final lo entregamos el 20 de noviembre')[0]![0]).toBe('Informe final');
   });
 });
+
+describe('review fixes', () => {
+  const titles = (text: string) =>
+    parseCaptureProposals(text, ctx, 'QUICK').proposals.map((p) => p.title.value);
+
+  it('"en 0 días" never writes a broken date into the title', () => {
+    for (const t of titles('en 0 días hay parcial')) expect(t).not.toMatch(/NaN|undefined/);
+  });
+
+  it('"hay laboratorio" is the activity, and an "informe de laboratorio" stays one', () => {
+    expect(titles('hay laboratorio de redes el viernes')).toEqual(['Laboratorio']);
+    expect(titles('entregar el informe de laboratorio el miércoles')).toEqual([
+      'Entregar el informe de laboratorio',
+    ]);
+  });
+
+  it('a correction only reaches its own sentence', () => {
+    expect(
+      parseCaptureProposals(
+        'el parcial se cambió para el viernes en vez del jueves. El quiz es lunes y no martes',
+        ctx,
+        'QUICK',
+      ).proposals.map((p) => p.date.value),
+    ).toEqual(['2026-10-09', '2026-10-05', '2026-10-06']);
+  });
+});

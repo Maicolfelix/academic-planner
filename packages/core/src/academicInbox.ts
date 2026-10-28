@@ -186,8 +186,6 @@ const READ_VERBS = new Set(['leer', 'lean', 'leeremos', 'leera', 'lea', 'leamos'
 const TASK_NOUNS = new Set([
   'informe',
   'informes',
-  'laboratorio',
-  'laboratorios',
   'reporte',
   'reportes',
   'ejercicio',
@@ -300,6 +298,21 @@ const ESSAY_NOUNS = new Set([
   'entregas',
   'informe',
   'informes',
+  'laboratorio',
+  'laboratorios',
+]);
+const NUMBER_WORDS = new Set([
+  'un',
+  'una',
+  'dos',
+  'tres',
+  'cuatro',
+  'cinco',
+  'seis',
+  'siete',
+  'ocho',
+  'nueve',
+  'diez',
 ]);
 const ERRAND_VERBS = new Set([
   'llevar',
@@ -378,7 +391,17 @@ export function findAnchors(
         tokens
           .slice(Math.max(0, i - 3), i)
           .some((t) => ['informe', 'informes', 'reporte', 'reportes'].includes(t.norm));
-      if (!inside && !inSubjectName && !ofDelivery && !ofTypeWord && !ofReport) {
+      // "no tengo actividades hoy", "las actividades de esta semana": the word is only mentioned, not an activity. A plural
+      // counts only with a number before it, and a negation just before cancels any of these nouns.
+      const before = tokens.slice(Math.max(0, i - 3), i).map((t) => t.norm);
+      const ofMention =
+        word !== 'ensayo' &&
+        word !== 'ensayos' &&
+        ESSAY_NOUNS.has(word) &&
+        (before.some((w) => ['no', 'ninguna', 'ninguno', 'sin', 'nada'].includes(w)) ||
+          (word.endsWith('s') &&
+            !before.slice(-2).some((w) => /^\d+$/.test(w) || NUMBER_WORDS.has(w))));
+      if (!inside && !inSubjectName && !ofDelivery && !ofTypeWord && !ofReport && !ofMention) {
         anchors.push({ start: i, length: 1, implicitType });
       }
     }

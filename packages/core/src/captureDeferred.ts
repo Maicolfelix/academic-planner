@@ -1,3 +1,5 @@
+import { addDays } from './calendar.js';
+import { MONTH_BY_NAME } from './captureShared.js';
 import { toLocalParts } from './time.js';
 /**
  * "Tengo dos actividades, una el martes y la otra el jueves; la del martes es sobre redes y la del jueves es práctica con
@@ -6,8 +8,8 @@ import { toLocalParts } from './time.js';
  * de redes el martes. Práctica con Kali Linux el jueves."), which the rest of the engine already understands.
  *
  * Strict on purpose: the opening must be ONLY the announcement, and every announced item must be described exactly once.
- * Anything else returns null and the message is read as before. Nothing is invented: every word of the result is the
- * student's, the weekday included.
+ * Anything else returns null and the message is read as before. The result is only what the engine reads: the words and
+ * weekdays are the student's, but the evidence line of a proposal shows this rewritten sentence, not the original.
  */
 
 const DAY = '(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)';
@@ -87,20 +89,6 @@ export function resolveDeferredDescriptions(text: string): string | null {
 
 // ───────────────────────── Loose wording that says nothing about the activity ─────────────────────────
 
-const MONTH_NAMES = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
 const OFFSET_WORDS: Readonly<Record<string, number>> = {
   un: 1,
   una: 1,
@@ -123,10 +111,15 @@ const REPORTING =
 const NEXT_WEEK_LIST = /^\s*(?:para\s+)?(?:la\s+)?(?:pr[oó]xima|siguiente|otra)\s+semana\s*[:,-]/iu;
 /** "hay parcial el lunes": the "hay" only says it exists. */
 const EXISTENTIAL = /(?<=^\s*|[.,;]\s*|\by\s+)hay\s+(?!que\b)/giu;
-const DAY_WORD = new RegExp(DAY.slice(1, -1), 'giu');
-/** "se cambió para el viernes en vez del jueves": the new day stands alone, the old one is dropped. */
-const MOVED =
-  /(?<![\p{L}\p{N}])se\s+(?:cambi[oó]|movi[oó]|pas[oó]|aplaz[oó]|corri[oó])\s+(?:para|a)\s+/giu;
+/** A weekday that does not already say which week. */
+const BARE_DAY = new RegExp(
+  String.raw`(?<![\p{L}])${DAY}(?![\p{L}])(?!\s+de\s+la\s+(?:otra|pr[oó]xima|siguiente)\s+semana)`,
+  'giu',
+);
+/** "se cambió para el viernes en vez del jueves": that clause only (up to a full stop), where the new day stands alone. */
+const MOVED_CLAUSE =
+  /(?<![\p{L}\p{N}])se\s+(?:cambi[oó]|movi[oó]|pas[oó]|aplaz[oó]|corri[oó])\s+(?:para|a)\s+[^.;!?]*/iu;
+const MOVED_VERB = /^se\s+\S+\s+(?:para|a)\s+/iu;
 const INSTEAD = new RegExp(
   String.raw`[,\s]*(?:en\s+vez\s+de(?:l)?|y\s+no|no|en\s+lugar\s+de(?:l)?)\s+(?:el\s+)?${DAY}(?![\p{L}])`,
   'giu',
@@ -134,26 +127,28 @@ const INSTEAD = new RegExp(
 
 /**
  * The message with its relative offsets written as dates ("en dos semanas" -> "el 19 de octubre"), hearsay removed and
- * corrections applied. Every change is deterministic and loses nothing the engine would have used; null when nothing changed.
+ * corrections applied. The engine reads the result; the student's own text is what the screen keeps showing. Null when
+ * nothing changed.
  */
 export function normalizeLooseText(text: string, now: Date, timeZone: string): string | null {
+  const today = toLocalParts(now, timeZone).date;
   let out = text.replace(OFFSET, (whole, n: string, unit: string) => {
-    const amount =
-      (Number(n) || OFFSET_WORDS[n.toLowerCase()]!) * (unit.toLowerCase().startsWith('s') ? 7 : 1);
-    const [y, m, d] = toLocalParts(now, timeZone).date.split('-').map(Number) as [
-      number,
-      number,
-      number,
-    ];
-    const target = new Date(Date.UTC(y, m - 1, d + amount));
-    return `el ${target.getUTCDate()} de ${MONTH_NAMES[target.getUTCMonth()]}`;
+    const count = Number(n) || OFFSET_WORDS[n.toLowerCase()] || 0;
+    if (count < 1) return whole; // "en 0 días" is today, which the engine reads by itself
+    const [, month, day] = addDays(
+      today,
+      count * (unit.toLowerCase().startsWith('s') ? 7 : 1),
+    ).split('-');
+    const name = Object.keys(MONTH_BY_NAME).find((k) => MONTH_BY_NAME[k] === Number(month));
+    return `el ${Number(day)} de ${name}`;
   });
   out = out.replace(REPORTING, '');
   if (NEXT_WEEK_LIST.test(out)) {
-    out = out.replace(NEXT_WEEK_LIST, '').replace(DAY_WORD, (day) => `${day} de la próxima semana`);
+    out = out.replace(NEXT_WEEK_LIST, '').replace(BARE_DAY, (day) => `${day} de la próxima semana`);
   }
   out = out.replace(EXISTENTIAL, '');
-  if (MOVED.test(out)) out = out.replace(MOVED, 'para ').replace(INSTEAD, '');
-  MOVED.lastIndex = 0;
+  out = out.replace(MOVED_CLAUSE, (clause) =>
+    clause.replace(MOVED_VERB, 'para ').replace(INSTEAD, ''),
+  );
   return out === text ? null : out;
 }
