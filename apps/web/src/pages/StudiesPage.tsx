@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { CapIcon } from '../components/ui/icons';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useProfile } from '../profile/useProfile';
 import {
@@ -81,6 +82,7 @@ export function StudiesPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
+        icon={<CapIcon />}
         title="Mis estudios"
         description="Lo que estudias ahora. Tu Inicio y tu Agenda siguen siendo uno solo."
         actions={loaded && add}

@@ -148,7 +148,7 @@ export function DayList({
       )}
 
       {rows.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className="stagger flex flex-col gap-2">
           {rows.map((row) =>
             row.kind === 'activity' ? (
               <li key={`a-${row.a.activity.id}`}>

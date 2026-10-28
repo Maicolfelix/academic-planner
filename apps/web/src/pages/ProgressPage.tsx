@@ -1,6 +1,8 @@
 import { QueryError } from '../components/QueryError';
 import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
+import { ChartIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Ring } from './dashboard/ProgressCard';
 import { addDays, formatDateOnly, formatDuration, isRealDateOnly } from '@planner/core';
 import { Link, useSearchParams } from 'react-router';
@@ -30,12 +32,11 @@ export function ProgressPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="animate-rise">
-        <h1 className="text-display break-words">Progreso y carga semanal</h1>
-        <p className="text-sm text-muted-foreground">
-          Todo se calcula con lo que has registrado en la aplicación.
-        </p>
-      </header>
+      <PageHeader
+        icon={<ChartIcon />}
+        title="Progreso y carga semanal"
+        description="Todo se calcula con lo que has registrado en la aplicación."
+      />
 
       <section aria-labelledby="progress-title" className="flex flex-col gap-3">
         <h2 id="progress-title" className="text-lg font-semibold">

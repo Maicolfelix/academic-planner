@@ -17,6 +17,8 @@ import { useActivities } from '../activities/useActivities';
 import { usePeriods, useCurrentPeriod, useOrigins, useSubjects } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { Modal } from '../components/Modal';
+import { CalendarIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useIsDesktop } from '../lib/useIsDesktop';
 import { useNow } from '../lib/useNow';
 import { useSchedule, useScheduleBlock } from '../schedule/useSchedule';
@@ -87,25 +89,28 @@ export function CalendarPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Agenda</h1>
-          <p className="text-sm text-slate-600" aria-live="polite">
+      <PageHeader
+        icon={<CalendarIcon />}
+        title="Agenda"
+        description={
+          <span aria-live="polite">
             Semana del {formatDateOnly(week.from)} al {formatDateOnly(week.to)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/calendar/import" className={`${secondary} inline-flex items-center`}>
-            Importar horario
-          </Link>
-          <Link to="/calendar/import-ics" className={`${secondary} inline-flex items-center`}>
-            Importar calendario (.ics)
-          </Link>
-          <button type="button" onClick={() => setEditing('new')} className={primary}>
-            Agregar bloque
-          </button>
-        </div>
-      </header>
+          </span>
+        }
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link to="/calendar/import" className={`${secondary} inline-flex items-center`}>
+              Importar horario
+            </Link>
+            <Link to="/calendar/import-ics" className={`${secondary} inline-flex items-center`}>
+              Importar calendario (.ics)
+            </Link>
+            <button type="button" onClick={() => setEditing('new')} className={primary}>
+              Agregar bloque
+            </button>
+          </div>
+        }
+      />
 
       <nav aria-label="Semana" className="flex flex-wrap gap-2">
         <button type="button" onClick={() => goTo(addDays(week.from, -7))} className={secondary}>

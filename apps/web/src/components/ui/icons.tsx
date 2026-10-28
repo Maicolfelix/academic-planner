@@ -137,6 +137,38 @@ export const BellIcon = ({ className = 'size-4' }: IconProps) => (
   </Icon>
 );
 
+/** The Radar: rings and a sweep. */
+export const RadarIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4.5" />
+    <path d="M12 12 18 6" />
+  </Icon>
+);
+
+/** The Bandeja: a tray that receives. */
+export const InboxIcon = () => (
+  <Icon>
+    <path d="M3 13h5l1.5 3h5L16 13h5" />
+    <path d="M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z" />
+  </Icon>
+);
+
+/** Mis estudios: a graduation cap. */
+export const CapIcon = () => (
+  <Icon>
+    <path d="m2 9 10-5 10 5-10 5z" />
+    <path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" />
+  </Icon>
+);
+
+/** Progreso: three rising bars. */
+export const ChartIcon = () => (
+  <Icon>
+    <path d="M4 20V13M12 20V5M20 20v-9" />
+  </Icon>
+);
+
 /** The product mark: a rounded square with a check, the same idea as the favicon. */
 export const BrandMark = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7 text-primary">

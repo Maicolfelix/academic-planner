@@ -38,7 +38,7 @@ export function ActivityList({
   ];
 
   return (
-    <ul className="grid gap-3 lg:grid-cols-2">
+    <ul className="stagger grid gap-3 lg:grid-cols-2">
       {ordered.map((activity) => (
         <ActivityCard
           key={activity.id}

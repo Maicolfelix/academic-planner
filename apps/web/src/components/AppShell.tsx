@@ -89,6 +89,8 @@ export function AppShell() {
         <span className="ambient-orb ambient-orb-a" />
         <span className="ambient-orb ambient-orb-b" />
         <span className="ambient-orb ambient-orb-c" />
+        {/* Graph paper: a faint dotted grid that fades out down the page (the pixels of the companion, spread thin). */}
+        <span className="pixel-grid absolute inset-0" />
       </div>
       {/* First stop of the keyboard: jump over the navigation, straight to the page. */}
       <a
@@ -97,8 +99,13 @@ export function AppShell() {
       >
         Saltar al contenido
       </a>
-      <header className="relative border-b border-border/70 bg-surface/90 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-[linear-gradient(90deg,transparent,rgb(13_148_136/0.5),rgb(99_102_241/0.45),transparent)]">
+      <header className="sticky top-0 z-20 border-b border-border/70 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-[linear-gradient(90deg,transparent,rgb(13_148_136/0.5),rgb(99_102_241/0.45),transparent)]">
         {/* The bar is as wide as the widest screen (Agenda, Home), so brand, four destinations and sign-out fit on ONE row from 1024 px; the reading column below it stays narrow. */}
+        {/* The glass lives on its own layer: a backdrop filter on the header itself would trap the fixed bottom navigation inside it. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-surface/80 backdrop-blur-md"
+        />
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 px-4 py-2 lg:py-3">
           <span className="mr-auto flex items-center gap-2 py-2 font-semibold tracking-tight lg:mr-0">
             <BrandMark />

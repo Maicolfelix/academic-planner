@@ -10,6 +10,8 @@ import { readsSeveralPeriods, scopeNames } from '../academic/origin';
 import { useOrigins } from '../academic/useAcademic';
 import { useMe } from '../auth/useAuth';
 import { QueryError } from '../components/QueryError';
+import { RadarIcon } from '../components/ui/icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useNow } from '../lib/useNow';
 import { useRadar } from '../radar/useRadar';
 import { DueSection } from './dashboard/DueSection';
@@ -36,20 +38,19 @@ export function RadarPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Radar académico</h1>
-        {several ? (
-          <p className="text-sm text-slate-600 break-words">
-            En tus estudios actuales: {scopeNames(periods).join(' · ')}
-          </p>
-        ) : (
-          period && <p className="text-sm text-slate-600 break-words">{period.name}</p>
-        )}
-        <p className="mt-1 text-sm text-slate-700">
+      <div className="flex flex-col gap-2">
+        <PageHeader
+          icon={<RadarIcon />}
+          title="Radar académico"
+          description={
+            several ? `En tus estudios actuales: ${scopeNames(periods).join(' · ')}` : period?.name
+          }
+        />
+        <p className="text-sm text-slate-700">
           Ordena tus actividades abiertas según el tiempo que falta para cada fecha límite. No es
           prioridad ni una recomendación de qué hacer primero.
         </p>
-      </header>
+      </div>
 
       <QueryError query={radar} title="No se pudo cargar el Radar" />
 

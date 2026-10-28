@@ -6,6 +6,7 @@ describe('PageHeader', () => {
   it('renders the title as the page h1', () => {
     const out = renderToStaticMarkup(<PageHeader title="Actividades" />);
     expect(out).toMatch(/^<header/);
+    expect(out).toContain('pixel-rule');
     expect(out).toContain('<h1 class="text-page-title">Actividades</h1>');
     expect(out.match(/<h1/g)).toHaveLength(1);
   });
@@ -13,6 +14,7 @@ describe('PageHeader', () => {
   it('shows the description and the actions only when given', () => {
     const bare = renderToStaticMarkup(<PageHeader title="Mis asignaturas" />);
     expect(bare).not.toContain('<p');
+    expect(bare).not.toContain('<svg');
     const full = renderToStaticMarkup(
       <PageHeader
         title="Mis asignaturas"
@@ -22,6 +24,11 @@ describe('PageHeader', () => {
     );
     expect(full).toContain('Segundo semestre 2026');
     expect(full).toContain('<button type="button">Agregar asignatura</button>');
+  });
+
+  it('draws the icon as decoration, hidden from assistive technology', () => {
+    const out = renderToStaticMarkup(<PageHeader title="Agenda" icon={<svg />} />);
+    expect(out).toMatch(/<span aria-hidden="true"[^>]*><svg/);
   });
 
   it('renders nothing for an action that is false (the "no list yet" case)', () => {
