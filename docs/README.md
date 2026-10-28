@@ -75,13 +75,13 @@
 | [grades-validation.md](grades-validation.md)               | Validación del modelo de notas con 3 sistemas reales (proxy; GO provisional)                             |
 | [roadmap-post-rc.md](roadmap-post-rc.md)                   | Ciclo de producto post-RC: visión, etapas, decisiones (planificación)                                    |
 | [phase-history.md](phase-history.md)                       | Resumen de las fases 0–20                                                                                |
-| [release-notes-1.0.0.md](release-notes-1.0.0.md)           | Notas de `v1.0.0` (vigente en el PR final; el tag no existe hasta fusionar y con autorización)           |
+| [release-notes-1.0.0.md](release-notes-1.0.0.md)           | Notas de `v1.0.0` (vigente; también cuerpo del GitHub Release)                                           |
 | [release-notes-1.0.0-rc.3.md](release-notes-1.0.0-rc.3.md) | Notas del Release Candidate 3 (candidato publicado): qué agrupa desde rc.2, validación de RG-3 y límites |
 | [release-notes-1.0.0-rc.2.md](release-notes-1.0.0-rc.2.md) | Notas del Release Candidate 2 (anterior): qué corrige, límites, pendientes                               |
 | [release-notes-1.0.0-rc.1.md](release-notes-1.0.0-rc.1.md) | Notas del Release Candidate: qué incluye, límites, pendientes                                            |
 | [release-manifest.md](release-manifest.md)                 | Ficha técnica del candidato: versión, requisitos, migraciones, etiquetado                                |
 | [release-validation.md](release-validation.md)             | Evidencia de la validación del candidato                                                                 |
-| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (candidatos rc.1 y rc.2; sin v1.0.0 final)                                                       |
+| [../CHANGELOG.md](../CHANGELOG.md)                         | Cambios (candidatos rc.1 a rc.3 y v1.0.0 final)                                                          |
 | [../ARCHITECTURE_PLAN_v1.md](../ARCHITECTURE_PLAN_v1.md)   | Plan original de la Fase 0 (documento histórico)                                                         |
 
 ## Terminología
