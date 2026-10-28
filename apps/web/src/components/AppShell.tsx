@@ -8,7 +8,8 @@ import { useSlidingIndicator } from '../lib/useSlidingIndicator';
 import { LogoutButton } from './LogoutButton';
 import { ReminderBadge } from './ReminderBadge';
 import { buttonStyles } from './ui/buttonStyles';
-import { BookIcon, BrandMark, CalendarIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
+import { Brand } from './Brand';
+import { BookIcon, CalendarIcon, CapIcon, CheckSquareIcon, HomeIcon } from './ui/icons';
 
 /**
  * The four places a student comes back to every day. Everything else is reached from the screen where it makes
@@ -108,9 +109,8 @@ export function AppShell() {
           className="pointer-events-none absolute inset-0 -z-10 bg-surface/80 backdrop-blur-md"
         />
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 px-4 py-2 lg:py-3">
-          <span className="mr-auto flex items-center gap-2 py-2 font-semibold tracking-tight lg:mr-0">
-            <BrandMark />
-            Academic Planner
+          <span className="mr-auto lg:mr-0">
+            <Brand />
           </span>
 
           <nav
@@ -172,10 +172,17 @@ export function AppShell() {
           {/* The end of the bar is where the avatar and the bell will go: they arrive with their own features. */}
           <Link
             to="/settings/studies"
+            title="Mis estudios"
             aria-current={pathname.startsWith('/settings/studies') ? 'page' : undefined}
-            className={buttonStyles({ variant: 'ghost', size: 'sm' })}
+            className={buttonStyles({
+              variant: 'ghost',
+              size: 'sm',
+              className:
+                'gap-2 border border-accent/30 bg-accent-soft font-semibold text-accent-ink shadow-card',
+            })}
           >
-            Mis estudios
+            <CapIcon className="size-5" />
+            <span className="sr-only sm:not-sr-only">Mis estudios</span>
           </Link>
           <LogoutButton />
         </div>

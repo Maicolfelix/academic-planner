@@ -101,6 +101,17 @@ export const PIXELS = {
     '#..........#',
     '############',
   ],
+  logout: [
+    '#####.......',
+    '#...#.......',
+    '#...#..#....',
+    '#...#...#...',
+    '#...#######.',
+    '#...#...#...',
+    '#...#..#....',
+    '#...#.......',
+    '#####.......',
+  ],
   cap: [
     '.....##.....',
     '...######...',
@@ -169,7 +180,14 @@ export const RadarIcon = () => <PixelIcon rows={PIXELS.radar} />;
 export const InboxIcon = () => <PixelIcon rows={PIXELS.inbox} />;
 
 /** Mis estudios: a graduation cap. */
-export const CapIcon = () => <PixelIcon rows={PIXELS.cap} />;
+export const CapIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.cap} className={className} />
+);
+
+/** Cerrar sesión: an arrow leaving through a door. */
+export const LogoutIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.logout} className={className} />
+);
 
 /** Progreso: three rising bars on a baseline. */
 export const ChartIcon = () => <PixelIcon rows={PIXELS.chart} />;
@@ -256,19 +274,4 @@ export const BellIcon = ({ className = 'size-4' }: IconProps) => (
     <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
     <path d="M10 21a2 2 0 0 0 4 0" />
   </Icon>
-);
-
-/** The product mark: a rounded square with a check, the same idea as the favicon. */
-export const BrandMark = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="size-7 text-primary">
-    <rect width="24" height="24" rx="6" fill="currentColor" />
-    <path
-      d="m7.5 12.5 3 3 6-7"
-      fill="none"
-      className="stroke-primary-foreground"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
 );
