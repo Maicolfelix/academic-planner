@@ -1,10 +1,16 @@
 # Changelog
 
-Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). La versión sigue [SemVer](https://semver.org/lang/es/); las versiones actuales son **candidatos a versión** (`1.0.0-rc.1`, `1.0.0-rc.2`, `1.0.0-rc.3`). Resumen por fase: [docs/phase-history.md](docs/phase-history.md). Notas de los candidatos: [rc.1](docs/release-notes-1.0.0-rc.1.md) · [rc.2](docs/release-notes-1.0.0-rc.2.md) · [rc.3](docs/release-notes-1.0.0-rc.3.md).
+Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). La versión sigue [SemVer](https://semver.org/lang/es/); las versiones actuales son **candidatos a versión** (`1.0.0-rc.1`, `1.0.0-rc.2`, `1.0.0-rc.3`) y la versión final `1.0.0` (en preparación). Resumen por fase: [docs/phase-history.md](docs/phase-history.md). Notas de los candidatos: [rc.1](docs/release-notes-1.0.0-rc.1.md) · [rc.2](docs/release-notes-1.0.0-rc.2.md) · [rc.3](docs/release-notes-1.0.0-rc.3.md).
 
 ## Unreleased
 
 _(nada todavía)_
+
+## 1.0.0 — Versión final, beta cerrada (en preparación; tag `v1.0.0` NO creado)
+
+### Changed
+
+- **Version `1.0.0` (final PR; no product changes).** Versions raised from `1.0.0-rc.3` to `1.0.0` in the root and the three workspaces (and `package-lock.json`; the `@planner/core` ranges are untouched). Same product validated in `1.0.0-rc.3`: no features, no visual changes, no logic or endpoint changes, no migrations, no dependency changes. Release notes: [docs/release-notes-1.0.0.md](docs/release-notes-1.0.0.md). The tag `v1.0.0` is created only after this change is merged and with the maintainer's express authorization. Known: `npm audit --omit=dev` is 0, but `npm audit` reports 4 findings of low severity in this dependency tree, all dev-only, since 2026-10-28 (new advisory GHSA-gcqx-w48m-w2h4 on `deepmerge@4.3.1`, `dev: true`, through `vite-plugin-pwa` → `workbox-build`). **OWNER_ACCEPTED / ACCEPTED FOR v1.0.0** as a known development-tooling risk to follow up later; the lockfile is unchanged and `--force` was not applied. It is not an acceptance of future vulnerabilities.
 
 ## 1.0.0-rc.3 — Release Candidate 3 (2026-10-27)
 
