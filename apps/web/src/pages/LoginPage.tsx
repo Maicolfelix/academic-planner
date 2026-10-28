@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ApiRequestError } from '../api/client';
 import { useLogin } from '../auth/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
+import { AuthLayout, type AuthMood } from '../components/AuthLayout';
+import { buttonStyles } from '../components/ui/buttonStyles';
 import { FormField } from '../components/FormField';
 
 export function LoginPage() {
@@ -36,21 +37,38 @@ export function LoginPage() {
     });
   }
 
+  const mood: AuthMood = login.isPending
+    ? 'pending'
+    : login.isSuccess
+      ? 'success'
+      : formError || Object.keys(fieldErrors).length > 0
+        ? 'error'
+        : 'idle';
+
   return (
-    <AuthLayout title="Iniciar sesión">
+    <AuthLayout title="Iniciar sesión" intro="Hola otra vez. Qué bueno verte." mood={mood}>
       {warning && (
-        <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+        <p
+          role="status"
+          className="rounded-control border border-warning-line bg-warning-soft p-3 text-sm text-warning-ink"
+        >
           {warning}
         </p>
       )}
       {notice && (
-        <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">
+        <p
+          role="status"
+          className="rounded-control border border-success-line bg-success-soft p-3 text-sm text-success-ink"
+        >
           {notice}
         </p>
       )}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {formError && (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+          <p
+            role="alert"
+            className="rounded-control border border-danger-line bg-danger-soft p-3 text-sm text-danger-ink"
+          >
             {formError}
           </p>
         )}
@@ -75,14 +93,14 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={login.isPending}
-          className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+          className={buttonStyles({ variant: 'primary', className: 'w-full' })}
         >
           {login.isPending ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
       <p className="text-sm">
         ¿No tienes cuenta?{' '}
-        <Link to="/register" className="font-medium underline">
+        <Link to="/register" className="font-medium text-accent-ink underline underline-offset-4">
           Crear cuenta
         </Link>
       </p>

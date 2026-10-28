@@ -9,8 +9,9 @@ import {
   useUpdatePeriod,
 } from '../academic/useAcademic';
 import { ApiRequestError } from '../api/client';
-import { FullPageMessage, isUnreachable, RetryMessage } from '../auth/guards';
+import { isUnreachable, RetryMessage } from '../auth/guards';
 import { useMe } from '../auth/useAuth';
+import { LoadingScreen } from '../components/LoadingScreen';
 import { LogoutButton } from '../components/LogoutButton';
 import { Button } from '../components/ui/Button';
 import { readDraft, useDraftWriter } from '../lib/drafts';
@@ -126,7 +127,7 @@ function Onboarding({ userId }: { userId: string }) {
   }, [step]);
 
   if (profile.isPending || home.isPending || studies.isPending) {
-    return <FullPageMessage>Cargando…</FullPageMessage>;
+    return <LoadingScreen>Cargando…</LoadingScreen>;
   }
   if (
     (profile.isError && !profile.data) ||
@@ -322,7 +323,7 @@ function Onboarding({ userId }: { userId: string }) {
         />,
       );
     case 'SUBJECTS': {
-      if (subjects.isPending) return <FullPageMessage>Cargando…</FullPageMessage>;
+      if (subjects.isPending) return <LoadingScreen>Cargando…</LoadingScreen>;
       return frame(
         subjectsTitle(use),
         <SubjectsStep

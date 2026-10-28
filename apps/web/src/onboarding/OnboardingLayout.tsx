@@ -1,5 +1,6 @@
 import type { PrimaryUse } from '@planner/core';
 import { forwardRef, type ReactNode } from 'react';
+import { CompanionSprite } from '../companion/PixelCompanion';
 import { BrandMark } from '../components/ui/icons';
 import { progressSteps, STEP_LABEL } from './onboardingModel';
 
@@ -63,15 +64,25 @@ export const OnboardingLayout = forwardRef<
           </ol>
         </header>
 
-        <div className="flex flex-col gap-2">
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            className="text-2xl font-semibold tracking-tight outline-none sm:text-3xl"
-          >
-            {title}
-          </h1>
-          {intro && <p className="text-muted-foreground">{intro}</p>}
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-tight outline-none sm:text-3xl"
+            >
+              {title}
+            </h1>
+            {intro && <p className="text-muted-foreground">{intro}</p>}
+          </div>
+          {/* The companion goes along on every question (decoration: it says nothing the heading does not). At the end it rejoices. */}
+          <div key={step === 'FINAL' ? 'done' : 'going'} className="shrink-0">
+            <CompanionSprite
+              state="CALM"
+              pose={step === 'FINAL' ? 'joy' : undefined}
+              className="size-16 sm:size-20"
+            />
+          </div>
         </div>
 
         {children}

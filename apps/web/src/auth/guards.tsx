@@ -1,3 +1,5 @@
+import { buttonStyles } from '../components/ui/buttonStyles';
+import { LoadingScreen } from '../components/LoadingScreen';
 import { useEffect, useState, type ReactNode } from 'react';
 import { safeReturnTo } from '@planner/core';
 import { Navigate, Outlet, useLocation } from 'react-router';
@@ -41,11 +43,7 @@ export function RetryMessage({
         {unreachable ? OFFLINE_MESSAGE : text}
       </p>
       {unreachable && <p className="mb-3 text-sm text-slate-700">{OFFLINE_DETAIL}</p>}
-      <button
-        type="button"
-        onClick={onRetry}
-        className="rounded-md bg-slate-900 px-4 py-2 text-white"
-      >
+      <button type="button" onClick={onRetry} className={buttonStyles({ variant: 'primary' })}>
         Reintentar
       </button>
     </FullPageMessage>
@@ -80,7 +78,7 @@ export function RequireAuth() {
     if (userId) sweepDrafts(userId);
   }, [userId]);
 
-  if (me.isPending) return <FullPageMessage>Verificando sesión…</FullPageMessage>;
+  if (me.isPending) return <LoadingScreen>Verificando sesión…</LoadingScreen>;
   // A failed background refetch (e.g. the connection dropped) keeps the data already loaded on screen.
   if (me.isError && !me.data) {
     return (

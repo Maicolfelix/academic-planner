@@ -172,6 +172,8 @@ body[data-ambient='done'] {
   --animate-rise: rise var(--duration-normal) var(--ease-enter) backwards;
   --animate-pop: pop var(--duration-normal) var(--ease-spring) backwards;
   --animate-fill: fill var(--duration-slow) var(--ease-enter) backwards;
+  /* A rise with NO opacity, for screens whose text must be readable (and measurable) from the first frame: the sign-in. */
+  --animate-settle: settle var(--duration-normal) var(--ease-enter) backwards;
   --animate-grow: grow var(--duration-slow) var(--ease-enter) backwards;
   --animate-glint: glint 900ms var(--ease-standard) 500ms both;
   --animate-beacon: beacon 1100ms var(--ease-standard) 400ms 1 backwards;
@@ -204,6 +206,8 @@ body[data-ambient='done'] {
   --animate-companion-twinkle: companion-twinkle 3.2s steps(1, end) infinite;
   /* C2: the roaming companion's step and the bubble it speaks in. */
   --animate-companion-walk: companion-walk 0.45s steps(1, end) infinite;
+  /* C3: the stars of the sign-in sky dim for a moment (they are mostly lit, unlike a sparkle). */
+  --animate-companion-star: companion-star 4s steps(1, end) infinite;
   --animate-companion-bubble: companion-bubble 0.18s steps(3, end) 1;
 
   @keyframes rise {
@@ -213,6 +217,15 @@ body[data-ambient='done'] {
     }
     to {
       opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes settle {
+    from {
+      transform: translateY(10px);
+    }
+    to {
       transform: none;
     }
   }
@@ -462,6 +475,18 @@ body[data-ambient='done'] {
     80% {
       opacity: 0;
       transform: translateY(4px);
+    }
+  }
+
+  @keyframes companion-star {
+    0%,
+    62%,
+    100% {
+      opacity: 1;
+    }
+    68%,
+    84% {
+      opacity: 0.2;
     }
   }
 
