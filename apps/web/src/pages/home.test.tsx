@@ -284,6 +284,7 @@ describe('motion (index.css)', () => {
       'companion-walk',
       'drift',
       'drift-slow',
+      'gloss',
       'halo',
       'orbit',
       'scan',

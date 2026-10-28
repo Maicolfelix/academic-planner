@@ -1,6 +1,7 @@
 import { DUE_REMINDERS_LIMIT, reminderMessage } from '@planner/core';
 import { OriginLabel } from '../../components/OriginLabel';
-import { BellIcon } from '../../components/ui/icons';
+import { buttonStyles } from '../../components/ui/buttonStyles';
+import { PIXELS, PixelIcon, TickIcon } from '../../components/ui/icons';
 import { useOrigins } from '../../academic/useAcademic';
 import { useDueReminders, useMarkSeen } from '../../reminders/useReminders';
 
@@ -8,6 +9,11 @@ import { useDueReminders, useMarkSeen } from '../../reminders/useReminders';
  * One compact card on the Dashboard with the reminders that are due now. It is not a stack of
  * modals: each row can be dismissed ("Visto") or all at once. Nothing is marked as seen just by
  * loading the page — only the student's click does it.
+ *
+ * The look: a warm card with a pixel bell that swings once when it appears, a count pill, and one row per reminder with its own
+ * bell tile and a rail down the edge (red when the deadline has already passed, amber when it is still coming), the subject
+ * as a colored dot and "Visto" as a small button with a pixel tick. The rows arrive one after another. The words say
+ * everything (the message already says "venció" or "vence"); the rail and the tile only accompany them.
  */
 export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date }) {
   const due = useDueReminders();
@@ -22,43 +28,79 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
   return (
     <section
       aria-labelledby="reminders-panel-heading"
-      className="flex flex-col gap-3 rounded-surface border border-warning-line bg-warning-soft p-4"
+      className="relative flex flex-col gap-3 overflow-hidden rounded-surface border border-warning-line bg-[linear-gradient(160deg,var(--warning-soft),var(--surface)_130%)] p-4 shadow-card"
     >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#f59e0b,#fb7185_60%,transparent)]"
+      />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="reminders-panel-heading" className="text-section-title">
-          Recordatorios
-        </h2>
-        <p className="text-sm font-medium">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[linear-gradient(135deg,#f59e0b,#ea580c)] text-white shadow-[3px_3px_0_0_rgb(180_83_9/0.25),inset_0_2px_0_rgb(255_255_255/0.3)]"
+          >
+            <PixelIcon rows={PIXELS.bell} className="size-6 origin-top motion-safe:animate-bell" />
+          </span>
+          <h2 id="reminders-panel-heading" className="text-section-title">
+            Recordatorios
+          </h2>
+        </div>
+        <p className="rounded-full border border-warning-line bg-surface/80 px-3 py-1 text-sm font-semibold text-warning-ink">
           Tienes {total} {total === 1 ? 'recordatorio' : 'recordatorios'}
         </p>
       </div>
-      <ul className="flex flex-col gap-2">
-        {reminders.map((r) => (
-          <li
-            key={r.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-white p-3"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="flex items-start gap-2 break-words">
-                <BellIcon className="mt-0.5 size-4 shrink-0 text-warning-ink" />
-                <span className="min-w-0">{reminderMessage(r.activity, now, timeZone)}</span>
-              </p>
-              <p className="pl-6 text-sm break-words text-slate-700">
-                {r.subject?.name ?? 'Sin asignatura'}
-                <OriginLabel label={originOf(r.activity.periodId)} />
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={markSeen.isPending}
-              onClick={() => markSeen.mutate([r.id])}
-              aria-label={`Marcar como visto: ${r.activity.title}`}
-              className="min-h-11 rounded-md border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-60"
+      <ul className="stagger flex flex-col gap-2">
+        {reminders.map((r) => {
+          const late = new Date(r.activity.dueAt).getTime() < now.getTime();
+          return (
+            <li
+              key={r.id}
+              className="relative flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-control border border-border bg-surface py-3 pr-3 pl-5 shadow-card"
             >
-              Visto
-            </button>
-          </li>
-        ))}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-y-0 left-0 w-1.5 ${late ? 'bg-danger' : 'bg-warning'}`}
+              />
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl ${late ? 'bg-danger-soft text-danger-ink' : 'bg-warning-soft text-warning-ink'}`}
+                >
+                  <PixelIcon rows={PIXELS.bell} className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-medium break-words">
+                    {reminderMessage(r.activity, now, timeZone)}
+                  </p>
+                  <p className="flex items-center gap-1.5 text-sm break-words text-muted-foreground">
+                    {r.subject && (
+                      <span
+                        aria-hidden="true"
+                        style={{ backgroundColor: r.subject.color }}
+                        className="size-2 shrink-0 rounded-full"
+                      />
+                    )}
+                    <span>
+                      {r.subject?.name ?? 'Sin asignatura'}
+                      <OriginLabel label={originOf(r.activity.periodId)} />
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={markSeen.isPending}
+                onClick={() => markSeen.mutate([r.id])}
+                aria-label={`Marcar como visto: ${r.activity.title}`}
+                className={buttonStyles({ size: 'sm', className: 'gap-1.5 disabled:opacity-60' })}
+              >
+                <TickIcon className="size-4" />
+                Visto
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {hidden > 0 && (
         <p className="text-sm">
@@ -76,8 +118,12 @@ export function RemindersPanel({ timeZone, now }: { timeZone: string; now: Date 
           type="button"
           disabled={markSeen.isPending}
           onClick={() => markSeen.mutate(ids)}
-          className="min-h-11 self-start rounded-md border border-slate-400 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-60"
+          className={buttonStyles({
+            size: 'sm',
+            className: 'gap-2 self-start disabled:opacity-60',
+          })}
         >
+          <TickIcon className="size-4" />
           Marcar todos como vistos
         </button>
       )}

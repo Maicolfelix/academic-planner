@@ -1,3 +1,4 @@
+import { PlusIcon } from '../components/ui/icons';
 import { DEFAULT_TIMEZONE } from '@planner/core';
 import { Link } from 'react-router';
 import { heroItemsOf, useAttention } from '../attention/useAttention';
@@ -208,10 +209,18 @@ export function DashboardPage() {
             <WeekCard />
 
             <nav aria-label="Accesos rápidos" className="flex flex-wrap gap-2">
-              <Link to="/activities?action=create" className={buttonStyles({ size: 'sm' })}>
+              <Link
+                to="/activities?action=create"
+                className={buttonStyles({ size: 'sm', className: 'gap-2 font-medium' })}
+              >
+                <PlusIcon className="size-4" />
                 Nueva actividad
               </Link>
-              <Link to="/subjects?action=create" className={buttonStyles({ size: 'sm' })}>
+              <Link
+                to="/subjects?action=create"
+                className={buttonStyles({ size: 'sm', className: 'gap-2 font-medium' })}
+              >
+                <PlusIcon className="size-4" />
                 Nueva asignatura
               </Link>
             </nav>

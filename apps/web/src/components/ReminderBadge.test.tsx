@@ -58,8 +58,10 @@ describe('the reminders card', () => {
   it('shows a small bell icon per reminder instead of the emoji, and keeps its words and buttons', () => {
     const html = render();
     expect(html).not.toContain('🔔');
-    expect(html.match(/<svg/g)).toHaveLength(2);
-    expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(2);
+    // pixel pictures (the header bell, one bell and one tick per reminder, one tick for "all"): every one is decoration
+    const svgs = html.match(/<svg/g) ?? [];
+    expect(svgs.length).toBeGreaterThanOrEqual(2);
+    expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(svgs.length);
     expect(html).toContain('size-4'); // discreet, not a big bell
     expect(text(html)).toContain('Tienes 2 recordatorios');
     expect(text(html)).toContain('Parcial 1');

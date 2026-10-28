@@ -36,7 +36,9 @@ describe('AuthLayout', () => {
   it('every animation is motion-safe and written as a full class name', () => {
     const out = html();
     for (const c of [...out.matchAll(/[\w:[\]-]*animate-[\w-]+/g)].map((m) => m[0])) {
-      expect(c).toMatch(/^(motion-safe:animate-companion-[a-z]+|animate-settle)$/);
+      expect(c).toMatch(
+        /^(motion-safe:animate-companion-[a-z]+|motion-safe:animate-gloss|animate-(settle|tile|grow))$/,
+      );
     }
   });
 });

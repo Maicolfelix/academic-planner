@@ -211,6 +211,11 @@ body[data-ambient='done'] {
   /* C3: the stars of the sign-in sky dim for a moment (they are mostly lit, unlike a sparkle). */
   --animate-companion-star: companion-star 4s steps(1, end) infinite;
   /* The object of an empty state bobs one square up and down (steps, transform only). */
+  /* A screen's header: the icon tile springs in, and now and then a gloss passes over it (ambient, transform only). */
+  /* The bell of the reminders swings once when the panel appears. */
+  --animate-bell: bell 1.1s var(--ease-standard) 400ms backwards;
+  --animate-tile: tile 560ms var(--ease-spring) backwards;
+  --animate-gloss: gloss 7s ease-in-out infinite;
   --animate-bob: bob 3s steps(1, end) infinite;
   --animate-companion-bubble: companion-bubble 0.18s steps(3, end) 1;
 
@@ -327,6 +332,45 @@ body[data-ambient='done'] {
   @keyframes orbit {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes bell {
+    0%,
+    100% {
+      transform: rotate(0);
+    }
+    15% {
+      transform: rotate(16deg);
+    }
+    35% {
+      transform: rotate(-14deg);
+    }
+    55% {
+      transform: rotate(9deg);
+    }
+    75% {
+      transform: rotate(-5deg);
+    }
+  }
+
+  @keyframes tile {
+    from {
+      transform: scale(0.55) rotate(-14deg);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes gloss {
+    0%,
+    55% {
+      transform: translateX(-160%) skewX(-18deg);
+    }
+    80%,
+    100% {
+      transform: translateX(260%) skewX(-18deg);
     }
   }
 

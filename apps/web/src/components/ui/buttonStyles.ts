@@ -15,7 +15,9 @@ const VARIANT: Record<ButtonVariant, string> = {
   // A deep indigo with a lit top edge and a tinted shadow: it sits ON the page instead of being painted flat on it.
   primary:
     'bg-primary text-primary-foreground bg-[linear-gradient(180deg,var(--primary-lift),var(--primary))] shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_6px_12px_-6px_rgb(31_38_112/0.65)] hover:brightness-110',
-  secondary: 'border border-border-strong hover:bg-secondary',
+  // A white surface that fades to the page's soft indigo, with a lit top edge; it lifts and borrows the accent on hover.
+  secondary:
+    'border border-border-strong bg-[linear-gradient(180deg,var(--surface),var(--secondary))] shadow-[inset_0_1px_0_rgb(255_255_255),0_2px_4px_-2px_rgb(20_26_60/0.2)] hover:[transform:translateY(-1px)] hover:border-accent hover:shadow-[inset_0_1px_0_rgb(255_255_255),0_8px_14px_-8px_rgb(13_148_136/0.5)]',
   ghost: 'hover:bg-secondary',
   danger: 'bg-danger text-primary-foreground hover:bg-danger/90',
 };

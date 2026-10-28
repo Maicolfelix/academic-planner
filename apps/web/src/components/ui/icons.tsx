@@ -182,6 +182,28 @@ export const PIXELS = {
     '....##......',
     '...##.......',
   ],
+  plus: [
+    '.....##.....',
+    '.....##.....',
+    '.....##.....',
+    '############',
+    '############',
+    '.....##.....',
+    '.....##.....',
+    '.....##.....',
+  ],
+  bell: [
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '...######...',
+    '..########..',
+    '..########..',
+    '.##########.',
+    '############',
+    '............',
+    '.....##.....',
+  ],
   cap: [
     '.....##.....',
     '...######...',
@@ -235,19 +257,31 @@ export function PixelIcon({
   );
 }
 
-export const HomeIcon = () => <PixelIcon rows={PIXELS.home} />;
+export const HomeIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.home} className={className} />
+);
 
-export const CheckSquareIcon = () => <PixelIcon rows={PIXELS.check} />;
+export const CheckSquareIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.check} className={className} />
+);
 
-export const CalendarIcon = () => <PixelIcon rows={PIXELS.calendar} />;
+export const CalendarIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.calendar} className={className} />
+);
 
-export const BookIcon = () => <PixelIcon rows={PIXELS.book} />;
+export const BookIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.book} className={className} />
+);
 
 /** The Radar: a ring and a sweep. */
-export const RadarIcon = () => <PixelIcon rows={PIXELS.radar} />;
+export const RadarIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.radar} className={className} />
+);
 
 /** The Bandeja: a tray that receives. */
-export const InboxIcon = () => <PixelIcon rows={PIXELS.inbox} />;
+export const InboxIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.inbox} className={className} />
+);
 
 /** Mis estudios: a graduation cap. */
 export const CapIcon = ({ className }: { className?: string }) => (
@@ -265,6 +299,10 @@ export const TickIcon = ({ className }: { className?: string }) => (
 );
 export const WarnIcon = ({ className }: { className?: string }) => (
   <PixelIcon rows={PIXELS.warn} className={className} />
+);
+
+export const PlusIcon = ({ className }: { className?: string }) => (
+  <PixelIcon rows={PIXELS.plus} className={className} />
 );
 
 /** Cerrar sesión: an arrow leaving through a door. */
