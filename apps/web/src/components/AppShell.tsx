@@ -1,3 +1,4 @@
+import { AchievementToast } from '../achievements/AchievementToast';
 import { CompanionLayer } from '../companion/CompanionLayer';
 import { CompanionSprite } from '../companion/PixelCompanion';
 import { Suspense } from 'react';
@@ -205,6 +206,7 @@ export function AppShell() {
           <Outlet />
         </Suspense>
       </main>
+      <AchievementToast />
       <CompanionLayer />
     </div>
   );

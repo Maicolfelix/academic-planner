@@ -39,10 +39,10 @@ export function RetryMessage({
   const unreachable = isUnreachable(error);
   return (
     <FullPageMessage>
-      <p role="alert" className="mb-3 text-red-700">
+      <p role="alert" className="mb-3 text-danger-ink">
         {unreachable ? OFFLINE_MESSAGE : text}
       </p>
-      {unreachable && <p className="mb-3 text-sm text-slate-700">{OFFLINE_DETAIL}</p>}
+      {unreachable && <p className="mb-3 text-sm text-muted-foreground">{OFFLINE_DETAIL}</p>}
       <button type="button" onClick={onRetry} className={buttonStyles({ variant: 'primary' })}>
         Reintentar
       </button>

@@ -105,7 +105,7 @@ function GradesView({
     return (
       <div className="flex flex-col gap-3">
         <PageHeader title={`Notas de ${subject.name}`} />
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-red-800">
+        <div role="alert" className="rounded-control bg-danger-soft p-3 text-danger-ink">
           <p className="mb-2">No pudimos cargar el estudio de este periodo.</p>
           <Button onClick={() => refetch.refetch()}>Reintentar</Button>
         </div>

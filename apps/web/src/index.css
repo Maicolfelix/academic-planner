@@ -213,6 +213,9 @@ body[data-ambient='done'] {
   /* The object of an empty state bobs one square up and down (steps, transform only). */
   /* A screen's header: the icon tile springs in, and now and then a gloss passes over it (ambient, transform only). */
   /* The bell of the reminders swings once when the panel appears. */
+  /* An achievement: the card drops in with a little spring, stays, and leaves (transform only: its text is readable throughout). */
+  --animate-achievement: achievement 4.8s ease-out forwards;
+  --animate-confetti: confetti 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) 280ms both;
   --animate-bell: bell 1.1s var(--ease-standard) 400ms backwards;
   --animate-tile: tile 560ms var(--ease-spring) backwards;
   --animate-gloss: gloss 7s ease-in-out infinite;
@@ -332,6 +335,36 @@ body[data-ambient='done'] {
   @keyframes orbit {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes achievement {
+    0% {
+      transform: translateY(-160%) scale(0.92);
+    }
+    8% {
+      transform: translateY(6px) scale(1.03);
+    }
+    12% {
+      transform: none;
+    }
+    90% {
+      transform: none;
+    }
+    100% {
+      transform: translateY(-160%) scale(0.96);
+    }
+  }
+
+  @keyframes confetti {
+    from {
+      opacity: 1;
+      transform: translate(-50%, -50%) rotate(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot))
+        scale(0.5);
     }
   }
 

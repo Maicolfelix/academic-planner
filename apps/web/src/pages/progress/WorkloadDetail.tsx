@@ -46,10 +46,13 @@ export function WorkloadDetail({ workload }: { workload: Workload }) {
             <span aria-hidden="true" className="text-sm font-semibold">
               {d.totalCommitments}
             </span>
-            <span aria-hidden="true" className="flex h-16 w-full items-end rounded-md bg-secondary">
+            <span
+              aria-hidden="true"
+              className="flex h-16 w-full items-end rounded-control bg-secondary"
+            >
               <span
                 style={{ height: `${(d.totalCommitments / max) * 100}%` }}
-                className={`w-full origin-bottom animate-grow rounded-md ${
+                className={`w-full origin-bottom animate-grow rounded-control ${
                   d.date === busiest
                     ? 'bg-[linear-gradient(180deg,var(--accent),#4f46e5)]'
                     : 'bg-accent/45'

@@ -46,7 +46,7 @@ export function RadarPage() {
             several ? `En tus estudios actuales: ${scopeNames(periods).join(' · ')}` : period?.name
           }
         />
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-muted-foreground">
           Ordena tus actividades abiertas según el tiempo que falta para cada fecha límite. No es
           prioridad ni una recomendación de qué hacer primero.
         </p>
@@ -62,7 +62,7 @@ export function RadarPage() {
       </section>
 
       {open === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
+        <p className="rounded-surface border border-dashed border-border p-6 text-center">
           {several
             ? 'No tienes actividades abiertas en tus estudios actuales.'
             : 'No tienes actividades abiertas en el periodo actual.'}
