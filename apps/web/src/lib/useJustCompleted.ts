@@ -1,5 +1,6 @@
 import type { ActivityStatus } from '@planner/core';
 import { useEffect, useRef, useState } from 'react';
+import { emitCompanion } from '../companion/companionBus';
 
 /**
  * True for a little over a second right after an activity BECOMES completed (not when it was already completed, and
@@ -15,6 +16,7 @@ export function useJustCompleted(status: ActivityStatus): boolean {
     previous.current = status;
     if (was === 'COMPLETED' || status !== 'COMPLETED') return;
     setJust(true);
+    emitCompanion('completed'); // the roaming companion notices it; nothing is stored
     const timer = setTimeout(() => setJust(false), 1200);
     return () => clearTimeout(timer);
   }, [status]);

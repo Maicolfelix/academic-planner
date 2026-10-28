@@ -7,6 +7,7 @@ import { buttonStyles } from '../components/ui/buttonStyles';
 import { Card } from '../components/ui/Card';
 import { readsSeveralPeriods } from '../academic/origin';
 import { useOrigins } from '../academic/useAcademic';
+import { CompanionRestore } from '../companion/CompanionRestore';
 import { PixelCompanion } from '../companion/PixelCompanion';
 import {
   companionClassLine,
@@ -99,6 +100,7 @@ export function DashboardPage() {
               state={companionState}
               nextLine={companionClassLine(d.classesToday, now, timeZone)}
             />
+            <CompanionRestore />
           </div>
         )}
       </header>

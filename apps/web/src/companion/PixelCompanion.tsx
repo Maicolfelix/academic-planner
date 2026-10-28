@@ -79,6 +79,56 @@ function Extras({ state }: { state: CompanionState }) {
   return null;
 }
 
+/** The picture alone (decorative): the Home card and the roaming companion both draw it. `walking` swaps the mood's rhythm for a step. */
+export function CompanionSprite({
+  state,
+  className = 'size-16 shrink-0 sm:size-[4.5rem] lg:size-24',
+  walking = false,
+}: {
+  state: CompanionState;
+  className?: string;
+  walking?: boolean;
+}) {
+  // An unknown state never breaks the Home: it falls back to the neutral one.
+  const known: CompanionState = state in FACES ? state : 'CALM';
+  const face = FACES[known];
+  return (
+    <svg
+      viewBox={`0 0 ${GRID} ${GRID}`}
+      aria-hidden="true"
+      focusable="false"
+      shapeRendering="crispEdges"
+      className={className}
+    >
+      <g className="opacity-15">
+        <Paths paths={SHADOW_PATHS} />
+      </g>
+      <g className={'motion-safe:animate-companion-hop'}>
+        <g className={walking ? 'motion-safe:animate-companion-walk' : IDLE[known]}>
+          <Paths paths={BODY_PATHS} />
+          <Paths paths={BACKPACK_PATHS} />
+          <Paths paths={CHEEK_PATHS} />
+          <g className={awake(known, 'motion-safe:animate-companion-sway')}>
+            <Paths paths={TUFT_PATHS} />
+          </g>
+          <g className={awake(known, 'motion-safe:animate-companion-wave')}>
+            <Paths paths={ARM_PATHS} />
+          </g>
+          <g className={known === 'CALM' ? 'motion-safe:animate-companion-look' : ''}>
+            <g
+              className={`origin-center [transform-box:fill-box] ${awake(known, 'motion-safe:animate-companion-blink')}`}
+            >
+              <Paths paths={pathsOfRects(face.eyes)} />
+            </g>
+          </g>
+          <Paths paths={pathsOfRects(face.rest)} />
+        </g>
+        <Extras state={known} />
+      </g>
+    </svg>
+  );
+}
+
 export function PixelCompanion({
   state,
   nextLine,
@@ -89,45 +139,12 @@ export function PixelCompanion({
 }) {
   // An unknown state never breaks the Home: it falls back to the neutral one.
   const known: CompanionState = state in FACES ? state : 'CALM';
-  const face = FACES[known];
   return (
     <div
       data-companion={known}
       className="flex w-fit max-w-full items-center gap-3 rounded-2xl border border-border bg-accent-soft/70 py-2 pr-4 pl-3 sm:gap-4 sm:pl-4 lg:gap-5"
     >
-      <svg
-        viewBox={`0 0 ${GRID} ${GRID}`}
-        aria-hidden="true"
-        focusable="false"
-        shapeRendering="crispEdges"
-        className="size-16 shrink-0 sm:size-[4.5rem] lg:size-24"
-      >
-        <g className="opacity-15">
-          <Paths paths={SHADOW_PATHS} />
-        </g>
-        <g className={'motion-safe:animate-companion-hop'}>
-          <g className={IDLE[known]}>
-            <Paths paths={BODY_PATHS} />
-            <Paths paths={BACKPACK_PATHS} />
-            <Paths paths={CHEEK_PATHS} />
-            <g className={awake(known, 'motion-safe:animate-companion-sway')}>
-              <Paths paths={TUFT_PATHS} />
-            </g>
-            <g className={awake(known, 'motion-safe:animate-companion-wave')}>
-              <Paths paths={ARM_PATHS} />
-            </g>
-            <g className={known === 'CALM' ? 'motion-safe:animate-companion-look' : ''}>
-              <g
-                className={`origin-center [transform-box:fill-box] ${awake(known, 'motion-safe:animate-companion-blink')}`}
-              >
-                <Paths paths={pathsOfRects(face.eyes)} />
-              </g>
-            </g>
-            <Paths paths={pathsOfRects(face.rest)} />
-          </g>
-          <Extras state={known} />
-        </g>
-      </svg>
+      <CompanionSprite state={known} />
       <div className="min-w-0">
         <p className="text-base font-medium text-foreground">{COMPANION_COPY[known]}</p>
         {nextLine && <p className="text-sm break-words text-muted-foreground">{nextLine}</p>}

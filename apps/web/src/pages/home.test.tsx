@@ -279,6 +279,7 @@ describe('motion (index.css)', () => {
       'companion-sleep',
       'companion-sway',
       'companion-twinkle',
+      'companion-walk',
       'drift',
       'drift-slow',
       'halo',
