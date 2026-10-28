@@ -225,7 +225,7 @@ Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiale
 **P9 = DONE. Lo siguiente es el release gate; no se crean fases funcionales nuevas.** Estado y matriz: [release-readiness-audit.md](release-readiness-audit.md); lista final: [final-checklist.md](final-checklist.md); QA en dispositivos: [release-qa-plan.md](release-qa-plan.md); respaldo: [backup-restore.md](backup-restore.md).
 
 - **Alcance de v1:** **beta cerrada.** Recuperación de contraseña, verificación de correo y MFA no bloquean este release, pero sí bloquean un servicio con registro público abierto.
-- **Candidato:** `v1.0.0-rc.3` es el artefacto que pasa por preproducción, PWA real y QA de dispositivos; `v1.0.0` solo si pasa sin cambios. La versión y el tag **no se cambian hasta RG-4**, con autorización.
+- **Candidato:** `v1.0.0-rc.3` es el artefacto que pasa por preproducción, PWA real y QA de dispositivos; `v1.0.0` solo si pasa sin cambios. La versión y el tag se cambiaron en RG-4 (PR #74, `v1.0.0-rc.3`), con autorización.
 - **Licencia:** pendiente de decisión del propietario; no bloquea una beta privada, sí una distribución pública.
 
 | PR    | Objetivo                                                                                                                                                                           | Estado                                                |
@@ -235,7 +235,7 @@ Cursos compartidos **solo si hay evidencia de uso**. Compartido: fechas oficiale
 | RG-2a | Artefacto de despliegue, guardas de arranque, mapeo de `PORT`, smoke de producción y validación desde base vacía, todo en local                                                    | DONE (PR #70)                                         |
 | RG-2b | Validación HTTPS real sin coste: Docker local + Cloudflare Quick Tunnel (Railway bloqueado por el registro de cuenta y el presupuesto de $0): proxy, cookie `__Host-`, HSTS y humo | DONE (PR #71)                                         |
 | RG-3  | Playwright completo, suites de seguridad, QA en dispositivos (con el Share Target en Android) y ensayo de restauración ([resultados](rg3-results.md))                              | DONE — owner accepted device-evidence waiver (PR #73) |
-| RG-4  | Versión `1.0.0-rc.3`, notas y tag (el tag solo tras fusionar y con autorización); después, si pasa sin cambios, `v1.0.0`                                                           | en revisión (versión y notas; tag pendiente)          |
+| RG-4  | Versión `1.0.0-rc.3`, notas y tag (el tag solo tras fusionar y con autorización); después, si pasa sin cambios, `v1.0.0`                                                           | DONE (PR #74; tag `v1.0.0-rc.3` creado)               |
 
 ### Prerrequisitos técnicos identificados
 

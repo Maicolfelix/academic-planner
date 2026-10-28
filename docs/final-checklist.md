@@ -2,7 +2,7 @@
 
 Se escribió de nuevo para el estado **actual** (RG-1, 2026-10-25) y se actualizó con RG-2a (PR #70) y RG-2b (PR #71, 2026-10-26, HTTPS temporal). Estado a 2026-10-27: RG-2a DONE, RG-2b DONE, **sin alojamiento permanente**, **RG-3 DONE — owner accepted device-evidence waiver** (automatizado, HTTPS, seguridad y respaldo DONE; la QA en iPhone y Android reales la **ejecutó y declaró el mantenedor**, que aceptó la ausencia de capturas, modelos y versiones: [resultados](rg3-results.md)); RG-4 NOT STARTED (autorizado) y RG-4 pendiente. Marca solo lo que **se comprobó de verdad después de P9**, con la evidencia indicada; todo lo demás queda sin marcar. Esta lista no la completa nadie por optimismo: los puntos abiertos son las limitaciones reales ([limitations.md](limitations.md)) y cada uno aparece con su estado en la [auditoría de preparación](release-readiness-audit.md).
 
-**Alcance de v1:** **beta cerrada** ([política](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). **Candidato:** `v1.0.0-rc.3` (preproducción, PWA real y dispositivos); `v1.0.0` solo si ese candidato pasa sin cambios. Las versiones siguen en `1.0.0-rc.2` y **no se ha creado ningún tag nuevo**: el cambio de versión es RG-4, con autorización.
+**Alcance de v1:** **beta cerrada** ([política](release-readiness-audit.md#política-de-acceso-para-v1-decisión-provisional)). **Candidato:** `v1.0.0-rc.3` (preproducción, PWA real y dispositivos); `v1.0.0` solo si ese candidato pasa sin cambios. Las versiones están en `1.0.0-rc.3` (RG-4, PR #74) y el tag `v1.0.0-rc.3` está creado y publicado como pre-release; `v1.0.0` **no existe**.
 
 Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate de #68» = la tanda secuencial del PR #68 sobre `9b522c1` (lo último de P9), repetida en parte sobre `main` `57090dd` tras fusionarlo.
 
@@ -67,10 +67,10 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 ## 10. Metadatos del release
 
 - [x] **Notas de versión** de `rc.3` ([release-notes-1.0.0-rc.3.md](release-notes-1.0.0-rc.3.md); 230 commits y 9 migraciones desde `rc.2`). Las de `v1.0.0` siguen pendientes.
-- [x] **Versiones subidas a `1.0.0-rc.3`** (raíz, tres workspaces y `package-lock.json`; PR de RG-4). **Pendiente:** etiquetar `v1.0.0-rc.3` (pre-release) **solo después de fusionar el PR**, desde `main` y con autorización.
+- [x] **Versiones subidas a `1.0.0-rc.3`** (raíz, tres workspaces y `package-lock.json`; PR de RG-4). **Hecho:** `v1.0.0-rc.3` etiquetado (anotado, sobre `main` `2e6d2b4`) y publicado como pre-release después de fusionar el PR #74, con autorización.
 - [ ] **Licencia decidida** (no existe `LICENSE`; no bloquea una beta privada, sí una distribución pública).
 - [ ] **`v1.0.0`:** solo si `rc.3` pasa el gate sin cambios y con autorización expresa.
-- [x] `v1.0.0-rc.1` y `v1.0.0-rc.2` publicados como pre-release (inmutables).
+- [x] `v1.0.0-rc.1`, `v1.0.0-rc.2` y `v1.0.0-rc.3` publicados como pre-release (inmutables).
 
 ## Fuera de esta lista (no bloquean la beta cerrada)
 

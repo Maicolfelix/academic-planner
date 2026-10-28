@@ -13,7 +13,7 @@
 | RG-2b                  | DONE (#71): HTTPS temporal validado con Cloudflare Quick Tunnel; humo `--full` 36/0/0                                                                              |
 | Alojamiento permanente | **NO** (no existe; el túnel no garantiza disponibilidad)                                                                                                           |
 | RG-3                   | **DONE — aceptado por el mantenedor con renuncia a la evidencia formal de dispositivos** (ejecutado el 2026-10-27; resultados en [rg3-results.md](rg3-results.md)) |
-| RG-4                   | NOT STARTED (autorizado por el mantenedor tras el cierre de RG-3; versión `1.0.0-rc.2` sin cambios, sin tag nuevo)                                                 |
+| RG-4                   | DONE (PR #74): versión `1.0.0-rc.3` y tag `v1.0.0-rc.3` publicado como pre-release                                                                                 |
 
 ## Shell requerido
 

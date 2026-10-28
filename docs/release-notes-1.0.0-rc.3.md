@@ -1,6 +1,6 @@
 # Academic Planner 1.0.0-rc.3 — notas de la versión
 
-**Release Candidate 3.** Candidato para la **beta cerrada** de `v1.0.0` y para entrega y evaluación académica. **No es una certificación para producción pública**: no existe un alojamiento persistente (HTTPS y proxy reales se validaron de forma **temporal**) y la QA en dispositivos físicos es una declaración del mantenedor sin evidencia formal. Tag: `v1.0.0-rc.3`, que se crea **después** de fusionar el PR de este candidato, desde `main` y con autorización (hasta entonces el tag no existe). `v1.0.0` **no** existe.
+**Release Candidate 3.** Candidato para la **beta cerrada** de `v1.0.0` y para entrega y evaluación académica. **No es una certificación para producción pública**: no existe un alojamiento persistente (HTTPS y proxy reales se validaron de forma **temporal**) y la QA en dispositivos físicos es una declaración del mantenedor sin evidencia formal. Tag: `v1.0.0-rc.3`, anotado, sobre el commit de `main` que fusionó el PR #74 (`2e6d2b4`). `v1.0.0` **no** existe.
 
 ## Qué cambia respecto a rc.2
 
@@ -26,7 +26,7 @@ Todo lo de [rc.2](release-notes-1.0.0-rc.2.md) y [rc.1](release-notes-1.0.0-rc.1
 Node.js ≥ 22.18 (probado con 24.19), npm ≥ 10, Docker Desktop (PostgreSQL 17, puerto del host 5433) y un navegador moderno.
 
 ```bash
-git clone https://github.com/Maicolfelix/academic-planner.git && cd academic-planner && git checkout v1.0.0-rc.3   # el tag existe solo después de fusionar este candidato
+git clone https://github.com/Maicolfelix/academic-planner.git && cd academic-planner && git checkout v1.0.0-rc.3
 npm ci
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 npm run db:up
