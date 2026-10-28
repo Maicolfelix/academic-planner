@@ -127,7 +127,7 @@ Por campo hay valor, `certainty` (`EXACT`, `LIKELY`, `AMBIGUOUS`, `MISSING`) y `
 
 ## Días anunciados primero, descripción después (C5)
 
-«Tengo dos actividades, una el martes y la otra el jueves; la del martes es sobre redes y la del jueves es práctica con Kali Linux»: reescribe este mensaje, solo en Captura rápida, como una frase por actividad («actividad de redes el martes. práctica con Kali Linux el jueves.») y el motor de siempre lo lee (fechas, asignaturas, tipos). Es **estricto**: el arranque debe ser solo el anuncio, y cada día anunciado debe describirse exactamente una vez (por su día, «la del martes», o por su lugar, «la primera»/«la segunda»); si algo no cuadra devuelve y el mensaje se lee como antes. Ninguna palabra se inventa. «Actividad» y «práctica» cuentan como actividades en la captura de varias; «tengo», «hay», «hacer» y «que» no entran en un título.
+«Tengo dos actividades, una el martes y la otra el jueves; la del martes es sobre redes y la del jueves es práctica con Kali Linux»: `captureDeferred.ts` reescribe este mensaje, solo en Captura rápida, como una frase por actividad («actividad de redes el martes. práctica con Kali Linux el jueves.») y el motor de siempre lo lee (fechas, asignaturas, tipos). Es **estricto**: el arranque debe ser solo el anuncio, y cada día anunciado debe describirse exactamente una vez (por su día, «la del martes», o por su lugar, «la primera»/«la segunda»); si algo no cuadra devuelve `null` y el mensaje se lee como antes. Ninguna palabra se inventa. «Actividad» y «práctica» cuentan como actividades en la captura de varias; «tengo», «hay», «hacer» y «que» no entran en un título.
 
 ## Recurrencia semanal (F1-2e)
 
