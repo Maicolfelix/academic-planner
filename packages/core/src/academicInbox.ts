@@ -186,6 +186,8 @@ const READ_VERBS = new Set(['leer', 'lean', 'leeremos', 'leera', 'lea', 'leamos'
 const TASK_NOUNS = new Set([
   'informe',
   'informes',
+  'laboratorio',
+  'laboratorios',
   'reporte',
   'reportes',
   'ejercicio',
@@ -294,6 +296,10 @@ const ESSAY_NOUNS = new Set([
   'actividades',
   'practica',
   'practicas',
+  'entrega',
+  'entregas',
+  'informe',
+  'informes',
 ]);
 const ERRAND_VERBS = new Set([
   'llevar',
@@ -363,7 +369,16 @@ export function findAnchors(
             i - a.start <= 4 &&
             tokens.slice(a.start + 1, i).every((t) => NOUN_SKIPPABLE.has(t.norm)),
         );
-      if (!inside && !inSubjectName && !ofDelivery) {
+      // "informe final del proyecto": the type word right after names the activity; the report is part of its title.
+      const ofTypeWord =
+        (word === 'informe' || word === 'informes') &&
+        anchors.some((a) => a.implicitType === null && a.start > i && a.start - i <= 4);
+      const ofReport =
+        (word === 'laboratorio' || word === 'laboratorios') &&
+        tokens
+          .slice(Math.max(0, i - 3), i)
+          .some((t) => ['informe', 'informes', 'reporte', 'reportes'].includes(t.norm));
+      if (!inside && !inSubjectName && !ofDelivery && !ofTypeWord && !ofReport) {
         anchors.push({ start: i, length: 1, implicitType });
       }
     }

@@ -5,7 +5,7 @@ import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activ
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
 import { gradeCaptureSchema } from './captureGrades.js';
 import { describeTokens, maskMetaText } from './captureContext.js';
-import { resolveDeferredDescriptions } from './captureDeferred.js';
+import { normalizeLooseText, resolveDeferredDescriptions } from './captureDeferred.js';
 import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
   FIELD_CERTAINTIES,
@@ -1013,7 +1013,11 @@ export function parseCaptureProposals(
   const entries = buildSubjectEntries(context.subjects);
   // "Tengo 3 actividades…" and "la otra es…" are about the text, not activities: blanked out (offsets stay), never a title.
   const meta = maskMetaText(
-    (mode === 'QUICK' ? resolveDeferredDescriptions(trimmed) : null) ?? trimmed,
+    mode === 'QUICK'
+      ? (resolveDeferredDescriptions(trimmed) ??
+          normalizeLooseText(trimmed, context.now, context.timeZone) ??
+          trimmed)
+      : trimmed,
   );
   let spans = segmentDiscourse(meta.text, context, {
     splitLeading: mode === 'QUICK',

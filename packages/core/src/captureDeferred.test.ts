@@ -64,3 +64,55 @@ describe('chatter before the activity is not part of its title', () => {
     expect(proposals.map((p) => p.title.value)).toEqual(['Exposición', 'Quiz']);
   });
 });
+
+describe('hard messages', () => {
+  const rows = (text: string) =>
+    parseCaptureProposals(text, ctx, 'QUICK').proposals.map(
+      (p) => [p.title.value, p.date.value] as const,
+    );
+
+  it('"mañana … y pasado mañana entrega de …" are two activities on two days', () => {
+    expect(rows('mañana tengo parcial de redes y pasado mañana entrega de programación')).toEqual([
+      ['Parcial', '2026-10-06'],
+      ['Entrega de programación', '2026-10-07'],
+    ]);
+  });
+
+  it('keeps the informe in a list of three', () => {
+    expect(
+      rows(
+        'tengo tres cosas: un taller el lunes, un quiz el miércoles y un informe el viernes',
+      ).map((r) => r[0]),
+    ).toEqual(['Taller', 'Quiz', 'Informe']);
+  });
+
+  it('reads "en dos semanas" and "en 3 días" as dates', () => {
+    expect(
+      rows('en dos semanas hay exposición de ciberseguridad, en tres semanas el parcial'),
+    ).toEqual([
+      ['Exposición de ciberseguridad', '2026-10-19'],
+      ['Parcial', '2026-10-26'],
+    ]);
+    expect(rows('quiz de redes en 3 días')[0]![1]).toBe('2026-10-08');
+  });
+
+  it('a change of day keeps only the new day', () => {
+    expect(rows('el parcial de redes se cambió para el viernes en vez del jueves')).toEqual([
+      ['Parcial', '2026-10-09'],
+    ]);
+  });
+
+  it('a list under "la próxima semana" is of that week', () => {
+    expect(rows('para la próxima semana: lunes quiz de redes, martes taller')).toEqual([
+      ['Quiz', '2026-10-12'],
+      ['Taller', '2026-10-13'],
+    ]);
+  });
+
+  it('hearsay at the start and "lo entregamos" are not part of the title', () => {
+    expect(rows('profe dijo que el taller de bases de datos es el miércoles')[0]![0]).toBe(
+      'Taller de bases de datos',
+    );
+    expect(rows('el informe final lo entregamos el 20 de noviembre')[0]![0]).toBe('Informe final');
+  });
+});
