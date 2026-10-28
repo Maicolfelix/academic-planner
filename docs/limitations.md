@@ -49,7 +49,7 @@ Lista central y honesta de lo que el sistema **no** hace o no se ha comprobado. 
 - El registro revela si un correo ya existe (409), a diferencia del inicio de sesión.
 - Sesión de duración fija de 7 días (sin renovación ni cierre por inactividad) y sin lista de sesiones activas. Las sesiones vencidas solo se borran al usarse; no hay tarea de purga.
 - Límites de frecuencia **en memoria y por proceso**: se reinician con el servidor y no se comparten entre instancias, así que v1 se despliega con **una sola instancia**.
-- `npm audit`: **0 vulnerabilidades** (con y sin `--omit=dev`) en `main` tras P9. Ver [security.md](security.md#15-dependencias-npm-audit) para el historial.
+- `npm audit`: `--omit=dev` = **0**. Sin `--omit=dev`: **4 bajas, solo de desarrollo** desde el 2026-10-28 (aviso nuevo GHSA-gcqx-w48m-w2h4 en `deepmerge`, cadena `vite-plugin-pwa` → `workbox-build` → `@rollup/plugin-node-resolve`); eran 0 en `main` tras P9 y en `rc.3`. La única corrección ofrecida es `--force` con una degradación mayor y no se aplicó. Ver [security.md](security.md#15-dependencias-npm-audit) para el historial.
 - No se hizo prueba de penetración ni revisión de la infraestructura de despliegue.
 - La cuenta demo (contraseña pública) **no debe existir** en un despliegue público ([demo.md](demo.md)).
 - **Licencia:** no hay archivo `LICENSE` (decisión pendiente del propietario). Para una beta privada no bloquea; antes de cualquier distribución pública debe decidirse.

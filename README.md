@@ -2,7 +2,7 @@
 
 Aplicación web progresiva (PWA) para **organizar asignaturas, actividades, agenda y progreso académico** de un estudiante universitario. Centraliza la información en un solo lugar, calcula qué requiere atención primero y reduce los pasos operativos para registrar compromisos (escribiendo una frase, pegando un mensaje o subiendo un horario). Todo el procesamiento ocurre en el servidor de la aplicación: no usa IA generativa ni servicios de terceros.
 
-> Estado: **Release Candidate `1.0.0-rc.3`** (roadmap de las Fases 0–20 completo; congelación de funcionalidades). Candidato para entrega y evaluación académica: **no es una certificación para producción pública**, no se ha desplegado y no hay versión final. Notas: [rc.3](docs/release-notes-1.0.0-rc.3.md) (reemplaza a [rc.2](docs/release-notes-1.0.0-rc.2.md) y [rc.1](docs/release-notes-1.0.0-rc.1.md)). El software **no ha medido** efectos sobre el rendimiento o el bienestar académico; las pruebas demuestran que funciona como se describe. Limitaciones: [docs/limitations.md](docs/limitations.md).
+> Estado: **`1.0.0-rc.3` publicado; versión final `1.0.0` (beta cerrada) preparada, tag aún inexistente** (roadmap de las Fases 0–20 completo; congelación de funcionalidades). Candidato para entrega y evaluación académica: **no es una certificación para producción pública**, no se ha desplegado y no hay versión final. Notas: [rc.3](docs/release-notes-1.0.0-rc.3.md) (reemplaza a [rc.2](docs/release-notes-1.0.0-rc.2.md) y [rc.1](docs/release-notes-1.0.0-rc.1.md)). El software **no ha medido** efectos sobre el rendimiento o el bienestar académico; las pruebas demuestran que funciona como se describe. Limitaciones: [docs/limitations.md](docs/limitations.md).
 
 ## Funcionalidades
 

@@ -135,6 +135,8 @@ Restricciones que PostgreSQL hace cumplir por sí mismo (probadas con escrituras
 
 ## 15. Dependencias (`npm audit`)
 
+**Hallazgo del 2026-10-28 (previo a `v1.0.0`, sin cambios de dependencias):** `npm audit --omit=dev` = 0, pero `npm audit` = **4 bajas, solo de desarrollo**: GHSA-gcqx-w48m-w2h4 (`deepmerge`, prototype poisoning en `mergeObject()`) en la cadena de build `vite-plugin-pwa` → `workbox-build` → `@rollup/plugin-node-resolve` → `deepmerge`. Es un aviso nuevo del registro (el mismo lockfile daba 0 con `rc.3`). No llega al código de producción. La única corrección es `npm audit fix --force` con una degradación mayor de `workbox-build`, que no se aplicó. Queda como pendiente de decisión del mantenedor o de un PR de dependencias aparte.
+
 **Actualización (octubre 2026):** `npm audit fix` sin `--force` (solo `package-lock.json`: `prisma`/`@prisma/client` 7.10.0 → 7.10.1 con `@prisma/config` → `deepmerge-ts` 8.0.2 y `mysql2` 3.24.4; `concurrently` 10.0.6 → `shell-quote` 1.12.0) dejó `npm audit` y `npm audit --omit=dev` en **0 vulnerabilidades**. Los hallazgos descritos abajo son el historial previo (ninguno era alcanzable en ejecución); suites completas verdes tras el cambio.
 
 **Antes de la fase: 4 vulnerabilidades altas. Después: 4 (sin cambio, por decisión).** Todas son de **una sola cadena**: `prisma@7.10.0` (CLI) → `@prisma/config` → `deepmerge-ts`, y `prisma` → `mysql2`.

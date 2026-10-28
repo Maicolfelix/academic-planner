@@ -29,7 +29,7 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 
 ## 4. Seguridad
 
-- [x] `npm audit` = 0 y `npm audit --omit=dev` = 0 en `main` tras #68.
+- [x] `npm audit --omit=dev` = 0 (producción). `npm audit` = 0 en `main` tras #68 y en `rc.3`, pero el 2026-10-28 un aviso nuevo del registro (GHSA-gcqx-w48m-w2h4, `deepmerge` vía `vite-plugin-pwa` → `workbox-build`) lo dejó en **4 de severidad baja, solo de desarrollo**; la única corrección es `--force` con una degradación mayor y no se aplicó. Decisión del mantenedor pendiente de aceptarlo o tratarlo en un PR de dependencias aparte.
 - [x] `npm run security:scan`, `npm run test:security` (273 pruebas) y `npm run test:security:browser` (9 de 9) tras RG-2.
 - [x] Cookie `__Host-`, `Secure`, `HttpOnly`, `SameSite=Lax`, sin `Domain` y HSTS verificados por **HTTPS real** (humo `--full`, túnel temporal de Cloudflare, RG-2b). **Pendiente:** hacerlo en un navegador real (RG-3).
 - [x] `TRUST_PROXY=1` y `CORS_ORIGIN` exacto verificados tras un proxy real (Cloudflare Tunnel, con evidencia: IP añadida a la derecha, un `X-Forwarded-For` falso no esquiva el límite). **Solo vale para esa topología.**
@@ -66,10 +66,10 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 
 ## 10. Metadatos del release
 
-- [x] **Notas de versión** de `rc.3` ([release-notes-1.0.0-rc.3.md](release-notes-1.0.0-rc.3.md); 230 commits y 9 migraciones desde `rc.2`). Las de `v1.0.0` siguen pendientes.
+- [x] **Notas de versión** de `rc.3` ([release-notes-1.0.0-rc.3.md](release-notes-1.0.0-rc.3.md); 230 commits y 9 migraciones desde `rc.2`). Las de `v1.0.0`: [release-notes-1.0.0.md](release-notes-1.0.0.md), en el PR final.
 - [x] **Versiones subidas a `1.0.0-rc.3`** (raíz, tres workspaces y `package-lock.json`; PR de RG-4). **Hecho:** `v1.0.0-rc.3` etiquetado (anotado, sobre `main` `2e6d2b4`) y publicado como pre-release después de fusionar el PR #74, con autorización.
 - [ ] **Licencia decidida** (no existe `LICENSE`; no bloquea una beta privada, sí una distribución pública).
-- [ ] **`v1.0.0`:** solo si `rc.3` pasa el gate sin cambios y con autorización expresa.
+- [ ] **`v1.0.0`:** PR final de versión preparado (árbol en `1.0.0`, sin cambios de producto desde `rc.3`). **Tag y GitHub Release NO creados**: solo después de fusionar ese PR y con autorización expresa.
 - [x] `v1.0.0-rc.1`, `v1.0.0-rc.2` y `v1.0.0-rc.3` publicados como pre-release (inmutables).
 
 ## Fuera de esta lista (no bloquean la beta cerrada)
