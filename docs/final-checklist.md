@@ -29,7 +29,7 @@ Evidencia «gate de RG-2» = la tanda de este PR sobre su último commit; «gate
 
 ## 4. Seguridad
 
-- [x] `npm audit --omit=dev` = 0 (producción). `npm audit` = 0 en `main` tras #68 y en `rc.3`, pero el 2026-10-28 un aviso nuevo del registro (GHSA-gcqx-w48m-w2h4, `deepmerge` vía `vite-plugin-pwa` → `workbox-build`) lo dejó en **4 de severidad baja, solo de desarrollo**; la única corrección es `--force` con una degradación mayor y no se aplicó. Decisión del mantenedor pendiente de aceptarlo o tratarlo en un PR de dependencias aparte.
+- [x] `npm audit --omit=dev` = 0 (producción). `npm audit` = 0 en `main` tras #68 y en `rc.3`, pero el 2026-10-28 un aviso nuevo del registro (GHSA-gcqx-w48m-w2h4, `deepmerge` vía `vite-plugin-pwa` → `workbox-build`) lo dejó con **4 hallazgos de severidad baja según `npm audit`, solo de desarrollo** (`deepmerge@4.3.1`, `dev: true`). **`OWNER_ACCEPTED / ACCEPTED FOR v1.0.0`** (tooling de desarrollo; `--omit=dev` = 0; seguimiento posterior; la única corrección es `--force` con un cambio incompatible y **no** se aplica). Aceptación de este hallazgo, no de vulnerabilidades futuras.
 - [x] `npm run security:scan`, `npm run test:security` (273 pruebas) y `npm run test:security:browser` (9 de 9) tras RG-2.
 - [x] Cookie `__Host-`, `Secure`, `HttpOnly`, `SameSite=Lax`, sin `Domain` y HSTS verificados por **HTTPS real** (humo `--full`, túnel temporal de Cloudflare, RG-2b). **Pendiente:** hacerlo en un navegador real (RG-3).
 - [x] `TRUST_PROXY=1` y `CORS_ORIGIN` exacto verificados tras un proxy real (Cloudflare Tunnel, con evidencia: IP añadida a la derecha, un `X-Forwarded-For` falso no esquiva el límite). **Solo vale para esa topología.**
