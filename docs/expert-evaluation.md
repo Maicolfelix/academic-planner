@@ -1,0 +1,41 @@
+# Evaluación funcional y de usabilidad (2026-10-28)
+
+Recorrido de las funciones principales hecho por **un evaluador experto (el desarrollador asistido por Claude), no por estudiantes**. Es una revisión de calidad con un recorrido de usuario nuevo: detecta fallos y confusiones, pero **no** mide si la aplicación le sirve a un estudiante ni sustituye una prueba con usuarios (el protocolo para hacerla, opcional, está en [user-validation.md](user-validation.md)).
+
+**Entorno:** stack de desarrollo local (`npm run dev`), cuenta nueva creada durante la prueba (borrada al terminar), navegador de escritorio, Bogotá. Fecha de la prueba: miércoles 28 de octubre de 2026.
+
+## Resultados por función
+
+| #   | Función                       | Qué se hizo                                                                                                   | Resultado                                                                                                                                                           |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Registro y onboarding         | Crear cuenta, elegir «Universidad», periodo 2026-II con fechas, omitir carrera y semestre, agregar 2 materias | Correcto. Cada paso se puede omitir; termina en «Listo para empezar» y entra al Inicio con el periodo.                                                              |
+| 2   | Captura rápida                | Mensaje de dos actividades con días anunciados primero y descripción después; revisar y confirmar             | Correcto: 2 propuestas con fechas válidas (jue 29/10 y mar 3/11), nada se guardó hasta confirmar, y al confirmar el Inicio, el Radar y el progreso se actualizaron. |
+| 3   | «¿Qué hago ahora?» y estados  | Pulsar «Empezar» en la actividad más cercana                                                                  | Correcto: pasa a «En proceso» y el aviso lo confirma.                                                                                                               |
+| 4   | Editar actividad              | Vaciar el título (validación), corregirlo, cambiar la fecha dos semanas                                       | Correcto: «Ingresa un título.» al vaciarlo; «Actividad actualizada.»; el Radar la pasó de «Planificable» a «Bajo control» sola.                                     |
+| 5   | Selector de fecha             | Elegir mes y año con las cuadrículas nuevas                                                                   | Correcto (PR #83): el campo recibe la fecha elegida.                                                                                                                |
+| 6   | Importar calendario `.ics`    | Archivo de ejemplo con una clase semanal y un parcial; revisar y confirmar                                    | Correcto: detectó clase («Cada lunes, 8:00–10:00») y parcial, propuso la asignatura que coincidía y creó «1 actividad y 1 clase».                                   |
+| 7   | Agenda                        | Ver la semana actual y la siguiente                                                                           | Correcto: la clase aparece los lunes con «se repite cada semana» y el parcial el miércoles; la actividad movida ya no aparece en su fecha anterior.                 |
+| 8   | Notas                         | Configurar escala 0–5 y cortes 30/30/40; registrar 4,2 en el corte 1 (con coma decimal)                       | Correcto: acepta la coma; aporta 1,26; «necesitas aproximadamente 2,5 en el 70 % restante» coincide con el cálculo (3,0 − 1,26) / 0,70 ≈ 2,49.                      |
+| 9   | Pantalla de teléfono (360 px) | Desbordes horizontales en Inicio, Actividades, Agenda, Asignaturas, Radar, Bandeja y Mis estudios             | Sin desbordes (revisión previa).                                                                                                                                    |
+
+## Hallazgos
+
+| Id  | Severidad               | Hallazgo                                                                                                                                                                                                                                             | Estado                                                                                                                                                                                   |
+| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1  | Media (solo desarrollo) | En `npm run dev`, la primera petición a la API tras arrancar fallaba con 502 (por ejemplo, el primer registro): `node --watch` reiniciaba el servidor al cargar por primera vez archivos de `node_modules` (`busboy`, `iconv-lite`, `tesseract.js`). | **Corregido:** el script `dev` de la API vigila solo `src` y `packages/core/dist`. Verificado: tres peticiones seguidas sin reinicio. No afecta a producción (`start` no usa `--watch`). |
+| H2  | Baja                    | El título de la actividad creada a partir de «una el martes… la del martes es sobre redes» queda como «Actividad» (la asignatura sí es Redes). «Actividad de redes» sería más informativo.                                                           | Documentado: se puede editar en la revisión; no se cambió para no tocar el motor sin necesidad.                                                                                          |
+| H3  | Baja                    | «Práctica con Kali Linux» se clasifica como tipo «Tarea» y sin asignatura (el mensaje no nombra una materia).                                                                                                                                        | Documentado: es la conducta diseñada (nunca inventa una asignatura); el estudiante puede asignarla en la revisión.                                                                       |
+| H4  | Informativa             | Dentro de «Listo para empezar» el texto dice «Organizaremos este periodo dentro de Universidad». Es correcto pero suena a lenguaje interno.                                                                                                          | Documentado.                                                                                                                                                                             |
+
+## Qué NO se probó
+
+- Importación de horario por imagen (OCR) y por texto, Bandeja académica, Share Target.
+- PWA instalada, aviso de actualización y comportamiento sin conexión.
+- Recordatorios al paso del tiempo, «Añadir al calendario» (descarga del `.ics`) y Progreso por asignatura con datos reales.
+- Teclado y lectores de pantalla en las cuadrículas de mes y año.
+- Navegadores distintos de Chromium.
+- Cualquier uso por personas distintas del desarrollador.
+
+## Cómo citarlo
+
+«Se realizó una evaluación funcional por recorrido de las funciones principales con una cuenta nueva (9 funciones; 1 hallazgo de severidad media en el entorno de desarrollo, corregido, y 3 menores documentados). No se realizó una prueba con usuarios: esta evaluación no permite afirmar utilidad ni facilidad de uso percibida.»
