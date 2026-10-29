@@ -6,6 +6,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 _(nada todavía)_
 
+## 1.1.0 — Pixel Companion, smarter capture, date picker and ruled-table OCR (2026-10-29)
+
+### Added
+
+- **Pixel Companion C1 to C3 (PR #78, #79, #80).** The character has a life of its own, walks with the student through the app and the whole app gets an aesthetic polish: pixel icons, empty-state scenes, dialogs, cards, sign-in and sign-up in the same identity, a new reminders panel and an achievement card with the companion celebrating a completed activity. Presentation only: no rules changed.
+- **App icon with the companion (C4, PR #81).** New PWA icons and favicon on the same manifest colours.
+- **Smarter capture (C5, PR #82).** Days announced first and described later, relative deadlines ("en dos semanas", "en 3 días"), next-week lists, corrections ("se cambió para el viernes en vez del jueves"), hearsay phrasing and more activity nouns. Still deterministic (no AI); nothing is saved without the student confirming.
+- **Own date picker with month and year grids (PR #83) and keyboard on them (PR #84).**
+- **Schedule import reads ruled tables (PR #86).** A table with thick black borders gave 0 classes; the long thin lines are now erased before the OCR. No new dependency.
+- **Documentation for presenting the work:** expert functional evaluation (not a user test), the optional user-validation protocol and the thesis outline with screenshots (PR #84, #85); state documents brought up to date (PR #86).
+
+### Changed
+
+- **Version `1.1.0`** in the root and the three workspaces (and `package-lock.json`; the `@planner/core` ranges are untouched). No migrations (still 15), no new or updated dependencies, no endpoint changes.
+
 ## 1.0.0 — Versión final, beta cerrada (2026-10-28)
 
 ### Changed
