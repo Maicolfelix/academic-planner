@@ -9,6 +9,7 @@ import {
 import { createWorker, type Worker } from 'tesseract.js';
 import { getDocumentProxy, renderPageAsImage } from 'unpdf';
 import { AppError } from '../errors/AppError.js';
+import { removeTableLines } from './removeTableLines.js';
 
 /**
  * The external libraries live behind these two small interfaces, so the pipeline (and its tests) never depends
@@ -122,7 +123,8 @@ export function createOcrProvider(): OcrProvider {
         clearTimeout(idle);
         const w = await start();
         try {
-          const { data } = await w.recognize(image, {}, { blocks: true });
+          // The ruling of a table is erased first: OCR reads a ruled grid as a picture and finds no words in it.
+          const { data } = await w.recognize(await removeTableLines(image), {}, { blocks: true });
           const words: ExtractedWord[] = [];
           for (const block of data.blocks ?? []) {
             for (const paragraph of block.paragraphs) {

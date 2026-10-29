@@ -65,6 +65,17 @@ El worker de OCR se crea al primer uso, procesa **una imagen a la vez** y se lib
 - Cuerpo estricto: un solo archivo en el campo `file` y ningún otro campo (`userId`, `periodId`… se rechazan). El periodo y las asignaturas salen de la sesión.
 - Respuesta `Cache-Control: no-store`.
 
+## Líneas de tabla
+
+Una tabla con **bordes negros gruesos** confundía al OCR: leía la rejilla como un dibujo y devolvía «rms», «fees» o nada, y la importación daba 0 clases. `removeTableLines` (`apps/api/src/scheduleImport/removeTableLines.ts`) pinta de blanco, antes de reconocer el texto, las líneas **largas** (al menos el 8 % del ancho o del alto, mínimo 60 px) y **delgadas** (unos pocos píxeles de grosor, proporcional a la imagen):
+
+- un bloque relleno (cabecera oscura, celda de color) **no** es una línea: es mucho más grueso, y se conserva;
+- los trazos de las letras que cruzan una línea se conservan: solo se borran los píxeles cuyo tramo oscuro perpendicular es corto;
+- una imagen sin líneas devuelve **el mismo buffer** (nada cambia para lo que ya funcionaba), una imagen enorme (> 40 megapíxeles) o ilegible se deja como está, y cualquier fallo devuelve la original: es una ayuda para el OCR, nunca un motivo para que la importación falle;
+- usa `@napi-rs/canvas`, que ya es una dependencia (la usa el lector de PDF): sin dependencias nuevas.
+
+Pruebas: `removeTableLines.test.ts` (sin líneas = mismo buffer, grosores de 1 a 6 px, bloque relleno, trazos de letras, datos no imagen, imagen diminuta; con una comprobación de mutación de la regla «delgada») y una prueba de la ruta con OCR real (`a ruled table (real OCR)`). Límite: no se probó con horarios reales de universidades.
+
 ## Cómo se interpreta
 
 **Días:** lunes … domingo y abreviaturas (lun, mar, mié/mie, jue, vie, sáb/sab, dom), sin distinguir mayúsculas ni acentos.

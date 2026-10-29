@@ -168,6 +168,29 @@ export const twoClassTable = (format: 'png' | 'jpeg' = 'png') =>
   );
 
 /**
+ * The same two classes, drawn inside a RULED table: thick black lines between the rows and the columns, as printed or
+ * hand-made timetables have them. The lines sit in the gaps between the texts, never through them.
+ */
+export const twoClassBorderedTable = (thickness = 3, format: 'png' | 'jpeg' = 'png') => {
+  const size = { width: 900, height: 460 };
+  const canvas = createCanvas(size.width, size.height);
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, size.width, size.height);
+  g.fillStyle = '#000000';
+  g.font = '28px sans-serif';
+  for (const item of tableItems([
+    { time: '08:00 - 10:00', cells: [{ day: 0, text: 'Redes' }] },
+    { time: '10:00 - 12:00', cells: [{ day: 2, text: 'Bases de Datos' }] },
+  ]))
+    g.fillText(item.text, item.x, item.y);
+  for (const y of [8, 75, 165, 255]) g.fillRect(10, y, size.width - 20, thickness);
+  for (const x of [10, 185, 405, 625, size.width - 10])
+    g.fillRect(x, 8, thickness, 247 + thickness);
+  return format === 'png' ? canvas.toBuffer('image/png') : canvas.toBuffer('image/jpeg', 95);
+};
+
+/**
  * What a scanner or a phone produces: a full A4-proportioned page (about 150 dpi) with 12-14 pt text, wrapped as a
  * JPEG inside a PDF. Text this size is what OCR meets in real documents.
  */
