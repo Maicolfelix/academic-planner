@@ -20,6 +20,7 @@ import {
   scannedTwoClassPdf,
   tableItems,
   twoClassListItems,
+  twoClassBorderedTable,
   twoClassTable,
   weeklyCalendarImage,
 } from '../../test/scheduleImportFixtures.js';
@@ -864,5 +865,17 @@ describe('performance (this machine, for the record)', () => {
     console.info('schedule import timings (ms):', JSON.stringify(timings));
     expect(timings['pdf-text']!).toBeLessThan(5000);
     expect(timings['image']!).toBeLessThan(20_000);
+  });
+});
+
+// Its own app (and so its own rate-limit budget): the interpretation block above spends all of its 10 imports.
+describe('a ruled table (real OCR)', () => {
+  const app = appWith({ pdf, ocr: realOcr });
+
+  it('thick black borders are read like a table without them', async () => {
+    const u = await setupUser(app, 'ruled@example.com', 'Redes');
+    await u.agent.post('/api/subjects').send({ periodId: u.period.id, name: 'Bases de Datos' });
+    const r = parsed(await upload(u.agent, twoClassBorderedTable(3), 'horario.png', 'image/png'));
+    expect(summary(r)).toEqual(TWO_CLASSES);
   });
 });
