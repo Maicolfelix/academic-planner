@@ -125,6 +125,10 @@ Por campo hay valor, `certainty` (`EXACT`, `LIKELY`, `AMBIGUOUS`, `MISSING`) y `
 
 `result.corrections[]` lista cada pregunta que **dos o más** propuestas comparten: la misma asignatura ambigua o desconocida (entre actividades distintas también) y los días que comparten una hora ambigua (también la hora de una referencia a un grupo). Una respuesta se propaga a todas mientras ninguna se haya personalizado: **lo que el estudiante cambia en UNA propuesta deja de seguir al grupo** y no lo pisa una respuesta posterior. Una pregunta que solo tiene una propuesta no se lista: su tarjeta la hace.
 
+## Días anunciados primero, descripción después (C5)
+
+«Tengo dos actividades, una el martes y la otra el jueves; la del martes es sobre redes y la del jueves es práctica con Kali Linux»: `captureDeferred.ts` reescribe este mensaje, solo en Captura rápida, como una frase por actividad («actividad de redes el martes. práctica con Kali Linux el jueves.») y el motor de siempre lo lee (fechas, asignaturas, tipos). Es **estricto**: el arranque debe ser solo el anuncio, y cada día anunciado debe describirse exactamente una vez (por su día, «la del martes», o por su lugar, «la primera»/«la segunda»); si algo no cuadra devuelve `null` y el mensaje se lee como antes. Ninguna palabra se inventa. «Actividad» y «práctica» cuentan como actividades en la captura de varias; «tengo», «hay», «hacer» y «que» no entran en un título.
+
 ## Recurrencia semanal (F1-2e)
 
 Una `RecurrenceSuggestion` clasifica lo que se repite en **tres** destinos (el estudiante nunca lo organiza: el motor decide con palabras, y la persistencia sigue siendo proponer → confirmar):

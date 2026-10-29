@@ -288,6 +288,11 @@ const TITLE_FILLERS = new Set([
  */
 const LOOSE_FILLERS = new Set([
   'tengo',
+  'tenemos',
+  'tienen',
+  'hay',
+  'hacer',
+  'que',
   'tienes',
   'tiene',
   'tuve',
@@ -309,6 +314,9 @@ const LOOSE_FILLERS = new Set([
   'semana',
   'semanas',
   'entrego',
+  'entregamos',
+  'presentamos',
+  'enviamos',
   'presento',
   'hago',
   'hare',

@@ -287,7 +287,33 @@ function exactSubjectRanges(tokens: Token[], entries: SubjectEntry[]): [number, 
  */
 const MEETING_NOUNS = new Set(['reunion', 'reuniones', 'cita', 'citas', 'tramite', 'tramites']);
 /** "ensayo": a written (or rehearsed) piece of work that is not one of the school types. It is a TASK by default. */
-const ESSAY_NOUNS = new Set(['ensayo', 'ensayos']);
+const ESSAY_NOUNS = new Set([
+  'ensayo',
+  'ensayos',
+  'actividad',
+  'actividades',
+  'practica',
+  'practicas',
+  'entrega',
+  'entregas',
+  'informe',
+  'informes',
+  'laboratorio',
+  'laboratorios',
+]);
+const NUMBER_WORDS = new Set([
+  'un',
+  'una',
+  'dos',
+  'tres',
+  'cuatro',
+  'cinco',
+  'seis',
+  'siete',
+  'ocho',
+  'nueve',
+  'diez',
+]);
 const ERRAND_VERBS = new Set([
   'llevar',
   'pagar',
@@ -356,7 +382,26 @@ export function findAnchors(
             i - a.start <= 4 &&
             tokens.slice(a.start + 1, i).every((t) => NOUN_SKIPPABLE.has(t.norm)),
         );
-      if (!inside && !inSubjectName && !ofDelivery) {
+      // "informe final del proyecto": the type word right after names the activity; the report is part of its title.
+      const ofTypeWord =
+        (word === 'informe' || word === 'informes') &&
+        anchors.some((a) => a.implicitType === null && a.start > i && a.start - i <= 4);
+      const ofReport =
+        (word === 'laboratorio' || word === 'laboratorios') &&
+        tokens
+          .slice(Math.max(0, i - 3), i)
+          .some((t) => ['informe', 'informes', 'reporte', 'reportes'].includes(t.norm));
+      // "no tengo actividades hoy", "las actividades de esta semana": the word is only mentioned, not an activity. A plural
+      // counts only with a number before it, and a negation just before cancels any of these nouns.
+      const before = tokens.slice(Math.max(0, i - 3), i).map((t) => t.norm);
+      const ofMention =
+        word !== 'ensayo' &&
+        word !== 'ensayos' &&
+        ESSAY_NOUNS.has(word) &&
+        (before.some((w) => ['no', 'ninguna', 'ninguno', 'sin', 'nada'].includes(w)) ||
+          (word.endsWith('s') &&
+            !before.slice(-2).some((w) => /^\d+$/.test(w) || NUMBER_WORDS.has(w))));
+      if (!inside && !inSubjectName && !ofDelivery && !ofTypeWord && !ofReport && !ofMention) {
         anchors.push({ start: i, length: 1, implicitType });
       }
     }
