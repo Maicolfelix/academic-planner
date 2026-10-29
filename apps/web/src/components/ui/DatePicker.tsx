@@ -85,7 +85,8 @@ function CalendarPopup({
       setView(shiftMonth(view, e.key === 'PageUp' ? -1 : 1));
       return;
     }
-    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    const cols = mode === 'days' ? 7 : mode === 'months' ? 3 : 4;
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
     const days = [...(grid.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
     const at = days.indexOf(document.activeElement as HTMLButtonElement);
     if (at < 0) return;
@@ -94,8 +95,8 @@ function CalendarPopup({
       days[Math.min(days.length - 1, Math.max(0, at + step))]?.focus();
     } else if (e.key === 'Home' || e.key === 'End') {
       e.preventDefault();
-      const row = Math.floor(at / 7) * 7;
-      days[e.key === 'Home' ? row : Math.min(days.length - 1, row + 6)]?.focus();
+      const row = Math.floor(at / cols) * cols;
+      days[e.key === 'Home' ? row : Math.min(days.length - 1, row + cols - 1)]?.focus();
     }
   }
 
@@ -152,7 +153,7 @@ function CalendarPopup({
       </div>
 
       {mode === 'months' && (
-        <div role="group" aria-label="Mes" className="grid grid-cols-3 gap-1 py-1">
+        <div ref={grid} role="group" aria-label="Mes" className="grid grid-cols-3 gap-1 py-1">
           {MONTH_NAMES.map((name, i) => (
             <button
               key={name}
@@ -175,6 +176,7 @@ function CalendarPopup({
       )}
       {pickingYear && (
         <div
+          ref={grid}
           role="group"
           aria-label="Año"
           className="grid max-h-[12rem] grid-cols-4 gap-1 overflow-y-auto py-1"
@@ -207,48 +209,50 @@ function CalendarPopup({
           ))}
         </div>
       )}
-      <div
-        aria-hidden="true"
-        hidden={mode !== 'days'}
-        className="grid grid-cols-7 pb-1 text-center text-xs font-semibold text-muted-foreground"
-      >
-        {WEEKDAYS.map((w, i) => (
-          <span key={i}>{w}</span>
-        ))}
-      </div>
-      <div
-        ref={grid}
-        hidden={mode !== 'days'}
-        role="group"
-        aria-labelledby={titleId}
-        className="grid grid-cols-7 gap-y-0.5"
-      >
-        {monthGrid(view)
-          .flat()
-          .map((d, i) =>
-            d ? (
-              <button
-                key={d}
-                type="button"
-                aria-label={dayLabel(d)}
-                aria-pressed={d === chosen}
-                aria-current={d === today ? 'date' : undefined}
-                onClick={() => onPick(d)}
-                className={`mx-auto grid size-10 place-items-center rounded-xl text-sm font-medium tabular-nums transition-[transform,background-color,box-shadow] duration-(--duration-fast) ease-spring focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent active:scale-90 ${
-                  d === chosen
-                    ? 'bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--accent)]'
-                    : d === today
-                      ? 'bg-accent-soft font-semibold text-accent-ink ring-2 ring-accent/60 hover:bg-accent/15'
-                      : 'hover:bg-secondary'
-                }`}
-              >
-                {Number(d.slice(8, 10))}
-              </button>
-            ) : (
-              <span key={`b${i}`} aria-hidden="true" />
-            ),
-          )}
-      </div>
+      {mode === 'days' && (
+        <>
+          <div
+            aria-hidden="true"
+            className="grid grid-cols-7 pb-1 text-center text-xs font-semibold text-muted-foreground"
+          >
+            {WEEKDAYS.map((w, i) => (
+              <span key={i}>{w}</span>
+            ))}
+          </div>
+          <div
+            ref={grid}
+            role="group"
+            aria-labelledby={titleId}
+            className="grid grid-cols-7 gap-y-0.5"
+          >
+            {monthGrid(view)
+              .flat()
+              .map((d, i) =>
+                d ? (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-label={dayLabel(d)}
+                    aria-pressed={d === chosen}
+                    aria-current={d === today ? 'date' : undefined}
+                    onClick={() => onPick(d)}
+                    className={`mx-auto grid size-10 place-items-center rounded-xl text-sm font-medium tabular-nums transition-[transform,background-color,box-shadow] duration-(--duration-fast) ease-spring focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent active:scale-90 ${
+                      d === chosen
+                        ? 'bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--accent)]'
+                        : d === today
+                          ? 'bg-accent-soft font-semibold text-accent-ink ring-2 ring-accent/60 hover:bg-accent/15'
+                          : 'hover:bg-secondary'
+                    }`}
+                  >
+                    {Number(d.slice(8, 10))}
+                  </button>
+                ) : (
+                  <span key={`b${i}`} aria-hidden="true" />
+                ),
+              )}
+          </div>
+        </>
+      )}
 
       <div className="mt-2 flex items-center justify-between border-t border-dashed border-border-strong/40 pt-2 text-sm font-semibold">
         <button
