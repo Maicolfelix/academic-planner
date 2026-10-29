@@ -51,6 +51,15 @@ function CalendarPopup({
   const today = toLocalParts(now, timeZone).date;
   const chosen = isRealDateOnly(value) ? value : undefined;
   const [view, setView] = useState<DateOnly>(firstOfMonth(chosen ?? today));
+  const viewYear = Number(view.slice(0, 4));
+  const todayYear = Number(today.slice(0, 4));
+  const years = Array.from(
+    { length: Math.max(todayYear + 10, viewYear) - Math.min(todayYear - 10, viewYear) + 1 },
+    (_, i) => Math.min(todayYear - 10, viewYear) + i,
+  );
+  const [mode, setMode] = useState<'days' | 'months' | 'years'>('days');
+  const pickingYear = mode === 'years';
+  const viewMonth = Number(view.slice(5, 7));
   const grid = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -61,7 +70,7 @@ function CalendarPopup({
       grid.current?.querySelector<HTMLElement>('[aria-current="date"]') ??
       grid.current?.querySelector<HTMLElement>('button');
     target?.focus();
-  }, [view]);
+  }, [view, mode]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
@@ -106,34 +115,114 @@ function CalendarPopup({
       <div className="mb-2 flex items-center justify-between gap-1 pt-1">
         <button
           type="button"
-          aria-label="Mes anterior"
-          onClick={() => setView(shiftMonth(view, -1))}
+          aria-label={mode === 'months' ? 'Año anterior' : 'Mes anterior'}
+          onClick={() => setView(shiftMonth(view, mode === 'months' ? -12 : -1))}
           className="grid size-11 place-items-center rounded-full text-primary transition-colors duration-(--duration-fast) hover:bg-secondary"
         >
           <PixelIcon rows={PIXELS.left} className="size-5" />
         </button>
-        <p id={titleId} aria-live="polite" className="text-center text-card-title capitalize">
-          {MONTH_NAMES[Number(view.slice(5, 7)) - 1]} {view.slice(0, 4)}
+        <p id={titleId} aria-live="polite" className="flex items-center gap-1 text-card-title">
+          <button
+            type="button"
+            aria-expanded={mode === 'months'}
+            aria-label={`${MONTH_NAMES[viewMonth - 1]}. Elegir mes`}
+            onClick={() => setMode(mode === 'months' ? 'days' : 'months')}
+            className="min-h-11 rounded-control px-2 capitalize transition-colors duration-(--duration-fast) hover:bg-secondary"
+          >
+            {MONTH_NAMES[viewMonth - 1]}
+          </button>
+          <button
+            type="button"
+            aria-expanded={pickingYear}
+            aria-label={`${viewYear}. Elegir año`}
+            onClick={() => setMode(pickingYear ? 'days' : 'years')}
+            className="min-h-11 rounded-control px-2 tabular-nums transition-colors duration-(--duration-fast) hover:bg-secondary"
+          >
+            {viewYear}
+          </button>
         </p>
         <button
           type="button"
-          aria-label="Mes siguiente"
-          onClick={() => setView(shiftMonth(view, 1))}
+          aria-label={mode === 'months' ? 'Año siguiente' : 'Mes siguiente'}
+          onClick={() => setView(shiftMonth(view, mode === 'months' ? 12 : 1))}
           className="grid size-11 place-items-center rounded-full text-primary transition-colors duration-(--duration-fast) hover:bg-secondary"
         >
           <PixelIcon rows={PIXELS.right} className="size-5" />
         </button>
       </div>
 
+      {mode === 'months' && (
+        <div role="group" aria-label="Mes" className="grid grid-cols-3 gap-1 py-1">
+          {MONTH_NAMES.map((name, i) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={i + 1 === viewMonth}
+              onClick={() => {
+                setView(`${view.slice(0, 5)}${String(i + 1).padStart(2, '0')}-01` as DateOnly);
+                setMode('days');
+              }}
+              className={`min-h-11 rounded-xl text-sm font-medium capitalize transition-colors duration-(--duration-fast) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                i + 1 === viewMonth
+                  ? 'bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--accent)]'
+                  : 'hover:bg-secondary'
+              }`}
+            >
+              {name.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      )}
+      {pickingYear && (
+        <div
+          role="group"
+          aria-label="Año"
+          className="grid max-h-[12rem] grid-cols-4 gap-1 overflow-y-auto py-1"
+        >
+          {years.map((y) => (
+            <button
+              key={y}
+              type="button"
+              aria-pressed={y === viewYear}
+              ref={(el) => {
+                if (el && y === viewYear) {
+                  const box = el.parentElement!; // scroll the list only, never the page behind
+                  box.scrollTop = el.offsetTop - box.offsetTop - box.clientHeight / 2;
+                }
+              }}
+              onClick={() => {
+                setView(`${y}-${view.slice(5, 7)}-01` as DateOnly);
+                setMode('days');
+              }}
+              className={`min-h-11 rounded-xl text-sm font-medium tabular-nums transition-colors duration-(--duration-fast) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                y === viewYear
+                  ? 'bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--accent)]'
+                  : y === todayYear
+                    ? 'bg-accent-soft font-semibold text-accent-ink ring-2 ring-accent/60'
+                    : 'hover:bg-secondary'
+              }`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         aria-hidden="true"
+        hidden={mode !== 'days'}
         className="grid grid-cols-7 pb-1 text-center text-xs font-semibold text-muted-foreground"
       >
         {WEEKDAYS.map((w, i) => (
           <span key={i}>{w}</span>
         ))}
       </div>
-      <div ref={grid} role="group" aria-labelledby={titleId} className="grid grid-cols-7 gap-y-0.5">
+      <div
+        ref={grid}
+        hidden={mode !== 'days'}
+        role="group"
+        aria-labelledby={titleId}
+        className="grid grid-cols-7 gap-y-0.5"
+      >
         {monthGrid(view)
           .flat()
           .map((d, i) =>
