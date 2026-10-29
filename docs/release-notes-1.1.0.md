@@ -2,7 +2,7 @@
 
 **`v1.1.0` es la versión del proyecto universitario que incluye todo lo hecho después de [`v1.0.0`](release-notes-1.0.0.md):** el pulido visual con el Pixel Companion, una captura más inteligente, un selector de fecha propio con meses y años, la lectura de tablas con bordes negros en la importación de horario y la documentación para presentar el trabajo. Sigue siendo una **beta cerrada**, no una certificación para producción pública: no existe un alojamiento persistente (HTTPS real solo se validó de forma temporal), la QA en dispositivos físicos fue declarada por el mantenedor con evidencia formal incompleta, **no hay licencia** (decisión del mantenedor; no existe `LICENSE`) y **no se hizo una prueba con estudiantes**.
 
-> **El tag `v1.1.0` (anotado, inmutable) se crea sobre `main`, en el merge del PR que introduce estas notas, solo con la autorización expresa del mantenedor.** Hasta entonces esta versión no está publicada. `v1.0.0` y las versiones anteriores no se tocan.
+> **El tag `v1.1.0` (anotado, inmutable) se creó sobre `main` `d9e1c79`, el merge del PR #87, con autorización expresa del mantenedor** y el [GitHub Release](https://github.com/Maicolfelix/academic-planner/releases/tag/v1.1.0) se publicó el 2026-10-29 como el último. `v1.0.0` y las versiones anteriores no se tocaron.
 
 ## Qué cambia respecto a v1.0.0
 
