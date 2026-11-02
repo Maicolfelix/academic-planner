@@ -44,15 +44,10 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      # The two real-OCR suites draw their test images with the system `sans-serif` and read them back with
-      # Tesseract. Verified in a Linux container: 12 of 52 fail there even with Liberation Sans, while all pass on
-      # the Windows development machine. They run below as non-blocking until their fixtures stop depending on the OS.
       - run: npm test -w @planner/core
       - run: npm test -w @planner/web
-      - run: npm test -w @planner/api -- --exclude src/scheduleImport/scheduleImport.test.ts --exclude src/scheduleImport/scheduleImportConfirm.test.ts
-      - name: Real-OCR suites (non-blocking, platform-dependent)
-        continue-on-error: true
-        run: npm test -w @planner/api -- src/scheduleImport/scheduleImport.test.ts src/scheduleImport/scheduleImportConfirm.test.ts
+      # The real-OCR suites draw their images with a font bundled in apps/api/test/fonts, so they read the same on any OS.
+      - run: npm test -w @planner/api
       - run: npm run build
       - run: npm run security:scan
       - run: npm run docs:check

@@ -104,6 +104,14 @@ Verificación de correo, recuperación de contraseña, MFA y CAPTCHA siguen fuer
 
 Es un análisis de brechas contra dos marcos reconocidos, con evidencia por criterio y un plan priorizado. Para un proyecto sin operación, lo defendible es decir: **los controles técnicos están implementados y probados; los procedimientos de organización (incidentes, retención, derechos del titular) se documentan como trabajo para quien opere el servicio**. No afirmes cumplimiento ni certificación.
 
-## 6. Hallazgo del primer CI (2026-11-02)
+## 6. Hallazgo del primer CI (2026-11-02) y su corrección
 
-El primer CI en GitHub (Ubuntu) mostró que **12 de las 52 pruebas de `scheduleImport.test.ts` y 1 de `scheduleImportConfirm.test.ts` fallan en Linux** y pasan todas en Windows. Son las pruebas de **OCR real**: dibujan la imagen de prueba con la fuente `sans-serif` del sistema y Tesseract la lee. Se reprodujo en un contenedor `node:24-bookworm` y el fallo persiste aun forzando Liberation Sans (equivalente a Arial). No es un fallo de la aplicación sino de la dependencia de las pruebas del sistema operativo. Decisión: esas dos suites corren en un paso **no bloqueante** del CI y el resto es bloqueante. Pendiente: fijar una fuente dentro del repositorio para que las imágenes de prueba no dependan del sistema. Este hallazgo también es una advertencia para la tesis: la precisión medida del OCR vale para imágenes sintéticas en este equipo.
+El primer CI en GitHub (Ubuntu) mostró que **12 de las 52 pruebas de `scheduleImport.test.ts` y 1 de `scheduleImportConfirm.test.ts` fallaban en Linux** y pasaban todas en Windows. Son las pruebas de **OCR real**: dibujan la imagen de prueba y Tesseract la lee. Se reprodujo en un contenedor `node:24-bookworm` y se encontró la causa: las imágenes se dibujaban con la fuente `sans-serif` **del sistema**, y en el equipo de desarrollo esa fuente resolvía a una letra muy estrecha (una línea «08:00 - 10:00» de 28 px medía 119 px; Arial mide 165 px) sobre la que estaban calibradas las posiciones de las pruebas. En otro sistema, otra fuente.
+
+**Corrección:** las imágenes ahora se dibujan con una fuente incluida en el repositorio ([Liberation Sans](../apps/api/test/fonts/LICENSE-Liberation.txt)), comprimida horizontalmente al ancho calibrado, así que son idénticas en cualquier sistema. Verificado: las 104 pruebas de `scheduleImport` pasan en Windows y en Linux **sin ninguna fuente extra instalada**, y los tests de navegador que usan esas imágenes pasan. El CI vuelve a bloquear con ellas.
+
+**Efectos a tener presentes:**
+
+- Con la lectura ahora limpia, la sala «A207» se lee sin error, así que la segunda clase del calendario ya no aparece como «Nueva — revisa el nombre / Se leyó con poca claridad». Las pruebas se ajustaron para no depender de ese ruido del OCR.
+- **La interfaz de «poca claridad» (`LOW_CONFIDENCE` en `ImportProposalCard`) ya no tiene una prueba automática de navegador**; la regla que la genera sigue probada en `packages/core`. Pendiente: una prueba de componente que la cubra.
+- Advertencia para la tesis: la precisión del OCR medida aquí es sobre imágenes sintéticas con una fuente fija, no sobre fotos reales.
