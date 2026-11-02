@@ -1,4 +1,29 @@
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, GlobalFonts, type SKRSContext2D } from '@napi-rs/canvas';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * The test images are drawn with a font that ships with the repository (Liberation Sans, see
+ * fonts/LICENSE-Liberation.txt), not with the system `sans-serif`: the OCR reads these pixels back, so a different
+ * system font made the same tests pass on Windows and fail on Linux.
+ */
+const TEST_FONT = 'PlannerTestSans';
+/**
+ * The expected positions in these tests were calibrated on a narrow font (a 28 px line "08:00 - 10:00" was about 119 px wide;
+ * Arial and Liberation are 165 px). The glyphs are squeezed horizontally by this factor so the layout is the same on
+ * every machine; the height of the letters is unchanged.
+ */
+const TEXT_SQUEEZE = 0.75;
+
+function fillTexts(g: SKRSContext2D, items: DrawnText[]) {
+  g.save();
+  g.scale(TEXT_SQUEEZE, 1);
+  for (const item of items) g.fillText(item.text, item.x / TEXT_SQUEEZE, item.y);
+  g.restore();
+}
+GlobalFonts.registerFromPath(
+  fileURLToPath(new URL('./fonts/LiberationSans-Regular.ttf', import.meta.url)),
+  TEST_FONT,
+);
 
 /**
  * Synthetic schedule documents, generated on demand (no real timetable, no copyright, nothing private):
@@ -24,8 +49,8 @@ export function drawTextImage(
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, size.width, size.height);
   g.fillStyle = '#000000';
-  g.font = `${fontSize}px sans-serif`;
-  for (const item of items) g.fillText(item.text, item.x, item.y);
+  g.font = `${fontSize}px ${TEST_FONT}`;
+  fillTexts(g, items);
   return format === 'png' ? canvas.toBuffer('image/png') : canvas.toBuffer('image/jpeg', 95);
 }
 
@@ -178,12 +203,14 @@ export const twoClassBorderedTable = (thickness = 3, format: 'png' | 'jpeg' = 'p
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, size.width, size.height);
   g.fillStyle = '#000000';
-  g.font = '28px sans-serif';
-  for (const item of tableItems([
-    { time: '08:00 - 10:00', cells: [{ day: 0, text: 'Redes' }] },
-    { time: '10:00 - 12:00', cells: [{ day: 2, text: 'Bases de Datos' }] },
-  ]))
-    g.fillText(item.text, item.x, item.y);
+  g.font = `28px ${TEST_FONT}`;
+  fillTexts(
+    g,
+    tableItems([
+      { time: '08:00 - 10:00', cells: [{ day: 0, text: 'Redes' }] },
+      { time: '10:00 - 12:00', cells: [{ day: 2, text: 'Bases de Datos' }] },
+    ]),
+  );
   for (const y of [8, 75, 165, 255]) g.fillRect(10, y, size.width - 20, thickness);
   for (const x of [10, 185, 405, 625, size.width - 10])
     g.fillRect(x, 8, thickness, 247 + thickness);
