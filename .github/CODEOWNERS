@@ -1,0 +1,7 @@
+# Every change needs the maintainer's review; the security-sensitive paths are listed so they stay visible.
+*                              @Maicolfelix
+/apps/api/src/auth/            @Maicolfelix
+/apps/api/src/security/        @Maicolfelix
+/apps/api/prisma/              @Maicolfelix
+/.github/                      @Maicolfelix
+/docs/security.md              @Maicolfelix

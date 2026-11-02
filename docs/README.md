@@ -54,6 +54,10 @@
 | Documento                                                | Contenido                                                                                                                                         |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [security.md](security.md)                               | Modelo de amenazas, controles, hallazgos de dependencias y limitaciones                                                                           |
+| [privacy-notice.md](privacy-notice.md)                   | Plantilla de aviso de privacidad y política de retención (campos por completar)                                                                   |
+| [data-protection.md](data-protection.md)                 | Registro de tratamientos y evaluación de impacto (DPIA) resumida                                                                                  |
+| [incident-response.md](incident-response.md)             | Plan de respuesta a incidentes y de notificación de brechas                                                                                       |
+| [hardening-soc2-iso27701.md](hardening-soc2-iso27701.md) | Análisis de brechas frente a SOC 2 e ISO 27701 y plan de endurecimiento priorizado (no es una certificación)                                      |
 | [testing.md](testing.md)                                 | Capas de prueba, cifras, base de test, cómo ejecutar, humo de rendimiento                                                                         |
 | [system-validation.md](system-validation.md)             | Validación integral (Fase 17): matriz de escenarios, evidencia, registro de defectos                                                              |
 | [deployment.md](deployment.md)                           | Requisitos de producción, variables de entorno, `TRUST_PROXY`, base de datos                                                                      |
