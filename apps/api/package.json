@@ -16,16 +16,16 @@
     "db:seed:demo": "node --env-file=../../.env --import tsx src/demo/cli.ts"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.10",
+    "@napi-rs/canvas": "^1.1.0",
     "@planner/core": "^1.0.0-rc.3",
-    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.0",
     "@tesseract.js-data/spa": "^1.0.0",
     "argon2": "^0.45.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.7.0",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.2",
     "helmet": "^8.3.0",
     "ical.js": "^2.2.1",
     "multer": "^2.4.0",
@@ -45,6 +45,6 @@
     "pg": "^8.23.1",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   }
 }
