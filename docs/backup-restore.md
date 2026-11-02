@@ -47,6 +47,19 @@ DATABASE_URL=postgresql://…/planner_restore_test npm run db:deploy   # no debe
 
 El respaldo cuenta como validado solo si el ensayo completo (pasos 1 a 7) se hizo con una copia **real** de preproducción y quedó la evidencia. Una copia que nunca se restauró no es una copia.
 
+## Objetivos de recuperación
+
+**Propuestos, no medidos ni garantizados** (no hay servicio en producción). Quien opere el servicio debe confirmarlos o cambiarlos con su proveedor:
+
+| Objetivo                          | Propuesta                                       | Cómo se sostiene                                                                                                                                                               |
+| --------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RPO (datos que se aceptan perder) | 24 h                                            | Una copia lógica diaria, y otra antes de cada despliegue con migración                                                                                                         |
+| RTO (tiempo para volver a servir) | 4 h                                             | Restaurar la última copia en una base nueva y apuntar `DATABASE_URL` ([ensayo](#ensayo-de-restauración-obligatorio-antes-del-release-repetir-tras-cambios-mayores-de-esquema)) |
+| Retención de copias               | 30 días `[POR COMPLETAR]`                       | Rotación del proveedor o del script del operador                                                                                                                               |
+| Ensayo de restauración            | Antes de cada release y tras cambios de esquema | Con evidencia                                                                                                                                                                  |
+
+El tiempo real de la restauración local está en [rg3-results.md](rg3-results.md); no se extrapola a un proveedor.
+
 ## Fuera de alcance
 
 Sin replicación ni conmutación por error, sin respaldo continuo propio, sin retención automatizada por el proyecto y sin monitoreo de las copias: son decisiones del proveedor elegido.
