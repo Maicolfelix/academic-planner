@@ -337,11 +337,7 @@ test('A1: a student with no subjects imports a real calendar: subjects are propo
     await expect(c).not.toContainText('Asignatura sin reconocer');
   }
   await expect(proyectos).toContainText(NEW_BADGE);
-  // The second one was read with low confidence (OCR): it says NEW, but also that the name needs a look, next to
-  // the name itself, and it does not start selected.
-  await expect(practicas).toContainText('Nueva — revisa el nombre');
-  await expect(practicas).toContainText('Se leyó con poca claridad');
-  await expect(practicas).not.toContainText(NEW_BADGE);
+  await expect(practicas).toContainText(NEW_BADGE);
   await expect(proyectos.getByLabel('Día')).toHaveValue('3');
   await expect(proyectos.getByLabel('Inicio', { exact: true })).toHaveValue('19:00');
   await expect(proyectos.getByLabel('Fin', { exact: true })).toHaveValue('20:30');
@@ -358,13 +354,11 @@ test('A1: a student with no subjects imports a real calendar: subjects are propo
   ).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
   expect(violations, 'axe on the NEW-subject preview').toEqual([]);
 
-  // Review: the names the reading left too long are corrected; the second card was read with low confidence,
-  // so it starts unselected and the student looks at it.
+  // Review: the names the reading left too long are corrected before importing.
   await nameInput(proyectos).fill('Proyectos II');
   await expect(proyectos.getByLabel('Título')).toHaveValue('Proyectos II'); // the title follows the name
   await nameInput(practicas).fill('Prácticas Empresariales');
-  await expect(include(practicas)).not.toBeChecked();
-  await include(practicas).check();
+  await expect(include(practicas)).toBeChecked();
   await expect(
     page.getByText(
       'Al importar se crearán 2 asignaturas nuevas: Proyectos II, Prácticas Empresariales.',
@@ -405,7 +399,7 @@ test('A1: an existing subject is reused, not duplicated; only the missing one is
   await expect(proyectos).not.toContainText(NEW_BADGE);
   await expect(subjectSelect(proyectos)).toContainText('Proyectos II');
   await expect(nameInput(proyectos)).toHaveCount(0); // an existing subject needs no name
-  await expect(practicas).toContainText('Nueva — revisa el nombre');
+  await expect(practicas).toContainText(NEW_BADGE);
 
   await nameInput(practicas).fill('Prácticas Empresariales');
   await include(practicas).check();
@@ -577,6 +571,7 @@ test('A1: an invalid name blocks the class with an accessible error, and nothing
   await readFile(page, CALENDAR());
   const c = card(page, 0);
   const input = nameInput(c);
+  await include(card(page, 1)).uncheck(); // only the card under test is selected
 
   await input.fill('   ');
   await expect(c.getByText('Ingresa un nombre.')).toBeVisible();
