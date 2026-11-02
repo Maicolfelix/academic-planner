@@ -103,3 +103,7 @@ Verificación de correo, recuperación de contraseña, MFA y CAPTCHA siguen fuer
 ## 5. Cómo presentarlo en la tesis
 
 Es un análisis de brechas contra dos marcos reconocidos, con evidencia por criterio y un plan priorizado. Para un proyecto sin operación, lo defendible es decir: **los controles técnicos están implementados y probados; los procedimientos de organización (incidentes, retención, derechos del titular) se documentan como trabajo para quien opere el servicio**. No afirmes cumplimiento ni certificación.
+
+## 6. Hallazgo del primer CI (2026-11-02)
+
+El primer CI en GitHub (Ubuntu) mostró que **12 de las 52 pruebas de `scheduleImport.test.ts` y 1 de `scheduleImportConfirm.test.ts` fallan en Linux** y pasan todas en Windows. Son las pruebas de **OCR real**: dibujan la imagen de prueba con la fuente `sans-serif` del sistema y Tesseract la lee. Se reprodujo en un contenedor `node:24-bookworm` y el fallo persiste aun forzando Liberation Sans (equivalente a Arial). No es un fallo de la aplicación sino de la dependencia de las pruebas del sistema operativo. Decisión: esas dos suites corren en un paso **no bloqueante** del CI y el resto es bloqueante. Pendiente: fijar una fuente dentro del repositorio para que las imágenes de prueba no dependan del sistema. Este hallazgo también es una advertencia para la tesis: la precisión medida del OCR vale para imágenes sintéticas en este equipo.
