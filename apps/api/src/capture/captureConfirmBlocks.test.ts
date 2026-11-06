@@ -126,7 +126,7 @@ describe('POST /api/capture/confirm: weekly blocks', () => {
       const res = await send(agent, { blocks: [block('b1', over)] });
       expect(res.status, JSON.stringify(over)).toBe(400);
     }
-    const tooMany = Array.from({ length: 22 }, (_, i) => block(`b${i}`));
+    const tooMany = Array.from({ length: 43 }, (_, i) => block(`b${i}`));
     expect((await send(agent, { blocks: tooMany })).status).toBe(400);
     expect((await send(agent, { blocks: [block('b1'), block('b1', { weekday: 4 })] })).status).toBe(
       400,

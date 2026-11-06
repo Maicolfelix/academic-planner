@@ -2,6 +2,7 @@ import type { Weekday } from './calendar.js';
 import {
   MONTH_BY_NAME,
   WEEKDAY_BY_NAME,
+  hourConnectorLength,
   bareTimeAlternatives,
   findDateExpressions,
   isFree,
@@ -279,7 +280,8 @@ function readClock(tokens: readonly Token[], at: number): Clock | null {
     }
   }
   if (minute > 59 || hour > 23) return null;
-  const h24 = hour > 12 || hour === 0;
+  // "14:00", "00:30" and also "06:00", "08:30": a leading zero with no am/pm is the 24-hour clock written out
+  const h24 = hour > 12 || hour === 0 || (meridiem === null && /^0\d:\d\d$/.test(t.norm));
   if (meridiem !== null && (hour < 1 || hour > 12)) return null;
   if (meridiem === null && !h24 && hour < 1) return null;
   return {
@@ -336,8 +338,10 @@ function matchTimeRangeAt(
 } | null {
   let j = i;
   let hadPrefix = false;
-  if (isFree(tokens[j]) && ['de', 'desde'].includes(tokens[j]!.norm)) {
+  let between = false; // "entre las 8 y las 10": the same range, with "y" where "de … a" has "a"
+  if (isFree(tokens[j]) && ['de', 'desde', 'entre'].includes(tokens[j]!.norm)) {
     hadPrefix = true;
+    between = tokens[j]!.norm === 'entre';
     j += 1;
   }
   if (isFree(tokens[j]) && ['las', 'la'].includes(tokens[j]!.norm)) j += 1;
@@ -345,7 +349,8 @@ function matchTimeRangeAt(
   if (!first) return null;
   j += first.length;
   const connector = tokens[j]?.norm;
-  if (!isFree(tokens[j]) || !['a', 'hasta'].includes(connector ?? '')) return null;
+  if (!isFree(tokens[j]) || !(between ? ['y'] : ['a', 'hasta']).includes(connector ?? ''))
+    return null;
   j += 1;
   if (isFree(tokens[j]) && ['las', 'la'].includes(tokens[j]!.norm)) j += 1;
   const second = readClock(tokens, j);
@@ -388,8 +393,9 @@ function matchTimeRangeAt(
     b = to24(second, first.meridiem);
     if (!second.h24 && b <= a) b = to24(second, first.meridiem === 'am' ? 'pm' : 'am');
   } else if (first.h24 || second.h24) {
-    a = to24(first, null);
-    b = to24(second, null);
+    // one end is written in 24 hours ("09:00 a 12:00"): so is the other, and 12 is noon
+    a = first.hour * 60 + first.minute;
+    b = second.hour * 60 + second.minute;
   } else {
     // Bare hours: class hours. 7-11 morning; 12 and 1-6 afternoon or evening.
     const morning = first.hour >= 7 && first.hour <= 11;
@@ -479,10 +485,9 @@ export function planTemporal(tokens: Token[]): TemporalPlan {
     if (isFree(tokens[start - 1]) && ['las', 'la'].includes(tokens[start - 1]!.norm)) {
       start -= 1;
       length += 1;
-      if (isFree(tokens[start - 1]) && tokens[start - 1]!.norm === 'a') {
-        start -= 1;
-        length += 1;
-      }
+      const lead = hourConnectorLength(tokens, start);
+      start -= lead;
+      length += lead;
     }
     const item = timeItems.length;
     timeStarts.add(start);

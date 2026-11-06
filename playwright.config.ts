@@ -17,6 +17,11 @@ export default defineConfig({
   testIgnore: /security\.spec\.ts/,
   globalSetup: './e2e/globalSetup.ts',
   fullyParallel: true,
+  // Every test starts by registering a user, which hashes a password: with four browsers at once that alone can take more
+  // than the default 5 s on a busy machine (seen as "expected /onboarding, received /register" in tests that had nothing
+  // to do with it, and only in long parallel runs: each passed alone and 12 of 12 times when repeated under load). A real
+  // regression still fails, 5 s later.
+  expect: { timeout: 10_000 },
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:5173',

@@ -90,13 +90,63 @@ function periodEndsSentence(line: string, i: number): boolean {
   const before = line.slice(0, i);
   const word = (/\S*$/.exec(before)?.[0] ?? '').replace(/^[^\p{L}\p{N}]+/u, '');
   const folded = normalizeNameKey(word);
+  // "7 A.M. A 10 A.M.": glued, the hour goes on with "a 10" / "hasta 10" just the same
+  if (/^[ap]\.m$/i.test(word.replace(/\.$/, '')) && /^(a|hasta|y)\s+(las\s+)?\d/i.test(after))
+    return false;
   const head = before.slice(0, before.length - word.length);
-  if (folded === 'm' && /\b[ap]\.\s*$/i.test(head)) return !startsLowercase; // "10:00 a. m. Además ..."
+  if (folded === 'm' && /\b[ap]\.\s*$/i.test(head)) {
+    // "10:00 a. m. Además ..." ends a sentence, "7 A. M. A 10 A. M." does not: the hour goes on with "a 10" / "hasta 10"
+    const goesOn = /^(a|hasta|y)\s+(las\s+)?\d/i.test(after);
+    return !startsLowercase && !goesOn;
+  }
   if (startsLowercase) return false;
   if (/^[a-z]$/.test(folded)) return false; // an initial: "a." "p."
   if (ABBREVIATIONS.has(folded)) return false;
   if (/^\d+$/.test(folded) && head.trim() === '') return false; // list numbering: "1. Parcial ..."
   return true;
+}
+
+const plain = normalizeNameKey;
+const WEEKDAY_WORD =
+  /\b(lunes|martes|miercoles|jueves|viernes|sabados?|domingos?|lun|mar|mie|mier|jue|vie|sab|dom)\b/;
+/** "1) ", "2. ", "- ", "• ": how a student numbers or bullets a line; not part of what they wrote. */
+export const withoutMarker = (t: string) => t.replace(/^([-•*–]|\d+[.)])\s+/, '');
+/** A whole timetable entry: a weekday and a start AND an end hour ("Fisiología lunes de 8 a 10"). */
+const isTimetableEntry = (t: string) =>
+  WEEKDAY_WORD.test(plain(t)) && (t.match(/\d+/g) ?? []).length >= 2;
+/** Words a line cannot end on if the sentence goes on in the next one. */
+const DANGLING_END = /(?:[,:]|\b(?:y|e|o|de|del|a|al|el|la|los|las|para|con|que|en|hasta|desde))$/;
+/** A line that starts like this is the rest of the previous sentence even in capitals: "PM", "Y los otros…", "A las 5". */
+const CONTINUES_SENTENCE =
+  /^(?:am|pm|a|m|y|e|o|u|de|del|al|con|para|hasta|desde|que|en|mas|pero|sino|ni|por)\b/;
+/** A line that ends on a whole hour RANGE: "… 6:00 PM a 9:00 PM", "… 7-9", "… entre las 8 y las 10 am" (one hour alone is not it). */
+const CLOSING_HOUR =
+  /\d(?::\d{2})?\s*(?:[ap]\.?\s?m\.?|h|hs|hrs)?\s*(?:a|y|-|–)\s*(?:las\s+)?\d(?::\d{2})?\s*(?:[ap]\.?\s?m\.?|h|hs|hrs)?\s*$/i;
+/**
+ * "Mi horario es:", "Este semestre tengo:": a line that only announces the timetable. It carries no day and no hour, so it is
+ * dropped and what follows is read on its own ("Tarea: lunes" or "Parcial: martes" are NOT headers: they name a thing).
+ */
+const TIMETABLE_HEADER =
+  /^[^:\d.!?;]{0,60}?\b(horario|clases|materias|asignaturas|semestre|periodo)\b[^:\d.!?;]{0,40}:\s*/i;
+function withoutHeader(line: string): string {
+  const m = TIMETABLE_HEADER.exec(line);
+  if (!m || line.length === m[0].length) return line;
+  return WEEKDAY_WORD.test(plain(m[0])) ? line : line.slice(m[0].length);
+}
+
+/**
+ * "tengo Física los lunes de 8 a 11 am. tengo Farmacología los jueves de 6 a 7": a phone rarely capitalises, so a period between
+ * two whole timetable entries ends the first one even if the next starts in lowercase. Never inside "a. m." (the first entry
+ * is not whole yet there) and never when the first one is left hanging.
+ */
+function timetablePeriod(line: string, start: number, i: number): boolean {
+  const next = line[i + 1];
+  if (next !== undefined && !/\s/.test(next)) return false;
+  const left = withoutMarker(line.slice(start, i));
+  const right = withoutMarker(line.slice(i + 1).trim());
+  if (/^m\.?(\s|,|;|$)/i.test(right)) return false; // the "p." of "p. m."
+  if (/^(a|hasta|y)\s+(las\s+)?\d/i.test(right)) return false; // the hour goes on: "10 a. m. A 1 p. m."
+  return isTimetableEntry(left) && isTimetableEntry(right) && !DANGLING_END.test(plain(left));
 }
 
 /**
@@ -111,7 +161,9 @@ function logicalLines(text: string): string[] {
   const lines: string[] = [];
   let pendingBlank = false;
   for (const piece of raw) {
-    const cur = piece.trim();
+    const trimmed = piece.trim();
+    const cur = withoutHeader(trimmed);
+    const hadHeader = cur !== trimmed; // "Mi horario: …" starts something new, whatever case follows
     if (cur === '') {
       pendingBlank = true;
       continue;
@@ -120,7 +172,31 @@ function logicalLines(text: string): string[] {
     const endsSentence = prev !== undefined && /[.!?;:]["')\]»”]*$/.test(prev);
     const isListItem = /^([-•*–]|\d+[.)])\s/.test(cur);
     const continues = /^\p{Ll}/u.test(cur);
-    if (prev === undefined || pendingBlank || isListItem || (endsSentence && !continues)) {
+    // each line is a whole timetable entry ("Fisiología lunes 8 a 10" ⏎ "Anatomía martes 2 a 4"): a line break between two of
+    // them is a separator, unless the first one is left hanging ("…de 8 a" ⏎ "10 am")
+    const entries =
+      prev !== undefined &&
+      isTimetableEntry(withoutMarker(prev)) &&
+      isTimetableEntry(withoutMarker(cur)) &&
+      !DANGLING_END.test(plain(prev));
+    // a timetable entry that ends on its closing hour ("…de 6:00 PM a 9:00 PM") followed by a line that starts a new sentence in
+    // capitals ("Mañana tengo parcial…"): the entry is over even without a period, or the next sentence is swallowed by it
+    const entryThenSentence =
+      prev !== undefined &&
+      !continues &&
+      !CONTINUES_SENTENCE.test(plain(cur)) &&
+      isTimetableEntry(withoutMarker(prev)) &&
+      !DANGLING_END.test(plain(prev)) &&
+      CLOSING_HOUR.test(prev);
+    if (
+      prev === undefined ||
+      pendingBlank ||
+      isListItem ||
+      hadHeader ||
+      entries ||
+      entryThenSentence ||
+      (endsSentence && !continues)
+    ) {
       lines.push(cur);
     } else {
       lines[lines.length - 1] = `${prev} ${cur}`;
@@ -134,7 +210,8 @@ function logicalLines(text: string): string[] {
 export function splitSentences(text: string): string[] {
   const sentences: string[] = [];
   const push = (s: string) => {
-    const trimmed = s.trim();
+    // "…para mañana. Además Mi horario: Redes los lunes…": the announcement is dropped wherever in the line it is
+    const trimmed = withoutHeader(s.trim());
     if (trimmed !== '') sentences.push(trimmed);
   };
   for (const line of logicalLines(text)) {
@@ -144,7 +221,7 @@ export function splitSentences(text: string): string[] {
       const isBoundary =
         c === ';' ||
         ((c === '!' || c === '?') && (line[i + 1] === undefined || /\s/.test(line[i + 1]!))) ||
-        (c === '.' && periodEndsSentence(line, i));
+        (c === '.' && (periodEndsSentence(line, i) || timetablePeriod(line, start, i)));
       if (!isBoundary) continue;
       let end = i + 1;
       while (end < line.length && /[.!?)"'»”]/.test(line[end]!)) end++;

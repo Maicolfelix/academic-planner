@@ -1,4 +1,10 @@
-import { splitSentences, findAnchors, CLAUSE_SPLITTERS, type Anchor } from './academicInbox.js';
+import {
+  splitSentences,
+  withoutMarker,
+  findAnchors,
+  CLAUSE_SPLITTERS,
+  type Anchor,
+} from './academicInbox.js';
 import { cueLength } from './captureContext.js';
 import type { ActivityType } from './activity.js';
 import {
@@ -319,6 +325,102 @@ const datesIn = (tokens: readonly Token[], from: number, to: number) =>
  * start one when what follows it is an enumerator ("uno para el jueves y OTRO para el viernes") or the previous activity
  * still needs days ("dos tareas jueves y viernes").
  */
+/**
+ * "…de 6:00 AM a 8:00 AM FISIOLOGÍA miércoles…": with no "y", period or line break, a closed hour range still ends the clause
+ * when what follows starts a new thing (not "y", "a", "pm", a day, another number or a word that goes on: "con", "en"…).
+ * `j` is the closing hour; returns the index where the next thing starts, or -1 when `j` does not close a range.
+ */
+function closedRangeEnd(tokens: readonly Token[], j: number): number {
+  const isHour = (t: Token | undefined) => t !== undefined && /^\d/.test(t.norm);
+  const isMeridiem = (t: Token | undefined) => t !== undefined && /^[ap]m$/.test(t.norm);
+  if (!isHour(tokens[j])) return -1;
+  let end = j + 1;
+  while (isMeridiem(tokens[end])) end++;
+  const next = tokens[end];
+  if (next === undefined || isHour(next)) return -1;
+  if (CLAUSE_SPLITTERS.has(next.norm) || CONNECTS_CLAUSE.has(next.norm)) return -1;
+  // "…de 6 a 8 am, LOS VIERNES de 2 a 4": a day with its own hours right after goes on with the same subject; "…a 9 pm EL VIERNES
+  // entrego el taller": a day with no hour of its own starts the next thing
+  let d = end;
+  while (d < tokens.length && (STOPWORDS.has(tokens[d]!.norm) || EVERY.has(tokens[d]!.norm))) d++;
+  if (isWeekdayWord(tokens[d]?.norm)) {
+    let h = d + 1;
+    while (STOPWORDS.has(tokens[h]?.norm ?? '')) h++;
+    if (isHour(tokens[h])) return -1;
+  }
+  let k = j - 1;
+  while (isMeridiem(tokens[k])) k--;
+  if (!['a', 'y', 'hasta'].includes(tokens[k]?.norm ?? '')) return -1;
+  k--;
+  if (tokens[k]?.norm === 'las') k--;
+  while (isMeridiem(tokens[k])) k--;
+  return isHour(tokens[k]) ? end : -1;
+}
+
+/** "entre las 8 Y las 10": the "y" of a range of hours joins them, it does not start another activity. */
+function joinsHours(tokens: readonly Token[], p: number): boolean {
+  let next = p + 1;
+  while (next < tokens.length && STOPWORDS.has(tokens[next]!.norm)) next++;
+  return (
+    /^\d/.test(tokens[next]?.norm ?? '') &&
+    tokens.slice(Math.max(0, p - 4), p).some((t) => t.norm === 'entre')
+  );
+}
+
+/**
+ * The separator between `lastBefore` and `firstAfter` (a comma or "y") sits between day names only ("los jueves Y viernes",
+ * "lunes, miércoles y viernes"): it joins days, it does not start another activity.
+ */
+function joinsDays(
+  tokens: readonly Token[],
+  lastBefore: number,
+  firstAfter: number,
+  lowerBound: number,
+): boolean {
+  // what follows is a day too ("y viernes", "y el viernes"), else it is something else ("y otro para el viernes")
+  let next = firstAfter;
+  while (
+    next < tokens.length &&
+    (STOPWORDS.has(tokens[next]!.norm) || EVERY.has(tokens[next]!.norm))
+  )
+    next++;
+  if (!isWeekdayWord(tokens[next]?.norm)) return false;
+  // the word right before the separator (past articles and "todos") is a day: the name before it, if any, does not matter
+  for (let q = lastBefore; q >= lowerBound; q--) {
+    const t = tokens[q]!;
+    if (STOPWORDS.has(t.norm) || EVERY.has(t.norm)) continue;
+    return isWeekdayWord(t.norm);
+  }
+  return false;
+}
+
+/** The stretch of the activity before the cut has no hour yet: what comes next may still be where its hours are. */
+const previousHasNoHour = (tokens: readonly Token[], from: number, cut: number) =>
+  tokens.slice(from, cut).every((t) => !/^\d/.test(t.norm));
+
+/** From `cut` up to the next break (or `limit`) there are only days, hours and small words: no activity of its own. */
+function continuesPrevious(tokens: readonly Token[], cut: number, limit: number): boolean {
+  let end = cut;
+  while (
+    end < limit &&
+    (end === cut || (!tokens[end]!.afterBreak && !CLAUSE_SPLITTERS.has(tokens[end]!.norm)))
+  )
+    end++;
+  const stretch = tokens.slice(cut, end);
+  return (
+    stretch.length > 0 &&
+    stretch.some((t) => isWeekdayWord(t.norm)) &&
+    stretch.some((t) => /^\d/.test(t.norm)) &&
+    stretch.every(
+      (t) =>
+        isWeekdayWord(t.norm) ||
+        STOPWORDS.has(t.norm) ||
+        /^\d/.test(t.norm) ||
+        /^[ap]m$/.test(t.norm),
+    )
+  );
+}
+
 function cutBetween(
   tokens: readonly Token[],
   previous: DiscourseAnchor,
@@ -330,10 +432,29 @@ function cutBetween(
   for (let p = previous.start + previous.length; p < limit; p++) {
     const t = tokens[p]!;
     let cut = -1;
-    if (CLAUSE_SPLITTERS.has(t.norm)) cut = p + 1;
-    else if (t.afterBreak) cut = p;
+    if (CLAUSE_SPLITTERS.has(t.norm)) {
+      // "…, los jueves Y viernes tengo Epidemiología": a conjunction between day names joins the days, it starts nothing.
+      if (
+        !joinsDays(tokens, p - 1, p + 1, previous.start + previous.length) &&
+        !joinsHours(tokens, p)
+      )
+        cut = p + 1;
+    } else if (t.afterBreak && !joinsDays(tokens, p - 1, p, previous.start + previous.length)) {
+      cut = p;
+    } else if (closedRangeEnd(tokens, p) >= 0) {
+      cut = closedRangeEnd(tokens, p);
+    }
     if (cut < 0 || cut > limit) continue;
     if (cut < limit && ENUMERATORS.has(tokens[cut]!.norm)) continue;
+    // "anatomía los lunes Y VIERNES de 10 a 12, bioquímica…": days and hours with no word of their own keep the activity before
+    if (
+      cut < limit &&
+      cut > previous.start + previous.length &&
+      cur.schedule === true &&
+      previousHasNoHour(tokens, previousFrom, cut) &&
+      continuesPrevious(tokens, cut, limit)
+    )
+      continue;
     // "ensayo de ciberseguridad, PARA el lunes": a deadline ("para" + a day) belongs to the activity it follows while that
     // one has no day yet; a comma does not take it away.
     if (
@@ -387,9 +508,29 @@ const EVERY = new Set(['todos', 'todas', 'cada']);
  *    (the first word that is not a filler after the last "y" or comma), so two schedules in one sentence stay two.
  * Nothing here decides WHAT it is (a class or a repeating activity): that is read with the words, in the engine.
  */
-function scheduleAnchors(tokens: Token[], found: readonly DiscourseAnchor[]): DiscourseAnchor[] {
-  const isDay = (norm: string | undefined) =>
-    norm !== undefined && WEEKDAY_BY_NAME[norm] !== undefined;
+/** Words that go on with the same clause after an hour range: "de 8 a 10 CON el profe", "de 8 a 10 EN el salón". */
+const CONNECTS_CLAUSE = new Set([
+  'con',
+  'en',
+  'de',
+  'del',
+  'para',
+  'por',
+  'que',
+  'hasta',
+  'desde',
+  'al',
+]);
+const isWeekdayWord = (norm: string | undefined) =>
+  norm !== undefined && WEEKDAY_BY_NAME[norm] !== undefined;
+
+function scheduleAnchors(
+  tokens: Token[],
+  found: readonly DiscourseAnchor[],
+  entries: SubjectEntry[] = [],
+  textTimetable = false,
+): DiscourseAnchor[] {
+  const isDay = (norm: string | undefined) => isWeekdayWord(norm);
   const hasWeekday = tokens.some((t) => isDay(t.norm));
   if (!hasWeekday) return [];
   const out: DiscourseAnchor[] = [];
@@ -439,8 +580,92 @@ function scheduleAnchors(tokens: Token[], found: readonly DiscourseAnchor[]): Di
     }
     let s = from;
     while (s < m && (LEAD_FILLERS.has(tokens[s]!.norm) || STOPWORDS.has(tokens[s]!.norm))) s++;
+    // "…de 5 a 8 pm, TODOS LOS lunes y sábados tengo Ética…": a day (or an hour) is no name; here the name comes after the days
+    if (s < m && (isDay(tokens[s]!.norm) || /^\d/.test(tokens[s]!.norm))) return;
     if (s < m && !taken(s) && !out.some((a) => a.start === s)) out.push(make(s));
   });
+  // "Tengo clase de farmacología todos los jueves de 6 a 8 Y LOS MIÉRCOLES TENGO FISIOLOGÍA de 6 a 9": a clause with its own
+  // weekday and its own hour but no marker is another schedule when it names its own thing: a noun after "tengo/veo/hay",
+  // a known subject, or a word followed straight by its day ("y fisiología los miércoles"). With no anchor in front of it
+  // (nothing said "clase" or "todos los"), it takes TWO such clauses to read a timetable: one alone stays a plain possibility.
+  const NEW_THING_VERBS = new Set(['tengo', 'tenemos', 'veo', 'vemos', 'hay']);
+  const rangeEnds = tokens.flatMap((_, j) => {
+    const end = closedRangeEnd(tokens, j);
+    return end < 0 ? [] : [end];
+  });
+  const bounds = [
+    ...new Set([
+      0,
+      ...tokens.flatMap((t, i) =>
+        CLAUSE_SPLITTERS.has(t.norm) ? [i + 1] : t.afterBreak && i > 0 ? [i] : [],
+      ),
+      ...rangeEnds,
+    ]),
+  ].sort((a, b) => a - b);
+  const skip = (t: Token) =>
+    LEAD_FILLERS.has(t.norm) ||
+    STOPWORDS.has(t.norm) ||
+    isDay(t.norm) ||
+    /^\d/.test(t.norm) ||
+    /^[ap]m$/.test(t.norm);
+  // A stretch with nothing but days and hours ("... Y JUEVES de 6 a 8") continues the clause before it, it is not a clause.
+  const ranges: { from: number; to: number }[] = [];
+  let carryFrom: number | null = null; // days with no hour yet: they belong to the clause that comes NEXT
+  bounds.forEach((boundFrom, bi) => {
+    const to = bounds.slice(bi + 1).find((b) => b > boundFrom) ?? tokens.length;
+    const stretch = tokens.slice(boundFrom, to);
+    const last = ranges.at(-1);
+    if (stretch.every(skip)) {
+      if (last && stretch.some((t) => /^\d/.test(t.norm))) {
+        last.to = to; // "... Y JUEVES de 6 a 8": days and hours of the clause before
+      } else {
+        carryFrom = carryFrom ?? boundFrom; // "los jueves Y viernes tengo X": days of the clause after
+      }
+      return;
+    }
+    const from = carryFrom ?? boundFrom;
+    carryFrom = null;
+    // ...or a stretch that goes on with the days the previous one ended on ("los jueves, VIERNES y sábado de 6 a 7")
+    const firstWord = stretch.find((t) => !STOPWORDS.has(t.norm) && !EVERY.has(t.norm));
+    const lastWord = last
+      ? tokens.slice(last.from, last.to).findLast((t) => !STOPWORDS.has(t.norm))
+      : undefined;
+    const goesOnWithDays = last !== undefined && isDay(firstWord?.norm) && isDay(lastWord?.norm);
+    if (last && goesOnWithDays) last.to = to;
+    else ranges.push({ from, to });
+  });
+  const clauses = ranges
+    .map(({ from, to }) => {
+      if (!tokens.slice(from, to).some((t) => isDay(t.norm))) return null;
+      if (!tokens.slice(from, to).some((t) => /^\d/.test(t.norm))) return null;
+      if (found.some((a) => a.start >= from && a.start < to)) return null;
+      if (out.some((a) => a.start >= from && a.start < to)) return null;
+      let s = from;
+      while (s < to && skip(tokens[s]!)) s++;
+      if (s >= to || taken(s)) return null;
+      const afterVerb = tokens.slice(from, s).some((t) => NEW_THING_VERBS.has(t.norm));
+      const knownSubject = subjectOfText(tokens[s]!.norm, entries) !== null;
+      // the day sits next to the name, which can be several words ("salud pública los viernes"): no hour in between
+      const dayNextToIt =
+        isDay(tokens[s - 1]?.norm) ||
+        [1, 2, 3, 4, 5, 6].some(
+          (k) =>
+            isDay(tokens[s + k]?.norm) && !tokens.slice(s, s + k).some((t) => /^\d/.test(t.norm)),
+        );
+      if (!afterVerb && !knownSubject && !dayNextToIt) return null;
+      const digits = tokens.slice(from, to).filter((t) => /^\d/.test(t.norm)).length;
+      return { from, s, range: digits >= 2 };
+    })
+    .filter((c): c is { from: number; s: number; range: boolean } => c !== null);
+  // Without an anchor in front of them, only clauses with a start AND an end hour ("de 8 a 10") read as a timetable: "cita
+  // con el médico martes 3 pm y cumpleaños viernes 7 pm" are not classes.
+  const ranged = clauses.filter((c) => c.range);
+  for (const c of clauses) {
+    // only a weekly schedule in front of it ("clase de…", "todos los…") makes a lone clause another one
+    const afterSchedule =
+      [...found, ...out].filter((a) => a.start < c.from).at(-1)?.schedule === true;
+    if (afterSchedule || ((ranged.length >= 2 || textTimetable) && c.range)) out.push(make(c.s));
+  }
   return out.sort((a, b) => a.start - b.start);
 }
 
@@ -495,7 +720,20 @@ export function segmentDiscourse(
     });
   };
 
-  splitSentences(text).forEach((sentence, sentenceIndex) => {
+  // A timetable read out across sentences ("…de 6 a 8. Los miércoles tengo fisiología de 6 a 9."): two or more sentences with a
+  // weekday and a start AND an end hour. Each sentence alone would only be a possibility; together they are the timetable.
+  const textTimetable =
+    options.scheduleAnchors === true &&
+    splitSentences(text).filter((sentence) => {
+      const tokens = tokenize(withoutMarker(sentence));
+      return (
+        tokens.some((t) => isWeekdayWord(t.norm)) &&
+        tokens.filter((t) => /^\d/.test(t.norm)).length >= 2
+      );
+    }).length >= 2;
+
+  splitSentences(text).forEach((numbered, sentenceIndex) => {
+    const sentence = withoutMarker(numbered);
     const tokens = tokenize(sentence);
     // "otro" is also a type word ("Otro"), but in running text it is "uno … otro": an enumerator, never an activity.
     const found = findAnchors(tokens, entries, true, new Set(['otro']));
@@ -507,7 +745,9 @@ export function segmentDiscourse(
       const { count } = nounPhrase(tokens, headStart, a.start, plural);
       return { ...a, kind, count, headStart };
     });
-    const timetable = options.scheduleAnchors ? scheduleAnchors(tokens, base) : [];
+    const timetable = options.scheduleAnchors
+      ? scheduleAnchors(tokens, base, entries, textTimetable)
+      : [];
     if (
       base.length === 0 &&
       timetable.length === 0 &&
@@ -556,6 +796,18 @@ export function segmentDiscourse(
     let leadingSplit = false;
     if (options.splitLeading && anchors[0]!.headStart > 0) {
       const lead = tokens.slice(0, anchors[0]!.headStart);
+      // "TODOS LOS LUNES Y JUEVES tengo Redes de 8 a 10": in a timetable the days in front belong to the thing that follows.
+      const keepWithNext =
+        anchors[0]!.schedule === true &&
+        lead.every(
+          (t) =>
+            isWeekdayWord(t.norm) ||
+            STOPWORDS.has(t.norm) ||
+            EVERY.has(t.norm) ||
+            LEAD_FILLERS.has(t.norm) ||
+            CLAUSE_SPLITTERS.has(t.norm),
+        );
+
       const stretchEnd = anchors.length > 1 ? starts[1]! : tokens.length;
       const dates = findDateExpressions(lead);
       const dated = new Set(
@@ -570,6 +822,7 @@ export function segmentDiscourse(
           !CLAUSE_SPLITTERS.has(t.norm),
       );
       if (
+        !keepWithNext &&
         dates.length > 0 &&
         ownWords.length > 0 &&
         findDateExpressions(tokens.slice(anchors[0]!.headStart, stretchEnd)).length > 0

@@ -12,7 +12,9 @@ import {
   confirmLabel,
   createdMessage,
   createReview,
+  effectiveRecurrenceSubject,
   effectiveSlots,
+  effectiveSubject,
   isRecurrenceComplete,
   recurrencePendingOf,
   removeRecurrences,
@@ -20,6 +22,7 @@ import {
   setRecurrenceSubject,
   setRecurrenceTime,
   setError,
+  setSubject,
   summarize,
   toggle,
   toggleRecurrence,
@@ -46,6 +49,58 @@ const review = (text: string, subjects = SUBJECTS): ReviewState => {
 };
 
 describe('a weekly schedule in the review', () => {
+  it('one answer for a subject that is not there yet serves every card that offers that name', () => {
+    const state0 = review(
+      'Parcial de Anatomía el viernes a las 8 am. Anatomía los lunes de 10 am a 12 pm y Química los martes de 2 a 4 pm',
+    );
+    const item = state0.items[0]!;
+    expect(item.proposal.subject).toMatchObject({ kind: 'UNRESOLVED', suggestedName: 'Anatomía' });
+    const anatomy = state0.recurrences.find((r) => r.suggestion.title.value === 'Anatomía')!;
+    const networks = state0.recurrences.find((r) => r.suggestion.title.value === 'Química')!;
+
+    // "Crear «Anatomía»" on the activity answers the class too, and only that one
+    const state1 = setSubject(state0, item.proposal.clientId, { kind: 'NEW', name: 'Anatomía' });
+    const after = (s: ReviewState, r: typeof anatomy) =>
+      effectiveRecurrenceSubject(
+        s.recurrences.find((x) => x.suggestion.clientId === r.suggestion.clientId)!,
+      );
+    expect(after(state1, anatomy)).toEqual({ kind: 'NEW', name: 'Anatomía' });
+    expect(after(state1, networks)).toBeUndefined();
+    expect(summarize(state1).newSubjects).toEqual(['Anatomía']);
+
+    // and the other way round: answering the class answers the activity
+    const state2 = setRecurrenceSubject(state0, anatomy.suggestion.clientId, {
+      kind: 'EXISTING',
+      id: id(1),
+      name: 'Redes de Computadores',
+    });
+    expect(effectiveSubject(state2, state2.items[0]!)).toEqual({
+      kind: 'EXISTING',
+      id: id(1),
+      name: 'Redes de Computadores',
+    });
+  });
+
+  it('"Sin asignatura" is a decision about ONE activity and is never shared', () => {
+    const state0 = review(
+      'Parcial de Anatomía el viernes a las 8 am. Anatomía los lunes de 10 am a 12 pm y Química los martes de 2 a 4 pm',
+    );
+    const anatomy = state0.recurrences.find((r) => r.suggestion.title.value === 'Anatomía')!;
+    const state1 = setSubject(state0, state0.items[0]!.proposal.clientId, { kind: 'NONE' });
+    expect(
+      effectiveRecurrenceSubject(
+        state1.recurrences.find((r) => r.suggestion.clientId === anatomy.suggestion.clientId)!,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('the days are plural when they are said: "Todos los sábados", never "Todos los sábado"', () => {
+    const state = review('Tengo Ciberseguridad todos los sábados de 8 am a 11 am');
+    expect(scheduleLines(effectiveSlots(state.recurrences[0]!))).toEqual([
+      'Todos los sábados · 8:00 a. m. – 11:00 a. m.',
+    ]);
+  });
+
   it('case 1: "todos los martes y jueves de 6 pm a 8 pm" is ONE ready card that creates two weekly blocks', () => {
     const state = review('Tengo Ciberseguridad todos los martes y jueves de 6 pm a 8 pm');
     expect(state.items).toHaveLength(0);

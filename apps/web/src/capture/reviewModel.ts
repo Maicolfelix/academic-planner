@@ -9,6 +9,7 @@ import {
   type CaptureCorrection,
   type CaptureProposal,
   type CaptureResult,
+  type CaptureSubject,
   type GradeResolution,
   type GradeSelection,
   type GradeSuggestion,
@@ -273,6 +274,38 @@ const patchItem = (state: ReviewState, clientId: string, patch: Partial<ReviewIt
     ),
   });
 
+/** The name the engine offered for a subject that does not exist yet ("Anatomía"), if it offered one. */
+const offeredName = (subject: CaptureSubject | undefined): string | null =>
+  subject?.kind === 'UNRESOLVED' ? subject.suggestedName : null;
+
+/**
+ * The student answered for one card ("Crear «Anatomía»", or "Elegir otra" and picked one): every other card of the same
+ * capture that offers THE SAME name and has no answer yet takes it too. One subject named Anatomía is one decision, not one per
+ * activity and class that mention it. "Sin asignatura" is never shared: it is a decision about one activity.
+ */
+function shareSubjectChoice(
+  state: ReviewState,
+  offered: CaptureSubject | undefined,
+  choice: SubjectChoice,
+): ReviewState {
+  const name = offeredName(offered);
+  if (name === null || choice.kind === 'NONE') return state;
+  const key = normalizeNameKey(name);
+  const same = (subject: CaptureSubject) => {
+    const other = offeredName(subject);
+    return other !== null && normalizeNameKey(other) === key;
+  };
+  return settle({
+    ...state,
+    items: state.items.map((i) =>
+      i.subject === undefined && same(i.proposal.subject) ? { ...i, subject: choice } : i,
+    ),
+    recurrences: state.recurrences.map((r) =>
+      r.subject === undefined && same(r.suggestion.subject) ? { ...r, subject: choice } : r,
+    ),
+  });
+}
+
 export const setTitle = (s: ReviewState, id: string, title: string) => patchItem(s, id, { title });
 export const setType = (s: ReviewState, id: string, type: ActivityType) =>
   patchItem(s, id, { type });
@@ -280,7 +313,11 @@ export const setDate = (s: ReviewState, id: string, date: string) => patchItem(s
 /** An individual hour: this proposal stops following the shared answer. '' = no time. */
 export const setTime = (s: ReviewState, id: string, time: string) => patchItem(s, id, { time });
 export const setSubject = (s: ReviewState, id: string, subject: SubjectChoice) =>
-  patchItem(s, id, { subject });
+  shareSubjectChoice(
+    patchItem(s, id, { subject }),
+    s.items.find((i) => i.proposal.clientId === id)?.proposal.subject,
+    subject,
+  );
 /** '' = none. Never longer than the server accepts (the field stops there too). */
 export const setDescription = (s: ReviewState, id: string, description: string) =>
   patchItem(s, id, { description: description.slice(0, ACTIVITY_DESCRIPTION_MAX) });
@@ -520,7 +557,11 @@ const patchRecurrence = (
 export const setRecurrenceTitle = (s: ReviewState, id: string, title: string) =>
   patchRecurrence(s, id, () => ({ title }));
 export const setRecurrenceSubject = (s: ReviewState, id: string, subject: SubjectChoice) =>
-  patchRecurrence(s, id, () => ({ subject }));
+  shareSubjectChoice(
+    patchRecurrence(s, id, () => ({ subject })),
+    s.recurrences.find((r) => r.suggestion.clientId === id)?.suggestion.subject,
+    subject,
+  );
 export const setRecurrenceSharedEnd = (s: ReviewState, id: string, sharedEnd: string) =>
   patchRecurrence(s, id, () => ({ sharedEnd }));
 export const setRecurrenceSharedStart = (s: ReviewState, id: string, sharedStart: string) =>

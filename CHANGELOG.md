@@ -4,7 +4,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## Unreleased
 
-_(nada todavía)_
+### Fixed
+
+- **Quick Capture merged two subjects into one schedule.** «Tengo clase de farmacología todos los jueves de 6 a 8 am y los miércoles tengo fisiología de 6 a 9 pm» produced two blocks of Farmacología; now it proposes Farmacología (existing) and Fisiología (a new subject to confirm), each with its own day and hours. The cause was the same in every variant: days and hours were attached to the neighbouring subject whenever the text had no «todos los» marker.
+
+### Added
+
+- **Long timetables in one text** (8 to 12 subjects, with activities in the same message): a timetable is recognised by its shape (two or more fragments with a weekday and a start and end hour, across sentences), days of a list go with the subject that follows, names keep their inner small words («Introducción a la programación»), abbreviated and plural days («lun», «mié», «todos los sábados»), every hour format (a. m./p. m. with dots or capitals, «de la tarde», 24 h with a leading zero, «hasta»), line lists (bullets, numbers, a heading like «Mi horario es:») and a period between entries. Documented, with its honest limits, in [capture-proposals.md](docs/capture-proposals.md#horarios-largos-varias-materias-formatos-y-actividades-en-un-mismo-texto). No endpoint, migration or dependency change.
+- `captureTimetable.test.ts`: seeded generators that build thousands of texts with a known answer (subjects, days, hours, activity types and dates) and check all of them; 15 of its 16 tests fail on the previous code.
+
+### Fixed (third pass)
+
+- Quick Capture: a timetable followed by an activity with only a line break between them, or all in one line with no period and no "y", no longer swallows the activity (QA text: "Farmacología jueves 6–8 am ⏎ Fisiología miércoles 6–9 pm ⏎ Mañana tengo parcial de Anatomía" gave two copies of "Fisiología parcial" and no schedules). A closed hour range now ends its clause; see `docs/capture-proposals.md`.
+
+### Fixed (second pass)
+
+- An activity of a subject that does not exist («El viernes tengo parcial de Anatomía», «el lunes entrego el taller de Bioquímica») stayed «Sin asignatura» without asking, because the verb left before the «de» hid the subject name.
+- Hour ranges with a dash («lunes 7-9», «8 am - 10 am», «8am-10am») were read as dates or lost; «entre las 8 y las 10 am» lost its end hour. A bare «7-9» is hours only after a weekday; «el 15-10» is still a date.
+
+### Changed
+
+- **A text may hold 42 weekly blocks, not 21** (`CAPTURE_MAX_BLOCKS`, shared by the engine and `POST /api/capture/confirm`): a timetable of 10 to 12 subjects with 2 or 3 sessions each went over the old limit. Past 42 the capture is still refused, now with its own message («más de 42 horarios semanales»), which used to say «más de 50 actividades».
+- **One answer for a new subject.** In the review, creating (or choosing) a subject for one card answers every other card of the same capture that offers the same name, so a subject that appears in a class and three activities is one decision, not four. «Sin asignatura» is never shared.
+- The schedule card says «Todos los sábados» / «domingos» (it said «sábado»).
 
 ## 1.1.0 — Pixel Companion, smarter capture, date picker and ruled-table OCR (2026-10-29)
 

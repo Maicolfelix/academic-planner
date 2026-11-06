@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
-import { titlesAreRelated, ACADEMIC_CUES } from './academicInbox.js';
+import { titlesAreRelated, ACADEMIC_CUES, CLAUSE_SPLITTERS } from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
 import { gradeCaptureSchema } from './captureGrades.js';
@@ -53,8 +53,11 @@ import { dueFromLocal, toLocalParts } from './time.js';
  */
 
 export const CAPTURE_MAX_PROPOSALS = 50;
-/** A weekly class or study session per weekday: more than this in one capture is not a normal text. */
-export const CAPTURE_MAX_BLOCKS = 21;
+/**
+ * A weekly class or study session per weekday: more than this in one capture is not a normal text. 42 = six sessions a day for
+ * seven days: a heavy timetable of 10 to 12 subjects with two or three sessions each fits, and nothing real goes over.
+ */
+export const CAPTURE_MAX_BLOCKS = 42;
 /**
  * The shape and meaning of a result. A review the student left half done is kept as a draft; a draft written by another
  * version of the engine is not trusted (it is dropped, never repaired). Bump it when the proposals change.
@@ -72,6 +75,7 @@ export const CAPTURE_MESSAGES = {
   TOO_LONG_QUICK: 'Este texto parece demasiado largo para Captura rápida.',
   TOO_LONG_INBOX: 'El texto es demasiado largo. Pega únicamente el mensaje académico relevante.',
   TOO_MANY_PROPOSALS: `Encontré más de ${CAPTURE_MAX_PROPOSALS} actividades. Divide el mensaje en dos partes para revisarlas mejor.`,
+  TOO_MANY_BLOCKS: `Encontré más de ${CAPTURE_MAX_BLOCKS} horarios semanales. Divide el mensaje en dos partes para revisarlos mejor.`,
   NO_ACTIVITIES: 'No encontramos actividades claras en este mensaje.',
 } as const;
 
@@ -424,6 +428,29 @@ const NOT_A_SUBJECT_NAME = new Set([
   'laboratorio',
 ]);
 
+/** Verbs of having or handing in something, which can be left in front of "de <subject>" once the type word is read. */
+const SAYING_VERBS = new Set([
+  'tengo',
+  'tenemos',
+  'tiene',
+  'tienen',
+  'hay',
+  'es',
+  'son',
+  'sera',
+  'seran',
+  'entrego',
+  'entregamos',
+  'entrega',
+  'entregan',
+  'presento',
+  'presentamos',
+  'presenta',
+  'debo',
+  'toca',
+  'tocan',
+]);
+
 /**
  * "Parcial de ciberseguridad" when Ciberseguridad does not exist: the words after "de" (up to four, no digits, not a
  * generic noun) are offered as the name of a subject to create. Only after a recognised type word AND a "de": without
@@ -432,6 +459,9 @@ const NOT_A_SUBJECT_NAME = new Set([
 function suggestSubjectName(tokens: readonly Token[], typeRecognised: boolean): string | null {
   if (!typeRecognised) return null;
   const rest = tokens.filter((t) => !t.used);
+  // "El viernes tengo parcial DE ANATOMÍA", "el lunes entrego el taller DE BIOQUÍMICA": the verb that is left in front of the
+  // "de" says nothing about the subject
+  while (rest.length > 0 && SAYING_VERBS.has(rest[0]!.norm)) rest.shift();
   if (rest.length < 2 || (rest[0]!.norm !== 'de' && rest[0]!.norm !== 'del')) return null;
   const name = rest.slice(1);
   while (name.length > 0 && STOPWORDS.has(name[0]!.norm)) name.shift();
@@ -723,6 +753,12 @@ const ENUMERATOR_NORMS = new Set(['uno', 'una', 'unos', 'unas', 'otro', 'otra', 
 
 /** Marks what is noise to the reading of ONE span: its noun phrase, enumerators, and words said twice in a row. */
 function clearNoise(tokens: Token[], span: DiscourseSpan, entries: SubjectEntry[]): void {
+  // "Además el viernes tengo parcial": the word that only links this stretch to the one before is not part of the title.
+  for (let i = 0; i < tokens.length && CLAUSE_SPLITTERS.has(tokens[i]!.norm); i++)
+    tokens[i]!.used = true;
+  // ...and the one that links it to the NEXT stretch ("…de 6 a 9 Y LUEGO tengo…") is not part of the title either.
+  for (let i = tokens.length - 1; i > 0 && CLAUSE_SPLITTERS.has(tokens[i]!.norm); i--)
+    tokens[i]!.used = true;
   if ((span.kind === 'TYPE' || span.kind === 'IMPLICIT') && span.anchorIndex > 0) {
     for (let i = span.headIndex; i < span.anchorIndex && i < tokens.length; i++)
       tokens[i]!.used = true;
@@ -871,10 +907,12 @@ function buildRecurrence(
   );
   const blockType: 'CLASS' | 'STUDY' = studies ? 'STUDY' : 'CLASS';
 
-  const name = reading.tokens
-    .filter((t) => !t.used && !STOPWORDS.has(t.norm) && !SCHEDULE_TITLE_FILLERS.has(t.norm))
-    .map((t) => t.raw);
-  const cleanName = name.length > 0 && name.length <= 4 ? capitalize(name.join(' ')) : '';
+  // "Introducción a la programación", "Historia de Colombia": the small words INSIDE a name stay, only the ones around it go.
+  const words = reading.tokens.filter((t) => !t.used && !SCHEDULE_TITLE_FILLERS.has(t.norm));
+  while (words.length > 0 && STOPWORDS.has(words[0]!.norm)) words.shift();
+  while (words.length > 0 && STOPWORDS.has(words.at(-1)!.norm)) words.pop();
+  const name = words.map((t) => t.raw);
+  const cleanName = name.length > 0 && name.length <= 6 ? capitalize(name.join(' ')) : '';
 
   // The subject. A class always has one: a missing one is a question, not a general class.
   let subject: CaptureSubject = reading.subject;
@@ -1104,7 +1142,15 @@ export function parseCaptureProposals(
     }
     // A time nobody gave this stretch but the sentence did, once.
     let sharedTime: PlannedTime | null = null;
-    if (!daysInherited && plan.timeItems === 0 && sharedPlan && sharedPlan.times.length === 1) {
+    // An activity with a day of its own is another one: the hour said at the start of the sentence belonged to the first
+    // ("El 25 a las 10 am quiz de X, el 20 taller de Y": the workshop has no hour, it does not borrow the quiz's).
+    if (
+      !daysInherited &&
+      plan.days.length === 0 &&
+      plan.timeItems === 0 &&
+      sharedPlan &&
+      sharedPlan.times.length === 1
+    ) {
       sharedTime = sharedPlan.times[0] ?? null;
     }
 
@@ -1154,6 +1200,24 @@ export function parseCaptureProposals(
     }
     mentions.push(mention);
     bySpan.set(span.index, mention);
+  }
+
+  // "Farmacología martes y jueves de 6 a 8 y fisiología miércoles de 6 a 9": things with no type word that the sentence
+  // marks as timetable and that have a weekday are a weekly schedule when there are two or more of them in the text
+  // (the student is reading out their timetable), even if one of them only names one day.
+  const timetable = mentions.filter(
+    (m) =>
+      m.span.schedule &&
+      m.reading.words.typeCertainty !== 'EXACT' &&
+      !m.span.kind.startsWith('DETAIL') &&
+      m.days.some((d) => d.expr.kind === 'weekday'),
+  );
+  for (const m of timetable) {
+    if (m.recurrence !== null) continue;
+    if (timetable.length >= 2) {
+      m.recurrence = 'WEEKLY_SCHEDULE';
+      m.suggested = true;
+    }
   }
 
   // 2. The references, in the order written: each adds its day, hour, subject or context to the activity it refers to.
@@ -1530,7 +1594,15 @@ export function parseCaptureProposals(
       proposals: [],
       suggestions: [],
       corrections: [],
-      warnings: [{ code: 'TOO_MANY_PROPOSALS', message: CAPTURE_MESSAGES.TOO_MANY_PROPOSALS }],
+      warnings: [
+        {
+          code: 'TOO_MANY_PROPOSALS',
+          message:
+            unique.length > CAPTURE_MAX_PROPOSALS
+              ? CAPTURE_MESSAGES.TOO_MANY_PROPOSALS
+              : CAPTURE_MESSAGES.TOO_MANY_BLOCKS,
+        },
+      ],
       stats: { characters, found, collapsed, expected: meta.expected },
     };
   }
