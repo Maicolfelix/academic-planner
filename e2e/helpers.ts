@@ -95,8 +95,15 @@ export async function expectNoHorizontalOverflow(page: Page) {
 
 /** Creates a subject through the UI (from /subjects). */
 export async function addSubjectViaUi(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Agregar asignatura' }).click();
   const dialog = page.getByRole('dialog', { name: 'Agregar asignatura' });
+  // Under load (many workers, a stack that has just started) a click can land before the page answers: ask again, but only
+  // while the dialog is not open, so a slow first click is never followed by a second one.
+  await expect(async () => {
+    if (!(await dialog.isVisible())) {
+      await page.getByRole('button', { name: 'Agregar asignatura' }).click({ timeout: 5_000 });
+    }
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 20_000 });
   await dialog.getByLabel('Nombre').fill(name);
   await dialog.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(dialog).toBeHidden();

@@ -149,7 +149,9 @@ export const WEEKDAY_BY_NAME: Readonly<Record<string, Weekday>> = {
   jueves: 4,
   viernes: 5,
   sabado: 6,
+  sabados: 6, // the two that change when pluralised ("todos los sábados")
   domingo: 7,
+  domingos: 7,
 };
 
 export const MONTH_BY_NAME: Readonly<Record<string, number>> = {
@@ -332,6 +334,23 @@ const isLooseFiller = (norm: string) => LOOSE_FILLERS.has(norm) || CLITIC_VERB.t
  * Words that END the title after the type word: whatever comes after them is about something else ("tarea PARA el
  * jueves Y otra ..."). Used only by the multi-activity engine, which reads long, loose sentences.
  */
+/**
+ * "Introducción A LA programación", "Iniciación a la física": in the name of a course, the "a" that follows these nouns is part
+ * of the name, not the start of a complement ("tarea a entregar").
+ */
+const COURSE_NAME_OPENERS = new Set([
+  'introduccion',
+  'iniciacion',
+  'aproximacion',
+  'acercamiento',
+  'orientacion',
+  'acompanamiento',
+  'inmersion',
+]);
+function isCourseNameJoint(rest: readonly Token[], i: number): boolean {
+  return rest[i]!.norm === 'a' && COURSE_NAME_OPENERS.has(rest[i - 1]?.norm ?? '');
+}
+
 const QUALIFIER_STOPS = new Set([
   'para',
   'por',
@@ -459,6 +478,61 @@ function softenInternalBreaks(tokens: Token[]): void {
   }
 }
 
+/** "lun", "mié", "jue", "vie", "sáb", "dom" as students type them in a timetable: read as the whole day name. */
+const WEEKDAY_ABBREVIATIONS: Readonly<Record<string, string>> = {
+  lun: 'lunes',
+  mie: 'miercoles',
+  mier: 'miercoles',
+  jue: 'jueves',
+  vie: 'viernes',
+  sab: 'sabado',
+  dom: 'domingo',
+};
+/** "el mar", "un mar de dudas": the sea, not Tuesday. "mar" is only Tuesday when nothing like an article leads it. */
+const NOT_BEFORE_MAR = new Set([
+  'el',
+  'la',
+  'del',
+  'al',
+  'un',
+  'una',
+  'este',
+  'ese',
+  'mi',
+  'tu',
+  'su',
+  'otro',
+  'otra',
+]);
+function expandWeekdayAbbreviations(tokens: Token[]): void {
+  tokens.forEach((t, i) => {
+    const full = WEEKDAY_ABBREVIATIONS[t.norm];
+    if (full !== undefined) t.norm = full;
+    else if (t.norm === 'mar' && !NOT_BEFORE_MAR.has(tokens[i - 1]?.norm ?? '')) t.norm = 'martes';
+  });
+}
+
+/** "7-9", "7:30-9:30", "8am-10am", "6-8pm": two hours with a dash and no spaces. */
+const HOUR_RANGE = /^(\d{1,2}(?::\d{2})?(?:am|pm)?)[-–—](\d{1,2}(?::\d{2})?(?:am|pm)?)$/i;
+const isWeekdayish = (norm: string) =>
+  WEEKDAY_BY_NAME[norm] !== undefined ||
+  WEEKDAY_ABBREVIATIONS[norm] !== undefined ||
+  norm === 'mar';
+/**
+ * "lunes 7-9" is an hour range, "el 7-9" is a date (7 September). With an am/pm or minutes it can only be hours; bare
+ * numbers need a weekday just before them and an end after the start.
+ */
+function hourRangeIsPlausible(
+  range: RegExpExecArray,
+  raw: string,
+  before: readonly Token[],
+): boolean {
+  if (/am|pm|:/i.test(raw)) return true;
+  const [a, b] = [Number(range[1]), Number(range[2])];
+  if (!(a >= 1 && a < b && b <= 24)) return false;
+  return before.slice(-10).some((t) => isWeekdayish(t.norm));
+}
+
 export function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   let previousEnd = 0;
@@ -470,7 +544,49 @@ export function tokenize(text: string): Token[] {
     const index = match.index ?? 0;
     const between = text.slice(previousEnd, index);
     previousEnd = index + part.length;
-    if (raw === '') continue; // "-", "—", "..." and other lone separators
+    if (raw === '') {
+      // "8 am - 10 am": a dash between two hours is the "a" of "de 8 am a 10 am"; any other lone separator is dropped
+      if (
+        /^[-–—]$/.test(part) &&
+        /(\d|am|pm|^m)$/.test(tokens.at(-1)?.norm ?? '') &&
+        /^\s*\d/.test(text.slice(index + part.length))
+      ) {
+        tokens.push({
+          raw: part,
+          norm: 'a',
+          used: false,
+          start: index,
+          end: index + part.length,
+          afterBreak: false,
+        });
+      }
+      continue;
+    }
+    const range = HOUR_RANGE.exec(raw);
+    if (range && hourRangeIsPlausible(range, raw, tokens)) {
+      // "7-9", "7:30-9:30", "8am-10am": the same range written without spaces, read as "de 7 a 9"
+      const [, first, second] = range as unknown as [string, string, string];
+      const at = index + lead;
+      const mid = at + first.length;
+      const previous = tokens.at(-1)?.norm ?? '';
+      const after = (norm: string, from: number, to: number, glue: boolean): Token => ({
+        raw: text.slice(from, to),
+        norm: glue ? norm : foldToken(text.slice(from, to)),
+        used: false,
+        start: from,
+        end: to,
+        afterBreak: false,
+      });
+      if (!['de', 'desde', 'las', 'la', 'a', 'entre'].includes(previous)) {
+        tokens.push({ ...after('de', at, at, true), afterBreak: /[,;]/.test(between) });
+        tokens.push(after('', at, mid, false));
+      } else {
+        tokens.push({ ...after('', at, mid, false), afterBreak: /[,;]/.test(between) });
+      }
+      tokens.push(after('a', mid, mid + 1, true));
+      tokens.push(after('', mid + 1, mid + 1 + second.length, false));
+      continue;
+    }
     tokens.push({
       raw,
       norm: foldToken(raw),
@@ -498,6 +614,7 @@ export function tokenize(text: string): Token[] {
       });
     }
   }
+  expandWeekdayAbbreviations(tokens);
   softenInternalBreaks(tokens);
   return tokens;
 }
@@ -542,6 +659,19 @@ export function bareTimeAlternatives(hour: number, minute = 0): string[] {
   const mm = pad(minute);
   if (hour === 12) return [`00:${mm}`, `12:${mm}`];
   return [`${pad(hour)}:${mm}`, `${pad(hour + 12)}:${mm}`];
+}
+
+/**
+ * The words that only introduce the hour right before "las": "a las 10", "para las 10", "antes de las 10". They leave the title
+ * with the hour. Returns how many tokens before `lasIndex` they take.
+ */
+export function hourConnectorLength(tokens: readonly Token[], lasIndex: number): number {
+  const one = tokens[lasIndex - 1];
+  if (!isFree(one)) return 0;
+  if (one.norm === 'a' || one.norm === 'para') return 1;
+  const two = tokens[lasIndex - 2];
+  if (one.norm === 'de' && isFree(two) && two.norm === 'antes') return 2;
+  return 0;
 }
 
 export function matchTimeAt(
@@ -658,10 +788,9 @@ function detectTime(
     if (isFree(tokens[start - 1]) && ['las', 'la'].includes(tokens[start - 1]!.norm)) {
       start -= 1;
       length += 1;
-      if (isFree(tokens[start - 1]) && tokens[start - 1]!.norm === 'a') {
-        start -= 1;
-        length += 1;
-      }
+      const lead = hourConnectorLength(tokens, start);
+      start -= lead;
+      length += lead;
     }
     if (match.value === null) {
       use(tokens, start, length);
@@ -1347,7 +1476,10 @@ export function interpretWords(
         ? -1
         : rest.findIndex(
             (t, i) =>
-              i >= from && (QUALIFIER_STOPS.has(t.norm) || t.afterBreak || cueLength(rest, i) > 0),
+              i >= from &&
+              ((QUALIFIER_STOPS.has(t.norm) && !isCourseNameJoint(rest, i)) ||
+                t.afterBreak ||
+                cueLength(rest, i) > 0),
           );
     if (cut >= 0) {
       description = describeTokens(rest.slice(cut));

@@ -219,21 +219,142 @@ describe('recurrence: limits and determinism', () => {
   it('more weekly blocks than a normal text has is reported, never truncated in silence', () => {
     const group = (name: string) =>
       `Tengo ${name} todos los lunes martes miércoles jueves viernes sábado domingo de 7 a 9.`;
+    // seven subjects every day of the week: 49 blocks, over the 42 a text may hold
     const text = [
-      group('fisiología'),
-      group('redes'),
-      group('ciberseguridad'),
-      group('mecánica'),
-    ].join(' ');
+      'fisiología',
+      'redes',
+      'ciberseguridad',
+      'mecánica',
+      'química',
+      'dibujo',
+      'cálculo',
+    ]
+      .map(group)
+      .join(' ');
     const r = parse(text);
-    expect(CAPTURE_MAX_BLOCKS).toBe(21);
+    expect(CAPTURE_MAX_BLOCKS).toBe(42);
     expect(r.status).toBe('TOO_MANY_PROPOSALS');
     expect(r.suggestions).toEqual([]);
+    expect(r.warnings[0]!.message).toMatch(/horarios semanales/);
   });
 
   it('the same text and the same moment give the same answer', () => {
     const text =
       'Tengo un parcial de redes el viernes a las 8 am y clase de ciberseguridad todos los martes y jueves de 6 pm a 8 pm';
     expect(JSON.stringify(parse(text))).toBe(JSON.stringify(parse(text)));
+  });
+});
+
+describe('recurrence: two subjects in one sentence stay two schedules', () => {
+  const FARMA = [{ id: id(1), name: 'Farmacologia' }];
+  /** Subject (existing or new), its status and its slots, per suggestion. */
+  const read = (text: string, subjects = FARMA) => {
+    const r = parse(text, subjects);
+    return {
+      proposals: r.proposals.length,
+      schedules: r.suggestions.map((s) => ({
+        title: s.title.value,
+        subject: s.subject.kind,
+        slots: s.slots.map((x) => [x.weekday, x.time.value, x.endTime.value]),
+      })),
+    };
+  };
+  const EXPECTED = {
+    proposals: 0,
+    schedules: [
+      { title: 'Farmacologia', subject: 'EXISTING', slots: [[4, '06:00', '08:00']] },
+      { title: 'Fisiologia', subject: 'UNRESOLVED', slots: [[3, '18:00', '21:00']] },
+    ],
+  };
+
+  it('the reported text: an existing subject and a NEW one made up on the spot', () => {
+    expect(
+      read(
+        'Tengo clase de farmacologia todos los jueves de 6:00 AM a 8:00 AM y los miercoles tengo fisiologia de 6:00 PM a 9:00 PM',
+      ),
+    ).toEqual(EXPECTED);
+  });
+
+  it('the second subject is only a proposed name until the student confirms it', () => {
+    const [, second] = parse(
+      'Tengo clase de farmacologia todos los jueves de 6 am a 8 am y los miercoles tengo fisiologia de 6 pm a 9 pm',
+      FARMA,
+    ).suggestions;
+    expect(second!.subject).toMatchObject({ kind: 'UNRESOLVED', suggestedName: 'Fisiologia' });
+    expect(second!.status).toBe('NEEDS_REVIEW');
+  });
+
+  it.each([
+    'Los jueves tengo farmacologia de 6 a 8 am y los miercoles fisiologia de 6 a 9 pm',
+    'Farmacologia los jueves de 6 a 8 am y fisiologia los miercoles de 6 a 9 pm',
+    'Tengo clase de farmacologia los jueves de 6 a 8 am y clase de fisiologia los miercoles de 6 a 9 pm',
+  ])('other ways to say it: %s', (text) => {
+    expect(read(text)).toEqual(EXPECTED);
+  });
+
+  it('several days for the first subject, one for the second', () => {
+    expect(
+      read('Farmacologia martes y jueves de 6 a 8 am y fisiologia miercoles de 6 a 9 pm'),
+    ).toEqual({
+      proposals: 0,
+      schedules: [
+        {
+          title: 'Farmacologia',
+          subject: 'EXISTING',
+          slots: [
+            [2, '06:00', '08:00'],
+            [4, '06:00', '08:00'],
+          ],
+        },
+        { title: 'Fisiologia', subject: 'UNRESOLVED', slots: [[3, '18:00', '21:00']] },
+      ],
+    });
+  });
+
+  it('a second stretch of days and hours without a new name stays in the same subject', () => {
+    expect(slots('Tengo clase de redes los lunes de 7 a 9 y los jueves de 2 a 4')).toEqual([
+      [
+        [1, '07:00', '09:00'],
+        [4, '14:00', '16:00'],
+      ],
+    ]);
+  });
+});
+
+describe('recurrence: a long timetable with activities in the same text', () => {
+  const LONG =
+    'Tengo clase de farmacologia todos los jueves de 6:00 AM a 8:00 AM, los miercoles tengo fisiologia de 6:00 PM a 9:00 PM, ' +
+    'anatomia los lunes y viernes de 10 am a 12 pm, bioquimica los martes de 2 pm a 4 pm, histologia todos los sabados de 8 am a 11 am, ' +
+    'microbiologia los jueves de 3 pm a 5 pm, inmunologia los miercoles de 10 am a 12 pm, salud publica los viernes de 2 a 4 pm y ' +
+    'epidemiologia los martes de 7 am a 9 am. Ademas el viernes tengo parcial de anatomia a las 8 am, el lunes entrego el taller de ' +
+    'bioquimica antes de las 11:59 pm y el martes hay quiz de histologia a las 10 am';
+  const r = parse(LONG, [{ id: id(1), name: 'Farmacologia' }]);
+
+  it('nine schedules, each with its own subject, days and hours', () => {
+    expect(
+      r.suggestions.map((s) => [
+        s.title.value,
+        s.subject.kind,
+        s.slots.map((x) => `${x.weekday}@${x.time.value}-${x.endTime.value}`).join(','),
+      ]),
+    ).toEqual([
+      ['Farmacologia', 'EXISTING', '4@06:00-08:00'],
+      ['Fisiologia', 'UNRESOLVED', '3@18:00-21:00'],
+      ['Anatomia', 'UNRESOLVED', '1@10:00-12:00,5@10:00-12:00'],
+      ['Bioquimica', 'UNRESOLVED', '2@14:00-16:00'],
+      ['Histologia', 'UNRESOLVED', '6@08:00-11:00'],
+      ['Microbiologia', 'UNRESOLVED', '4@15:00-17:00'],
+      ['Inmunologia', 'UNRESOLVED', '3@10:00-12:00'],
+      ['Salud publica', 'UNRESOLVED', '5@14:00-16:00'],
+      ['Epidemiologia', 'UNRESOLVED', '2@07:00-09:00'],
+    ]);
+  });
+
+  it('and the three activities after them, with clean titles', () => {
+    expect(r.proposals.map((p) => [p.type.value, p.title.value, p.time?.value])).toEqual([
+      ['EXAM', 'Parcial de anatomia', '08:00'],
+      ['WORKSHOP', 'Taller de bioquimica', '23:59'],
+      ['QUIZ', 'Quiz de histologia', '10:00'],
+    ]);
   });
 });

@@ -62,7 +62,8 @@ export function scheduleLines(slots: readonly EffectiveSlot[]): string[] {
   }
   const several = groups.size > 1;
   return [...groups].map(([times, days]) => {
-    const phrase = daysPhrase(days);
+    // "Todos los sábados": the two that change when pluralised (lunes…viernes already end in s)
+    const phrase = daysPhrase(days).replace(/(sábado|domingo)/g, '$1s');
     return `${several ? 'Los' : 'Todos los'} ${phrase} · ${times}`;
   });
 }
