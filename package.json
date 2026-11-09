@@ -37,15 +37,15 @@
     "test:security:browser": "playwright test --config playwright.security.config.ts"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.65.0",
     "concurrently": "^10.0.5",
-    "eslint": "^10.12.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "typescript": "~5.9",
-    "typescript-eslint": "^8.71.0"
+    "typescript-eslint": "^8.72.1"
   }
 }
