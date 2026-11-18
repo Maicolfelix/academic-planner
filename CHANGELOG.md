@@ -16,6 +16,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 ### Fixed (third pass)
 
 - Quick Capture: a timetable followed by an activity with only a line break between them, or all in one line with no period and no "y", no longer swallows the activity (QA text: "Farmacología jueves 6–8 am ⏎ Fisiología miércoles 6–9 pm ⏎ Mañana tengo parcial de Anatomía" gave two copies of "Fisiología parcial" and no schedules). A closed hour range now ends its clause; see `docs/capture-proposals.md`.
+- Quick Capture: "N activities, one per day" ("Tengo 5 tareas sobre redes repartidas en la semana que viene empezando desde el lunes, una tarea por día" gave five cards on the same Monday plus a stray sixth). The N activities now go on consecutive school days from the day said (or from Monday of next week), every second or third day with "cada dos días", and stop before the weekend: what does not fit is asked, never dated. "5 tareas repartidas en la próxima semana" fills the five school days; any other count is asked. The "uno por día" words and "empezando desde / a partir del / esta semana" no longer end up in the title.
+- Quick Capture: other phrasings found by a hunt, each one wrong without warning before: "viernes 27" is Friday the 27th (it used the next Friday and left "27" in the title); "2 tareas el lunes y 1 el martes" are three (one was lost; the count of a noun-less "y 1 el martes" is kept); "…, todos a las 8 am" is a shared hour, not a weekly repetition (it produced no proposals); "uno de redes el jueves y otro de cálculo el viernes" keeps each subject (both were Redes); "La próxima semana tengo parcial el martes y taller el jueves" puts both days in that week.
 
 ### Fixed (second pass)
 

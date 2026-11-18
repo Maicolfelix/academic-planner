@@ -814,7 +814,14 @@ export type DateExpression =
    * `strictlyAfter`: "próximo martes" never means today. "este martes" and a bare "martes" may.
    * `nextWeek`: "el jueves de la otra semana" is that weekday of the week AFTER this one (Monday to Sunday).
    */
-  | { kind: 'weekday'; weekday: Weekday; strictlyAfter: boolean; nextWeek?: boolean }
+  | {
+      kind: 'weekday';
+      weekday: Weekday;
+      strictlyAfter: boolean;
+      nextWeek?: boolean;
+      /** "viernes 27": the next such weekday that is also that day of the month. */
+      dayOfMonth?: number;
+    }
   | { kind: 'explicit'; day: number; month: number; year: number | null };
 
 export interface DateMatch {
@@ -897,15 +904,31 @@ function matchDateAt(tokens: Token[], i: number): DateMatch | null {
     const before = isFree(tokens[i - 1]) ? tokens[i - 1]!.norm : '';
     const modifier = before === 'este' || before === 'proximo';
     const week = weekModifierAt(tokens, i + 1);
+    // "viernes 27": the weekday AND the day of the month. 13 or more cannot be an hour of a 12-hour clock; a month after it
+    // ("viernes 27 de noviembre") or a time word is read by the other rules.
+    const dom = /^(1[3-9]|2\d|3[01])$/.test(tokens[i + 1]?.norm ?? '')
+      ? Number(tokens[i + 1]!.norm)
+      : null;
+    const after = tokens[i + 2]?.norm ?? '';
+    const dayOfMonth =
+      dom !== null &&
+      week.length === 0 &&
+      !(after in MONTH_BY_NAME) &&
+      !['de', 'am', 'pm', 'h', 'hs', 'hrs', 'horas', 'hora'].includes(after) &&
+      // "lunes 14 a 16" is a range of hours; "viernes 27 a las 2:30" is a date and an hour
+      !(['a', 'y', 'hasta'].includes(after) && /^\d/.test(tokens[i + 3]?.norm ?? ''))
+        ? dom
+        : null;
     return {
       expr: {
         kind: 'weekday',
         weekday,
         strictlyAfter: before === 'proximo' || week.strictlyAfter,
         ...(week.nextWeek && { nextWeek: true }),
+        ...(dayOfMonth !== null && { dayOfMonth }),
       },
       start: modifier ? i - 1 : i,
-      length: (modifier ? 2 : 1) + week.length,
+      length: (modifier ? 2 : 1) + week.length + (dayOfMonth !== null ? 1 : 0),
     };
   }
 
@@ -982,6 +1005,16 @@ export function resolveDate(
     case 'relative':
       return { date: addDays(today, expr.offset), certainty: 'EXACT' };
     case 'weekday': {
+      if (expr.dayOfMonth !== undefined) {
+        // "viernes 27": the first Friday from today that is the 27th (weekday and day agree by construction)
+        let date = firstWeekdayOnOrAfter(today, expr.weekday);
+        for (let k = 0; k < 80 && Number(date.slice(8, 10)) !== expr.dayOfMonth; k++) {
+          date = addDays(date, 7);
+        }
+        return Number(date.slice(8, 10)) === expr.dayOfMonth
+          ? { date, certainty: 'LIKELY' }
+          : { date: null, certainty: 'MISSING', invalidText: matchedText };
+      }
       if (expr.nextWeek) {
         // "el jueves de la otra semana": that weekday of the week after this one, whatever today is.
         const monday = addDays(today, 1 - weekdayOf(today));
@@ -1489,7 +1522,7 @@ export function interpretWords(
   }
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
   const dangling = (t: Token | undefined) =>
-    t !== undefined && STOPWORDS.has(t.norm) && !isTypeToken(t);
+    t !== undefined && (STOPWORDS.has(t.norm) || t.norm === 'sobre') && !isTypeToken(t);
   while (dangling(rest[0])) rest.shift();
   while (dangling(rest.at(-1))) rest.pop();
   // A connector whose right-hand side was consumed ("de" REDES, "para" EL JUEVES) linked something that is no longer in the
