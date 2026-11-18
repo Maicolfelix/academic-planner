@@ -1522,7 +1522,7 @@ export function interpretWords(
   }
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
   const dangling = (t: Token | undefined) =>
-    t !== undefined && STOPWORDS.has(t.norm) && !isTypeToken(t);
+    t !== undefined && (STOPWORDS.has(t.norm) || t.norm === 'sobre') && !isTypeToken(t);
   while (dangling(rest[0])) rest.shift();
   while (dangling(rest.at(-1))) rest.pop();
   // A connector whose right-hand side was consumed ("de" REDES, "para" EL JUEVES) linked something that is no longer in the

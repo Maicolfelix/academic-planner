@@ -299,3 +299,15 @@ describe('phrasings found by the hunt (each one was wrong, silently)', () => {
     expect(got[0]!.title.value).toBe('Parcial');
   });
 });
+
+describe('a title never ends on "sobre" once its subject is recognised', () => {
+  it('"5 tareas sobre redes…" with the subject Redes gives "Tarea", not "Tarea sobre"', () => {
+    const got = parseCaptureProposals(
+      'Tengo 5 tareas sobre redes repartidas en la semana que viene, una por día',
+      { ...ctx(), subjects: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Redes' }] },
+      'QUICK',
+    ).proposals;
+    expect(got).toHaveLength(5);
+    expect(got.every((p) => p.title.value === 'Tarea')).toBe(true);
+  });
+});
