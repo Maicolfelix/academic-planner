@@ -889,3 +889,25 @@ test('29. an announced count that does not match is told, and nothing is ticked 
   ).toBeVisible();
   assertClean();
 });
+
+test('"5 tareas repartidas en la semana que viene, una por día": five cards, created on five different school days', async ({
+  page,
+}) => {
+  const done = watch(page);
+  await newUser(page, ['Cálculo']);
+  await write(
+    page,
+    'Tengo 5 tareas sobre redes repartidas en la semana que viene empezando desde el lunes, una tarea por dia',
+  );
+  await expect(cards(page)).toHaveCount(5);
+  await createButton(page, 5).click();
+  await expect.poll(async () => (await activities(page)).length).toBe(5);
+  const created = (await activities(page)).map(local);
+  // Monday to Friday of next week: five different days, never five on the same one, never a weekend
+  expect(created.map((a) => a.weekday).sort()).toEqual([1, 2, 3, 4, 5]);
+  expect(new Set(created.map((a) => a.date)).size).toBe(5);
+  const monday = created.find((a) => a.weekday === 1)!.date;
+  expect(monday > bogotaToday()).toBe(true);
+  expect(monday <= bogotaToday(7)).toBe(true);
+  done();
+});

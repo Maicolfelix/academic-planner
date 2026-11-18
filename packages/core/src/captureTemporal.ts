@@ -672,7 +672,17 @@ export function planTemporal(tokens: Token[]): TemporalPlan {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
     if (t.used) continue;
-    if ((t.norm === 'todos' || t.norm === 'todas') && days.length > 0) {
+    // "todos los lunes" repeats; "tengo 3 quices el lunes, el martes y el jueves, TODOS a las 8" says the three share an hour
+    const afterEvery =
+      tokens[i + 1] && ARTICLES.has(tokens[i + 1]!.norm)
+        ? (tokens[i + 2]?.norm ?? '')
+        : (tokens[i + 1]?.norm ?? '');
+    const everyWeekday =
+      (t.norm === 'todos' || t.norm === 'todas') &&
+      (WEEKDAY_BY_NAME[afterEvery] !== undefined || ['semana', 'semanas'].includes(afterEvery));
+    if ((t.norm === 'todos' || t.norm === 'todas') && days.length > 0 && !everyWeekday) {
+      // not a recurrence: the plain word is left for the title cleaning
+    } else if ((t.norm === 'todos' || t.norm === 'todas') && days.length > 0) {
       // (the article may already be marked: it was the noise before the weekday)
       const length = tokens[i + 1] && ARTICLES.has(tokens[i + 1]!.norm) ? 2 : 1;
       recurrence.strong = true;

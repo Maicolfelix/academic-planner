@@ -292,13 +292,26 @@ function ellipticalAnchors(tokens: Token[], anchors: DiscourseAnchor[]): Discour
   const sorted = [...anchors].sort((a, b) => a.start - b.start);
   for (let i = 1; i < tokens.length; i++) {
     const norm = tokens[i]!.norm;
-    if (norm !== 'otro' && norm !== 'otra') continue;
+    // "2 tareas el lunes y 1 EL MARTES": a number after "y" that has its own day and no noun is the same kind again
+    const bareCount = /^\d$/.test(norm) ? Number(norm) : null;
+    if (norm !== 'otro' && norm !== 'otra' && bareCount === null) continue;
+    if (
+      bareCount !== null &&
+      (bareCount < 1 ||
+        !CLAUSE_SPLITTERS.has(tokens[i - 1]!.norm) ||
+        !(
+          ['el', 'la', 'para'].includes(tokens[i + 1]?.norm ?? '') ||
+          isWeekdayWord(tokens[i + 1]?.norm)
+        ) ||
+        findDateExpressions(tokens.slice(i + 1, i + 4)).length === 0)
+    )
+      continue;
     if (sorted.some((a) => i >= a.headStart && i < a.start + a.length)) continue;
     const joined = CLAUSE_SPLITTERS.has(tokens[i - 1]!.norm) || tokens[i]!.afterBreak;
     if (!joined) continue;
     const previous = [...sorted, ...out].filter((a) => a.start < i).at(-1);
     if (!previous || previous.kind === 'PRONOUN') continue;
-    if (previous.count !== null && previous.count > 1) continue; // a group's own enumerators
+    if (bareCount === null && previous.count !== null && previous.count > 1) continue; // a group's own enumerators
     const word = tokens[previous.start]!.norm;
     const isNoun = QUICK_CAPTURE_TYPE_ALIASES[word] !== undefined || NOUN_IMPLICIT.has(word);
     if (!isNoun) continue;
@@ -309,7 +322,7 @@ function ellipticalAnchors(tokens: Token[], anchors: DiscourseAnchor[]): Discour
       length: 1,
       implicitType: previous.implicitType,
       kind: 'ELLIPTICAL',
-      count: 1,
+      count: bareCount ?? 1,
       headStart: i,
     });
   }
@@ -877,7 +890,7 @@ export function segmentDiscourse(
         anchor.kind === 'PRONOUN'
           ? { count: anchor.count, definite: true }
           : anchor.kind === 'ELLIPTICAL'
-            ? { count: 1, definite: false }
+            ? { count: anchor.count ?? 1, definite: false }
             : nounPhrase(tokens, anchor.headStart, anchor.start, plural);
 
       let shownFrom = from;

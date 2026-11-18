@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { normalizeNameKey, periodSchema, type DateOnly } from './academic.js';
-import { titlesAreRelated, ACADEMIC_CUES, CLAUSE_SPLITTERS } from './academicInbox.js';
+import {
+  titlesAreRelated,
+  ACADEMIC_CUES,
+  CLAUSE_SPLITTERS,
+  splitSentences,
+} from './academicInbox.js';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activity.js';
 import { addDays, weekdayOf, type Weekday } from './calendar.js';
 import { gradeCaptureSchema } from './captureGrades.js';
@@ -1033,6 +1038,108 @@ function buildRecurrence(
  * any proposal is made, so the student never repeats what was said once. What the words contradict is kept as two
  * readings and asked; what no word settles is left for the student, never guessed.
  */
+/**
+ * "una tarea por día", "uno cada día", "repartidas": how the student says N activities go one on each day. The phrase is blanked
+ * out (offsets stay) so it is never a second activity or part of a title; `spread` remembers it was said and `nextWeek` that the
+ * week is "la semana que viene" (Monday is then the first day).
+ */
+const DISTRIBUTION =
+  /\b(?:un[oa]s?(?:\s+\p{L}+)?\s+(?:por|cada)\s+d[ií]as?|(?:para\s+)?cada\s+(?:(?:dos|tres|2|3)\s+)?d[ií]as?|por\s+d[ií]a)\b/giu;
+/** "uno cada dos días": every second (or third) day. */
+const STEP = /\bcada\s+(dos|tres|2|3)\s+d[ií]as\b/iu;
+const SPREAD_WORD = /\b(?:repartid|distribuid)[ao]s?(?:\s+entre)?\b/giu;
+const SERIES_WORDS =
+  /\b(?:(?:empezando|comenzando|iniciando)(?:\s+(?:desde|por|con|en))?|a\s+partir\s+del?|desde(?=\s+(?:el|este|hoy|mañana)\b)|en\s+adelante|(?:de\s+)?esta\s+semana|(?:(?:en|para|durante)\s+)?(?:la\s+)?(?:semana\s+(?:que\s+viene|pr[oó]xima|siguiente)|pr[oó]xima\s+semana))\b/giu;
+const THIS_WEEK = /\b(?:(?:de|en|para)\s+)?esta\s+semana\b/giu;
+const NEXT_WEEK = /\b(?:semana\s+(?:que\s+viene|pr[oó]xima|siguiente)|pr[oó]xima\s+semana)\b/iu;
+function maskDistribution(text: string): {
+  text: string;
+  spread: boolean;
+  /** "repartidas" / "distribuidas": said without "una por día". */
+  distributed: boolean;
+  nextWeek: boolean;
+  step: number;
+} {
+  const blank = (m: string) => ' '.repeat(m.length);
+  const spread = new RegExp(DISTRIBUTION.source, 'iu').test(text);
+  let masked = text.replace(DISTRIBUTION, blank).replace(SPREAD_WORD, blank);
+  // how the series is introduced ("empezando desde el lunes", "la próxima semana") is not part of any title
+  const distributed = /\b(?:repartid|distribuid)[ao]s?\b/iu.test(text);
+  if (spread || distributed) masked = masked.replace(SERIES_WORDS, blank);
+  // "esta semana" carries no date of its own: it is never part of a title
+  masked = masked.replace(THIS_WEEK, blank);
+  const every = STEP.exec(text)?.[1]?.toLowerCase();
+  const step = every === 'dos' || every === '2' ? 2 : every === 'tres' || every === '3' ? 3 : 1;
+  return { text: masked, spread, distributed, nextWeek: NEXT_WEEK.test(text), step };
+}
+
+/** The known subjects a text names, in the order it names them. */
+function subjectsInOrder(text: string, entries: SubjectEntry[]): { id: string; name: string }[] {
+  const tokens = tokenize(text);
+  const found: { id: string; name: string }[] = [];
+  let from = 0;
+  while (from < tokens.length) {
+    const m = matchSubject(tokens.slice(from), entries);
+    if (m.kind !== 'match') break;
+    found.push({ id: m.subject.id, name: m.subject.name });
+    from += m.start + Math.max(1, m.length);
+  }
+  return found;
+}
+
+/**
+ * "LA PRÓXIMA SEMANA tengo parcial el martes y taller el jueves": a week said before the first day of its sentence puts every day of
+ * that sentence in that week. The phrase is blanked (offsets stay, so it is not part of a title) and the sentence is remembered by
+ * its index. A week said AFTER a day ("el jueves de la próxima semana") is read with the day itself.
+ */
+const LEAD_WEEK =
+  /\b(?:(?:en|para|durante)\s+)?(?:la\s+)?(?:semana\s+(?:que\s+viene|pr[oó]xima|siguiente)|pr[oó]xima\s+semana)\b/iu;
+const ANY_WEEKDAY = /\b(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bados?|domingos?)\b/iu;
+function maskLeadWeek(text: string): { text: string; sentences: Set<number> } {
+  const sentences = new Set<number>();
+  let masked = text;
+  splitSentences(text).forEach((sentence, index) => {
+    const week = LEAD_WEEK.exec(sentence);
+    const day = ANY_WEEKDAY.exec(sentence);
+    if (!week || !day || week.index > day.index || !masked.includes(sentence)) return;
+    sentences.add(index);
+    const blanked = sentence.replace(LEAD_WEEK, (m) => ' '.repeat(m.length));
+    masked = masked.replace(sentence, blanked);
+  });
+  return { text: masked, sentences };
+}
+
+/**
+ * `count` consecutive school days from `start`: the first keeps what the student wrote, the others are exact dates. It stops
+ * before a Saturday or a Sunday: nobody said whether the weekend counts, so the days left over stay unassigned and are asked.
+ */
+function spreadOverDays(
+  first: PlannedDay | null,
+  start: DateOnly,
+  count: number,
+  step: number,
+): PlannedDay[] {
+  const days: PlannedDay[] = [];
+  for (let k = 0; k < count; k++) {
+    const date = addDays(start, k * step);
+    if (weekdayOf(date) >= 6) break;
+    const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+    const base: PlannedDay = first ?? {
+      expr: { kind: 'explicit', day, month, year },
+      text: date,
+      time: null,
+      timeIssue: null,
+      fromRange: false,
+    };
+    days.push(
+      k === 0 && first
+        ? first
+        : { ...base, expr: { kind: 'explicit', day, month, year }, text: date },
+    );
+  }
+  return days.length > 0 ? days : first ? [first] : [];
+}
+
 export function parseCaptureProposals(
   text: string,
   context: QuickCaptureContext,
@@ -1057,7 +1164,15 @@ export function parseCaptureProposals(
           trimmed)
       : trimmed,
   );
-  let spans = segmentDiscourse(meta.text, context, {
+  const spread =
+    mode === 'QUICK'
+      ? maskDistribution(meta.text)
+      : { text: meta.text, spread: false, distributed: false, nextWeek: false, step: 1 };
+  const leadWeek =
+    mode === 'QUICK'
+      ? maskLeadWeek(spread.text)
+      : { text: spread.text, sentences: new Set<number>() };
+  let spans = segmentDiscourse(leadWeek.text, context, {
     splitLeading: mode === 'QUICK',
     implicitDetails: mode === 'QUICK',
     scheduleAnchors: mode === 'QUICK',
@@ -1101,6 +1216,7 @@ export function parseCaptureProposals(
     const tokens = tokenize(span.text);
     clearNoise(tokens, span, entries);
     const sharedTokens = span.sharedText === '' ? undefined : tokenize(span.sharedText);
+    const inNextWeek = leadWeek.sentences.has(span.sentenceIndex);
     const plan = planTemporal(tokens);
     const sharedPlan = sharedTokens ? planTemporal(cloneTokens(sharedTokens)) : null;
 
@@ -1139,6 +1255,13 @@ export function parseCaptureProposals(
       sharedPlan.days.length > 0
     ) {
       laterDayContext = { sentence: span.sentenceIndex, days: plan.days };
+    }
+    if (inNextWeek) {
+      days = days.map((d) =>
+        d.expr.kind === 'weekday' && d.expr.nextWeek !== true
+          ? { ...d, expr: { ...d.expr, nextWeek: true } }
+          : d,
+      );
     }
     // A time nobody gave this stretch but the sentence did, once.
     let sharedTime: PlannedTime | null = null;
@@ -1328,6 +1451,29 @@ export function parseCaptureProposals(
         ? (earliestHourOf.get(dayGroupRoot.get(mention)!) ?? timeOf(d))
         : timeOf(d);
     if (mention.dateConflict) days = mention.dateConflict;
+    // "5 tareas empezando el lunes, una por día": one on each following day, not five on the same one.
+    let spreadApplied = false;
+    // "5 tareas repartidas en la próxima semana": a week has five school days, so five activities spread over it are one per day
+    // (with any other count there is no safe way to choose the days: they are asked).
+    const fillsTheWeek =
+      spread.distributed && spread.nextWeek && mention.count === 5 && days.length === 0;
+    if (
+      (spread.spread || fillsTheWeek) &&
+      !mention.dateConflict &&
+      mention.count !== null &&
+      mention.count > 1
+    ) {
+      const start =
+        days.length === 1
+          ? resolveDays(days, today, context, hourForDate)[0]?.date
+          : days.length === 0 && spread.nextWeek
+            ? addDays(today, 8 - weekdayOf(today))
+            : null;
+      if (start) {
+        days = spreadOverDays(days[0] ?? null, start, mention.count, spread.step);
+        spreadApplied = true;
+      }
+    }
     const resolved = days.length > 0 ? resolveDays(days, today, context, hourForDate) : [];
     const weekdayDays = days.filter((d) => d.expr.kind === 'weekday');
     const possibleRecurrence =
@@ -1350,7 +1496,7 @@ export function parseCaptureProposals(
         extra: false,
         copy: c,
       }));
-    } else if (quantity !== null && days.length === 1) {
+    } else if (quantity !== null && days.length === 1 && !spreadApplied) {
       rows = Array.from({ length: quantity }, (_, c) => ({ index: 0, extra: false, copy: c }));
     } else {
       rows = days.map((_, i) => ({ index: i, extra: false, copy: 0 }));
@@ -1366,6 +1512,12 @@ export function parseCaptureProposals(
       !(days.length === 0 && plan.timeItems === 1) &&
       days.every((d) => d.time === null && d.timeIssue === null);
 
+    // "2 parciales: uno de REDES el jueves y otro de CÁLCULO el viernes": one subject per item, in the order they are written.
+    const namedInOrder =
+      quantity !== null && days.length === quantity && !mention.dateConflict
+        ? subjectsInOrder(span.text, entries)
+        : [];
+    const itemSubjects = namedInOrder.length === days.length ? namedInOrder : null;
     rows.forEach((row) => {
       const day = row.index >= 0 ? days[row.index]! : null;
       const r = row.index >= 0 ? resolved[row.index] : undefined;
@@ -1514,7 +1666,16 @@ export function parseCaptureProposals(
         rawSegment: reading.rawSegment,
         title: reading.title,
         type: reading.type,
-        subject: reading.subject,
+        subject:
+          itemSubjects && row.index >= 0
+            ? ({
+                kind: 'EXISTING',
+                id: itemSubjects[row.index]!.id,
+                name: itemSubjects[row.index]!.name,
+                certainty: 'EXACT',
+                origin: 'PARSED',
+              } as CaptureSubject)
+            : reading.subject,
         date: {
           value: dateValue,
           certainty: dateCertainty,
