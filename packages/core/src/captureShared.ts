@@ -113,7 +113,21 @@ export const QUICK_CAPTURE_TYPE_ALIASES: Readonly<Record<string, ActivityType>> 
   taller: 'WORKSHOP',
   lectura: 'READING',
   otro: 'OTHER',
+  foro: 'TASK',
+  evaluacion: 'EXAM',
+  prueba: 'EXAM',
+  control: 'QUIZ',
+  cuestionario: 'QUIZ',
+  sustentacion: 'PRESENTATION',
+  defensa: 'PRESENTATION',
   // plurals ("dos tareas", "los parciales"): the same type, said about several
+  foros: 'TASK',
+  evaluaciones: 'EXAM',
+  pruebas: 'EXAM',
+  controles: 'QUIZ',
+  cuestionarios: 'QUIZ',
+  sustentaciones: 'PRESENTATION',
+  defensas: 'PRESENTATION',
   tareas: 'TASK',
   trabajos: 'TASK',
   parciales: 'EXAM',
@@ -129,6 +143,13 @@ export const QUICK_CAPTURE_TYPE_ALIASES: Readonly<Record<string, ActivityType>> 
 
 /** The plural forms above: "dos tareas" is two activities, "las tareas" a group already mentioned. */
 export const PLURAL_TYPE_WORDS: ReadonlySet<string> = new Set([
+  'foros',
+  'evaluaciones',
+  'pruebas',
+  'controles',
+  'cuestionarios',
+  'sustentaciones',
+  'defensas',
   'tareas',
   'trabajos',
   'parciales',
@@ -219,6 +240,18 @@ const ORDINALS: Readonly<Record<string, number>> = {
 
 /** Words of a pasted message that say nothing about WHAT the activity is: dropped from its title. */
 const TITLE_FILLERS = new Set([
+  'grupo',
+  'chicos',
+  'chicas',
+  'muchachos',
+  'companeros',
+  'cordialmente',
+  'comparto',
+  'cronograma',
+  'cambia',
+  'aplazo',
+  'ahora',
+  'sigue',
   'deben',
   'debemos',
   'debes',
@@ -464,6 +497,8 @@ const DANGLING = new Set([
   'dia', // "el dia, jueves": the word that announces the day
 ]);
 const COMPLEMENT_OPENERS = new Set(['de', 'del']);
+/** Prepositions that open a date or a subject and are left hanging once it is consumed: "Entrega de proyecto ANTES". */
+const TITLE_EDGE_JUNK = new Set(['sobre', 'hasta', 'antes', 'desde', 'entre', 'durante']);
 
 function softenInternalBreaks(tokens: Token[]): void {
   for (let i = 1; i < tokens.length; i++) {
@@ -914,7 +949,9 @@ function matchDateAt(tokens: Token[], i: number): DateMatch | null {
       dom !== null &&
       week.length === 0 &&
       !(after in MONTH_BY_NAME) &&
-      !['de', 'am', 'pm', 'h', 'hs', 'hrs', 'horas', 'hora'].includes(after) &&
+      !['am', 'pm', 'h', 'hs', 'hrs', 'horas', 'hora'].includes(after) &&
+      // "martes 13 DE OCTUBRE" is read with its month; "lunes 23 DE FÍSICA" is a date and a subject
+      !(after === 'de' && (tokens[i + 3]?.norm ?? '') in MONTH_BY_NAME) &&
       // "lunes 14 a 16" is a range of hours; "viernes 27 a las 2:30" is a date and an hour
       !(['a', 'y', 'hasta'].includes(after) && /^\d/.test(tokens[i + 3]?.norm ?? ''))
         ? dom
@@ -1211,6 +1248,26 @@ export const GENERIC_SUBJECT_WORDS = new Set([
   'aplicado',
 ]);
 
+/** Same word apart from ONE letter: swapped with its neighbour, missing, extra or different. */
+export function oneSlipApart(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  if (a.length === b.length) {
+    const diff: number[] = [];
+    for (let i = 0; i < a.length && diff.length <= 2; i++) if (a[i] !== b[i]) diff.push(i);
+    if (diff.length === 1) return true;
+    return (
+      diff.length === 2 &&
+      diff[1] === diff[0]! + 1 &&
+      a[diff[0]!] === b[diff[1]!] &&
+      a[diff[1]!] === b[diff[0]!]
+    );
+  }
+  const [short, long] = a.length < b.length ? [a, b] : [b, a];
+  for (let i = 0; i < long.length; i++) {
+    if (long.slice(0, i) + long.slice(i + 1) === short) return true;
+  }
+  return false;
+}
 const subjectTokens = (norm: string) => norm.split(/[^a-z0-9]+/).filter(Boolean);
 
 export function buildSubjectEntries(
@@ -1269,6 +1326,22 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
     }
   }
 
+  // 1b. An acronym: "bd" is Bases de Datos, "pw" Programación Web. Only when exactly one subject has those initials; a word
+  // that is anything else on its own (a type word, a connector) is never read as one.
+  for (const [from, to] of runs) {
+    for (let start = from; start < to; start++) {
+      const word = tokens[start]!.norm;
+      if (word.length < 2 || word.length > 4 || STOPWORDS.has(word)) continue;
+      if (word in QUICK_CAPTURE_TYPE_ALIASES || word in WEEKDAY_BY_NAME) continue;
+      const hits = subjects.filter((s) => {
+        const significant = s.tokens.filter((t) => !STOPWORDS.has(t));
+        return significant.length >= 2 && significant.map((t) => t[0]).join('') === word;
+      });
+      if (hits.length === 1)
+        return { kind: 'match', subject: hits[0]!, exact: false, start, length: 1 };
+    }
+  }
+
   // 2. Words / unambiguous prefixes. Only a hit on a DISTINCTIVE word of the name is evidence (see GENERIC_SUBJECT_WORDS);
   // a hit on generic words alone is remembered and, if nothing better turns up, offered as a question.
   let weakHit: { start: number; length: number; candidates: SubjectEntry[] } | null = null;
@@ -1320,6 +1393,30 @@ export function matchSubject(tokens: Token[], subjects: SubjectEntry[]): Subject
       : { kind: 'ambiguous', candidates: [...union.values()], start: first.start, length };
   }
   if (weakHit !== null) return { kind: 'ambiguous', weak: true, ...weakHit };
+
+  // 3. A typing slip: "parcial de CALCLULO". A word right after "de" that is one letter away from a distinctive word of exactly
+  // one subject is offered as a QUESTION (a weak ambiguity with that subject as the only candidate); it is never applied, so
+  // the student confirms it. Needs 5+ letters and the same first letter, so short words and other words never match.
+  for (const [from, to] of runs) {
+    for (let i = Math.max(from, 1); i < to; i++) {
+      const word = tokens[i]!.norm;
+      if (word.length < 5 || !['de', 'del'].includes(tokens[i - 1]!.norm)) continue;
+      if (STOPWORDS.has(word) || word in QUICK_CAPTURE_TYPE_ALIASES || word in WEEKDAY_BY_NAME)
+        continue;
+      const near = subjects.filter((s) =>
+        s.tokens.some(
+          (t) =>
+            t.length >= 5 &&
+            t[0] === word[0] &&
+            !GENERIC_SUBJECT_WORDS.has(t) &&
+            !STOPWORDS.has(t) &&
+            oneSlipApart(word, t),
+        ),
+      );
+      if (near.length === 1)
+        return { kind: 'ambiguous', weak: true, candidates: near, start: i, length: 1 };
+    }
+  }
   return { kind: 'none' };
 }
 
@@ -1522,7 +1619,7 @@ export function interpretWords(
   }
   if (options.richTitle) rest = rest.filter((t) => !TITLE_FILLERS.has(t.norm));
   const dangling = (t: Token | undefined) =>
-    t !== undefined && (STOPWORDS.has(t.norm) || t.norm === 'sobre') && !isTypeToken(t);
+    t !== undefined && (STOPWORDS.has(t.norm) || TITLE_EDGE_JUNK.has(t.norm)) && !isTypeToken(t);
   while (dangling(rest[0])) rest.shift();
   while (dangling(rest.at(-1))) rest.pop();
   // A connector whose right-hand side was consumed ("de" REDES, "para" EL JUEVES) linked something that is no longer in the

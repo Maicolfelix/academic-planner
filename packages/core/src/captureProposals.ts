@@ -11,15 +11,20 @@ import { addDays, weekdayOf, type Weekday } from './calendar.js';
 import { gradeCaptureSchema } from './captureGrades.js';
 import { describeTokens, maskMetaText } from './captureContext.js';
 import { normalizeLooseText, resolveDeferredDescriptions } from './captureDeferred.js';
+import { protectNumberRuns, releaseJoiners } from './captureNumberRuns.js';
+import { repeatTypePerSubject, splitBySubject } from './captureSubjectList.js';
+import { orderTimetable } from './captureTimetableOrder.js';
 import { segmentDiscourse, type DiscourseSpan } from './captureDiscourse.js';
 import {
   FIELD_CERTAINTIES,
+  PLURAL_TYPE_WORDS,
   QUICK_CAPTURE_MESSAGES,
   STOPWORDS,
   buildSubjectEntries,
   capitalize,
   cloneTokens,
   findDateExpressions,
+  matchTimeAt,
   interpretWords,
   matchSubject,
   resolveDate,
@@ -408,6 +413,9 @@ const emptyResult = (
 
 /** Words that follow "parcial de …" without being a subject ("parcial de unidad"): never offered as a new subject's name. */
 const NOT_A_SUBJECT_NAME = new Set([
+  'todos',
+  'todas',
+  'todo',
   'unidad',
   'unidades',
   'capitulo',
@@ -736,6 +744,8 @@ interface Mention {
   sharedTime: PlannedTime | null;
   /** "dos tareas": how many activities the words say. */
   count: number | null;
+  /** One activity said over a range of days ("del lunes al miércoles"): it is the last day, not one per day. */
+  singleOverRange: boolean;
   /** Later words gave this activity a day the first ones did not agree with: all of them, kept for the student. */
   dateConflict: PlannedDay[] | null;
   /**
@@ -1140,11 +1150,22 @@ function spreadOverDays(
   return days.length > 0 ? days : first ? [first] : [];
 }
 
+/** The text with its timetables in the order the engine reads and a type word said once for several subjects said for each. */
+function orderedText(text: string, subjects: readonly { name: string }[]): string | null {
+  const timetable = orderTimetable(text, subjects);
+  const repeated = repeatTypePerSubject(timetable ?? text, subjects);
+  return repeated ?? timetable;
+}
+
 export function parseCaptureProposals(
   text: string,
   context: QuickCaptureContext,
   mode: CaptureMode = 'QUICK',
 ): CaptureResult {
+  return releaseJoiners(readCapture(text, context, mode));
+}
+
+function readCapture(text: string, context: QuickCaptureContext, mode: CaptureMode): CaptureResult {
   const trimmed = text.trim();
   if (trimmed === '') return emptyResult('EMPTY', 0, CAPTURE_MESSAGES.EMPTY);
   if (trimmed.length > CAPTURE_MAX_LENGTH[mode]) {
@@ -1157,13 +1178,16 @@ export function parseCaptureProposals(
 
   const entries = buildSubjectEntries(context.subjects);
   // "Tengo 3 actividades…" and "la otra es…" are about the text, not activities: blanked out (offsets stay), never a title.
-  const meta = maskMetaText(
+  const loose =
     mode === 'QUICK'
       ? (resolveDeferredDescriptions(trimmed) ??
-          normalizeLooseText(trimmed, context.now, context.timeZone) ??
-          trimmed)
-      : trimmed,
-  );
+        normalizeLooseText(trimmed, context.now, context.timeZone))
+      : normalizeLooseText(trimmed, context.now, context.timeZone);
+  // "No tengo parcial esta semana", "se canceló el quiz": nothing is left to capture once what says there is none is removed
+  const nothingToCapture = loose !== null && loose.trim() === '';
+  // "Lunes 8-10 Redes, martes 10-12 Cálculo": hours first, then the subject. Read in the order the engine reads a timetable.
+  const ordered = mode === 'QUICK' ? orderedText(loose ?? trimmed, context.subjects) : null;
+  const meta = maskMetaText(protectNumberRuns(ordered ?? loose ?? trimmed));
   const spread =
     mode === 'QUICK'
       ? maskDistribution(meta.text)
@@ -1178,29 +1202,38 @@ export function parseCaptureProposals(
     scheduleAnchors: mode === 'QUICK',
   });
   // "Tengo 3 actividades para el martes" and nothing else says nothing about WHICH ones: no activity is made up.
-  if (spans.length === 0 && mode === 'QUICK' && meta.expected === null) {
-    // No activity word: the whole phrase is one activity ("Cumpleaños de Ana martes").
-    spans = [
-      {
-        index: 0,
-        sentenceIndex: 0,
-        rawSegment: trimmed,
-        text: trimmed,
-        sharedText: '',
-        implicitType: null,
-        kind: 'LEADING',
-        role: 'INTRO',
-        count: null,
-        definite: false,
-        typeKey: 'leading',
-        anchorIndex: -1,
-        headIndex: 0,
-        anchorLength: 0,
-        targets: [],
-        ambiguous: false,
-        schedule: false,
-      },
-    ];
+  if (spans.length === 0 && mode === 'QUICK' && meta.expected === null && !nothingToCapture) {
+    // No activity word: the whole phrase is one activity ("Cumpleaños de Ana martes")...
+    const cleaned = protectNumberRuns(ordered ?? loose ?? trimmed);
+    const dated = (piece: string) => findDateExpressions(tokenize(piece)).length > 0;
+    const when = (piece: string) => {
+      const t = tokenize(piece);
+      return (
+        dated(piece) || t.some((_, i) => matchTimeAt(t, i, { ambiguousBareHours: true }) !== null)
+      );
+    };
+    // ...unless it names several subjects, each with its own day or hour ("Redes mañana a las 7 y Cálculo mañana a las 9")
+    const pieces = splitBySubject(cleaned, context.subjects, when, dated) ?? [cleaned];
+    spans = pieces.map((piece, index) => ({
+      index,
+      sentenceIndex: 0,
+      rawSegment: pieces.length === 1 ? trimmed : piece,
+      // the cleaned text (without "me toca", "oye", "recuérdame"…): the same words the other activities are read from
+      text: piece,
+      sharedText: '',
+      implicitType: null,
+      kind: 'LEADING' as const,
+      role: 'INTRO' as const,
+      count: null,
+      definite: false,
+      typeKey: 'leading',
+      anchorIndex: -1,
+      headIndex: 0,
+      anchorLength: 0,
+      targets: [],
+      ambiguous: false,
+      schedule: false,
+    }));
   }
 
   const today = toLocalParts(context.now, context.timeZone).date;
@@ -1263,6 +1296,21 @@ export function parseCaptureProposals(
           : d,
       );
     }
+    // "taller de física del lunes al miércoles": ONE activity over a range of days is due on the last one ("5 quices de lunes a
+    // viernes" and plurals are one per day, as before). The whole range is still resolved as one run (lunes, martes, miércoles).
+    let singleOverRange = false;
+    if (
+      span.kind === 'TYPE' &&
+      !span.schedule &&
+      !plan.recurrence.strong &&
+      (span.count ?? 1) <= 1 &&
+      plan.timeItems === 0 &&
+      days.length > 1 &&
+      days.every((d) => d.fromRange) &&
+      !tokens.some((t) => PLURAL_TYPE_WORDS.has(t.norm))
+    ) {
+      singleOverRange = true;
+    }
     // A time nobody gave this stretch but the sentence did, once.
     let sharedTime: PlannedTime | null = null;
     // An activity with a day of its own is another one: the hour said at the start of the sentence belonged to the first
@@ -1295,6 +1343,7 @@ export function parseCaptureProposals(
       sharedTime,
       count: span.count,
       dateConflict: null,
+      singleOverRange,
       pending: [],
       description: reading.description,
       descriptionFromReference: false,
@@ -1496,6 +1545,8 @@ export function parseCaptureProposals(
         extra: false,
         copy: c,
       }));
+    } else if (mention.singleOverRange) {
+      rows = [{ index: days.length - 1, extra: false, copy: 0 }];
     } else if (quantity !== null && days.length === 1 && !spreadApplied) {
       rows = Array.from({ length: quantity }, (_, c) => ({ index: 0, extra: false, copy: c }));
     } else {
@@ -1513,8 +1564,12 @@ export function parseCaptureProposals(
       days.every((d) => d.time === null && d.timeIssue === null);
 
     // "2 parciales: uno de REDES el jueves y otro de CÁLCULO el viernes": one subject per item, in the order they are written.
+    // (also "evaluación el lunes 23 de FÍSICA y el miércoles 25 de CÁLCULO": one type word, two days, two subjects)
     const namedInOrder =
-      quantity !== null && days.length === quantity && !mention.dateConflict
+      days.length >= 2 &&
+      (quantity === null || days.length === quantity) &&
+      !mention.singleOverRange &&
+      !mention.dateConflict
         ? subjectsInOrder(span.text, entries)
         : [];
     const itemSubjects = namedInOrder.length === days.length ? namedInOrder : null;

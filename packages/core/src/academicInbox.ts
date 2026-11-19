@@ -378,6 +378,8 @@ const ESSAY_NOUNS = new Set([
   'laboratorio',
   'laboratorios',
 ]);
+/** A lab or a practice session is run like a workshop. */
+const LAB_NOUNS = new Set(['practica', 'practicas', 'laboratorio', 'laboratorios']);
 const NUMBER_WORDS = new Set([
   'un',
   'una',
@@ -443,9 +445,11 @@ export function findAnchors(
       const word = tokens[i]!.norm;
       const implicitType: ActivityType | null = MEETING_NOUNS.has(word)
         ? 'OTHER'
-        : ERRAND_VERBS.has(word) || ESSAY_NOUNS.has(word)
-          ? 'TASK'
-          : null;
+        : LAB_NOUNS.has(word)
+          ? 'WORKSHOP'
+          : ERRAND_VERBS.has(word) || ESSAY_NOUNS.has(word)
+            ? 'TASK'
+            : null;
       if (implicitType === null) continue;
       const inside = anchors.some((a) => i >= a.start && i < a.start + a.length);
       const inSubjectName = subjectRanges.some(([from, to]) => i >= from && i < to);
@@ -461,8 +465,26 @@ export function findAnchors(
         );
       // "informe final del proyecto": the type word right after names the activity; the report is part of its title.
       const ofTypeWord =
-        (word === 'informe' || word === 'informes') &&
-        anchors.some((a) => a.implicitType === null && a.start > i && a.start - i <= 4);
+        ((word === 'informe' || word === 'informes') &&
+          anchors.some((a) => a.implicitType === null && a.start > i && a.start - i <= 4)) ||
+        // "entrega DEL PROYECTO", "actividad de taller": the type word right after names the activity, "entrega" is how it is said
+        (['entrega', 'entregas', 'actividad', 'actividades'].includes(word) &&
+          anchors.some(
+            (a) =>
+              a.implicitType === null &&
+              a.start > i &&
+              a.start - i <= 5 &&
+              tokens
+                .slice(i + 1, a.start)
+                .every(
+                  (t) =>
+                    PHRASE_CONNECTORS.has(t.norm) ||
+                    NOUN_SKIPPABLE.has(t.norm) ||
+                    t.norm === 'todos' ||
+                    t.norm === 'todas' ||
+                    t.norm === 'final',
+                ),
+          ));
       const ofReport =
         (word === 'laboratorio' || word === 'laboratorios') &&
         tokens
@@ -478,7 +500,17 @@ export function findAnchors(
         (before.some((w) => ['no', 'ninguna', 'ninguno', 'sin', 'nada'].includes(w)) ||
           (word.endsWith('s') &&
             !before.slice(-2).some((w) => /^\d+$/.test(w) || NUMBER_WORDS.has(w))));
-      if (!inside && !inSubjectName && !ofDelivery && !ofTypeWord && !ofReport && !ofMention) {
+      // "el taller SE ENTREGA el jueves": the reflexive verb says what happens to the activity before it
+      const reflexive = tokens[i - 1]?.norm === 'se';
+      if (
+        !inside &&
+        !inSubjectName &&
+        !ofDelivery &&
+        !ofTypeWord &&
+        !ofReport &&
+        !ofMention &&
+        !reflexive
+      ) {
         anchors.push({ start: i, length: 1, implicitType });
       }
     }
