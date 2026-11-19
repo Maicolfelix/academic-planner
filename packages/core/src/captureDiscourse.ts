@@ -315,8 +315,16 @@ function ellipticalAnchors(tokens: Token[], anchors: DiscourseAnchor[]): Discour
     const word = tokens[previous.start]!.norm;
     const isNoun = QUICK_CAPTURE_TYPE_ALIASES[word] !== undefined || NOUN_IMPLICIT.has(word);
     if (!isNoun) continue;
-    const reach = tokens.slice(i + 1, i + 5);
-    if (findDateExpressions(reach).length === 0 && !reach.some((t) => t.norm === 'para')) continue;
+    const reach = tokens.slice(i + 1, i + 7);
+    const hasHour = reach.some(
+      (_, j) => matchTimeAt(reach, j, { ambiguousBareHours: true }) !== null,
+    );
+    if (
+      findDateExpressions(reach.slice(0, 4)).length === 0 &&
+      !reach.slice(0, 4).some((t) => t.norm === 'para') &&
+      !hasHour
+    )
+      continue;
     out.push({
       start: i,
       length: 1,
@@ -434,6 +442,32 @@ function continuesPrevious(tokens: readonly Token[], cut: number, limit: number)
   );
 }
 
+/** Verbs that come right before an activity word: "entrego proyecto", "tengo quiz", "presentamos exposición". */
+const LEAD_VERBS = new Set([
+  'entrego',
+  'entregamos',
+  'tengo',
+  'tenemos',
+  'hay',
+  'toca',
+  'presento',
+  'presentamos',
+  'debo',
+  'debemos',
+]);
+
+/** From `from` up to `limit` there are only day names and small words, and at least one day: "EL JUEVES quiz de redes". */
+function daysOnlyUntil(tokens: readonly Token[], from: number, limit: number): boolean {
+  const lead = tokens.slice(from, limit);
+  // "…el martes y EL JUEVES ENTREGO proyecto": the verb that says what the student does with the next activity is no obstacle
+  while (lead.length > 0 && LEAD_VERBS.has(lead.at(-1)!.norm)) lead.pop();
+  return (
+    lead.length > 0 &&
+    lead.some((x) => isWeekdayWord(x.norm)) &&
+    lead.every((x) => isWeekdayWord(x.norm) || STOPWORDS.has(x.norm) || EVERY.has(x.norm))
+  );
+}
+
 function cutBetween(
   tokens: readonly Token[],
   previous: DiscourseAnchor,
@@ -446,13 +480,22 @@ function cutBetween(
     const t = tokens[p]!;
     let cut = -1;
     if (CLAUSE_SPLITTERS.has(t.norm)) {
+      // "parcial el martes Y EL JUEVES quiz de redes": a day (and nothing else) between the conjunction and the next activity word
+      // is that activity's own day, not one more day of the activity before.
+      const dayLeadsNext =
+        cur.schedule !== true && previous.schedule !== true && daysOnlyUntil(tokens, p + 1, limit);
       // "…, los jueves Y viernes tengo Epidemiología": a conjunction between day names joins the days, it starts nothing.
       if (
-        !joinsDays(tokens, p - 1, p + 1, previous.start + previous.length) &&
-        !joinsHours(tokens, p)
+        dayLeadsNext ||
+        (!joinsDays(tokens, p - 1, p + 1, previous.start + previous.length) &&
+          !joinsHours(tokens, p))
       )
         cut = p + 1;
-    } else if (t.afterBreak && !joinsDays(tokens, p - 1, p, previous.start + previous.length)) {
+    } else if (
+      t.afterBreak &&
+      (!joinsDays(tokens, p - 1, p, previous.start + previous.length) ||
+        (cur.schedule !== true && previous.schedule !== true && daysOnlyUntil(tokens, p, limit)))
+    ) {
       cut = p;
     } else if (closedRangeEnd(tokens, p) >= 0) {
       cut = closedRangeEnd(tokens, p);

@@ -139,6 +139,6 @@ describe('review fixes', () => {
         ctx,
         'QUICK',
       ).proposals.map((p) => p.date.value),
-    ).toEqual(['2026-10-09', '2026-10-05', '2026-10-06']);
+    ).toEqual(['2026-10-09', '2026-10-05']); // "lunes y no martes" is a correction too: only Monday, and only in its own sentence
   });
 });

@@ -99,6 +99,8 @@ export function cueLength(tokens: readonly Token[], i: number): number {
     if (phrase.every((w, k) => tokens[i + k]?.norm === w)) return phrase.length;
   }
   if (CUE_WORDS.has(norm)) return 1;
+  // "práctica" the noun is an activity ("tengo práctica de física"), not the verb "practicar" that opens a context
+  if (norm === 'practica' || norm === 'practicas') return 0;
   if (CUE_STEMS.some((s) => norm.startsWith(s))) return 1;
   if (/^entreg/.test(norm) && ['en', 'por', 'al', 'via', 'a'].includes(tokens[i + 1]?.norm ?? '')) {
     return 1;
@@ -195,7 +197,12 @@ export function describeTokens(tokens: readonly Token[]): string | null {
   if (to <= from) return null;
   const kept = tokens.slice(from, to);
   // Without a cue the piece must say something by itself; with one, the cue's verb plus one real word is enough.
-  const content = kept.filter((t, i) => isContentWord(t.norm) && cueLength(kept, i) === 0).length;
+  // ...a number right after the cue is what it is about too: "tema 3", "capítulo 5"
+  const content = kept.filter(
+    (t, i) =>
+      (isContentWord(t.norm) && cueLength(kept, i) === 0) ||
+      (i > 0 && cueLength(kept, i - 1) > 0 && /^\d{1,3}⁠?$/.test(t.norm)),
+  ).length;
   if (content === 0) return null;
   const text = kept
     .map((t, i) => (i > 0 && t.afterBreak ? `, ${t.raw}` : i > 0 ? ` ${t.raw}` : t.raw))
@@ -236,9 +243,32 @@ const POSITION_MARKER =
  * The text with those two kinds of words blanked out (same length: every offset stays where it was typed) and the count
  * the student announced, or null. Nothing is invented: the count is only ever compared with what is found.
  */
+/**
+ * "Tengo dos evaluaciones: lunes 23 evaluación de Física y miércoles 25 evaluación de Cálculo": a count and a plural type word
+ * FOLLOWED BY A COLON is the announcement of a list, not two more activities, when the list that follows has that many
+ * activities of its own.
+ */
+const ANNOUNCED_TYPE =
+  /(?<![\p{L}\p{N}])(?:(?:tengo|tenemos|hay|son|tendremos|tendr[eé]|tendr[aá]n|me\s+dejaron)\s+)?(\d{1,2}|dos|tres|cuatro|cinco|seis)\s+(?:parciales|ex[aá]menes|evaluaciones|quices|quizzes|talleres|tareas|trabajos|proyectos|exposiciones|presentaciones|lecturas|pruebas|controles|cuestionarios|sustentaciones|defensas|foros)\s*:/iu;
+
 export function maskMetaText(text: string): { text: string; expected: number | null } {
   let masked = text;
   let expected: number | null = null;
+  const announced = ANNOUNCED_TYPE.exec(masked);
+  if (announced) {
+    const n = Number(announced[1]) || COUNT_WORDS[announced[1]!.toLowerCase()] || null;
+    const rest = masked.slice(announced.index + announced[0].length);
+    const own = rest.match(
+      /(?<![\p{L}\p{N}])(?:parcial|ex[aá]men|evaluaci[oó]n|quiz|taller|tarea|trabajo|proyecto|exposici[oó]n|presentaci[oó]n|lectura|prueba|control|cuestionario|sustentaci[oó]n|defensa|foro)(?![\p{L}\p{N}])/giu,
+    );
+    if (n !== null && n >= 2 && (own?.length ?? 0) >= n) {
+      expected = n;
+      masked =
+        masked.slice(0, announced.index) +
+        ' '.repeat(announced[0].length) +
+        masked.slice(announced.index + announced[0].length);
+    }
+  }
   const count = EXPECTED_COUNT.exec(masked);
   if (count) {
     const n = Number(count[1]) || COUNT_WORDS[count[1]!.toLowerCase()] || null;
